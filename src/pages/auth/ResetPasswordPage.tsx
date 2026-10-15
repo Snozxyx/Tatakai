@@ -1,4 +1,7 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Background } from '@/components/layout/Background';
@@ -20,6 +23,8 @@ const passwordSchema = z.string().min(6, 'Password must be at least 6 characters
 type Step = 'email' | 'code' | 'password';
 
 export default function ResetPasswordPage() {
+  useUiTranslation();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { sendPasswordResetCode, verifyPasswordResetCode } = useAuth();
 
@@ -53,11 +58,11 @@ export default function ResetPasswordPage() {
     e.preventDefault();
     const parsed = emailSchema.safeParse(email);
     if (!parsed.success) {
-      toast.error(parsed.error.errors[0].message);
+      toast.error(t('auth.invalidEmail'));
       return;
     }
     if (turnstileEnabled && !captchaToken) {
-      toast.error('Please complete the verification challenge');
+      toast.error(t('auth.completeChallenge'));
       return;
     }
     setIsLoading(true);
@@ -67,7 +72,7 @@ export default function ResetPasswordPage() {
         toast.error(error.message);
         resetCaptcha();
       } else {
-        toast.success(`We sent a 6-digit code to ${email}`);
+        toast.success(t('auth.codeSent', { email }));
         setOtp('');
         setStep('code');
         resetCaptcha();
@@ -80,14 +85,14 @@ export default function ResetPasswordPage() {
   const handleVerifyCode = async (codeOverride?: string) => {
     const code = (codeOverride ?? otp).trim();
     if (code.length !== 6) {
-      toast.error('Enter the 6-digit code');
+      toast.error(t('auth.enter6Digit'));
       return;
     }
     setIsLoading(true);
     try {
       const { error } = await verifyPasswordResetCode(email, code);
       if (error) {
-        toast.error(error.message.toLowerCase().includes('expired') ? 'That code expired — request a new one.' : 'Invalid code. Please try again.');
+        toast.error(error.message.toLowerCase().includes('expired') ? t('auth.codeExpired') : t('auth.invalidCodeRetry'));
         setOtp('');
       } else {
         // A recovery session now exists; let the user choose a new password.
@@ -102,11 +107,11 @@ export default function ResetPasswordPage() {
     e.preventDefault();
     const parsed = passwordSchema.safeParse(password);
     if (!parsed.success) {
-      toast.error(parsed.error.errors[0].message);
+      toast.error(t('auth.passwordMin'));
       return;
     }
     if (password !== confirmPassword) {
-      toast.error('Passwords do not match');
+      toast.error(t('auth.passwordsNoMatch'));
       return;
     }
     setIsLoading(true);
@@ -115,7 +120,7 @@ export default function ResetPasswordPage() {
       if (error) {
         toast.error(error.message);
       } else {
-        toast.success('Password updated — you are signed in.');
+        toast.success(t('auth.passwordUpdatedSignedIn'));
         navigate('/');
       }
     } finally {
@@ -125,7 +130,7 @@ export default function ResetPasswordPage() {
 
   const handleResend = async () => {
     if (turnstileEnabled) {
-      toast.info('Head back and complete the challenge to get a fresh code.');
+      toast.info(t('auth.resendChallengeHint'));
       setStep('email');
       return;
     }
@@ -133,7 +138,7 @@ export default function ResetPasswordPage() {
     try {
       const { error } = await sendPasswordResetCode(email);
       if (error) toast.error(error.message);
-      else toast.success(`New code sent to ${email}`);
+      else toast.success(t('auth.newCodeSent', { email }));
     } finally {
       setIsLoading(false);
     }
@@ -152,25 +157,25 @@ export default function ResetPasswordPage() {
             className="gap-2"
           >
             <ArrowLeft className="w-4 h-4" />
-            {step === 'code' ? 'Back' : 'Back to Login'}
+            {step === 'code' ? t('common.back') : t('auth.backToLogin')}
           </Button>
 
           {/* Logo */}
           <div className="text-center mb-6">
-            <img src={`${import.meta.env.BASE_URL}assets/logo/tatakai-logo.png`} alt="Tatakai Logo" className="mx-auto h-52 w-282 transition-transform duration-300 hover:scale-105 hover:drop-shadow-lg" />
+            <img src={`${import.meta.env.BASE_URL}assets/logo/tatakai-logo.png`} alt={uiI18n.t('app.tatakai_logo_26c9f0b7')} className="mx-auto h-52 w-282 transition-transform duration-300 hover:scale-105 hover:drop-shadow-lg" />
           </div>
 
           <GlassPanel className="p-6 md:p-8">
             {step === 'email' && (
               <form onSubmit={handleSendCode} className="space-y-4">
                 <div className="space-y-2">
-                  <h2 className="text-2xl font-display font-semibold">Forgot Password?</h2>
+                  <h2 className="text-2xl font-display font-semibold">{t('auth.forgotPasswordTitle')}</h2>
                   <p className="text-sm text-muted-foreground">
-                    Enter your email address and we'll send you a 6-digit code to reset your password.
+                    {t('auth.forgotPasswordDesc')}
                   </p>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email Address</Label>
+                  <Label htmlFor="email">{t('auth.emailAddress')}</Label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                     <Input
@@ -198,17 +203,16 @@ export default function ResetPasswordPage() {
                     />
                     {challengeError && !captchaToken && (
                       <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-center">
-                        <p className="text-sm text-foreground font-medium">Verification didn't load correctly.</p>
+                        <p className="text-sm text-foreground font-medium">{uiI18n.t('app.verification_didn_t_load_correctly_4902f292')}</p>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          On iPhone this is usually iCloud Private Relay, a VPN, or a Safari content
-                          blocker interfering with the check. Disable them for this site, or try Safari.
+                          {uiI18n.t('app.on_iphone_this_is_usually_icloud_private_relay_a_b6f8de3d')}
                         </p>
                         <button
                           type="button"
                           onClick={retryChallenge}
                           className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline"
                         >
-                          <RefreshCw className="w-4 h-4" /> Retry verification
+                          <RefreshCw className="w-4 h-4" /> {uiI18n.t('app.retry_verification_a113d86c')}
                         </button>
                       </div>
                     )}
@@ -216,9 +220,9 @@ export default function ResetPasswordPage() {
                 )}
                 <Button type="submit" className="w-full" disabled={isLoading || !email || (turnstileEnabled && !captchaToken)}>
                   {isLoading ? (
-                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Sending...</>
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> {t('auth.sending')}</>
                   ) : (
-                    <><Mail className="w-4 h-4 mr-2" /> Send me a code</>
+                    <><Mail className="w-4 h-4 mr-2" /> {t('auth.sendCode')}</>
                   )}
                 </Button>
               </form>
@@ -227,9 +231,9 @@ export default function ResetPasswordPage() {
             {step === 'code' && (
               <div className="space-y-5">
                 <div className="space-y-2">
-                  <h2 className="text-2xl font-display font-semibold">Enter your code</h2>
+                  <h2 className="text-2xl font-display font-semibold">{t('auth.enterYourCode')}</h2>
                   <p className="text-sm text-muted-foreground">
-                    We sent a 6-digit code to <strong>{email}</strong>. Enter it below.
+                    {t('auth.codeSentHint')} <strong>{email}</strong>. {t('auth.enterItBelow')}
                   </p>
                 </div>
                 <OtpCodeInput
@@ -246,17 +250,17 @@ export default function ResetPasswordPage() {
                   disabled={isLoading || otp.length !== 6}
                 >
                   {isLoading ? (
-                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Verifying...</>
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> {t('auth.verifying')}</>
                   ) : (
-                    <><ShieldCheck className="w-4 h-4 mr-2" /> Verify code</>
+                    <><ShieldCheck className="w-4 h-4 mr-2" /> {t('auth.verifyCode')}</>
                   )}
                 </Button>
                 <div className="flex items-center justify-between text-sm">
                   <button type="button" onClick={() => setStep('email')} className="text-muted-foreground hover:text-foreground transition-colors">
-                    Use a different email
+                    {t('auth.useDifferentEmail')}
                   </button>
                   <button type="button" onClick={handleResend} disabled={isLoading} className="text-primary hover:underline font-medium disabled:opacity-50">
-                    Resend code
+                    {t('auth.resendCode')}
                   </button>
                 </div>
               </div>
@@ -265,13 +269,13 @@ export default function ResetPasswordPage() {
             {step === 'password' && (
               <form onSubmit={handleUpdatePassword} className="space-y-4">
                 <div className="space-y-2">
-                  <h2 className="text-2xl font-display font-semibold">Set a new password</h2>
+                  <h2 className="text-2xl font-display font-semibold">{t('auth.setNewPasswordTitle')}</h2>
                   <p className="text-sm text-muted-foreground">
-                    Choose a new password for <strong>{email}</strong>.
+                    {t('auth.chooseNewPasswordFor')} <strong>{email}</strong>.
                   </p>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="new-password">New Password</Label>
+                  <Label htmlFor="new-password">{t('auth.newPassword')}</Label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                     <Input
@@ -294,7 +298,7 @@ export default function ResetPasswordPage() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="confirm-password">Confirm Password</Label>
+                  <Label htmlFor="confirm-password">{t('auth.confirmPassword')}</Label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                     <Input
@@ -311,9 +315,9 @@ export default function ResetPasswordPage() {
                 </div>
                 <Button type="submit" className="w-full" disabled={isLoading || !password || !confirmPassword}>
                   {isLoading ? (
-                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Updating...</>
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> {t('auth.updating')}</>
                   ) : (
-                    <><KeyRound className="w-4 h-4 mr-2" /> Update password</>
+                    <><KeyRound className="w-4 h-4 mr-2" /> {t('auth.updatePassword')}</>
                   )}
                 </Button>
               </form>
@@ -322,21 +326,21 @@ export default function ResetPasswordPage() {
 
           {/* Additional Help */}
           <div className="text-center text-sm text-muted-foreground space-y-2">
-            <p>Didn't receive the email? Check your spam folder.</p>
+            <p>{t('auth.checkSpam')}</p>
             <p>
-              Still need help?{' '}
+              {t('auth.stillNeedHelp')}{' '}
               <button
                 onClick={() => window.open('https://discord.gg/Vr5GZFJszp', '_blank')}
                 className="text-primary hover:underline"
               >
-                Contact Support
+                {t('auth.contactSupport')}
               </button>
-              &nbsp;or submit a
+              {" "}{t('auth.orSubmitA')}
               <button
                 onClick={() => window.open('/suggestions', '_blank')}
                 className="text-primary hover:underline"
               >
-                &nbsp;Ticket
+                {" "}{t('auth.ticket')}
               </button>
             </p>
           </div>

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 
 /**
@@ -37,9 +38,11 @@ export function HomeSectionHeading({
   size = "default",
   action,
   viewAllTo,
-  viewAllLabel = "View All",
+  viewAllLabel,
   className,
 }: HomeSectionHeadingProps) {
+  const { t } = useTranslation();
+  const resolvedViewAllLabel = viewAllLabel ?? t('home.viewAll');
   return (
     <div className={cn("home-section-heading flex items-center justify-between gap-3", size === "sub" ? "mb-4" : "mb-6", className)}>
       <div className="min-w-0">
@@ -63,7 +66,7 @@ export function HomeSectionHeading({
             to={viewAllTo}
             className="ui-forward-link flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground shrink-0"
           >
-            {viewAllLabel}
+            {resolvedViewAllLabel}
             <ArrowRight className="w-4 h-4" />
           </Link>
         ))}

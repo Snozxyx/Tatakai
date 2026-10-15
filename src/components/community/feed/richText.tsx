@@ -122,13 +122,17 @@ function nodeToReact(node: ChildNode, key: string): ReactNode {
  * text — if no tags are present we fall back to the {@link RichText} linkifier
  * so legacy posts keep their clickable @mentions/#hashtags.
  */
+export function sanitizeRichContent(html: string): string {
+  const value = maybeDecodeEntities(html);
+  return /<[a-z][\s\S]*>/i.test(value) ? DOMPurify.sanitize(value, { ALLOWED_TAGS, ALLOWED_ATTR }) : value;
+}
+
 export function RichContent({ html, className }: { html?: string | null; className?: string }) {
-  const value = maybeDecodeEntities(html || '');
+  const value = sanitizeRichContent(html || '');
   if (!/<[a-z][\s\S]*>/i.test(value)) {
     return <div className={cn('whitespace-pre-wrap break-words', className)}><RichText text={value} /></div>;
   }
-  const clean = DOMPurify.sanitize(value, { ALLOWED_TAGS, ALLOWED_ATTR });
-  const doc = new DOMParser().parseFromString(clean, 'text/html');
+  const doc = new DOMParser().parseFromString(value, 'text/html');
   const nodes = Array.from(doc.body.childNodes).map((n, i) => nodeToReact(n, `n-${i}`));
   return <div className={cn('rich-content break-words [&_h2]:text-lg [&_h2]:font-bold [&_blockquote]:border-l-2 [&_blockquote]:border-white/20 [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_code]:rounded [&_code]:bg-white/[0.08] [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-xs', className)}>{nodes}</div>;
 }

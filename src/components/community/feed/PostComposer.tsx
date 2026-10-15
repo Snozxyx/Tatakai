@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
@@ -111,6 +113,7 @@ async function persistTagsAndMentions(postId: string, html: string, plain: strin
 }
 
 export function PostComposer({ onPosted, defaultCommunityId, defaultMedia }: { onPosted?: () => void; defaultCommunityId?: string; defaultMedia?: SelectedMedia }) {
+  useUiTranslation();
   const { user, profile } = useAuth();
   const ensureAgreed = useCommunityRulesGate();
   const createPost = useCreateForumPost();
@@ -158,7 +161,7 @@ export function PostComposer({ onPosted, defaultCommunityId, defaultMedia }: { o
 
   const handleImagePick = (url: string) => {
     if (imageUrls.length >= MAX_IMAGES) {
-      toast.error(`Up to ${MAX_IMAGES} images per post`);
+      toast.error(uiI18n.t('app.up_to_i18n_value_0_images_per_post_00849ba9', { value0: MAX_IMAGES }));
       return;
     }
     setGifUrl(null);
@@ -171,7 +174,7 @@ export function PostComposer({ onPosted, defaultCommunityId, defaultMedia }: { o
   };
 
   const intakeImageFile = async (file: File) => {
-    if (imageUrls.length >= MAX_IMAGES) { toast.error(`Up to ${MAX_IMAGES} images per post`); return; }
+    if (imageUrls.length >= MAX_IMAGES) { toast.error(uiI18n.t('app.up_to_i18n_value_0_images_per_post_00849ba9', { value0: MAX_IMAGES })); return; }
     const err = validateImageFile(file);
     if (err) { toast.error(err); return; }
     setIntakeBusy(true);
@@ -180,7 +183,7 @@ export function PostComposer({ onPosted, defaultCommunityId, defaultMedia }: { o
       setGifUrl(null);
       setImageUrls((prev) => (prev.length >= MAX_IMAGES ? prev : [...prev, url]));
     } catch (e) {
-      toast.error('Upload failed', { description: e instanceof Error ? e.message : undefined });
+      toast.error(uiI18n.t('app.upload_failed_ad0d0603'), { description: e instanceof Error ? e.message : undefined });
     } finally {
       setIntakeBusy(false);
     }
@@ -191,13 +194,13 @@ export function PostComposer({ onPosted, defaultCommunityId, defaultMedia }: { o
     const idx = pollImgIdx.current;
     if (pollImgRef.current) pollImgRef.current.value = '';
     if (!file || idx < 0) return;
-    if (!file.type.startsWith('image/')) { toast.error('Please select an image file'); return; }
-    if (file.size > 5 * 1024 * 1024) { toast.error('Each image must be under 5MB'); return; }
+    if (!file.type.startsWith('image/')) { toast.error(uiI18n.t('app.please_select_an_image_file_b1d184e9')); return; }
+    if (file.size > 5 * 1024 * 1024) { toast.error(uiI18n.t('app.each_image_must_be_under_5mb_68935d6e')); return; }
     try {
       const url = await uploadImage(file);
       setPoll((p) => (p ? { ...p, choices: p.choices.map((c, i) => (i === idx ? { ...c, image: url } : c)) } : p));
     } catch (err) {
-      toast.error('Failed to upload image', { description: err instanceof Error ? err.message : undefined });
+      toast.error(uiI18n.t('app.failed_to_upload_image_e641eacd'), { description: err instanceof Error ? err.message : undefined });
     }
   };
 
@@ -251,7 +254,7 @@ export function PostComposer({ onPosted, defaultCommunityId, defaultMedia }: { o
 
       if (created?.id) await persistTagsAndMentions(created.id, html, plain);
 
-      toast.success(imageUrls.length ? 'Post submitted for approval' : 'Posted', {
+      toast.success(imageUrls.length ? uiI18n.t('app.post_submitted_for_approval_4ce5da04') : uiI18n.t('app.posted_301777ff'), {
         description: imageUrls.length ? 'Posts with images require admin approval before they appear.' : undefined,
       });
       void triggerHaptic('post');
@@ -259,7 +262,7 @@ export function PostComposer({ onPosted, defaultCommunityId, defaultMedia }: { o
       onPosted?.();
     } catch (err) {
       const friendly = mapUgcError(err instanceof Error ? err : null);
-      toast.error(friendly || 'Failed to post', {
+      toast.error(friendly || uiI18n.t('app.failed_to_post_608f5031'), {
         description: friendly ? undefined : err instanceof Error ? err.message : 'Unknown error',
       });
     } finally {
@@ -302,7 +305,7 @@ export function PostComposer({ onPosted, defaultCommunityId, defaultMedia }: { o
       {(dropActive || intakeBusy) && (
         <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center rounded-xl border-2 border-dashed border-primary/60 bg-background/80 backdrop-blur-sm">
           <p className="flex items-center gap-2 text-sm font-semibold text-primary">
-            {intakeBusy ? <><Loader2 className="h-4 w-4 animate-spin" /> Uploading…</> : 'Drop image to attach'}
+            {intakeBusy ? <><Loader2 className="h-4 w-4 animate-spin" /> {uiI18n.t('app.uploading_d921a79a')}</> : uiI18n.t('app.drop_image_to_attach_7acfa9c7')}
           </p>
         </div>
       )}
@@ -318,8 +321,8 @@ export function PostComposer({ onPosted, defaultCommunityId, defaultMedia }: { o
             {profile?.username && <p className="text-sm font-display font-bold tracking-tight text-muted-foreground">@{profile.username}</p>}
             {communityId && (
               <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
-                <span className="truncate">in {communities.find((c) => c.id === communityId)?.name}</span>
-                <button type="button" aria-label="Clear community" onClick={() => setCommunityId(null)} className="shrink-0 rounded-full p-0.5 hover:bg-primary/20"><X className="h-3 w-3" /></button>
+                <span className="truncate">{uiI18n.t('app.in_af10ef20')} {communities.find((c) => c.id === communityId)?.name}</span>
+                <button type="button" aria-label={uiI18n.t('app.clear_community_3c93740f')} onClick={() => setCommunityId(null)} className="shrink-0 rounded-full p-0.5 hover:bg-primary/20"><X className="h-3 w-3" /></button>
               </span>
             )}
           </div>
@@ -329,13 +332,13 @@ export function PostComposer({ onPosted, defaultCommunityId, defaultMedia }: { o
             value={title}
             maxLength={120}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="Add a title (optional)"
+            placeholder={uiI18n.t('app.add_a_title_optional_2ffcbeb8')}
             className="mb-1.5 w-full bg-transparent text-base sm:text-[17px] font-display font-bold tracking-tight text-white placeholder:text-muted-foreground/40 focus:outline-none"
           />
 
           <RichEditor
             ref={editorRef}
-            placeholder="What’s happening?"
+            placeholder={uiI18n.t('app.what_s_happening_617696c8')}
             minHeight="52px"
             className="text-[15px] leading-relaxed"
             onChange={setContent}
@@ -345,7 +348,7 @@ export function PostComposer({ onPosted, defaultCommunityId, defaultMedia }: { o
 
           {/* Formatting hint */}
           <p className="mt-1 text-[11px] text-muted-foreground/50">
-            Add an optional title, then a description · select text to format · type <span className="font-semibold text-primary/70">@</span> to mention · <span className="font-semibold text-primary/70">#</span> to tag
+            {uiI18n.t('app.add_an_optional_title_then_a_description_select__ca9ee523')} <span className="font-semibold text-primary/70">@</span> {uiI18n.t('app.to_mention_09e97c3d')} <span className="font-semibold text-primary/70">#</span> {uiI18n.t('app.to_tag_58eb9458')}
           </p>
 
           {/* Poll editor */}
@@ -359,7 +362,7 @@ export function PostComposer({ onPosted, defaultCommunityId, defaultMedia }: { o
                         <img src={getProxiedImageUrl(choice.image)} alt="" className="h-full w-full object-cover" />
                         <button
                           type="button"
-                          aria-label="Remove choice image"
+                          aria-label={uiI18n.t('app.remove_choice_image_1ac68abc')}
                           onClick={() => setPoll((p) => (p ? { ...p, choices: p.choices.map((c, idx) => (idx === i ? { ...c, image: null } : c)) } : p))}
                           className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity hover:opacity-100"
                         >
@@ -369,7 +372,7 @@ export function PostComposer({ onPosted, defaultCommunityId, defaultMedia }: { o
                     ) : (
                       <button
                         type="button"
-                        aria-label="Add choice image"
+                        aria-label={uiI18n.t('app.add_choice_image_86757ebe')}
                         onClick={() => { pollImgIdx.current = i; pollImgRef.current?.click(); }}
                         className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] text-muted-foreground hover:text-primary"
                       >
@@ -379,17 +382,17 @@ export function PostComposer({ onPosted, defaultCommunityId, defaultMedia }: { o
                     <Input
                       value={choice.text}
                       maxLength={80}
-                      placeholder={`Choice ${i + 1}`}
+                      placeholder={uiI18n.t('app.choice_i18n_value_0_6c996baf', { value0: i + 1 })}
                       onChange={(e) => setPoll((p) => (p ? { ...p, choices: p.choices.map((c, idx) => (idx === i ? { ...c, text: e.target.value } : c)) } : p))}
                       className="h-10 rounded-xl bg-white/[0.03] border-white/10"
                     />
                     {poll.choices.length > 2 && (
-                      <button type="button" aria-label="Remove choice" onClick={() => setPoll((p) => (p ? { ...p, choices: p.choices.filter((_, idx) => idx !== i) } : p))} className="text-muted-foreground hover:text-destructive">
+                      <button type="button" aria-label={uiI18n.t('app.remove_choice_7cbb41a0')} onClick={() => setPoll((p) => (p ? { ...p, choices: p.choices.filter((_, idx) => idx !== i) } : p))} className="text-muted-foreground hover:text-destructive">
                         <X className="h-4 w-4" />
                       </button>
                     )}
                     {i === poll.choices.length - 1 && poll.choices.length < 4 && (
-                      <button type="button" aria-label="Add choice" onClick={() => setPoll((p) => (p ? { ...p, choices: [...p.choices, { text: '', image: null }] } : p))} className="text-primary hover:text-primary/80">
+                      <button type="button" aria-label={uiI18n.t('app.add_choice_b14374e6')} onClick={() => setPoll((p) => (p ? { ...p, choices: [...p.choices, { text: '', image: null }] } : p))} className="text-primary hover:text-primary/80">
                         <Plus className="h-5 w-5" />
                       </button>
                     )}
@@ -397,11 +400,11 @@ export function PostComposer({ onPosted, defaultCommunityId, defaultMedia }: { o
                 ))}
               </div>
               <div>
-                <p className="mb-2 text-sm font-display font-bold tracking-tight">Poll length</p>
+                <p className="mb-2 text-sm font-display font-bold tracking-tight">{uiI18n.t('app.poll_length_8ea03451')}</p>
                 <div className="grid grid-cols-3 gap-2">
                   {(['days', 'hours', 'minutes'] as const).map((unit) => (
                     <div key={unit}>
-                      <label className="mb-1 block text-[11px] uppercase tracking-wider text-muted-foreground/70">{unit}</label>
+                      <label className="mb-1 block text-[11px] uppercase tracking-wider text-muted-foreground/70">{uiI18n.t(({"days":"app.days_5548ae4f","hours":"app.hours_5aedee09","minutes":"app.minutes_be2e2bb6"})[unit])}</label>
                       <Select value={String(poll[unit])} onValueChange={(v) => setPoll((p) => (p ? { ...p, [unit]: Number(v) } : p))}>
                         <SelectTrigger className="h-10 rounded-xl bg-white/[0.03] border-white/10"><SelectValue /></SelectTrigger>
                         <SelectContent>{DURATION[unit].map((n) => <SelectItem key={n} value={String(n)}>{n}</SelectItem>)}</SelectContent>
@@ -410,7 +413,7 @@ export function PostComposer({ onPosted, defaultCommunityId, defaultMedia }: { o
                   ))}
                 </div>
               </div>
-              <button type="button" onClick={() => setPoll(null)} className="text-sm font-medium text-destructive hover:underline">Remove poll</button>
+              <button type="button" onClick={() => setPoll(null)} className="text-sm font-medium text-destructive hover:underline">{uiI18n.t('app.remove_poll_771e6008')}</button>
             </div>
           )}
 
@@ -419,14 +422,14 @@ export function PostComposer({ onPosted, defaultCommunityId, defaultMedia }: { o
             <div className={cn('mt-2 gap-1.5', gifUrl ? '' : 'grid', !gifUrl && imageUrls.length > 1 ? 'grid-cols-2' : 'grid-cols-1')}>
               {gifUrl ? (
                 <div className="relative overflow-hidden rounded-2xl border border-white/[0.06]">
-                  <img src={getProxiedImageUrl(gifUrl)} alt="gif" className="max-h-64 sm:max-h-80 w-full object-contain bg-black/20" />
-                  <button type="button" aria-label="Remove" onClick={() => setGifUrl(null)} className="absolute right-2 top-2 rounded-full bg-black/60 p-1.5 text-white hover:bg-black/80 active:scale-95"><X className="h-4 w-4" /></button>
+                  <img src={getProxiedImageUrl(gifUrl)} alt={uiI18n.t('app.gif_b9ec94b9')} className="max-h-64 sm:max-h-80 w-full object-contain bg-black/20" />
+                  <button type="button" aria-label={uiI18n.t('app.remove_e963907d')} onClick={() => setGifUrl(null)} className="absolute right-2 top-2 rounded-full bg-black/60 p-1.5 text-white hover:bg-black/80 active:scale-95"><X className="h-4 w-4" /></button>
                 </div>
               ) : (
                 imageUrls.map((src, i) => (
                   <div key={i} className="relative overflow-hidden rounded-2xl border border-white/[0.06]">
-                    <img src={getProxiedImageUrl(src)} alt="preview" className="h-32 sm:h-44 w-full object-cover" />
-                    <button type="button" aria-label="Remove image" onClick={() => setImageUrls((p) => p.filter((_, idx) => idx !== i))} className="absolute right-2 top-2 rounded-full bg-black/60 p-1.5 text-white hover:bg-black/80 active:scale-95"><X className="h-4 w-4" /></button>
+                    <img src={getProxiedImageUrl(src)} alt={uiI18n.t('app.preview_1aa787fe')} className="h-32 sm:h-44 w-full object-cover" />
+                    <button type="button" aria-label={uiI18n.t('app.remove_image_5f94b03c')} onClick={() => setImageUrls((p) => p.filter((_, idx) => idx !== i))} className="absolute right-2 top-2 rounded-full bg-black/60 p-1.5 text-white hover:bg-black/80 active:scale-95"><X className="h-4 w-4" /></button>
                   </div>
                 ))
               )}
@@ -436,10 +439,10 @@ export function PostComposer({ onPosted, defaultCommunityId, defaultMedia }: { o
           {/* Attachment chips */}
           {(playlistId || tierlistId || watchRoomId || media) && (
             <div className="mt-2 flex flex-wrap gap-2">
-              {playlistId && <AttachChip label={`Playlist: ${playlists.find((p) => p.id === playlistId)?.name ?? ''}`} onClear={() => setPlaylistId(null)} />}
-              {tierlistId && <AttachChip label={`Tier list: ${tierlists.find((t) => t.id === tierlistId)?.title ?? ''}`} onClear={() => setTierlistId(null)} />}
-              {watchRoomId && <AttachChip label={`Lobby: ${rooms.find((r) => r.id === watchRoomId)?.name ?? ''}`} onClear={() => setWatchRoomId(null)} />}
-              {media && <AttachChip label={`${media.type}: ${media.name}`} onClear={() => setMedia(null)} />}
+              {playlistId && <AttachChip label={uiI18n.t('app.playlist_i18n_value_0_bc8e64ab', { value0: playlists.find((p) => p.id === playlistId)?.name ?? '' })} onClear={() => setPlaylistId(null)} />}
+              {tierlistId && <AttachChip label={uiI18n.t('app.tier_list_i18n_value_0_56537b3b', { value0: tierlists.find((t) => t.id === tierlistId)?.title ?? '' })} onClear={() => setTierlistId(null)} />}
+              {watchRoomId && <AttachChip label={uiI18n.t('app.lobby_i18n_value_0_3bee05b6', { value0: rooms.find((r) => r.id === watchRoomId)?.name ?? '' })} onClear={() => setWatchRoomId(null)} />}
+              {media && <AttachChip label={uiI18n.t('app.i18n_value_0_i18n_value_1_b6af3412', { value0: media.type, value1: media.name })} onClear={() => setMedia(null)} />}
             </div>
           )}
 
@@ -450,20 +453,20 @@ export function PostComposer({ onPosted, defaultCommunityId, defaultMedia }: { o
                 userId={user.id}
                 uploadFile={async (f) => ({ url: await uploadImage(f) })}
                 onSelect={(img) => handleImagePick(img.url)}
-                trigger={<span><ToolbarIcon icon={ImageIcon} label="Image" active={imageUrls.length > 0} onClick={() => {}} /></span>}
+                trigger={<span><ToolbarIcon icon={ImageIcon} label={uiI18n.t('app.image_50e19fda')} active={imageUrls.length > 0} onClick={() => {}} /></span>}
               />
-              <GifPicker onSelect={(att) => { setImageUrls([]); setGifUrl(att.url); }} trigger={<span><ToolbarIcon icon={Film} label="GIF" active={!!gifUrl} onClick={() => {}} /></span>} />
-              <ToolbarIcon icon={ListChecks} label="Poll" active={!!poll} onClick={togglePoll} />
-              <PickerPopover icon={Music2} label="Playlist" active={!!playlistId} items={playlists.map((p) => ({ id: p.id, label: p.name }))} empty="You have no playlists yet." onPick={setPlaylistId} />
-              <PickerPopover icon={Layers} label="Tier list" active={!!tierlistId} items={tierlists.map((t) => ({ id: t.id, label: t.title }))} empty="You have no tier lists yet." onPick={setTierlistId} />
-              <PickerPopover icon={Radio} label="Watch Together lobby" active={!!watchRoomId} items={rooms.map((r) => ({ id: r.id, label: r.name }))} empty="You have no active lobbies." onPick={setWatchRoomId} />
-              <PickerPopover icon={Users} label="Post to community" active={!!communityId} items={communities.map((c) => ({ id: c.id, label: c.name }))} empty="No communities yet." onPick={setCommunityId} />
-              <MediaPicker onSelect={setMedia} trigger={<span><ToolbarIcon icon={Tv} label="Share anime / manga" active={!!media} onClick={() => {}} /></span>} />
-              <ToolbarIcon icon={AlertTriangle} label="Mark spoiler" active={isSpoiler} onClick={() => setIsSpoiler((v) => !v)} />
+              <GifPicker onSelect={(att) => { setImageUrls([]); setGifUrl(att.url); }} trigger={<span><ToolbarIcon icon={Film} label={uiI18n.t('app.gif_758f6c93')} active={!!gifUrl} onClick={() => {}} /></span>} />
+              <ToolbarIcon icon={ListChecks} label={uiI18n.t('app.poll_dafe1d3d')} active={!!poll} onClick={togglePoll} />
+              <PickerPopover icon={Music2} label={uiI18n.t('app.playlist_cd95b41f')} active={!!playlistId} items={playlists.map((p) => ({ id: p.id, label: p.name }))} empty="You have no playlists yet." onPick={setPlaylistId} />
+              <PickerPopover icon={Layers} label={uiI18n.t('app.tier_list_b0ba4885')} active={!!tierlistId} items={tierlists.map((t) => ({ id: t.id, label: t.title }))} empty="You have no tier lists yet." onPick={setTierlistId} />
+              <PickerPopover icon={Radio} label={uiI18n.t('app.watch_together_lobby_759f3ef3')} active={!!watchRoomId} items={rooms.map((r) => ({ id: r.id, label: r.name }))} empty="You have no active lobbies." onPick={setWatchRoomId} />
+              <PickerPopover icon={Users} label={uiI18n.t('app.post_to_community_51dbf5fa')} active={!!communityId} items={communities.map((c) => ({ id: c.id, label: c.name }))} empty="No communities yet." onPick={setCommunityId} />
+              <MediaPicker onSelect={setMedia} trigger={<span><ToolbarIcon icon={Tv} label={uiI18n.t('app.share_anime_manga_b61a2abd')} active={!!media} onClick={() => {}} /></span>} />
+              <ToolbarIcon icon={AlertTriangle} label={uiI18n.t('app.mark_spoiler_f0b4b53f')} active={isSpoiler} onClick={() => setIsSpoiler((v) => !v)} />
             </div>
 
             <Button onClick={handleSubmit} disabled={!canPost} className="mt-2.5 h-10 w-full rounded-2xl px-5 text-sm font-bold shadow-lg shadow-primary/20 sm:mt-0 sm:h-9 sm:w-auto sm:rounded-full sm:ml-auto">
-              {submitting ? 'Posting…' : 'Post'}
+              {submitting ? uiI18n.t('app.posting_20c00d70') : uiI18n.t('app.post_7858ac3f')}
             </Button>
           </div>
 
@@ -475,10 +478,11 @@ export function PostComposer({ onPosted, defaultCommunityId, defaultMedia }: { o
 }
 
 function AttachChip({ label, onClear }: { label: string; onClear: () => void }) {
+  useUiTranslation();
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
       <span className="max-w-[180px] truncate">{label}</span>
-      <button type="button" aria-label="Remove" onClick={onClear} className="hover:text-primary/70"><X className="h-3 w-3" /></button>
+      <button type="button" aria-label={uiI18n.t('app.remove_e963907d')} onClick={onClear} className="hover:text-primary/70"><X className="h-3 w-3" /></button>
     </span>
   );
 }
@@ -486,6 +490,7 @@ function AttachChip({ label, onClear }: { label: string; onClear: () => void }) 
 function PickerPopover({ icon: Icon, label, active, items, empty, onPick }: {
   icon: any; label: string; active: boolean; items: Array<{ id: string; label: string }>; empty: string; onPick: (id: string) => void;
 }) {
+  useUiTranslation();
   const [open, setOpen] = useState(false);
   return (
     <Popover open={open} onOpenChange={setOpen}>

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Download, MonitorPlay, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { GlassPanel } from '@/components/ui/GlassPanel';
@@ -45,6 +46,7 @@ export function WebWatchGate({
   mode?: GateMode;
 }) {
   const isNative = useIsNativeApp();
+  const { t } = useTranslation();
   const gated = isEnabled(FeatureFlag.WEB_WATCH_GATED);
   // The 48h bypass only exists for manga reading; anime playback is never unlocked on web.
   const [allowed, setAllowed] = useState(() => (mode === 'read' ? readSessionBypass() : false));
@@ -68,18 +70,18 @@ export function WebWatchGate({
           </div>
           <div className="space-y-2">
             <h1 className="text-xl font-bold tracking-tight">
-              {isWatch ? 'Anime playback lives in the app' : 'Read in the Tatakai app'}
+              {isWatch ? t('layout.webGateWatchTitle') : t('layout.webGateReadTitle')}
             </h1>
             <p className="text-sm text-muted-foreground leading-relaxed">
               {isWatch
-                ? 'Anime playback isn’t available in the browser. Install the Tatakai desktop app for the full player, offline downloads, and extension sources.'
-                : 'For the best reader, offline downloads, and fewer limits, open this chapter in the desktop or mobile app.'}
+                ? t('layout.webGateWatchDesc')
+                : t('layout.webGateReadDesc')}
             </p>
           </div>
           <div className="flex flex-col gap-2 pt-2">
             <Button className="w-full gap-2" onClick={() => window.open(RELEASES_URL, '_blank')}>
               <Download className="h-4 w-4" />
-              Get the app
+              {t('layout.webGateGetApp')}
             </Button>
             <Button
               variant="outline"
@@ -88,7 +90,7 @@ export function WebWatchGate({
                 window.location.href = '/download';
               }}
             >
-              {isWatch ? 'See all platforms' : 'Why the desktop app?'}
+              {isWatch ? t('layout.webGateAllPlatforms') : t('layout.webGateWhyApp')}
             </Button>
             {!isWatch && (
               <Button
@@ -99,7 +101,7 @@ export function WebWatchGate({
                   setAllowed(true);
                 }}
               >
-                Continue in browser (48h)
+                {t('layout.webGateContinueBrowser')}
               </Button>
             )}
           </div>

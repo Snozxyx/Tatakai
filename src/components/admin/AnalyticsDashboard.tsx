@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useMemo } from 'react';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { motion } from 'framer-motion';
@@ -12,7 +14,8 @@ import {
 } from 'recharts';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
-import { format, subDays, startOfDay, endOfDay } from 'date-fns';
+import { subDays, startOfDay, endOfDay } from 'date-fns';
+import { format } from '@/lib/localeFormat';
 import { fetchAllReleases, fetchRepoStats, platformForAsset, formatCompact, GITHUB_REPO_URL } from '@/lib/github';
 import { classifyChannel } from '@/hooks/api/useAnalytics';
 import { WorldMap } from '@/components/admin/WorldMap';
@@ -21,6 +24,7 @@ const GA4_ACQUISITION_URL = 'https://analytics.google.com/analytics/web/#/report
 const GA4_FUNNEL_URL = 'https://analytics.google.com/analytics/web/#/analysis';
 
 export function AnalyticsDashboard() {
+  useUiTranslation();
   const [timeRange, setTimeRange] = useState<'day' | 'week' | 'month'>('week');
   const days = timeRange === 'day' ? 1 : timeRange === 'week' ? 7 : 30;
 
@@ -433,58 +437,58 @@ export function AnalyticsDashboard() {
 
   const statCards = [
     {
-      title: 'Total Users',
-      value: totalUsers?.toLocaleString() || '0',
-      subtitle: 'Registered accounts',
+      get title() { return uiI18n.t('app.total_users_a028fce2'); },
+      value: totalUsers?.toLocaleString(uiI18n.language) || '0',
+      get subtitle() { return uiI18n.t('app.registered_accounts_ecf38c68'); },
       icon: <Users className="w-5 h-5" />,
       color: 'from-blue-500 to-blue-700',
     },
     {
-      title: 'Total Visitors',
-      value: totalVisitors?.toLocaleString() || '0',
-      subtitle: `${visitorBreakdown?.guests || 0} guests, ${visitorBreakdown?.loggedIn || 0} logged in`,
+      get title() { return uiI18n.t('app.total_visitors_af51227e'); },
+      value: totalVisitors?.toLocaleString(uiI18n.language) || '0',
+      get subtitle() { return uiI18n.t('app.i18n_value_0_guests_i18n_value_1_logged_in_1ecd2e23', { value0: visitorBreakdown?.guests || 0, value1: visitorBreakdown?.loggedIn || 0 }); },
       icon: <Eye className="w-5 h-5" />,
       color: 'from-green-500 to-green-700',
     },
     {
-      title: 'Watch Time',
+      get title() { return uiI18n.t('app.watch_time_c49f058c'); },
       value: formatWatchTime(totalWatchTime || 0),
-      subtitle: `Last ${days} days`,
+      get subtitle() { return uiI18n.t('app.last_i18n_value_0_days_6733129f', { value0: days }); },
       icon: <Clock className="w-5 h-5" />,
       color: 'from-purple-500 to-purple-700',
     },
     {
-      title: 'DAU (Today)',
-      value: (todayBreakdown.total || dailyStats?.[dailyStats.length - 1]?.dau || 0).toLocaleString(),
-      subtitle: `${todayBreakdown.members} members · ${todayBreakdown.guests} guests`,
+      get title() { return uiI18n.t('app.dau_today_54758960'); },
+      value: (todayBreakdown.total || dailyStats?.[dailyStats.length - 1]?.dau || 0).toLocaleString(uiI18n.language),
+      get subtitle() { return uiI18n.t('app.i18n_value_0_members_i18n_value_1_guests_5892a3dc', { value0: todayBreakdown.members, value1: todayBreakdown.guests }); },
       icon: <Activity className="w-5 h-5" />,
       color: 'from-pink-500 to-rose-700',
     },
     {
-      title: 'Top Country',
+      get title() { return uiI18n.t('app.top_country_4ee8868c'); },
       value: topCountries?.[0]?.name || 'N/A',
-      subtitle: `${topCountries?.[0]?.value || 0} visitors`,
+      get subtitle() { return uiI18n.t('app.i18n_value_0_visitors_77a4822c', { value0: topCountries?.[0]?.value || 0 }); },
       icon: <Globe className="w-5 h-5" />,
       color: 'from-orange-500 to-orange-700',
     },
     {
-      title: 'Page Depth',
+      get title() { return uiI18n.t('app.page_depth_d4ee2e80'); },
       value: String(sessionQuality?.avgPagesPerSession || 0),
-      subtitle: 'Avg pages per session',
+      get subtitle() { return uiI18n.t('app.avg_pages_per_session_a1e78f08'); },
       icon: <BarChart3 className="w-5 h-5" />,
       color: 'from-cyan-500 to-cyan-700',
     },
     {
-      title: 'Returning Sessions',
+      get title() { return uiI18n.t('app.returning_sessions_5f3a36ee'); },
       value: `${sessionQuality?.returningRate || 0}%`,
-      subtitle: `${sessionQuality?.returningSessions || 0} repeat sessions`,
+      get subtitle() { return uiI18n.t('app.i18n_value_0_repeat_sessions_2c9e80f8', { value0: sessionQuality?.returningSessions || 0 }); },
       icon: <TrendingUp className="w-5 h-5" />,
       color: 'from-emerald-500 to-emerald-700',
     },
     {
-      title: 'Avg Watch Session',
+      get title() { return uiI18n.t('app.avg_watch_session_3f8cc7b1'); },
       value: `${sessionQuality?.avgWatchMinutes || 0}m`,
-      subtitle: 'Per watch session',
+      get subtitle() { return uiI18n.t('app.per_watch_session_eb55894f'); },
       icon: <Play className="w-5 h-5" />,
       color: 'from-violet-500 to-violet-700',
     },
@@ -496,7 +500,7 @@ export function AnalyticsDashboard() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h2 className="font-display text-xl font-semibold flex items-center gap-2">
           <BarChart3 className="w-5 h-5 text-primary" />
-          Analytics Overview
+          {uiI18n.t('app.analytics_overview_36307b68')}
         </h2>
         <div className="flex items-center gap-3 flex-wrap">
           <a
@@ -505,7 +509,7 @@ export function AnalyticsDashboard() {
             rel="noreferrer"
             className="text-xs font-semibold text-muted-foreground hover:text-primary flex items-center gap-1"
           >
-            GA4 Acquisition <ExternalLink className="w-3 h-3" />
+            {uiI18n.t('app.ga4_acquisition_b3620a1d')} <ExternalLink className="w-3 h-3" />
           </a>
           <a
             href={GA4_FUNNEL_URL}
@@ -513,7 +517,7 @@ export function AnalyticsDashboard() {
             rel="noreferrer"
             className="text-xs font-semibold text-muted-foreground hover:text-primary flex items-center gap-1"
           >
-            GA4 Funnels <ExternalLink className="w-3 h-3" />
+            {uiI18n.t('app.ga4_funnels_be6e7eb6')} <ExternalLink className="w-3 h-3" />
           </a>
         <div className="flex gap-2 bg-muted/50 p-1 rounded-xl">
           {(['day', 'week', 'month'] as const).map((range) => (
@@ -522,8 +526,7 @@ export function AnalyticsDashboard() {
               onClick={() => setTimeRange(range)}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${timeRange === range
                 ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:text-foreground'
-                }`}
+                : 'text-muted-foreground hover:text-foreground'}`}
             >
               {range.charAt(0).toUpperCase() + range.slice(1)}
             </button>
@@ -536,21 +539,21 @@ export function AnalyticsDashboard() {
       <GlassPanel className="p-6">
         <h3 className="font-medium mb-1 flex items-center gap-2">
           <Target className="w-4 h-4 text-primary" />
-          Success Funnel
+          {uiI18n.t('app.success_funnel_d63a43d1')}
         </h3>
         <p className="text-xs text-muted-foreground mb-5">
-          Signup = new account · Activation = watched within the window · Retention = active on 2+ days · Bounce = single-page sessions
+          {uiI18n.t('app.signup_new_account_activation_watched_within_the_4bc00698')}
         </p>
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           {[
-            { label: 'Visitors', value: funnel?.visitors ?? 0, rate: null as number | null },
-            { label: 'Signups', value: funnel?.signups ?? 0, rate: funnel?.signupRate ?? 0 },
-            { label: 'Activated', value: funnel?.activated ?? 0, rate: funnel?.activationRate ?? 0 },
-            { label: 'Retained', value: funnel?.retained ?? 0, rate: funnel?.retentionRate ?? 0 },
-            { label: 'Bounce rate', value: `${funnel?.bounceRate ?? 0}%`, rate: null },
+            { get label() { return uiI18n.t('app.visitors_f8f3b6f9'); }, value: funnel?.visitors ?? 0, rate: null as number | null },
+            { get label() { return uiI18n.t('app.signups_09c26725'); }, value: funnel?.signups ?? 0, rate: funnel?.signupRate ?? 0 },
+            { get label() { return uiI18n.t('app.activated_a0b861f6'); }, value: funnel?.activated ?? 0, rate: funnel?.activationRate ?? 0 },
+            { get label() { return uiI18n.t('app.retained_ae868d9a'); }, value: funnel?.retained ?? 0, rate: funnel?.retentionRate ?? 0 },
+            { get label() { return uiI18n.t('app.bounce_rate_f45a2ab6'); }, value: `${funnel?.bounceRate ?? 0}%`, rate: null },
           ].map((step) => (
             <div key={step.label} className="rounded-2xl bg-white/5 border border-white/10 p-4">
-              <p className="text-2xl font-bold">{typeof step.value === 'number' ? step.value.toLocaleString() : step.value}</p>
+              <p className="text-2xl font-bold">{typeof step.value === 'number' ? step.value.toLocaleString(uiI18n.language) : step.value}</p>
               <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mt-1">{step.label}</p>
               {step.rate !== null && (
                 <div className="mt-2">
@@ -561,7 +564,7 @@ export function AnalyticsDashboard() {
                       className="h-full bg-primary rounded-full"
                     />
                   </div>
-                  <p className="text-[11px] text-muted-foreground mt-1">{step.rate}% conversion</p>
+                  <p className="text-[11px] text-muted-foreground mt-1">{step.rate}{uiI18n.t('app.conversion_53fca3ce')}</p>
                 </div>
               )}
             </div>
@@ -601,7 +604,7 @@ export function AnalyticsDashboard() {
         <GlassPanel className="p-6">
           <h3 className="font-medium mb-4 flex items-center gap-2">
             <TrendingUp className="w-4 h-4 text-primary" />
-            Visitor Trends
+            {uiI18n.t('app.visitor_trends_98544aab')}
           </h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
@@ -639,7 +642,7 @@ export function AnalyticsDashboard() {
         <GlassPanel className="p-6">
           <h3 className="font-medium mb-4 flex items-center gap-2">
             <PieChart className="w-4 h-4 text-primary" />
-            Most Watched Genres
+            {uiI18n.t('app.most_watched_genres_5d97a59a')}
           </h3>
           <div className="h-64 flex items-center">
             {topGenres && topGenres.length > 0 ? (
@@ -673,7 +676,7 @@ export function AnalyticsDashboard() {
                 </div>
               </>
             ) : (
-              <div className="w-full text-center text-muted-foreground">No genre data yet</div>
+              <div className="w-full text-center text-muted-foreground">{uiI18n.t('app.no_genre_data_yet_fe691902')}</div>
             )}
           </div>
         </GlassPanel>
@@ -685,15 +688,15 @@ export function AnalyticsDashboard() {
         <GlassPanel className="p-6">
           <h3 className="font-medium mb-1 flex items-center gap-2">
             <MapPin className="w-4 h-4 text-primary" />
-            World Map — Where Visitors Come From
+            {uiI18n.t('app.world_map_where_visitors_come_from_8f5877b8')}
           </h3>
           <p className="text-xs text-muted-foreground mb-4">
-            Bubbles sized by unique visitors in range. Hover for share detail.
+            {uiI18n.t('app.bubbles_sized_by_unique_visitors_in_range_hover__c8c28e80')}
           </p>
           {topCountries && topCountries.length > 0 ? (
             <WorldMap data={topCountries} unknownCount={unknownCountrySessions} />
           ) : (
-            <div className="text-center py-8 text-muted-foreground">No country data yet</div>
+            <div className="text-center py-8 text-muted-foreground">{uiI18n.t('app.no_country_data_yet_70cdd1c4')}</div>
           )}
         </GlassPanel>
 
@@ -701,7 +704,7 @@ export function AnalyticsDashboard() {
         <GlassPanel className="p-6">
           <h3 className="font-medium mb-4 flex items-center gap-2">
             <Globe className="w-4 h-4 text-primary" />
-            Acquisition Channels
+            {uiI18n.t('app.acquisition_channels_b9b0bb0e')}
           </h3>
           <div className="h-48 flex items-center">
             {referrerChannels && referrerChannels.length > 0 ? (
@@ -735,13 +738,13 @@ export function AnalyticsDashboard() {
                 </div>
               </>
             ) : (
-              <div className="text-center w-full text-muted-foreground">No acquisition data yet</div>
+              <div className="text-center w-full text-muted-foreground">{uiI18n.t('app.no_acquisition_data_yet_1a5b5232')}</div>
             )}
           </div>
           {topReferrers && topReferrers.length > 0 && (
             <div className="mt-5 pt-4 border-t border-white/10">
               <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">
-                Top referring sites
+                {uiI18n.t('app.top_referring_sites_be12eec7')}
               </p>
               <div className="space-y-2">
                 {topReferrers.map((r) => (
@@ -761,7 +764,7 @@ export function AnalyticsDashboard() {
                 ))}
               </div>
               <p className="text-[11px] text-muted-foreground mt-3">
-                Tip: tag campaigns with ?utm_source=&amp;utm_medium=&amp;utm_campaign= — they are stored per visit and cross-checked in GA4 Acquisition.
+                {uiI18n.t('app.tip_tag_campaigns_with_utm_source_amp_utm_medium_feb03ed3')}
               </p>
             </div>
           )}
@@ -773,7 +776,7 @@ export function AnalyticsDashboard() {
         <GlassPanel className="p-6">
           <h3 className="font-medium mb-4 flex items-center gap-2">
             <Activity className="w-4 h-4 text-primary" />
-            Hourly Traffic Pattern
+            {uiI18n.t('app.hourly_traffic_pattern_2ee1894a')}
           </h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
@@ -797,7 +800,7 @@ export function AnalyticsDashboard() {
         <GlassPanel className="p-6">
           <h3 className="font-medium mb-4 flex items-center gap-2">
             <Eye className="w-4 h-4 text-primary" />
-            Most Visited Paths
+            {uiI18n.t('app.most_visited_paths_b4d55b97')}
           </h3>
           {topPages && topPages.length > 0 ? (
             <div className="space-y-3">
@@ -805,7 +808,7 @@ export function AnalyticsDashboard() {
                 <div key={entry.path} className="space-y-1">
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-sm font-medium truncate">{entry.path}</p>
-                    <span className="text-xs text-muted-foreground shrink-0">{entry.sessions} sessions</span>
+                    <span className="text-xs text-muted-foreground shrink-0">{entry.sessions} {uiI18n.t('app.sessions_781791f5')}</span>
                   </div>
                   <div className="h-2 bg-muted rounded-full overflow-hidden">
                     <motion.div
@@ -818,7 +821,7 @@ export function AnalyticsDashboard() {
               ))}
             </div>
           ) : (
-            <div className="h-64 flex items-center justify-center text-muted-foreground">No page path data yet</div>
+            <div className="h-64 flex items-center justify-center text-muted-foreground">{uiI18n.t('app.no_page_path_data_yet_e9f3c5c0')}</div>
           )}
         </GlassPanel>
       </div>
@@ -828,7 +831,7 @@ export function AnalyticsDashboard() {
         <GlassPanel className="p-6">
           <h3 className="font-medium mb-4 flex items-center gap-2">
             <Users className="w-4 h-4 text-primary" />
-            User Engagement %
+            {uiI18n.t('app.user_engagement_9d2c8911')}
           </h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
@@ -846,7 +849,7 @@ export function AnalyticsDashboard() {
         <GlassPanel className="p-6">
           <h3 className="font-medium mb-4 flex items-center gap-2">
             <Play className="w-4 h-4 text-primary" />
-            Daily Watch Time
+            {uiI18n.t('app.daily_watch_time_a969389c')}
           </h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
@@ -867,24 +870,24 @@ export function AnalyticsDashboard() {
         <div className="space-y-4">
           <div className="flex items-center gap-2">
             <Github className="w-5 h-5 text-primary" />
-            <h2 className="text-lg font-semibold">GitHub Releases & Downloads</h2>
+            <h2 className="text-lg font-semibold">{uiI18n.t('app.github_releases_downloads_c128b47d')}</h2>
             <a
               href={GITHUB_REPO_URL}
               target="_blank"
               rel="noopener noreferrer"
               className="text-xs text-muted-foreground hover:text-primary transition-colors ml-1"
             >
-              snozxyx/tatakai ↗
+              {uiI18n.t('app.snozxyx_tatakai_3e548ec5')}
             </a>
           </div>
 
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
             {[
-              { icon: Download, label: 'Total Downloads', value: formatCompact(githubData.totalDownloads), color: 'text-violet-400' },
-              { icon: Smartphone, label: 'Mobile Downloads', value: formatCompact(githubData.mobileDownloads), color: 'text-emerald-400' },
-              { icon: Monitor, label: 'Desktop Downloads', value: formatCompact(githubData.desktopDownloads), color: 'text-blue-400' },
-              { icon: Star, label: 'GitHub Stars', value: formatCompact(githubData.stars), color: 'text-amber-400' },
-              { icon: TrendingUp, label: 'Latest Version', value: `v${githubData.latestVersion}`, color: 'text-emerald-400' },
+              { icon: Download, get label() { return uiI18n.t('app.total_downloads_85b696f8'); }, value: formatCompact(githubData.totalDownloads), color: 'text-violet-400' },
+              { icon: Smartphone, get label() { return uiI18n.t('app.mobile_downloads_cfebdf6a'); }, value: formatCompact(githubData.mobileDownloads), color: 'text-emerald-400' },
+              { icon: Monitor, get label() { return uiI18n.t('app.desktop_downloads_620f5c47'); }, value: formatCompact(githubData.desktopDownloads), color: 'text-blue-400' },
+              { icon: Star, get label() { return uiI18n.t('app.github_stars_d00bd5ef'); }, value: formatCompact(githubData.stars), color: 'text-amber-400' },
+              { icon: TrendingUp, get label() { return uiI18n.t('app.latest_version_2a2e9c3f'); }, value: `v${githubData.latestVersion}`, color: 'text-emerald-400' },
             ].map((s) => (
               <GlassPanel key={s.label} className="p-5">
                 <div className="flex items-center justify-between mb-2">
@@ -900,7 +903,7 @@ export function AnalyticsDashboard() {
             <GlassPanel className="p-6">
               <h3 className="font-medium mb-4 flex items-center gap-2">
                 <BarChart3 className="w-4 h-4 text-primary" />
-                Downloads per Release
+                {uiI18n.t('app.downloads_per_release_aaf2abec')}
               </h3>
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
@@ -908,7 +911,7 @@ export function AnalyticsDashboard() {
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                     <XAxis dataKey="version" stroke="hsl(var(--muted-foreground))" fontSize={12} />
                     <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                    <Tooltip formatter={(v: number) => [v.toLocaleString(), 'Downloads']} />
+                    <Tooltip formatter={(v: number) => [v.toLocaleString(uiI18n.language), 'Downloads']} />
                     <Bar dataKey="downloads" fill="#8b5cf6" radius={[4, 4, 0, 0]} name="Downloads" />
                   </BarChart>
                 </ResponsiveContainer>
@@ -918,7 +921,7 @@ export function AnalyticsDashboard() {
             <GlassPanel className="p-6">
               <h3 className="font-medium mb-4 flex items-center gap-2">
                 <PieChart className="w-4 h-4 text-primary" />
-                Downloads by Platform
+                {uiI18n.t('app.downloads_by_platform_b1497a96')}
               </h3>
               {githubData.perPlatform.length > 0 ? (
                 <div className="flex items-center gap-6">
@@ -939,7 +942,7 @@ export function AnalyticsDashboard() {
                             <Cell key={p.name} fill={p.color} />
                           ))}
                         </Pie>
-                        <Tooltip formatter={(v: number) => [v.toLocaleString(), 'Downloads']} />
+                        <Tooltip formatter={(v: number) => [v.toLocaleString(uiI18n.language), 'Downloads']} />
                       </RePieChart>
                     </ResponsiveContainer>
                   </div>
@@ -955,7 +958,7 @@ export function AnalyticsDashboard() {
                 </div>
               ) : (
                 <div className="h-56 flex items-center justify-center text-sm text-muted-foreground">
-                  No platform-tagged assets found
+                  {uiI18n.t('app.no_platform_tagged_assets_found_5d67278e')}
                 </div>
               )}
             </GlassPanel>

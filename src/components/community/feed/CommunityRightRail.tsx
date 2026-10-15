@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { motion } from 'framer-motion';
 import type { ReactNode } from 'react';
 import { useFollowAlongRail } from '@/hooks/ui/useFollowAlongRail';
@@ -59,6 +61,7 @@ export function CommunityRightRail({
   header,
   className,
 }: CommunityRightRailProps) {
+  useUiTranslation();
   const { ref: railRef, style: railStyle } = useFollowAlongRail();
   const scoped = Array.isArray(members);
 
@@ -72,7 +75,7 @@ export function CommunityRightRail({
             onlineUsers={onlineUsers}
             onlineUserIds={onlineUserIds}
             members={scoped ? members : undefined}
-            title={scoped ? 'Community' : 'Members'}
+            title={scoped ? uiI18n.t('app.community_bfd58ee3') : uiI18n.t('app.members_1cb449c1')}
             limit={scoped ? 24 : 20}
             className="w-full"
           />

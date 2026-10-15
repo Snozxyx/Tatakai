@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -21,6 +23,7 @@ export interface TierListCollaborator {
 }
 
 export function useTierListCollaborators(tierListId: string | undefined) {
+  useUiTranslation();
   return useQuery({
     queryKey: ['tier_list_collaborators', tierListId],
     queryFn: async () => {
@@ -60,6 +63,7 @@ export function useTierListCollaborators(tierListId: string | undefined) {
 }
 
 export function useTierListAccess(tierListId: string | undefined) {
+  useUiTranslation();
   const { user } = useAuth();
 
   return useQuery({
@@ -113,6 +117,7 @@ export function useTierListAccess(tierListId: string | undefined) {
 }
 
 export function useAddTierListCollaborator() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
@@ -126,7 +131,7 @@ export function useAddTierListCollaborator() {
       userId: string;
       role: TierCollaboratorRole;
     }) => {
-      if (!user) throw new Error('Must be logged in');
+      if (!user) throw new Error(uiI18n.t('app.must_be_logged_in_9cf435d8'));
 
       const db = supabase as any;
       const { error } = await db
@@ -143,15 +148,16 @@ export function useAddTierListCollaborator() {
     onSuccess: (_, { tierListId }) => {
       queryClient.invalidateQueries({ queryKey: ['tier_list_collaborators', tierListId] });
       queryClient.invalidateQueries({ queryKey: ['tier_list_access', tierListId] });
-      toast.success('Collaborator added');
+      toast.success(uiI18n.t('app.collaborator_added_30f9f0b4'));
     },
     onError: (error: any) => {
-      toast.error(error?.message || 'Failed to add collaborator');
+      toast.error(error?.message || uiI18n.t('app.failed_to_add_collaborator_64022a3c'));
     },
   });
 }
 
 export function useUpdateTierListCollaboratorRole() {
+  useUiTranslation();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -176,15 +182,16 @@ export function useUpdateTierListCollaboratorRole() {
     onSuccess: (_, { tierListId }) => {
       queryClient.invalidateQueries({ queryKey: ['tier_list_collaborators', tierListId] });
       queryClient.invalidateQueries({ queryKey: ['tier_list_access', tierListId] });
-      toast.success('Collaborator role updated');
+      toast.success(uiI18n.t('app.collaborator_role_updated_41cde5f8'));
     },
     onError: (error: any) => {
-      toast.error(error?.message || 'Failed to update role');
+      toast.error(error?.message || uiI18n.t('app.failed_to_update_role_2bce86b4'));
     },
   });
 }
 
 export function useRemoveTierListCollaborator() {
+  useUiTranslation();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -207,10 +214,10 @@ export function useRemoveTierListCollaborator() {
     onSuccess: (_, { tierListId }) => {
       queryClient.invalidateQueries({ queryKey: ['tier_list_collaborators', tierListId] });
       queryClient.invalidateQueries({ queryKey: ['tier_list_access', tierListId] });
-      toast.success('Collaborator removed');
+      toast.success(uiI18n.t('app.collaborator_removed_04258d86'));
     },
     onError: (error: any) => {
-      toast.error(error?.message || 'Failed to remove collaborator');
+      toast.error(error?.message || uiI18n.t('app.failed_to_remove_collaborator_d0efcc86'));
     },
   });
 }

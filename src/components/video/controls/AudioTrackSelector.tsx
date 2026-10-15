@@ -1,4 +1,7 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { Mic } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { AudioTrack } from "../VideoPlayer.types";
 
 interface AudioTrackSelectorProps {
@@ -16,6 +19,8 @@ export function AudioTrackSelector({
   onToggleMenu,
   onTrackChange,
 }: AudioTrackSelectorProps) {
+  useUiTranslation();
+  const { t } = useTranslation();
   if (audioTracks.length === 0) return null;
 
   return (
@@ -23,7 +28,7 @@ export function AudioTrackSelector({
       <button
         onClick={onToggleMenu}
         className={`p-2 rounded-lg hover:bg-white/10 transition-colors pointer-events-auto ${audioTracks.length > 1 ? "text-primary" : ""}`}
-        title="Audio Tracks"
+        title={t('player.audioTracks')}
       >
         <Mic className="w-4 h-4 md:w-5 md:h-5" />
       </button>
@@ -31,7 +36,7 @@ export function AudioTrackSelector({
       {showAudioMenu && (
         <div className="absolute bottom-full right-0 mb-2 bg-background/95 backdrop-blur-sm border border-border rounded-xl p-3 min-w-[150px] md:min-w-[180px] max-h-[300px] overflow-y-auto pointer-events-auto shadow-2xl">
           <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">
-            Audio Tracks
+            {t('player.audioTracks')}
           </div>
           <div className="space-y-1">
             {audioTracks.map((track) => (
@@ -41,7 +46,7 @@ export function AudioTrackSelector({
                 className={`w-full px-3 py-1.5 text-left text-xs md:text-sm rounded-lg hover:bg-muted transition-colors ${currentAudioTrack === track.id ? "text-primary font-medium bg-primary/10" : "text-foreground"}`}
               >
                 <span className="truncate block">
-                  {track.label || `Track ${track.id}`} ({track.lang || "und"})
+                  {track.label || t('player.audioTrackFallback', { id: track.id })} ({track.lang || uiI18n.t('app.und_b03a4348')})
                 </span>
               </button>
             ))}

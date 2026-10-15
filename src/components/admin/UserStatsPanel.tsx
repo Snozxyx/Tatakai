@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -22,7 +24,8 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { subDays, subMonths, startOfDay, format } from 'date-fns';
+import { subDays, subMonths, startOfDay } from 'date-fns';
+import { format } from '@/lib/localeFormat';
 import {
   groupSignupsByPeriod,
   computeDau,
@@ -60,6 +63,7 @@ function getRangeStart(timeRange: TimeRange): Date {
 // Component
 // ---------------------------------------------------------------------------
 export function UserStatsPanel() {
+  useUiTranslation();
   const [timeRange, setTimeRange] = useState<TimeRange>('week');
 
   // ------------------------------------------------------------------
@@ -224,11 +228,9 @@ export function UserStatsPanel() {
         <button
           key={range}
           onClick={() => handleTimeRangeChange(range)}
-          className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
-            timeRange === range
+          className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${timeRange === range
               ? 'bg-primary text-primary-foreground'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
+              : 'text-muted-foreground hover:text-foreground'}`}
         >
           {range.charAt(0).toUpperCase() + range.slice(1)}
         </button>
@@ -246,7 +248,7 @@ export function UserStatsPanel() {
     <GlassPanel className="p-12 text-center border-destructive/20 bg-destructive/5">
       <XCircle className="w-10 h-10 text-destructive/50 mx-auto mb-4" />
       <p className="text-sm font-medium text-destructive mb-4">
-        Failed to load user statistics
+        {uiI18n.t('app.failed_to_load_user_statistics_28a785ca')}
       </p>
       <Button
         variant="outline"
@@ -255,14 +257,14 @@ export function UserStatsPanel() {
         className="gap-2 border-destructive/30 hover:bg-destructive/10 text-destructive"
       >
         <RefreshCw className="w-4 h-4" />
-        Retry
+        {uiI18n.t('app.retry_9f5cd8a2')}
       </Button>
     </GlassPanel>
   );
 
   const renderEmptyChart = () => (
     <div className="flex items-center justify-center h-48 text-sm text-muted-foreground">
-      No data available for the selected period
+      {uiI18n.t('app.no_data_available_for_the_selected_period_cfa32ba2')}
     </div>
   );
 
@@ -272,7 +274,7 @@ export function UserStatsPanel() {
       <GlassPanel className="p-6">
         <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
           <TrendingUp className="w-4 h-4 text-primary" />
-          Signup Trend
+          {uiI18n.t('app.signup_trend_4291c8e6')}
         </h3>
         {data.length === 0 ? (
           renderEmptyChart()
@@ -324,7 +326,7 @@ export function UserStatsPanel() {
       <GlassPanel className="p-6">
         <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
           <Activity className="w-4 h-4 text-primary" />
-          Daily Active Users (DAU)
+          {uiI18n.t('app.daily_active_users_dau_32ad06a6')}
         </h3>
         {data.length === 0 ? (
           renderEmptyChart()
@@ -372,10 +374,10 @@ export function UserStatsPanel() {
       <GlassPanel className="p-6">
         <h3 className="text-sm font-semibold mb-1 flex items-center gap-2">
           <Globe className="w-4 h-4 text-primary" />
-          World Map — Visitors by Country
+          {uiI18n.t('app.world_map_visitors_by_country_0fd2b69b')}
         </h3>
         <p className="text-xs text-muted-foreground mb-4">
-          Every geo-tagged country in range, sized by unique visitors. Hover a bubble or row for detail.
+          {uiI18n.t('app.every_geo_tagged_country_in_range_sized_by_uniqu_4bcc5412')}
         </p>
         {countries.length === 0 ? (
           renderEmptyChart()
@@ -411,9 +413,9 @@ export function UserStatsPanel() {
             </div>
           </div>
           <div className="mt-4">
-            <p className="text-2xl font-bold text-white">{totalCount.toLocaleString()}</p>
-            <p className="text-sm text-white/70">Total Registered Users</p>
-            <p className="text-xs text-white/50 mt-1">All time count</p>
+            <p className="text-2xl font-bold text-white">{totalCount.toLocaleString(uiI18n.language)}</p>
+            <p className="text-sm text-white/70">{uiI18n.t('app.total_registered_users_965fc8a8')}</p>
+            <p className="text-xs text-white/50 mt-1">{uiI18n.t('app.all_time_count_dd176262')}</p>
           </div>
         </GlassPanel>
 
@@ -425,10 +427,10 @@ export function UserStatsPanel() {
             </div>
           </div>
           <div className="mt-4">
-            <p className="text-2xl font-bold text-white">{dauToday.toLocaleString()}</p>
-            <p className="text-sm text-white/70">DAU (Today)</p>
+            <p className="text-2xl font-bold text-white">{dauToday.toLocaleString(uiI18n.language)}</p>
+            <p className="text-sm text-white/70">{uiI18n.t('app.dau_today_54758960')}</p>
             <p className="text-xs text-white/50 mt-1">
-              {dauMembers.toLocaleString()} members · {dauGuests.toLocaleString()} guests
+              {dauMembers.toLocaleString(uiI18n.language)} {uiI18n.t('app.members_0c3cbc60')} {dauGuests.toLocaleString(uiI18n.language)} {uiI18n.t('app.guests_f8122851')}
             </p>
           </div>
         </GlassPanel>
@@ -441,10 +443,10 @@ export function UserStatsPanel() {
             </div>
           </div>
           <div className="mt-4">
-            <p className="text-2xl font-bold text-white">{rangeActives.toLocaleString()}</p>
-            <p className="text-sm text-white/70">Active in range</p>
+            <p className="text-2xl font-bold text-white">{rangeActives.toLocaleString(uiI18n.language)}</p>
+            <p className="text-sm text-white/70">{uiI18n.t('app.active_in_range_16ff4e75')}</p>
             <p className="text-xs text-white/50 mt-1">
-              Unique members + guest sessions
+              {uiI18n.t('app.unique_members_guest_sessions_8e34e29f')}
             </p>
           </div>
         </GlassPanel>
@@ -458,9 +460,9 @@ export function UserStatsPanel() {
           </div>
           <div className="mt-4">
             <p className="text-2xl font-bold text-white">{retentionDisplay}</p>
-            <p className="text-sm text-white/70">7-Day Retention</p>
+            <p className="text-sm text-white/70">{uiI18n.t('app.7_day_retention_d62e0d05')}</p>
             <p className="text-xs text-white/50 mt-1">
-              Trailing 30-day cohort · fixed
+              {uiI18n.t('app.trailing_30_day_cohort_fixed_724032d5')}
             </p>
           </div>
         </GlassPanel>
@@ -477,7 +479,7 @@ export function UserStatsPanel() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h2 className="text-xl font-bold flex items-center gap-2">
           <Users className="w-6 h-6 text-primary" />
-          User Statistics
+          {uiI18n.t('app.user_statistics_8db25f40')}
         </h2>
         <div className="flex items-center gap-3 flex-wrap">
           {renderTimeRangeSelector()}
@@ -489,7 +491,7 @@ export function UserStatsPanel() {
             className="gap-2 text-muted-foreground hover:text-foreground"
           >
             <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
-            Refresh
+            {uiI18n.t('app.refresh_56e3badc')}
           </Button>
         </div>
       </div>

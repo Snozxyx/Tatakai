@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -14,7 +16,7 @@ import {
   RotateCcw,
   PlusCircle,
 } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from '@/lib/localeFormat';
 import type { UpdatePolicy, CreatePolicyForm } from '@/types/admin-dashboard';
 import { GitHubReleasesPanel } from './GitHubReleasesPanel';
 
@@ -54,6 +56,7 @@ const TYPE_COLOURS: Record<UpdatePolicy['type'], string> = {
 };
 
 const TypeIcon = ({ type }: { type: UpdatePolicy['type'] }) => {
+  useUiTranslation();
   switch (type) {
     case 'mandatory':
       return <AlertTriangle className="w-3.5 h-3.5" />;
@@ -77,6 +80,7 @@ function isFormValid(form: CreatePolicyForm): boolean {
 // Component
 // ---------------------------------------------------------------------------
 export function UpdateManagementPanel() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const [form, setForm] = useState<CreatePolicyForm>(INITIAL_FORM);
   const [formError, setFormError] = useState<string | null>(null);
@@ -129,7 +133,7 @@ export function UpdateManagementPanel() {
       if (msg.includes(DUPLICATE_ACTIVE_CONSTRAINT) || msg.includes('unique') || msg.includes('duplicate')) {
         setFormError('A channel can only have one active policy at a time. Deactivate the existing policy first.');
       } else {
-        toast.error(`Failed to create policy: ${msg}`);
+        toast.error(uiI18n.t('app.failed_to_create_policy_i18n_value_0_6fbe5c20', { value0: msg }));
       }
     },
   });
@@ -173,8 +177,8 @@ export function UpdateManagementPanel() {
     },
     onError: (error: unknown) => {
       const message =
-        error instanceof Error ? error.message : 'Unknown error';
-      toast.error(`Failed to deactivate policy: ${message}`);
+        error instanceof Error ? error.message : uiI18n.t('app.unknown_error_e5fd9aa2');
+      toast.error(uiI18n.t('app.failed_to_deactivate_policy_i18n_value_0_f9bfea39', { value0: message }));
     },
   });
 
@@ -185,7 +189,7 @@ export function UpdateManagementPanel() {
     <GlassPanel className="p-5 border-white/10">
       <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
         <PlusCircle className="w-4 h-4 text-primary" />
-        New Update Policy
+        {uiI18n.t('app.new_update_policy_138343cc')}
       </h3>
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Inline constraint error */}
@@ -198,37 +202,37 @@ export function UpdateManagementPanel() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {/* Channel */}
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Channel</label>
+            <label className="text-xs text-muted-foreground font-medium uppercase tracking-wide">{uiI18n.t('app.channel_879f0b1b')}</label>
             <select
               value={form.channel}
               onChange={e => handleFormChange('channel', e.target.value)}
               className="w-full bg-white/5 border border-white/10 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary"
             >
-              <option value="stable">stable</option>
-              <option value="beta">beta</option>
-              <option value="experimental">experimental</option>
+              <option value="stable">{uiI18n.t('app.stable_4fbacc2f')}</option>
+              <option value="beta">{uiI18n.t('app.beta_a295e0bd')}</option>
+              <option value="experimental">{uiI18n.t('app.experimental_2216470a')}</option>
             </select>
           </div>
 
           {/* Type */}
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Type</label>
+            <label className="text-xs text-muted-foreground font-medium uppercase tracking-wide">{uiI18n.t('app.type_3deb7456')}</label>
             <select
               value={form.type}
               onChange={e => handleFormChange('type', e.target.value)}
               className="w-full bg-white/5 border border-white/10 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary"
             >
-              <option value="mandatory">mandatory</option>
-              <option value="recommended">recommended</option>
-              <option value="experimental">experimental</option>
-              <option value="rollback">rollback</option>
+              <option value="mandatory">{uiI18n.t('app.mandatory_cd357c16')}</option>
+              <option value="recommended">{uiI18n.t('app.recommended_13941e19')}</option>
+              <option value="experimental">{uiI18n.t('app.experimental_2216470a')}</option>
+              <option value="rollback">{uiI18n.t('app.rollback_ff3a6f3b')}</option>
             </select>
           </div>
 
           {/* Target version */}
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
-              Target Version <span className="text-muted-foreground/50">(e.g. 1.2.3)</span>
+              {uiI18n.t('app.target_version_32664455')} <span className="text-muted-foreground/50">(e.g. 1.2.3)</span>
             </label>
             <input
               type="text"
@@ -238,7 +242,7 @@ export function UpdateManagementPanel() {
               className="w-full bg-white/5 border border-white/10 rounded px-3 py-1.5 text-sm font-mono text-white placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary"
             />
             {form.target_version && !SEMVER_RE.test(form.target_version) && (
-              <p className="text-xs text-destructive">Must match format X.Y.Z</p>
+              <p className="text-xs text-destructive">{uiI18n.t('app.must_match_format_x_y_z_97f5bc6a')}</p>
             )}
           </div>
 
@@ -246,7 +250,7 @@ export function UpdateManagementPanel() {
           {form.type === 'rollback' && (
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
-                Rollback From Version <span className="text-destructive">*</span>
+                {uiI18n.t('app.rollback_from_version_fd6192da')} <span className="text-destructive">*</span>
               </label>
               <input
                 type="text"
@@ -256,7 +260,7 @@ export function UpdateManagementPanel() {
                 className="w-full bg-white/5 border border-white/10 rounded px-3 py-1.5 text-sm font-mono text-white placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary"
               />
               {form.rollback_from_version && !SEMVER_RE.test(form.rollback_from_version) && (
-                <p className="text-xs text-destructive">Must match format X.Y.Z</p>
+                <p className="text-xs text-destructive">{uiI18n.t('app.must_match_format_x_y_z_97f5bc6a')}</p>
               )}
             </div>
           )}
@@ -264,12 +268,12 @@ export function UpdateManagementPanel() {
 
         {/* Notes */}
         <div className="space-y-1">
-          <label className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Notes (optional)</label>
+          <label className="text-xs text-muted-foreground font-medium uppercase tracking-wide">{uiI18n.t('app.notes_optional_4d56ca9b')}</label>
           <textarea
             value={form.notes ?? ''}
             onChange={e => handleFormChange('notes', e.target.value)}
             rows={2}
-            placeholder="Release notes or reason for this policy…"
+            placeholder={uiI18n.t('app.release_notes_or_reason_for_this_policy_34f20c1e')}
             className="w-full bg-white/5 border border-white/10 rounded px-3 py-1.5 text-sm text-white placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary resize-none"
           />
         </div>
@@ -286,7 +290,7 @@ export function UpdateManagementPanel() {
             ) : (
               <PlusCircle className="w-3.5 h-3.5" />
             )}
-            Create Policy
+            {uiI18n.t('app.create_policy_07b4b371')}
           </Button>
           <Button
             type="button"
@@ -295,7 +299,7 @@ export function UpdateManagementPanel() {
             onClick={() => { setShowForm(false); setForm(INITIAL_FORM); setFormError(null); }}
             className="text-muted-foreground"
           >
-            Cancel
+            {uiI18n.t('app.cancel_77dfd213')}
           </Button>
         </div>
       </form>
@@ -312,7 +316,7 @@ export function UpdateManagementPanel() {
     <GlassPanel className="p-12 text-center border-destructive/20 bg-destructive/5">
       <XCircle className="w-10 h-10 text-destructive/50 mx-auto mb-4" />
       <p className="text-sm font-medium text-destructive mb-4">
-        Failed to load update policies
+        {uiI18n.t('app.failed_to_load_update_policies_4bcd9449')}
       </p>
       <Button
         variant="outline"
@@ -321,7 +325,7 @@ export function UpdateManagementPanel() {
         className="gap-2 border-destructive/30 hover:bg-destructive/10 text-destructive"
       >
         <RefreshCw className="w-4 h-4" />
-        Retry
+        {uiI18n.t('app.retry_9f5cd8a2')}
       </Button>
     </GlassPanel>
   );
@@ -330,7 +334,7 @@ export function UpdateManagementPanel() {
     <GlassPanel className="p-16 text-center border-dashed border-white/5">
       <ArrowDownCircle className="w-10 h-10 text-muted-foreground/25 mx-auto mb-3" />
       <p className="text-sm text-muted-foreground font-medium">
-        No update policies found.
+        {uiI18n.t('app.no_update_policies_found_8f6b286a')}
       </p>
     </GlassPanel>
   );
@@ -360,12 +364,12 @@ export function UpdateManagementPanel() {
             {policy.active ? (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold border bg-emerald-500/10 text-emerald-400 border-emerald-500/25">
                 <CheckCircle2 className="w-3 h-3" />
-                Active
+                {uiI18n.t('app.active_a733b809')}
               </span>
             ) : (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold border bg-muted/20 text-muted-foreground border-white/10">
                 <XCircle className="w-3 h-3" />
-                Inactive
+                {uiI18n.t('app.inactive_09af574c')}
               </span>
             )}
           </div>
@@ -374,7 +378,7 @@ export function UpdateManagementPanel() {
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
             <span>
               <span className="text-muted-foreground text-xs uppercase tracking-wide font-bold mr-1">
-                Target
+                {uiI18n.t('app.target_61ad50a9')}
               </span>
               <span className="font-mono font-semibold">
                 v{policy.target_version}
@@ -383,7 +387,7 @@ export function UpdateManagementPanel() {
             {policy.rollback_from_version && (
               <span>
                 <span className="text-muted-foreground text-xs uppercase tracking-wide font-bold mr-1">
-                  Rollback from
+                  {uiI18n.t('app.rollback_from_c68ad74f')}
                 </span>
                 <span className="font-mono font-semibold text-orange-400">
                   v{policy.rollback_from_version}
@@ -401,12 +405,12 @@ export function UpdateManagementPanel() {
 
           {/* Published at */}
           <p className="text-[11px] text-muted-foreground/70">
-            Published{' '}
+            {uiI18n.t('app.published_483bf207')}{' '}
             {formatDistanceToNow(new Date(policy.published_at), {
               addSuffix: true,
             })}{' '}
-            &nbsp;·&nbsp;{' '}
-            {new Date(policy.published_at).toLocaleString()}
+            {" · "}{' '}
+            {new Date(policy.published_at).toLocaleString(uiI18n.language)}
           </p>
         </div>
 
@@ -426,7 +430,7 @@ export function UpdateManagementPanel() {
               ) : (
                 <XCircle className="w-3.5 h-3.5" />
               )}
-              Deactivate
+              {uiI18n.t('app.deactivate_d65ded94')}
             </Button>
           </div>
         )}
@@ -443,7 +447,7 @@ export function UpdateManagementPanel() {
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold flex items-center gap-2">
           <ArrowDownCircle className="w-6 h-6 text-primary" />
-          Update Policies
+          {uiI18n.t('app.update_policies_8a906ec3')}
         </h2>
         <div className="flex items-center gap-2">
           <Button
@@ -453,7 +457,7 @@ export function UpdateManagementPanel() {
             className="gap-1.5 text-xs"
           >
             <PlusCircle className="w-3.5 h-3.5" />
-            New Policy
+            {uiI18n.t('app.new_policy_d5d4357a')}
           </Button>
           <Button
             variant="ghost"
@@ -463,7 +467,7 @@ export function UpdateManagementPanel() {
             className="gap-2 text-muted-foreground hover:text-foreground"
           >
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-            Refresh
+            {uiI18n.t('app.refresh_56e3badc')}
           </Button>
         </div>
       </div>

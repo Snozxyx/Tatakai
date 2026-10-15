@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Crown, Plus, Trophy, ChevronRight } from 'lucide-react';
@@ -11,6 +13,7 @@ export interface LeaderboardCardProps {
 }
 
 export function LeaderboardCard({ className, onOpen }: LeaderboardCardProps) {
+  useUiTranslation();
   const [sheetOpen, setSheetOpen] = useState(false);
   const { data: topUsers = [], isLoading } = useLeaderboard('watched', 5);
 
@@ -52,7 +55,7 @@ export function LeaderboardCard({ className, onOpen }: LeaderboardCardProps) {
               <Trophy className="h-3.5 w-3.5 text-amber-400" />
             </div>
             <span className="text-[11px] font-bold uppercase tracking-widest text-amber-400">
-              Leaderboard
+              {uiI18n.t('app.leaderboard_0381247a')}
             </span>
           </div>
         </div>
@@ -90,7 +93,7 @@ export function LeaderboardCard({ className, onOpen }: LeaderboardCardProps) {
                 {/* Info & Score */}
                 <div className="min-w-0 flex-1 py-0.5">
                   <p className="truncate text-[13px] font-semibold text-zinc-100 transition-colors group-hover/row:text-white">
-                    {entry.display_name || entry.username || 'Anonymous'}
+                    {entry.display_name || entry.username || uiI18n.t('app.anonymous_9bed5104')}
                   </p>
                   <div className="mt-1 flex items-center gap-2">
                     <div className={cn(
@@ -101,7 +104,7 @@ export function LeaderboardCard({ className, onOpen }: LeaderboardCardProps) {
                       #{i + 1}
                     </div>
                     <span className="text-[11px] font-medium text-zinc-500">
-                      <span className="text-zinc-300">{entry.score.toLocaleString()}</span> eps
+                      <span className="text-zinc-300">{entry.score.toLocaleString(uiI18n.language)}</span> {uiI18n.t('app.eps_85962fc8')}
                     </span>
                   </div>
                 </div>
@@ -120,10 +123,10 @@ export function LeaderboardCard({ className, onOpen }: LeaderboardCardProps) {
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <h3 className="truncate text-sm font-bold text-white transition-colors group-hover:text-amber-400">
-                  Full Rankings
+                  {uiI18n.t('app.full_rankings_2acb9927')}
                 </h3>
                 <p className="mt-0.5 text-[11px] font-medium text-muted-foreground">
-                  See where you stand
+                  {uiI18n.t('app.see_where_you_stand_986e6238')}
                 </p>
               </div>
               <button className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-black shadow-[0_0_15px_rgba(255,255,255,0.3)] transition-transform duration-300 group-hover:scale-110 group-hover:bg-amber-400 group-active:scale-95">

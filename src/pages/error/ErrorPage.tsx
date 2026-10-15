@@ -1,4 +1,7 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { motion } from "framer-motion";
+import { useTranslation } from "react-i18next";
 import { AlertCircle, RefreshCw, Home, Bug } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -9,6 +12,8 @@ interface ErrorPageProps {
 }
 
 const ErrorPage = ({ error, resetError, errorId }: ErrorPageProps) => {
+  useUiTranslation();
+  const { t } = useTranslation();
   const handleGoHome = () => {
     window.location.href = '/';
   };
@@ -45,7 +50,7 @@ const ErrorPage = ({ error, resetError, errorId }: ErrorPageProps) => {
               delay: i * 0.5,
             }}
           >
-            {`Error: undefined\n  at line ${100 + i * 23}\n  at Module.${['render', 'mount', 'update', 'fetch', 'parse'][i]}`}
+            {uiI18n.t('app.error_undefined_at_line_i18n_value_0_at_module_i_6be269e8', { value0: 100 + i * 23, value1: ['render', 'mount', 'update', 'fetch', 'parse'][i] })}
           </motion.div>
         ))}
       </div>
@@ -87,10 +92,10 @@ const ErrorPage = ({ error, resetError, errorId }: ErrorPageProps) => {
           className="space-y-4 mb-8"
         >
           <h1 className="text-3xl md:text-4xl font-display font-bold text-foreground">
-            Something Went Wrong
+            {t('errors.somethingWentWrong')}
           </h1>
           <p className="text-muted-foreground text-lg">
-            An unexpected error occurred. Don't worry, our team has been notified.
+            {t('errors.unexpectedError')}
           </p>
         </motion.div>
 
@@ -105,10 +110,10 @@ const ErrorPage = ({ error, resetError, errorId }: ErrorPageProps) => {
             <div className="bg-muted/50 border border-border rounded-lg p-4 text-left">
               <div className="flex items-center gap-2 mb-2">
                 <Bug className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm font-medium text-foreground">Error Details</span>
+                <span className="text-sm font-medium text-foreground">{t('errors.errorDetails')}</span>
               </div>
               <code className="text-xs text-muted-foreground break-all block">
-                {error.message || 'Unknown error'}
+                {error.message || t('errors.unknownError')}
               </code>
             </div>
           </motion.div>
@@ -127,11 +132,11 @@ const ErrorPage = ({ error, resetError, errorId }: ErrorPageProps) => {
             className="gap-2"
           >
             <RefreshCw className="w-5 h-5" />
-            Try Again
+            {t('errors.tryAgain')}
           </Button>
           <Button onClick={handleGoHome} variant="outline" size="lg" className="gap-2">
             <Home className="w-5 h-5" />
-            Go Home
+            {t('errors.goHome')}
           </Button>
         </motion.div>
 
@@ -142,7 +147,7 @@ const ErrorPage = ({ error, resetError, errorId }: ErrorPageProps) => {
           transition={{ delay: 1 }}
           className="mt-8 text-xs text-muted-foreground"
         >
-          Error ID: {errorId ?? Math.random().toString(36).substring(2, 10).toUpperCase()}
+          {t('errors.errorId')}: {errorId ?? Math.random().toString(36).substring(2, 10).toUpperCase()}
         </motion.p>
       </motion.div>
     </div>

@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
  * NovelReaderPage — immersive text reader.
  *
@@ -39,6 +41,7 @@ import { ReaderSelectionComment } from '@/components/novel/ReaderSelectionCommen
 import type { CommentQuoteDraft } from '@/lib/commentQuotes';
 
 export default function NovelReaderPage() {
+  useUiTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const isNative = useIsNativeApp();
@@ -134,7 +137,7 @@ export default function NovelReaderPage() {
 
   const { data: detailResp } = useNovelDetail(novelId);
   const detail = (detailResp as any)?.detail;
-  const novelTitle = detail?.canonicalTitle || detail?.title?.english || detail?.title?.romaji || 'Novel';
+  const novelTitle = detail?.canonicalTitle || detail?.title?.english || detail?.title?.romaji || uiI18n.t('app.novel_1a9fdb91');
   const novelPoster = detail?.coverImage ?? null;
 
   const resolvedNumber = useMemo(() => {
@@ -158,7 +161,7 @@ export default function NovelReaderPage() {
     };
   }, [isNative, novelTitle, novelPoster, resolvedNumber, novelId]);
 
-  const title = chapterTitleParam || data?.data?.chapter?.title || (resolvedNumber != null ? `Chapter ${resolvedNumber}` : 'Chapter');
+  const title = chapterTitleParam || data?.data?.chapter?.title || (resolvedNumber != null ? uiI18n.t('app.chapter_i18n_value_0_e0f6e591', { value0: resolvedNumber }) : uiI18n.t('app.chapter_46b00590'));
 
   const currentIndex = useMemo(() => {
     if (!chapters.length) return -1;
@@ -529,48 +532,48 @@ export default function NovelReaderPage() {
       <div className="relative z-30 shrink-0 border-b border-border" style={{ background: settings.background }}>
         <div className="mx-auto flex max-w-[1100px] items-center justify-between gap-3 px-3">
           <button type="button" onClick={() => setControlsOpen(value => !value)} aria-expanded={controlsOpen} aria-controls="novel-reader-controls" className="flex min-h-11 items-center gap-2 rounded-lg px-2 text-sm font-medium hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-            {controlsOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />} {controlsOpen ? 'Hide reader controls' : 'Reader controls'}
+            {controlsOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />} {controlsOpen ? uiI18n.t('app.hide_reader_controls_97fb1781') : uiI18n.t('app.reader_controls_f3849915')}
           </button>
-          <span aria-live="polite" className="truncate text-xs text-muted-foreground">{narratorPaused ? 'Narration paused' : narratorBuffering ? 'Preparing audio…' : narrating ? 'Narration active' : settings.showPercentRead ? `${percent}% read` : ''}</span>
+          <span aria-live="polite" className="truncate text-xs text-muted-foreground">{narratorPaused ? uiI18n.t('app.narration_paused_7c404973') : narratorBuffering ? uiI18n.t('app.preparing_audio_63cde625') : narrating ? uiI18n.t('app.narration_active_353b296f') : settings.showPercentRead ? uiI18n.t('app.i18n_value_0_read_f936320f', { value0: percent }) : ''}</span>
         </div>
         <div id="novel-reader-controls" hidden={!controlsOpen}>
         <div className="mx-auto flex max-w-[1100px] flex-wrap items-center gap-2 px-3 pb-2.5">
           <button onClick={() => { stopNarration(); navigate(novelId ? `/novel/${encodeURIComponent(novelId)}` : '/novel'); }}
-            className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 hover:bg-white/10" aria-label="Back to novel">
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 hover:bg-white/10" aria-label={uiI18n.t('app.back_to_novel_e943a5d2')}>
             <ArrowLeft className="w-4 h-4" />
           </button>
           <div className="min-w-0 flex-1 basis-40">
             <p className="truncate text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{novelTitle}</p>
             <h1 className="truncate text-sm font-black">
-              {settings.showChapterNumber && resolvedNumber != null ? `Ch.${resolvedNumber} · ` : ''}{title}
+              {settings.showChapterNumber && resolvedNumber != null ? uiI18n.t('app.ch_i18n_value_0_fc0c35f8', { value0: resolvedNumber }) : ''}{title}
               {isOfflineChapter && (
                 <span className="ml-2 rounded-md bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-emerald-400">
-                  Offline
+                  {uiI18n.t('app.offline_e01fa717')}
                 </span>
               )}
             </h1>
           </div>
-          <button onClick={toggleNarration} title={narratorPaused ? 'Resume narration' : narrating ? 'Pause narration' : 'Read aloud'}
+          <button onClick={toggleNarration} title={narratorPaused ? uiI18n.t('app.resume_narration_94036c2d') : narrating ? uiI18n.t('app.pause_narration_837bb7c0') : uiI18n.t('app.read_aloud_562107b8')}
             disabled={narratorBuffering && !narrating}
             className={cn('flex h-9 w-9 items-center justify-center rounded-xl border transition-colors',
               narrating ? 'border-primary/50 bg-primary text-primary-foreground' : 'border-white/10 bg-white/5 hover:bg-white/10')}>
             {narrating && !narratorPaused ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
           </button>
           {(narrating || narratorBuffering) && (
-            <button onClick={stopNarrationBtn} title="Stop narration"
+            <button onClick={stopNarrationBtn} title={uiI18n.t('app.stop_narration_b9e9b8c4')}
               className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 hover:bg-white/10">
               <Square className="w-3.5 h-3.5" />
             </button>
           )}
-          <button onClick={() => setShowChapters(true)} title="Chapters"
+          <button onClick={() => setShowChapters(true)} title={uiI18n.t('app.chapters_034e2733')}
             className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 hover:bg-white/10">
             <List className="w-4 h-4" />
           </button>
-          <button onClick={() => setShowSettings(true)} title="Reader settings"
+          <button onClick={() => setShowSettings(true)} title={uiI18n.t('app.reader_settings_bf922fa5')}
             className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 hover:bg-white/10">
             <Settings2 className="w-4 h-4" />
           </button>
-          <button onClick={toggleFullscreen} title="Fullscreen"
+          <button onClick={toggleFullscreen} title={uiI18n.t('app.fullscreen_bb08d10b')}
             className="hidden sm:flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 hover:bg-white/10">
             {isFs ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
           </button>
@@ -602,16 +605,16 @@ export default function NovelReaderPage() {
                 <div key={i} className="h-5 rounded bg-white/10" style={{ width: `${92 - (i % 3) * 12}%` }} />
               ))}
               <p className="flex items-center gap-2 text-sm text-muted-foreground pt-4">
-                <Loader2 className="w-4 h-4 animate-spin" /> Loading chapter text…
+                <Loader2 className="w-4 h-4 animate-spin" /> {uiI18n.t('app.loading_chapter_text_7c19bc32')}
               </p>
             </div>
           ) : error || paragraphs.length === 0 ? (
             <div className="py-20 text-center">
-              <p className="font-bold">No text for this chapter yet</p>
-              <p className="mt-2 text-sm text-muted-foreground">Try another translator, or reload.</p>
+              <p className="font-bold">{uiI18n.t('app.no_text_for_this_chapter_yet_faaadff4')}</p>
+              <p className="mt-2 text-sm text-muted-foreground">{uiI18n.t('app.try_another_translator_or_reload_8856619a')}</p>
               <button onClick={() => setReloadNonce((n) => n + 1)}
                 className="mt-4 rounded-xl bg-primary px-5 py-2 text-sm font-bold text-primary-foreground">
-                Retry
+                {uiI18n.t('app.retry_9f5cd8a2')}
               </button>
             </div>
           ) : (
@@ -619,8 +622,8 @@ export default function NovelReaderPage() {
               <header className="mb-8">
                 <h2 className="text-2xl font-black tracking-tight" style={{ fontSize: settings.textSize + 8 }}>{title}</h2>
                 <p className="mt-1 text-xs opacity-60">
-                  {resolvedProvider}{settings.showPercentRead ? ` · ${percent}% read` : ''}
-                  {narratorBackend ? ` · ${narratorEngineLabel(narratorBackend as NarratorBackend)}` : ''}
+                  {resolvedProvider}{settings.showPercentRead ? uiI18n.t('app.i18n_value_0_read_aabffb32', { value0: percent }) : ''}
+                  {narratorBackend ? uiI18n.t('app.i18n_value_0_92e4cd32', { value0: narratorEngineLabel(narratorBackend as NarratorBackend) }) : ''}
                 </p>
               </header>
               {paragraphs.map((p) => (
@@ -659,7 +662,7 @@ export default function NovelReaderPage() {
                 <>
                   <div className="mx-auto my-8 flex items-center gap-3 text-[11px] font-bold uppercase tracking-wider opacity-60">
                     <span className="h-px flex-1 bg-current" />
-                    <span>{appended.number != null ? `Chapter ${appended.number}` : ''} · {appended.title}</span>
+                    <span>{appended.number != null ? uiI18n.t('app.chapter_i18n_value_0_e0f6e591', { value0: appended.number }) : ''} · {appended.title}</span>
                     <span className="h-px flex-1 bg-current" />
                   </div>
                   {appended.paragraphs.map((p, i) => (
@@ -668,14 +671,14 @@ export default function NovelReaderPage() {
                   {nextChapter && (
                     <button onClick={() => navToChapter(nextChapter, 0)}
                       className="mt-6 w-full rounded-2xl border border-white/10 bg-white/5 py-3 text-sm font-bold hover:bg-white/10">
-                      Open Chapter {nextChapter.chapterNumber ?? ''} properly →
+                      {uiI18n.t('app.open_chapter_dd0f79f9')} {nextChapter.chapterNumber ?? ''} {uiI18n.t('app.properly_19e4d5d0')}
                     </button>
                   )}
                 </>
               )}
               <div ref={bottomRef} className="h-4" />
               {loadingNext && (
-                <p className="flex items-center gap-2 text-xs opacity-60 py-4"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading next chapter…</p>
+                <p className="flex items-center gap-2 text-xs opacity-60 py-4"><Loader2 className="w-3.5 h-3.5 animate-spin" /> {uiI18n.t('app.loading_next_chapter_3f34ab50')}</p>
               )}
             </>
           )}
@@ -685,15 +688,15 @@ export default function NovelReaderPage() {
         <div className="mx-auto flex max-w-[1100px] items-center justify-between gap-3 pt-8" style={{ maxWidth: settings.textWidth }}>
           <button disabled={!prevChapter} onClick={() => navToChapter(prevChapter, 0)}
             className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-bold disabled:opacity-30 hover:bg-white/10">
-            <ChevronLeft className="w-4 h-4" /> Prev
+            <ChevronLeft className="w-4 h-4" /> {uiI18n.t('app.prev_e96fea52')}
           </button>
           <button onClick={() => jumpToParagraph(Math.min(total - 1, paraIndex + 5))}
             className="text-xs font-bold uppercase tracking-wider opacity-60">
-            {settings.showPercentRead ? `${percent}%` : `${paraIndex + 1} / ${total}`}
+            {settings.showPercentRead ? uiI18n.t('app.i18n_value_0_cac4fa79', { value0: percent }) : uiI18n.t('app.i18n_value_0_i18n_value_1_68ff458e', { value0: paraIndex + 1, value1: total })}
           </button>
           <button disabled={!nextChapter && !appended} onClick={() => navToChapter(nextChapter, 0)}
             className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground disabled:opacity-30 hover:brightness-110">
-            Next <ChevronRight className="w-4 h-4" />
+            {uiI18n.t('app.next_bc981983')} <ChevronRight className="w-4 h-4" />
           </button>
         </div>
 
@@ -702,7 +705,7 @@ export default function NovelReaderPage() {
           <div ref={discussionRef} className="mx-auto pt-10" style={{ maxWidth: settings.textWidth }}>
             <button onClick={() => setShowComments((v) => !v)}
               className="flex items-center gap-2 text-sm font-bold opacity-80 hover:opacity-100">
-              <MessageSquare className="w-4 h-4" /> Chapter discussion
+              <MessageSquare className="w-4 h-4" /> {uiI18n.t('app.chapter_discussion_04f6597b')}
             </button>
             {showComments && (
               <div className="mt-3 rounded-2xl border border-white/10 bg-black/30 p-4">
@@ -722,11 +725,11 @@ export default function NovelReaderPage() {
       {/* Settings sheet */}
       <Sheet open={showSettings} onOpenChange={setShowSettings}>
         <SheetContent side="right" className="w-[380px] max-w-[92vw] overflow-y-auto">
-          <SheetHeader><SheetTitle>Novel reader settings</SheetTitle></SheetHeader>
+          <SheetHeader><SheetTitle>{uiI18n.t('app.novel_reader_settings_391b370d')}</SheetTitle></SheetHeader>
           <div className="mt-4 space-y-6">
             <NovelReaderPanel />
             <div>
-              <h3 className="mb-2 text-sm font-black">Manga reader layout (shared)</h3>
+              <h3 className="mb-2 text-sm font-black">{uiI18n.t('app.manga_reader_layout_shared_ec25e2e2')}</h3>
               <ReaderPanel />
             </div>
           </div>
@@ -736,8 +739,8 @@ export default function NovelReaderPage() {
       {/* Chapter list sheet */}
       <Sheet open={showChapters} onOpenChange={setShowChapters}>
         <SheetContent side="right" className="w-[360px] max-w-[92vw] overflow-y-auto">
-          <SheetHeader><SheetTitle>Chapters</SheetTitle></SheetHeader>
-          <input value={chapterSearch} onChange={(e) => setChapterSearch(e.target.value)} placeholder="Search…"
+          <SheetHeader><SheetTitle>{uiI18n.t('app.chapters_034e2733')}</SheetTitle></SheetHeader>
+          <input value={chapterSearch} onChange={(e) => setChapterSearch(e.target.value)} placeholder={uiI18n.t('app.search_f54fbca1')}
             className="mt-3 h-9 w-full rounded-lg border border-white/10 bg-white/5 px-3 text-sm outline-none" />
           <div className="mt-3 space-y-1">
             {filteredChapters.map((ch) => (
@@ -745,7 +748,7 @@ export default function NovelReaderPage() {
                 onClick={() => { setShowChapters(false); navToChapter(ch, 0); }}
                 className="w-full rounded-lg px-2.5 py-2 text-left text-sm hover:bg-white/5 flex items-center gap-2">
                 <span className="w-12 shrink-0 font-black tabular-nums opacity-60">#{ch.chapterNumber ?? '—'}</span>
-                <span className="flex-1 truncate">{ch.chapterTitle || `Chapter ${ch.chapterNumber ?? ''}`}</span>
+                <span className="flex-1 truncate">{ch.chapterTitle || uiI18n.t('app.chapter_i18n_value_0_e0f6e591', { value0: ch.chapterNumber ?? '' })}</span>
               </button>
             ))}
           </div>
@@ -762,11 +765,11 @@ export default function NovelReaderPage() {
               <Volume2 className="w-3.5 h-3.5 text-primary" />
             )}
             <span>
-              {narratorBuffering ? 'Synthesizing…' : 'Narrating'}
-              {activeUtterPara != null ? ` · ¶${activeUtterPara + 1}` : ''}
+              {narratorBuffering ? uiI18n.t('app.synthesizing_03754fa4') : uiI18n.t('app.narrating_f86ad44a')}
+              {activeUtterPara != null ? uiI18n.t('app.i18n_value_0_0d6e2989', { value0: activeUtterPara + 1 }) : ''}
             </span>
-            <button onClick={toggleNarration} className="ml-1 rounded-full bg-white/10 px-2.5 py-1 hover:bg-white/20">Pause</button>
-            <button onClick={stopNarrationBtn} className="rounded-full bg-white/10 px-2.5 py-1 hover:bg-white/20">Stop</button>
+            <button onClick={toggleNarration} className="ml-1 rounded-full bg-white/10 px-2.5 py-1 hover:bg-white/20">{uiI18n.t('app.pause_781961bc')}</button>
+            <button onClick={stopNarrationBtn} className="rounded-full bg-white/10 px-2.5 py-1 hover:bg-white/20">{uiI18n.t('app.stop_9e253470')}</button>
           </div>
         </div>
       )}

@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { BookOpen, BookMarked, ArrowRight, Layers, Search } from 'lucide-react';
@@ -24,6 +26,7 @@ const SHELF_GRID = 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4';
 const DIALOG_GRID = 'grid grid-cols-1 sm:grid-cols-2 gap-4';
 
 export function MangaReadlistTab({ mangaReadlist, loading, isViewingOther, onNavigate }: MangaReadlistTabProps) {
+  useUiTranslation();
   const rows = useMemo(() => mangaReadlist || [], [mangaReadlist]);
   const { data: items, isLoading: metadataLoading } = useResolvedMangaReadlist(rows);
   const { search, setSearch, term, groups, matchCount } = useShelfSearch<any>(
@@ -108,7 +111,7 @@ export function MangaReadlistTab({ mangaReadlist, loading, isViewingOther, onNav
 
             {/* continue affordance — slides in on hover */}
             <span className="flex items-center gap-1 text-[11px] font-bold text-primary opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300 shrink-0">
-              {hasChapter ? 'Continue' : 'Read'}
+              {hasChapter ? uiI18n.t('app.continue_2e026239') : uiI18n.t('app.read_852b438f')}
               <ArrowRight className="w-3.5 h-3.5" />
             </span>
           </div>
@@ -129,10 +132,10 @@ export function MangaReadlistTab({ mangaReadlist, loading, isViewingOther, onNav
           <div className="flex items-center gap-2">
             <BookOpen className="w-4 h-4 text-primary/80" />
             <h3 className="font-display font-bold text-base sm:text-lg text-foreground tracking-tight">
-              {isViewingOther ? 'Manga Readlist' : 'My Manga Readlist'}
+              {isViewingOther ? uiI18n.t('app.manga_readlist_2bfa7178') : uiI18n.t('app.my_manga_readlist_caacf897')}
             </h3>
             <span className="px-3 py-1 rounded-full bg-white/[0.03] text-xs font-semibold text-muted-foreground border border-white/[0.05]">
-              {items.length} items
+              {items.length} {uiI18n.t('app.items_7316c8b2')}
             </span>
           </div>
           {items.length > 0 && (
@@ -141,7 +144,7 @@ export function MangaReadlistTab({ mangaReadlist, loading, isViewingOther, onNav
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search readlist…"
+                placeholder={uiI18n.t('app.search_readlist_d901bcb3')}
                 className="pl-9 rounded-full bg-white/[0.03] border-white/[0.08] h-10"
               />
             </div>
@@ -157,18 +160,18 @@ export function MangaReadlistTab({ mangaReadlist, loading, isViewingOther, onNav
         ) : items.length === 0 ? (
           <div className="text-center py-20 border border-dashed border-white/10 bg-white/[0.01] rounded-[2rem]">
             <BookOpen className="w-16 h-16 mx-auto text-muted-foreground/30 mb-6" />
-            <h3 className="text-xl font-bold mb-2">{isViewingOther ? 'Readlist is empty' : 'Your manga readlist is empty'}</h3>
+            <h3 className="text-xl font-bold mb-2">{isViewingOther ? uiI18n.t('app.readlist_is_empty_1999897c') : uiI18n.t('app.your_manga_readlist_is_empty_d5c36fca')}</h3>
             <p className="text-muted-foreground mb-8">
-              {isViewingOther ? 'This user has not saved any manga yet.' : 'Save manga to your readlist from any manga details page.'}
+              {isViewingOther ? uiI18n.t('app.this_user_has_not_saved_any_manga_yet_103dd410') : uiI18n.t('app.save_manga_to_your_readlist_from_any_manga_detai_2b79e0cf')}
             </p>
             {!isViewingOther && (
               <Button onClick={() => onNavigate('/search')} className="rounded-full h-12 px-8 font-bold">
-                Browse Manga
+                {uiI18n.t('app.browse_manga_5451b29e')}
               </Button>
             )}
           </div>
         ) : term && matchCount === 0 ? (
-          <div className="text-center py-16 text-muted-foreground text-sm">No manga match “{search}”.</div>
+          <div className="text-center py-16 text-muted-foreground text-sm">{uiI18n.t('app.no_manga_match_c398eebf')}{search}”.</div>
         ) : (
           <div className="space-y-10">
             {groups.map((g) => (

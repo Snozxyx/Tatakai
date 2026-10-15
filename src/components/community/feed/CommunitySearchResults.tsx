@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Users, Music2, Layers, MessageSquare } from 'lucide-react';
@@ -11,6 +13,7 @@ import { FeedList } from './FeedList';
 const TAKEOVER_LIMIT = 12;
 
 function SectionHeader({ icon: Icon, label, count }: { icon: any; label: string; count?: number }) {
+  useUiTranslation();
   return (
     <div className="mb-3 flex items-center gap-2">
       <div className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-primary">
@@ -30,6 +33,7 @@ function SectionHeader({ icon: Icon, label, count }: { icon: any; label: string;
  * reused. Rendered by the page only while `query.trim().length >= 2`.
  */
 export function CommunitySearchResults({ query }: { query: string }) {
+  useUiTranslation();
   const navigate = useNavigate();
   const term = query.trim();
   const { data } = useCommunitySearch(query, TAKEOVER_LIMIT);
@@ -46,13 +50,13 @@ export function CommunitySearchResults({ query }: { query: string }) {
       className="mx-auto max-w-3xl space-y-10 pb-16"
     >
       <p className="text-sm text-muted-foreground">
-        Results for <span className="font-bold text-white">“{term}”</span>
+        {uiI18n.t('app.results_for_a89ba47c')} <span className="font-bold text-white">“{term}”</span>
       </p>
 
       {/* People */}
       {users.length > 0 && (
         <section>
-          <SectionHeader icon={Users} label="People" count={users.length} />
+          <SectionHeader icon={Users} label={uiI18n.t('app.people_b37554f6')} count={users.length} />
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {users.map((u) => {
               const name = u.display_name || u.username || 'Anonymous';
@@ -100,7 +104,7 @@ export function CommunitySearchResults({ query }: { query: string }) {
       {/* Playlists */}
       {playlists.length > 0 && (
         <section>
-          <SectionHeader icon={Music2} label="Playlists" count={playlists.length} />
+          <SectionHeader icon={Music2} label={uiI18n.t('app.playlists_77b69f32')} count={playlists.length} />
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {playlists.map((p) => (
               <button
@@ -117,7 +121,7 @@ export function CommunitySearchResults({ query }: { query: string }) {
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[13px] font-semibold text-foreground/90 transition-colors group-hover/pl:text-primary">{p.name}</p>
-                  <p className="truncate text-[11px] tabular-nums text-muted-foreground/60">{p.items_count ?? 0} anime</p>
+                  <p className="truncate text-[11px] tabular-nums text-muted-foreground/60">{p.items_count ?? 0} {uiI18n.t('app.anime_11a3e059')}</p>
                 </div>
               </button>
             ))}
@@ -128,7 +132,7 @@ export function CommunitySearchResults({ query }: { query: string }) {
       {/* Tier lists */}
       {tierlists.length > 0 && (
         <section>
-          <SectionHeader icon={Layers} label="Tier Lists" count={tierlists.length} />
+          <SectionHeader icon={Layers} label={uiI18n.t('app.tier_lists_86752701')} count={tierlists.length} />
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {tierlists.map((t) => (
               <button
@@ -148,7 +152,7 @@ export function CommunitySearchResults({ query }: { query: string }) {
 
       {/* Posts — full PostCards via the shared feed enrichment */}
       <section>
-        <SectionHeader icon={MessageSquare} label="Posts" />
+        <SectionHeader icon={MessageSquare} label={uiI18n.t('app.posts_a0ca0c31')} />
         <FeedList tab="foryou" search={term} showComposer={false} />
       </section>
     </motion.div>

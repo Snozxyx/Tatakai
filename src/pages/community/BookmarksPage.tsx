@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Bookmark } from 'lucide-react';
@@ -11,6 +13,7 @@ import { useBookmarkedPosts } from '@/hooks/community/usePostSocial';
 import { PostCard } from '@/components/community/feed/PostCard';
 
 export default function BookmarksPage() {
+  useUiTranslation();
   const isDesktopApp = useIsDesktopApp();
   const navigate = useNavigate();
   const { data: posts = [], isLoading } = useBookmarkedPosts();
@@ -21,12 +24,12 @@ export default function BookmarksPage() {
       <main className={cn('relative z-10 w-full', isDesktopApp ? 'pl-0' : 'pl-0 md:pl-20 lg:pl-24')}>
         <div className="mx-auto max-w-2xl px-4 py-6 md:px-6 md:py-8">
           <Button variant="ghost" onClick={() => navigate('/community')} className="mb-4 gap-2">
-            <ArrowLeft className="h-4 w-4" /> Community
+            <ArrowLeft className="h-4 w-4" /> {uiI18n.t('app.community_bfd58ee3')}
           </Button>
 
           <div className="mb-5 flex items-center gap-2.5">
             <Bookmark className="h-5 w-5 text-primary" />
-            <h1 className="font-display text-2xl font-black tracking-tight">Bookmarks</h1>
+            <h1 className="font-display text-2xl font-black tracking-tight">{uiI18n.t('app.bookmarks_ca3cddd2')}</h1>
           </div>
 
           {isLoading ? (
@@ -44,8 +47,8 @@ export default function BookmarksPage() {
           ) : (
             <GlassPanel className="rounded-[2rem] border-dashed border-white/10 bg-white/[0.01] p-16 text-center">
               <Bookmark className="mx-auto mb-4 h-12 w-12 text-muted-foreground/30" />
-              <h3 className="font-display text-lg font-bold tracking-tight">No bookmarks yet</h3>
-              <p className="mt-1 text-sm text-muted-foreground">Tap the bookmark icon on a post to save it here.</p>
+              <h3 className="font-display text-lg font-bold tracking-tight">{uiI18n.t('app.no_bookmarks_yet_aaf8c327')}</h3>
+              <p className="mt-1 text-sm text-muted-foreground">{uiI18n.t('app.tap_the_bookmark_icon_on_a_post_to_save_it_here_987bd9b9')}</p>
             </GlassPanel>
           )}
         </div>

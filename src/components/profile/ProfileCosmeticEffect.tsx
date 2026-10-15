@@ -1,8 +1,11 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import type { ReactNode } from 'react';
 import { useMotionPreference } from '@/hooks/ui/useMotionPreference';
 import { PROFILE_NAMEPLATES, type ProfileNameplateKey, type ProfileCosmeticEffectKey } from '@/lib/profileCosmetics';
 
 export function ProfileNameplate({ nameplate, children }: { nameplate: ProfileNameplateKey; children: ReactNode }) {
+  useUiTranslation();
   const design = PROFILE_NAMEPLATES.find(item => item.key === nameplate);
   if (!design || nameplate === 'none') return <>{children}</>;
   return (
@@ -17,6 +20,7 @@ const EFFECT_COLORS = { constellation: '#c5ddff', blossom: '#ffc1dd', spirit: '#
 
 /** An authored entrance at the perimeter; it settles so the portrait and copy stay clear. */
 export function ProfileCosmeticEffect({ effect, animated = true }: { effect: ProfileCosmeticEffectKey; animated?: boolean }) {
+  useUiTranslation();
   const reduced = useMotionPreference();
   if (effect === 'none') return null;
   const color = EFFECT_COLORS[effect];

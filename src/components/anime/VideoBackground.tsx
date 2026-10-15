@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useEffect, useRef } from 'react';
 import Hls from 'hls.js';
 import { getProxiedImageUrl } from '@/lib/api';
@@ -14,6 +16,7 @@ interface VideoBackgroundProps {
 }
 
 export function VideoBackground({ animeId, poster, children, anilistId, titles }: VideoBackgroundProps) {
+  useUiTranslation();
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const [isVideoReady, setIsVideoReady] = useState(false);

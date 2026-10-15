@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { FlaskConical, Gauge, Languages, Sparkles } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
@@ -6,6 +7,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/ui/useTheme';
+import { useAppLanguage } from '@/hooks/ui/useLanguage';
+import { usePreferredTitleLanguage } from '@/hooks/ui/useTitleLanguage';
+import { setPreferredTitleLanguage, setAccountTitleLanguage, type TitleLanguage } from '@/lib/titleLanguage';
+import { useDeviceTranslation } from '@/hooks/community/useDeviceTranslation';
+import { setDeviceTranslationEnabled } from '@/lib/community/onDeviceTranslation';
 import { FeatureFlag, useFeatureFlag, toggleFlag } from '@/core/feature-flags';
 import {
   SettingRow,
@@ -25,14 +31,17 @@ const normalizePreferredMangaLanguage = (value: unknown): PreferredMangaLanguage
 };
 
 /**
- * Display: title/manga language, Ultra-Lite / reduce-motion / high-contrast,
- * and admin-only feature-flag overrides. Extracted from the old "display" tab.
+ * Display: app interface language, title/manga language, Ultra-Lite /
+ * reduce-motion / high-contrast, and admin-only feature-flag overrides.
  */
 export function DisplayPanel() {
+  const { t } = useTranslation();
   const { user, profile, refreshProfile, isAdmin } = useAuth();
   const { theme, setTheme, reduceMotion, setReduceMotion, highContrast, setHighContrast } = useTheme();
+  const { preference, setLanguage, supportedLanguages } = useAppLanguage();
 
-  const [preferredTitleLanguage, setPreferredTitleLanguage] = useState<'romaji' | 'english' | 'native'>('romaji');
+  const preferredTitleLanguage = usePreferredTitleLanguage();
+  const deviceTranslation = useDeviceTranslation();
   const [preferredMangaLanguage, setPreferredMangaLanguage] = useState<PreferredMangaLanguage>('auto');
 
   const ffContentGraph = useFeatureFlag(FeatureFlag.CONTENT_GRAPH);
@@ -42,18 +51,18 @@ export function DisplayPanel() {
 
   useEffect(() => {
     if (profile) {
-      setPreferredTitleLanguage(profile.preferred_title_language || 'romaji');
       setPreferredMangaLanguage(normalizePreferredMangaLanguage((profile as any).preferred_manga_language));
     }
   }, [profile]);
 
-  const handleTitleLanguageChange = async (value: 'romaji' | 'english' | 'native') => {
-    if (!user?.id) {
-      toast.error('Please sign in to save title language preferences');
-      return;
-    }
+  const handleTitleLanguageChange = async (value: TitleLanguage) => {
     const previousValue = preferredTitleLanguage;
     setPreferredTitleLanguage(value);
+    if (!user?.id) {
+      toast.success(t('display.titles.titleUpdated', { value: t(`display.titles.${value}`) }));
+      return;
+    }
+    setAccountTitleLanguage(value);
     try {
       const { error } = await supabase
         .from('profiles')
@@ -61,16 +70,17 @@ export function DisplayPanel() {
         .eq('user_id', user.id);
       if (error) throw error;
       await refreshProfile();
-      toast.success(`Title language preference updated to ${value}`);
+      toast.success(t('display.titles.titleUpdated', { value: t(`display.titles.${value}`) }));
     } catch (err) {
       setPreferredTitleLanguage(previousValue);
-      toast.error('Failed to update title language preference');
+      setAccountTitleLanguage(previousValue);
+      toast.error(t('display.titles.titleUpdateFailed'));
     }
   };
 
   const handleMangaLanguageChange = async (value: PreferredMangaLanguage) => {
     if (!user?.id) {
-      toast.error('Please sign in to save manga language preferences');
+      toast.error(t('display.titles.signInRequired'));
       return;
     }
     const previousValue = preferredMangaLanguage;
@@ -82,11 +92,20 @@ export function DisplayPanel() {
         .eq('user_id', user.id);
       if (error) throw error;
       await refreshProfile();
-      toast.success('Preferred manga language updated');
+      toast.success(t('display.titles.mangaUpdated'));
     } catch (err) {
       setPreferredMangaLanguage(previousValue);
-      toast.error('Failed to update manga language preference');
+      toast.error(t('display.titles.mangaUpdateFailed'));
     }
+  };
+
+  const handleAppLanguageChange = (value: string) => {
+    const resolved = setLanguage(value);
+    const label =
+      value === 'auto'
+        ? t('display.appLanguage.options.auto')
+        : (supportedLanguages.find((l) => l.code === resolved)?.label ?? resolved);
+    toast.success(t('display.appLanguage.saved', { language: label }));
   };
 
   return (
@@ -94,15 +113,15 @@ export function DisplayPanel() {
       {isAdmin && (
         <SettingsSection
           icon={FlaskConical}
-          eyebrow="Admin"
-          title="Feature flags"
-          description="Override experimental features via localStorage."
-          action={<SettingsBadge tone="warning">Admin</SettingsBadge>}
+          eyebrow={t('display.admin.eyebrow')}
+          title={t('display.admin.title')}
+          description={t('display.admin.description')}
+          action={<SettingsBadge tone="warning">{t('display.admin.badge')}</SettingsBadge>}
         >
           <div className="flex flex-col">
             <SettingRow
-              title="Content Graph"
-              description="Use AniList/Jikan content graph APIs"
+              title={t('display.admin.contentGraph')}
+              description={t('display.admin.contentGraphDescription')}
               control={
                 <Switch
                   checked={ffContentGraph}
@@ -111,8 +130,8 @@ export function DisplayPanel() {
               }
             />
             <SettingRow
-              title="Virtual Grid"
-              description="Render large browse lists with virtualization"
+              title={t('display.admin.virtualGrid')}
+              description={t('display.admin.virtualGridDescription')}
               control={
                 <Switch
                   checked={ffVirtualGrid}
@@ -121,8 +140,8 @@ export function DisplayPanel() {
               }
             />
             <SettingRow
-              title="BlurHash Covers"
-              description="Use BlurHash placeholders for posters"
+              title={t('display.admin.blurhash')}
+              description={t('display.admin.blurhashDescription')}
               control={
                 <Switch
                   checked={ffBlurhashImages}
@@ -131,8 +150,8 @@ export function DisplayPanel() {
               }
             />
             <SettingRow
-              title="Tatakai Runtime"
-              description="Reserved for local runtime bridge"
+              title={t('display.admin.runtime')}
+              description={t('display.admin.runtimeDescription')}
               control={
                 <Switch
                   checked={ffTatakaiRuntime}
@@ -146,41 +165,75 @@ export function DisplayPanel() {
 
       <SettingsSection
         icon={Languages}
-        eyebrow="Language"
-        title="Titles & translations"
-        description="Choose how titles are displayed and your default manga translation language."
+        eyebrow={t('display.appLanguage.eyebrow')}
+        title={t('display.appLanguage.title')}
+        description={t('display.appLanguage.description')}
       >
         <div className="flex flex-col">
           <SettingRow
-            title="Preferred Title Language"
-            description="Select how anime titles should be displayed"
+            title={t('display.appLanguage.label')}
+            description={t('display.appLanguage.labelDescription')}
             control={
-              <Select value={preferredTitleLanguage} onValueChange={(value: any) => handleTitleLanguageChange(value)}>
-                <SelectTrigger className="h-9 w-36 rounded-lg text-sm">
-                  <SelectValue placeholder="Select language" />
+              <Select value={preference} onValueChange={handleAppLanguageChange}>
+                <SelectTrigger className="h-9 w-44 rounded-lg text-sm">
+                  <SelectValue placeholder={t('display.titles.selectLanguage')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="romaji">Romaji</SelectItem>
-                  <SelectItem value="english">English</SelectItem>
-                  <SelectItem value="native">Native</SelectItem>
+                  <SelectItem value="auto">{t('display.appLanguage.options.auto')}</SelectItem>
+                  {supportedLanguages.map((lang) => (
+                    <SelectItem key={lang.code} value={lang.code}>
+                      {t(`display.appLanguage.options.${lang.code}`, { defaultValue: lang.label })}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            }
+          />
+        </div>
+      </SettingsSection>
+
+      <SettingsSection icon={Languages} title={t('community.translation.settingsTitle')} description={t('community.translation.setupDescription')}>
+        <SettingRow title={t('community.translation.autoTranslate')} description={t('community.translation.settingsDescription')}
+          control={<Switch aria-label={t('community.translation.autoTranslate')} checked={deviceTranslation.enabled} onCheckedChange={setDeviceTranslationEnabled} />} />
+      </SettingsSection>
+
+      <SettingsSection
+        icon={Languages}
+        eyebrow={t('display.titles.eyebrow')}
+        title={t('display.titles.title')}
+        description={t('display.titles.description')}
+      >
+        <div className="flex flex-col">
+          <SettingRow
+            title={t('display.titles.preferredTitle')}
+            description={t('display.titles.preferredTitleDescription')}
+            control={
+              <Select value={preferredTitleLanguage} onValueChange={(value: TitleLanguage) => handleTitleLanguageChange(value)}>
+                <SelectTrigger className="h-9 w-36 rounded-lg text-sm">
+                  <SelectValue placeholder={t('display.titles.selectLanguage')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="romaji">{t('display.titles.romaji')}</SelectItem>
+                  <SelectItem value="english">{t('display.titles.english')}</SelectItem>
+                  <SelectItem value="native">{t('display.titles.native')}</SelectItem>
                 </SelectContent>
               </Select>
             }
           />
           <SettingRow
-            title="Preferred Manga Language"
-            description="Choose your default manga translation language"
+            title={t('display.titles.preferredManga')}
+            description={t('display.titles.preferredMangaDescription')}
             control={
               <Select value={preferredMangaLanguage} onValueChange={(value: PreferredMangaLanguage) => handleMangaLanguageChange(value)}>
                 <SelectTrigger className="h-9 w-40 rounded-lg text-sm">
-                  <SelectValue placeholder="Select language" />
+                  <SelectValue placeholder={t('display.titles.selectLanguage')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="auto">Auto</SelectItem>
-                  <SelectItem value="en">English</SelectItem>
-                  <SelectItem value="jp">Japanese</SelectItem>
-                  <SelectItem value="kr">Korean</SelectItem>
-                  <SelectItem value="zh">Chinese</SelectItem>
+                  <SelectItem value="auto">{t('display.titles.auto')}</SelectItem>
+                  <SelectItem value="en">{t('display.titles.en')}</SelectItem>
+                  <SelectItem value="jp">{t('display.titles.jp')}</SelectItem>
+                  <SelectItem value="kr">{t('display.titles.kr')}</SelectItem>
+                  <SelectItem value="zh">{t('display.titles.zh')}</SelectItem>
                 </SelectContent>
               </Select>
             }
@@ -190,34 +243,34 @@ export function DisplayPanel() {
 
       <SettingsSection
         icon={Gauge}
-        eyebrow="Performance & accessibility"
-        title="Motion & contrast"
-        description="Tune visual effects for performance and accessibility."
+        eyebrow={t('display.motion.eyebrow')}
+        title={t('display.motion.title')}
+        description={t('display.motion.description')}
       >
         <div className="flex flex-col">
           <SettingRow
             tone="accent"
-            title="Ultra Lite Mode"
-            badge={<SettingsBadge tone="warning">Max Speed</SettingsBadge>}
+            title={t('display.motion.ultraLite')}
+            badge={<SettingsBadge tone="warning">{t('display.motion.maxSpeed')}</SettingsBadge>}
             icon={Sparkles}
-            description="Disables all filters, animations, and heavy styles for low-end devices"
+            description={t('display.motion.ultraLiteDescription')}
             control={
               <Switch
-                aria-label="Ultra Lite Mode"
+                aria-label={t('display.motion.ultraLite')}
                 checked={theme === 'ultra-lite'}
                 onCheckedChange={(checked) => setTheme(checked ? 'ultra-lite' : 'cherry-blossom')}
               />
             }
           />
           <SettingRow
-            title="Reduce Motion"
-            description="Minimize animations for better performance"
-            control={<Switch aria-label="Reduce Motion" checked={reduceMotion} onCheckedChange={setReduceMotion} />}
+            title={t('display.motion.reduceMotion')}
+            description={t('display.motion.reduceMotionDescription')}
+            control={<Switch aria-label={t('display.motion.reduceMotion')} checked={reduceMotion} onCheckedChange={setReduceMotion} />}
           />
           <SettingRow
-            title="High Contrast Mode"
-            description="Increase visual contrast for accessibility"
-            control={<Switch aria-label="High Contrast Mode" checked={highContrast} onCheckedChange={setHighContrast} />}
+            title={t('display.motion.highContrast')}
+            description={t('display.motion.highContrastDescription')}
+            control={<Switch aria-label={t('display.motion.highContrast')} checked={highContrast} onCheckedChange={setHighContrast} />}
           />
         </div>
       </SettingsSection>

@@ -1,4 +1,7 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
@@ -28,6 +31,7 @@ function StatCard({
 }: {
   icon: LucideIcon; label: string; value: string | number; sublabel?: string; accent?: boolean; iconClass?: string;
 }) {
+  useUiTranslation();
   return (
     <GlassPanel className={cn(
       'p-5 text-center relative overflow-hidden',
@@ -47,6 +51,7 @@ function StatCard({
 }
 
 function MiniBar({ label, value, max, color }: { label: string; value: number; max: number; color: string }) {
+  useUiTranslation();
   const pct = max > 0 ? (value / max) * 100 : 0;
   return (
     <div className="flex items-center gap-3">
@@ -65,6 +70,8 @@ function MiniBar({ label, value, max, color }: { label: string; value: number; m
 }
 
 export default function WrappedPage() {
+  useUiTranslation();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { user, profile } = useAuth();
   const { data: history = [] } = useWatchHistory();
@@ -106,7 +113,7 @@ export default function WrappedPage() {
   const monthlyActivity = useMemo(() => {
     const months: Record<string, number> = {};
     history.forEach(h => {
-      const month = new Date(h.watched_at).toLocaleString('default', { month: 'short', year: '2-digit' });
+      const month = new Date(h.watched_at).toLocaleString(uiI18n.language, { month: 'short', year: '2-digit' });
       months[month] = (months[month] || 0) + 1;
     });
     return Object.entries(months)
@@ -120,8 +127,8 @@ export default function WrappedPage() {
   if (!user) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4">
-        <p className="text-muted-foreground">Sign in to see your stats</p>
-        <Button onClick={() => navigate('/auth')}>Sign In</Button>
+        <p className="text-muted-foreground">{uiI18n.t('app.sign_in_to_see_your_stats_b58a7ed7')}</p>
+        <Button onClick={() => navigate('/auth')}>{uiI18n.t('app.sign_in_f8492cc1')}</Button>
       </div>
     );
   }
@@ -146,7 +153,7 @@ export default function WrappedPage() {
           className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6 text-sm"
         >
           <ArrowLeft className="w-4 h-4" />
-          Back
+          {uiI18n.t('app.back_b52b36b7')}
         </button>
 
         {/* Hero */}
@@ -163,9 +170,9 @@ export default function WrappedPage() {
               </AvatarFallback>
             </Avatar>
             <div>
-              <div className="text-muted-foreground text-sm font-medium">Your {currentYear} stats</div>
+              <div className="text-muted-foreground text-sm font-medium">{uiI18n.t('app.your_ba596fd3')} {currentYear} {uiI18n.t('app.stats_e350d5ce')}</div>
               <h1 className="font-display text-3xl md:text-4xl font-black tracking-tight gradient-text">
-                {profile?.display_name || 'Your'} Wrapped
+                {profile?.display_name || uiI18n.t('app.your_ba596fd3')} {uiI18n.t('app.wrapped_5380d987')}
               </h1>
             </div>
           </div>
@@ -181,29 +188,29 @@ export default function WrappedPage() {
           <StatCard
             icon={Clock}
             iconClass="text-primary"
-            label="Hours Watched"
-            value={stats.totalHours.toLocaleString()}
-            sublabel={`${stats.totalMinutes.toLocaleString()} minutes`}
+            label={uiI18n.t('app.hours_watched_95a165b6')}
+            value={stats.totalHours.toLocaleString(uiI18n.language)}
+            sublabel={`${stats.totalMinutes.toLocaleString(uiI18n.language)} minutes`}
             accent
           />
           <StatCard
             icon={Tv2}
             iconClass="text-blue-400"
-            label="Episodes"
-            value={stats.totalEpisodes.toLocaleString()}
+            label={uiI18n.t('app.episodes_49d641ba')}
+            value={stats.totalEpisodes.toLocaleString(uiI18n.language)}
             sublabel={`${stats.completedEpisodes} completed`}
           />
           <StatCard
             icon={Film}
             iconClass="text-teal-400"
-            label="Anime Series"
-            value={stats.uniqueAnime.toLocaleString()}
+            label={uiI18n.t('app.anime_series_d9dbb67a')}
+            value={stats.uniqueAnime.toLocaleString(uiI18n.language)}
             sublabel="unique titles"
           />
           <StatCard
             icon={Flame}
             iconClass="text-orange-400"
-            label="Best Streak"
+            label={uiI18n.t('app.best_streak_3b03fa81')}
             value={`${streak.longestStreak}d`}
             sublabel={streak.currentStreak > 0 ? `${streak.currentStreak}d current` : 'Keep it going!'}
           />
@@ -231,16 +238,16 @@ export default function WrappedPage() {
                   className="w-20 h-20 object-contain drop-shadow-lg"
                 />
                 <div className="flex-1 min-w-0 text-center sm:text-left">
-                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-widest mb-1">Your Current Rank</p>
+                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-widest mb-1">{uiI18n.t('app.your_current_rank_0f3a2c27')}</p>
                   <h2 className={cn('text-2xl font-black font-display', rankStyle.className)} style={rankStyle.style}>{rankTier.name}</h2>
                   <p className="text-sm text-muted-foreground mt-0.5">
-                    {rankScore.toLocaleString()} RP · {stats.totalEpisodes.toLocaleString()} episodes
+                    {rankScore.toLocaleString(uiI18n.language)} {uiI18n.t('app.rp_9ddd995d')} {stats.totalEpisodes.toLocaleString(uiI18n.language)} {uiI18n.t('app.episodes_d5e17736')}
                   </p>
                   {nextRank && (
                     <div className="mt-3 space-y-1">
                       <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>Progress to <span className={getRankNameStyleForRank(nextRank.tier.rank).className}>{nextRank.tier.name}</span></span>
-                        <span>{nextRank.needed} RP left</span>
+                        <span>{uiI18n.t('app.progress_to_bc5e6d58')} <span className={getRankNameStyleForRank(nextRank.tier.rank).className}>{nextRank.tier.name}</span></span>
+                        <span>{nextRank.needed} {uiI18n.t('app.rp_left_f7e9aa71')}</span>
                       </div>
                       <div className="h-1.5 bg-muted rounded-full overflow-hidden">
                         <motion.div
@@ -269,7 +276,7 @@ export default function WrappedPage() {
               <GlassPanel className="p-5">
                 <div className="flex items-center gap-2 mb-5">
                   <Star className="w-4 h-4 text-amber-400" />
-                  <h2 className="font-display font-bold text-base">Most Watched</h2>
+                  <h2 className="font-display font-bold text-base">{uiI18n.t('app.most_watched_0965cbc0')}</h2>
                 </div>
                 <div className="space-y-3">
                   {genreStats.map((item, i) => (
@@ -296,7 +303,7 @@ export default function WrappedPage() {
               <GlassPanel className="p-5">
                 <div className="flex items-center gap-2 mb-5">
                   <Calendar className="w-4 h-4 text-primary" />
-                  <h2 className="font-display font-bold text-base">Monthly Activity</h2>
+                  <h2 className="font-display font-bold text-base">{uiI18n.t('app.monthly_activity_1955d927')}</h2>
                 </div>
                 <div className="flex items-end gap-2 h-24">
                   {monthlyActivity.map((m, i) => {
@@ -330,9 +337,9 @@ export default function WrappedPage() {
             <div className="flex items-center justify-between mb-5">
               <div className="flex items-center gap-2">
                 <Trophy className="w-4 h-4 text-amber-400" />
-                <h2 className="font-display font-bold text-base">Rank Badges</h2>
+                <h2 className="font-display font-bold text-base">{uiI18n.t('app.rank_badges_8f907804')}</h2>
                 <span className="text-xs text-muted-foreground">
-                  {rankBadges.filter((b) => b.unlocked).length}/{rankBadges.length} unlocked
+                  {rankBadges.filter((b) => b.unlocked).length}/{rankBadges.length} {uiI18n.t('app.unlocked_9bb5a73d')}
                 </span>
               </div>
             </div>
@@ -356,7 +363,7 @@ export default function WrappedPage() {
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: 0.35 + i * 0.03, duration: 0.2 }}
-                    title={`${badge.name}: ${badge.description}`}
+                    title={uiI18n.t('app.i18n_value_0_i18n_value_1_b6af3412', { value0: badge.name, value1: badge.description })}
                     className={cn(
                       'flex flex-col items-center gap-1 p-2 rounded-xl border text-center cursor-default',
                       badge.unlocked
@@ -386,12 +393,12 @@ export default function WrappedPage() {
         {history.length === 0 && (
           <div className="flex flex-col items-center justify-center py-24 text-center gap-4">
             <div className="text-6xl">📊</div>
-            <h2 className="font-display text-2xl font-black">No stats yet</h2>
+            <h2 className="font-display text-2xl font-black">{t("wrapped.emptyTitle")}</h2>
             <p className="text-muted-foreground max-w-xs">
-              Start watching anime to build your personal stats and unlock achievements!
+              {t("wrapped.emptyDescription")}
             </p>
             <Button onClick={() => navigate('/')}>
-              Start Watching
+              {t("wrapped.startWatching")}
             </Button>
           </div>
         )}

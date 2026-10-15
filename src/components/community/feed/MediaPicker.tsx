@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -56,7 +58,7 @@ async function searchAniListManga(query: string): Promise<SelectedMedia[]> {
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify({ query: gql, variables: { q: query } }),
   });
-  if (!res.ok) throw new Error('AniList manga search failed');
+  if (!res.ok) throw new Error(uiI18n.t('app.anilist_manga_search_failed_9c9ecc78'));
   const json = await res.json();
   const rows = Array.isArray(json?.data?.Page?.media) ? json.data.Page.media : [];
   return rows
@@ -76,6 +78,7 @@ export function MediaPicker({
   trigger: React.ReactNode;
   onSelect: (media: SelectedMedia) => void;
 }) {
+  useUiTranslation();
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<Tab>('anime');
   const [raw, setRaw] = useState('');
@@ -137,21 +140,21 @@ export function MediaPicker({
               onClick={() => setTab(t)}
               className={cn('flex-1 rounded-md px-2 py-1.5 text-xs font-medium capitalize transition-colors', tab === t ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:text-foreground')}
             >
-              {t === 'manga' ? 'Manga' : t === 'novel' ? 'Novels' : t === 'character' ? 'Character' : 'Anime'}
+              {t === 'manga' ? uiI18n.t('app.manga_87db0f99') : t === 'novel' ? uiI18n.t('app.novels_4ae488fd') : t === 'character' ? uiI18n.t('app.character_ee9946c8') : uiI18n.t('app.anime_f1b32a19')}
             </button>
           ))}
         </div>
         <div className="relative mb-2">
           <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input autoFocus value={raw} onChange={(e) => setRaw(e.target.value)} placeholder={`Search ${tab}…`} className="h-9 pl-8 text-sm" />
+          <Input autoFocus value={raw} onChange={(e) => setRaw(e.target.value)} placeholder={uiI18n.t('app.search_i18n_value_0_debbcdc0', { value0: tab })} className="h-9 pl-8 text-sm" />
         </div>
         <ScrollArea className="h-64 pr-2">
           {query.trim().length === 0 ? (
-            <p className="py-10 text-center text-sm text-muted-foreground">Type to search {tab}.</p>
+            <p className="py-10 text-center text-sm text-muted-foreground">{uiI18n.t('app.type_to_search_ab5297fd')} {tab}.</p>
           ) : loading ? (
             <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
           ) : rows.length === 0 ? (
-            <p className="py-10 text-center text-sm text-muted-foreground">No results.</p>
+            <p className="py-10 text-center text-sm text-muted-foreground">{uiI18n.t('app.no_results_00354033')}</p>
           ) : (
             <div className="space-y-1">
               {rows.map((m) => (

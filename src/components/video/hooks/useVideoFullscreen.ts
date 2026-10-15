@@ -1,9 +1,12 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useDesktopPlayerFullscreen } from "./useDesktopPlayerFullscreen";
 import { useState, useCallback, useEffect, useRef } from "react";
 import type { UseVideoFullscreenParams } from "../VideoPlayer.types";
 import { lockFullscreenAncestors } from "../fullscreenAncestors";
 
 export function useVideoFullscreen({ containerRef, isMobile }: UseVideoFullscreenParams) {
+  useUiTranslation();
   const [isFullscreen, setIsFullscreen] = useState(false);
   const desktop = useDesktopPlayerFullscreen(containerRef, setIsFullscreen);
   const fullscreenRef = useRef(false);
@@ -58,7 +61,7 @@ export function useVideoFullscreen({ containerRef, isMobile }: UseVideoFullscree
           } else if ((container as any).webkitRequestFullscreen) {
             await Promise.resolve((container as any).webkitRequestFullscreen());
           } else {
-            throw new Error("Fullscreen API unavailable");
+            throw new Error(uiI18n.t('app.fullscreen_api_unavailable_a64b8e4a'));
           }
           fullscreenRef.current = true;
           setIsFullscreen(true);

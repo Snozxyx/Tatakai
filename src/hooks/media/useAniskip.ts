@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useCallback, useRef, useEffect } from 'react';
 
 interface SkipTime {
@@ -18,6 +20,7 @@ interface AniskipResponse {
 }
 
 export function useAniskip(initialSkipTimes: SkipTime[] = []) {
+  useUiTranslation();
   const [skipTimes, setSkipTimes] = useState<SkipTime[]>(initialSkipTimes);
 
   const [isLoading, setIsLoading] = useState(false);
@@ -89,7 +92,7 @@ export function useAniskip(initialSkipTimes: SkipTime[] = []) {
       }
 
       if (!response.ok) {
-        throw new Error(`Aniskip API error: ${response.status}`);
+        throw new Error(uiI18n.t('app.aniskip_api_error_i18n_value_0_be17def2', { value0: response.status }));
       }
 
       const data: AniskipResponse = await response.json();
@@ -107,7 +110,7 @@ export function useAniskip(initialSkipTimes: SkipTime[] = []) {
       }
     } catch (err) {
       if (controller.signal.aborted || requestRef.current !== controller) return [];
-      const message = err instanceof Error ? err.message : 'Failed to fetch skip times';
+      const message = err instanceof Error ? err.message : uiI18n.t('app.failed_to_fetch_skip_times_86f85d6c');
       console.error('Aniskip fetch error:', message);
       setError(message);
       setSkipTimes([]);
@@ -130,14 +133,14 @@ export function useAniskip(initialSkipTimes: SkipTime[] = []) {
     switch (skipType) {
       case 'op':
       case 'mixed-op':
-        return 'Skip Intro';
+        return uiI18n.t('app.skip_intro_8789f6ce');
       case 'ed':
       case 'mixed-ed':
-        return 'Skip Outro';
+        return uiI18n.t('app.skip_outro_0bbc4ca6');
       case 'recap':
-        return 'Skip Recap';
+        return uiI18n.t('app.skip_recap_6c818924');
       default:
-        return 'Skip';
+        return uiI18n.t('app.skip_3da47453');
     }
   };
 

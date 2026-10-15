@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -60,7 +62,7 @@ async function sendStatusIncidentWebhook(payload: {
         username: 'Tatakai Status Bot',
         embeds: [
           {
-            title: `Status Incident ${payload.action === 'created' ? 'Created' : 'Updated'}`,
+            get title() { return uiI18n.t('app.status_incident_i18n_value_0_6ee30562', { value0: payload.action === 'created' ? 'Created' : 'Updated' }); },
             description: payload.message || payload.title,
             color: colorBySeverity[payload.severity],
             fields: [
@@ -81,6 +83,7 @@ async function sendStatusIncidentWebhook(payload: {
 }
 
 export function useStatusIncidents(activeOnly = true) {
+  useUiTranslation();
   return useQuery({
     queryKey: ['status_incidents', activeOnly],
     queryFn: async () => {
@@ -124,6 +127,7 @@ export function useStatusIncidents(activeOnly = true) {
 }
 
 export function useCreateIncident() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
@@ -135,7 +139,7 @@ export function useCreateIncident() {
       severity: StatusIncident['severity'];
       affected_services?: string[];
     }) => {
-      if (!user) throw new Error('Must be logged in');
+      if (!user) throw new Error(uiI18n.t('app.must_be_logged_in_9cf435d8'));
 
       const { data, error } = await supabase
         .from('status_incidents')
@@ -166,6 +170,7 @@ export function useCreateIncident() {
 }
 
 export function useUpdateIncident() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
@@ -179,7 +184,7 @@ export function useUpdateIncident() {
       updates: Partial<StatusIncident>;
       updateMessage?: string;
     }) => {
-      if (!user) throw new Error('Must be logged in');
+      if (!user) throw new Error(uiI18n.t('app.must_be_logged_in_9cf435d8'));
 
       // Update incident
       const { error: updateError } = await supabase
@@ -213,7 +218,7 @@ export function useUpdateIncident() {
 
       void sendStatusIncidentWebhook({
         action: 'updated',
-        title: `Incident ${incidentId}`,
+        get title() { return uiI18n.t('app.incident_i18n_value_0_8e665c28', { value0: incidentId }); },
         status: resolvedStatus,
         severity: resolvedSeverity,
         affectedServices: updates.affected_services || [],
@@ -258,6 +263,7 @@ export interface Popup {
 }
 
 export function useActivePopups() {
+  useUiTranslation();
   const { user } = useAuth();
 
   return useQuery({
@@ -323,6 +329,7 @@ export function useActivePopups() {
 }
 
 export function useAdminPopups() {
+  useUiTranslation();
   return useQuery({
     queryKey: ['admin_popups'],
     queryFn: async () => {
@@ -338,12 +345,13 @@ export function useAdminPopups() {
 }
 
 export function useCreatePopup() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
   return useMutation({
     mutationFn: async (popup: Omit<Popup, 'id' | 'created_by' | 'created_at' | 'updated_at'>) => {
-      if (!user) throw new Error('Must be logged in');
+      if (!user) throw new Error(uiI18n.t('app.must_be_logged_in_9cf435d8'));
 
       const { data, error } = await supabase
         .from('popups')
@@ -366,6 +374,7 @@ export function useCreatePopup() {
 }
 
 export function useUpdatePopup() {
+  useUiTranslation();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -388,6 +397,7 @@ export function useUpdatePopup() {
 }
 
 export function useDeletePopup() {
+  useUiTranslation();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -410,6 +420,7 @@ export function useDeletePopup() {
 const UNIQUE_VIOLATION = '23505';
 
 export function useDismissPopup() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
@@ -449,6 +460,7 @@ export interface Changelog {
 }
 
 export function useChangelog() {
+  useUiTranslation();
   return useQuery({
     queryKey: ['changelog'],
     queryFn: async () => {
@@ -465,6 +477,7 @@ export function useChangelog() {
 }
 
 export function useAdminChangelog() {
+  useUiTranslation();
   return useQuery({
     queryKey: ['admin_changelog'],
     queryFn: async () => {
@@ -480,6 +493,7 @@ export function useAdminChangelog() {
 }
 
 export function useCreateChangelog() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
@@ -492,7 +506,7 @@ export function useCreateChangelog() {
       is_published?: boolean;
       is_latest?: boolean;
     }) => {
-      if (!user) throw new Error('Must be logged in');
+      if (!user) throw new Error(uiI18n.t('app.must_be_logged_in_9cf435d8'));
 
       const { data, error } = await supabase
         .from('changelog')
@@ -514,6 +528,7 @@ export function useCreateChangelog() {
 }
 
 export function useUpdateChangelog() {
+  useUiTranslation();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -536,6 +551,7 @@ export function useUpdateChangelog() {
 }
 
 export function useDeleteChangelog() {
+  useUiTranslation();
   const queryClient = useQueryClient();
 
   return useMutation({

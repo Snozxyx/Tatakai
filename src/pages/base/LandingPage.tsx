@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 "use client";
 
 import { useEffect, useState, useRef } from "react";
@@ -14,6 +16,7 @@ import { FooterSection } from "@/components/ui/footer";
 const words = ["explore", "discover", "immerse", "love"];
 
 function BlurWord({ word, trigger }: { word: string; trigger: number }) {
+  useUiTranslation();
   const letters = word.split("");
   const STAGGER = 45;
   const DURATION = 500;
@@ -109,6 +112,7 @@ function BlurWord({ word, trigger }: { word: string; trigger: number }) {
 }
 
 export default function LandingPage() {
+  useUiTranslation();
   const [isVisible, setIsVisible] = useState(false);
   const [wordIndex, setWordIndex] = useState(0);
   const [mounted, setMounted] = useState(false);
@@ -166,13 +170,13 @@ export default function LandingPage() {
     : { latestDownloads: 0, mobileDownloads: 0 };
 
   const heroStats = [
-    { value: stars ?? "—", label: "GitHub stars" },
-    { value: latestVersion ? `v${latestVersion}` : "—", label: "latest release" },
+    { value: stars ?? "—", get label() { return uiI18n.t('app.github_stars_54c57454'); } },
+    { value: latestVersion ? `v${latestVersion}` : "—", get label() { return uiI18n.t('app.latest_release_f7b7a560'); } },
     latestDownloads > 0
-      ? { value: formatCompact(latestDownloads), label: "app downloads" }
-      : { value: forks ?? "—", label: "GitHub forks" },
+      ? { value: formatCompact(latestDownloads), get label() { return uiI18n.t('app.app_downloads_ee2154fd'); } }
+      : { value: forks ?? "—", get label() { return uiI18n.t('app.github_forks_868c5828'); } },
     mobileDownloads > 0
-      ? { value: formatCompact(mobileDownloads), label: "mobile downloads" }
+      ? { value: formatCompact(mobileDownloads), get label() { return uiI18n.t('app.mobile_downloads_ec3607f5'); } }
       : null,
   ].filter(Boolean) as { value: string; label: string }[];
 
@@ -253,32 +257,28 @@ export default function LandingPage() {
         <div className="flex flex-1 flex-col justify-center">
           {/* Tag pill */}
           <div
-            className={`mb-8 inline-flex w-fit items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 backdrop-blur-md transition-all duration-700 ${
-              mounted ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-4"
-            }`}
+            className={`mb-8 inline-flex w-fit items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 backdrop-blur-md transition-all duration-700 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-4"}`}
           >
             <span className="relative flex h-2 w-2">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
             </span>
             <span className="text-xs font-medium tracking-wide text-white/80">
-              Now in beta — v6.0 released
+              {uiI18n.t('app.now_in_beta_v6_0_released_39c85ddf')}
             </span>
             <Sparkles className="h-3 w-3 text-violet-300" />
           </div>
 
           {/* Main headline */}
           <h1
-            className={`mb-8 max-w-4xl text-[clamp(2.4rem,6vw,5.5rem)] font-display font-medium leading-[0.95] tracking-[-0.04em] text-white transition-all duration-1000 ${
-              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
-            }`}
+            className={`mb-8 max-w-4xl text-[clamp(2.4rem,6vw,5.5rem)] font-display font-medium leading-[0.95] tracking-[-0.04em] text-white transition-all duration-1000 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"}`}
           >
-            <span className="block whitespace-nowrap text-white/60">Your portal to</span>
+            <span className="block whitespace-nowrap text-white/60">{uiI18n.t('app.your_portal_to_36f136e1')}</span>
             <span className="block whitespace-nowrap">
-              anime &amp; manga
+              {uiI18n.t('app.anime_amp_manga_0cb1c231')}
             </span>
             <span className="block whitespace-nowrap">
-              you{" "}
+              {uiI18n.t('app.you_8af56de6')}{" "}
               <span className="relative inline-block align-baseline">
                 <BlurWord word={words[wordIndex]} trigger={wordIndex} />
                 <svg
@@ -302,19 +302,14 @@ export default function LandingPage() {
 
           {/* Subheadline */}
           <p
-            className={`mb-10 max-w-xl text-base leading-relaxed text-white/60 transition-all duration-1000 delay-200 lg:text-lg ${
-              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
-            }`}
+            className={`mb-10 max-w-xl text-base leading-relaxed text-white/60 transition-all duration-1000 delay-200 lg:text-lg ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"}`}
           >
-            Track, discover, and curate your personal library of anime & manga.
-            Built for fans who want a beautiful, distraction-free experience.
+            {uiI18n.t('app.track_discover_and_curate_your_personal_library__255fecc5')}
           </p>
 
           {/* CTA Buttons */}
           <div
-            className={`flex flex-wrap items-center gap-4 transition-all duration-1000 delay-300 ${
-              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
-            }`}
+            className={`flex flex-wrap items-center gap-4 transition-all duration-1000 delay-300 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"}`}
           >
             <Button
               size="lg"
@@ -323,7 +318,7 @@ export default function LandingPage() {
             >
               <span className="relative z-10 flex items-center gap-2">
                 <Download className="h-4 w-4" />
-                <span>Download App</span>
+                <span>{uiI18n.t('app.download_app_305f1717')}</span>
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
               </span>
             </Button>
@@ -334,15 +329,13 @@ export default function LandingPage() {
               className="h-12 rounded-full border border-white/15 bg-white/5 px-7 text-sm font-semibold text-white backdrop-blur-md transition-all hover:border-white/30 hover:bg-white/10 cursor-pointer"
             >
               <Play className="mr-2 h-4 w-4 fill-current" />
-              <span>Browse</span>
+              <span>{uiI18n.t('app.browse_2f3b5c55')}</span>
             </Button>
           </div>
 
           {/* Trust line */}
           <div
-            className={`mt-10 flex items-center gap-4 text-xs text-white/40 transition-all duration-1000 delay-500 ${
-              isVisible ? "opacity-100" : "opacity-0"
-            }`}
+            className={`mt-10 flex items-center gap-4 text-xs text-white/40 transition-all duration-1000 delay-500 ${isVisible ? "opacity-100" : "opacity-0"}`}
           >
             <div className="flex -space-x-2">
               {avatars.length > 0
@@ -350,7 +343,7 @@ export default function LandingPage() {
                     <img
                       key={i}
                       src={url}
-                      alt="Community member"
+                      alt={uiI18n.t('app.community_member_ba11f409')}
                       loading="lazy"
                       className="h-7 w-7 rounded-full border-2 border-black object-cover bg-white/10"
                       onError={(e) => {
@@ -367,7 +360,7 @@ export default function LandingPage() {
                   ))}
             </div>
             <span className="font-medium">
-              <span className="text-white">Free &amp; open source</span> — join the community
+              <span className="text-white">{uiI18n.t('app.free_amp_open_source_351c1503')}</span> {uiI18n.t('app.join_the_community_616a484e')}
             </span>
             <span className="hidden h-3 w-px bg-white/20 sm:block" />
             <a
@@ -376,16 +369,14 @@ export default function LandingPage() {
               rel="noopener noreferrer"
               className="hidden font-mono transition-colors hover:text-white sm:inline"
             >
-              ★ {stars ?? "—"} on GitHub
+              ★ {stars ?? "—"} {uiI18n.t('app.on_github_f5ea2d2f')}
             </a>
           </div>
         </div>
 
         {/* Bottom Stats Section */}
         <div
-          className={`w-full border-t border-white/10 pt-6 transition-all duration-1000 delay-700 ${
-            isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-          }`}
+          className={`w-full border-t border-white/10 pt-6 transition-all duration-1000 delay-700 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}
         >
           <div className="flex flex-wrap items-center justify-between gap-6">
             <div className="flex flex-wrap items-center gap-8 lg:gap-14">
@@ -403,7 +394,7 @@ export default function LandingPage() {
 
             {/* Scroll indicator */}
             <div className="hidden items-center gap-3 text-xs font-mono text-white/40 md:flex">
-              <span>SCROLL</span>
+              <span>{uiI18n.t('app.scroll_da4313f4')}</span>
               <div className="relative h-px w-16 overflow-hidden bg-white/10">
                 <div className="absolute inset-y-0 left-0 w-1/2 animate-[shimmer_2s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-white to-transparent" />
               </div>

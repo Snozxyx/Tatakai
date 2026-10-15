@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
  * NovelChapterProviderRows.tsx
  *
@@ -47,11 +49,12 @@ export function NovelChapterProviderRows({
   onNavigate,
   className,
 }: NovelChapterProviderRowsProps) {
+  useUiTranslation();
   // Build the chapter header label
   const chapterLabel =
     chapter.chapterNumber != null
-      ? `Chapter ${chapter.chapterNumber}`
-      : chapter.chapterTitle || "Chapter";
+      ? uiI18n.t('app.chapter_i18n_value_0_e0f6e591', { value0: chapter.chapterNumber })
+      : chapter.chapterTitle || uiI18n.t('app.chapter_46b00590');
 
   // Show title after the label only when it differs
   const titleSuffix =
@@ -86,8 +89,8 @@ export function NovelChapterProviderRows({
 
         const label =
           src.translator && src.translator.trim()
-            ? `${src.providerName || src.provider} • ${src.translator}`
-            : `${src.providerName || src.provider}`;
+            ? uiI18n.t('app.i18n_value_0_i18n_value_1_638125aa', { value0: src.providerName || src.provider, value1: src.translator })
+            : uiI18n.t('app.i18n_value_0_f0862f54', { value0: src.providerName || src.provider });
 
         return (
           <button
@@ -121,7 +124,7 @@ export function NovelChapterProviderRows({
             >
               {label}
             </span>
-            {src.language && <span className="text-muted-foreground">{src.language === 'ja' ? 'Japanese · Original' : src.language === 'en' ? 'English' : src.language}</span>}
+            {src.language && <span className="text-muted-foreground">{src.language === 'ja' ? uiI18n.t('app.japanese_original_6875faf6') : src.language === 'en' ? uiI18n.t('app.english_649df08a') : src.language}</span>}
           </button>
         );
       })}

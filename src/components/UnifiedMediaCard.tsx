@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
  * The card behind the manga surfaces, search results and the anime page's
  * related rails (docs/Plans.md §2 — "Cards (improve polish and consistency)").
@@ -61,13 +63,14 @@ export interface UnifiedMediaCardProps {
 function mangaFormatLabel(type?: string | null, mediaType = 'manga'): string {
   if (mediaType !== 'manga' && mediaType !== 'novel') return mediaType;
   const normalized = String(type || mediaType || 'manga').trim().toLowerCase();
-  if (normalized === 'manwha' || normalized === 'manwah') return 'manhwa';
-  if (normalized === 'comic' || normalized === 'oel') return 'comics';
-  if (!normalized) return 'manga';
+  if (normalized === 'manwha' || normalized === 'manwah') return uiI18n.t('app.manhwa_348a38ef');
+  if (normalized === 'comic' || normalized === 'oel') return uiI18n.t('app.comics_6d6af0b1');
+  if (!normalized) return uiI18n.t('app.manga_1c404c69');
   return normalized;
 }
 
 export const UnifiedMediaCard = memo(function UnifiedMediaCard({ item, variant, rank, className = "", topBadges = 'auto' }: UnifiedMediaCardProps) {
+  useUiTranslation();
   const isAnime = item.mediaType === 'anime';
   const isManga = item.mediaType === 'manga';
   const isNovel = (item.mediaType as string) === 'novel';
@@ -146,15 +149,15 @@ export const UnifiedMediaCard = memo(function UnifiedMediaCard({ item, variant, 
       {previewEnabled && !shouldBlurAdult && <video ref={preview.videoRef} preload="none" muted loop playsInline crossOrigin="anonymous" onError={preview.onError}
         className={cn('absolute inset-0 h-full w-full object-cover transition-opacity duration-150', preview.isActive ? 'opacity-100' : 'opacity-0')} />}
       {preview.isLoading && <div aria-hidden className="pointer-events-none absolute inset-0 flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-white" /></div>}
-      {preview.unavailable && <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center"><span className="rounded-lg bg-black/75 px-3 py-2 text-xs text-white">Preview unavailable</span></div>}
+      {preview.unavailable && <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center"><span className="rounded-lg bg-black/75 px-3 py-2 text-xs text-white">{uiI18n.t('app.preview_unavailable_36d31d45')}</span></div>}
       {!preview.isLoading && !preview.unavailable && !preview.isActive && <div aria-hidden className="media-card-preview media-card-open pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
         <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/90 text-primary-foreground">{isManga || isNovel ? <BookOpen className="h-6 w-6" /> : isCharacter ? <Star className="h-6 w-6" /> : <Play className="ml-1 h-6 w-6" />}</span>
       </div>}
     </>}
     badges={<>
-      {rank !== undefined && <span className="absolute left-2 top-2 z-20 rounded-lg bg-black/75 px-2 py-1 text-xs font-semibold tabular-nums text-white" aria-label={`Rank ${rank}`}>#{rank}</span>}
+      {rank !== undefined && <span className="absolute left-2 top-2 z-20 rounded-lg bg-black/75 px-2 py-1 text-xs font-semibold tabular-nums text-white" aria-label={uiI18n.t('app.rank_i18n_value_0_f4f41943', { value0: rank })}>#{rank}</span>}
       {isAdultItem && <AdultBadge className={cn('absolute left-2 z-20', rank !== undefined ? 'top-10' : 'top-2')} />}
-      {shouldBlurAdult && <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/50"><span className="rounded-full bg-black/80 px-3 py-1 text-xs font-semibold text-white">Sensitive preview</span></div>}
+      {shouldBlurAdult && <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/50"><span className="rounded-full bg-black/80 px-3 py-1 text-xs font-semibold text-white">{uiI18n.t('app.sensitive_preview_16bb7f14')}</span></div>}
       {overlay && topBadges !== 'none' && <span className={cn('absolute left-2 z-20 inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-black/60 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white', rank !== undefined || isAdultItem ? 'top-10' : 'top-2')}>
         {isManga || isNovel ? <BookOpen aria-hidden className="h-3 w-3" /> : isAnime ? <Film aria-hidden className="h-3 w-3" /> : <Star aria-hidden className="h-3 w-3" />}{mediaBadgeLabel}
       </span>}
@@ -163,14 +166,14 @@ export const UnifiedMediaCard = memo(function UnifiedMediaCard({ item, variant, 
     </>}
     metadata={overlay ? <div className="flex flex-wrap items-center gap-2">
       {score && <ScoreBadge score={score} />}{label && <MetaBadge className="text-white/85">{label}</MetaBadge>}
-      {isAnime && !!item.episodes?.sub && <MetaBadge className="text-white/85">{item.episodes.sub} sub {item.episodes.dub ? `· ${item.episodes.dub} dub` : ''}</MetaBadge>}
-      {(isManga || isNovel) && !!item.chapters && <MetaBadge className="text-white/85">{item.chapters} ch</MetaBadge>}
+      {isAnime && !!item.episodes?.sub && <MetaBadge className="text-white/85">{item.episodes.sub} {uiI18n.t('app.sub_5d85613a')} {item.episodes.dub ? uiI18n.t('app.i18n_value_0_dub_f85b5df5', { value0: item.episodes.dub }) : ''}</MetaBadge>}
+      {(isManga || isNovel) && !!item.chapters && <MetaBadge className="text-white/85">{item.chapters} {uiI18n.t('app.ch_482bd64c')}</MetaBadge>}
     </div> : <div className="flex flex-wrap items-center gap-x-1.5">
-      <span className="capitalize">{isAnime ? item.type || 'Anime' : mediaBadgeLabel}</span>
+      <span className="capitalize">{isAnime ? item.type || uiI18n.t('app.anime_f1b32a19') : mediaBadgeLabel}</span>
       {item.year && <span>· {item.year}</span>}
-      {(isManga || isNovel) && !!item.chapters && <span>· {item.chapters} ch</span>}
-      {isAnime && !!item.episodes?.sub && <span>· {item.episodes.sub} sub</span>}
-      {isAnime && !!item.episodes?.dub && <span>· {item.episodes.dub} dub</span>}
+      {(isManga || isNovel) && !!item.chapters && <span>· {item.chapters} {uiI18n.t('app.ch_482bd64c')}</span>}
+      {isAnime && !!item.episodes?.sub && <span>· {item.episodes.sub} {uiI18n.t('app.sub_5d85613a')}</span>}
+      {isAnime && !!item.episodes?.dub && <span>· {item.episodes.dub} {uiI18n.t('app.dub_1ca4b285')}</span>}
       {label && <span>· {label}</span>}
       {item.status && !isCharacter && <span>· {item.status}</span>}
     </div>} />;

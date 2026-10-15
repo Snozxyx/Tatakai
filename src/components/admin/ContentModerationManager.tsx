@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -6,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from '@/lib/localeFormat';
 import {
   Trash2, Search, MessageSquare, Music2, Layers,
   Eye, AlertTriangle, ExternalLink, Pin
@@ -18,6 +20,7 @@ import { useConfirm } from '@/components/ui/confirm-dialog';
 import { RichContent } from '@/components/community/feed/richText';
 
 export function ContentModerationManager() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const pinPost = usePinForumPost();
   const confirm = useConfirm();
@@ -122,10 +125,10 @@ export function ContentModerationManager() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin_forum_posts'] });
-      toast.success('Forum post deleted');
+      toast.success(uiI18n.t('app.forum_post_deleted_2f0358c3'));
     },
     onError: () => {
-      toast.error('Failed to delete forum post');
+      toast.error(uiI18n.t('app.failed_to_delete_forum_post_26616e4f'));
     },
   });
 
@@ -140,10 +143,10 @@ export function ContentModerationManager() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin_playlists'] });
-      toast.success('Playlist deleted');
+      toast.success(uiI18n.t('app.playlist_deleted_3cd30e93'));
     },
     onError: () => {
-      toast.error('Failed to delete playlist');
+      toast.error(uiI18n.t('app.failed_to_delete_playlist_9c4cbc5d'));
     },
   });
 
@@ -158,10 +161,10 @@ export function ContentModerationManager() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin_tier_lists'] });
-      toast.success('Tier list deleted');
+      toast.success(uiI18n.t('app.tier_list_deleted_940ae950'));
     },
     onError: () => {
-      toast.error('Failed to delete tier list');
+      toast.error(uiI18n.t('app.failed_to_delete_tier_list_9b40554c'));
     },
   });
 
@@ -188,12 +191,12 @@ export function ContentModerationManager() {
       <div className="flex items-center justify-between">
         <h2 className="font-display text-xl font-semibold flex items-center gap-2">
           <AlertTriangle className="w-5 h-5 text-primary" />
-          Content Moderation
+          {uiI18n.t('app.content_moderation_5f6854d1')}
         </h2>
         <div className="relative w-64">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            placeholder="Search content..."
+            placeholder={uiI18n.t('app.search_content_a99cba28')}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10 bg-muted/50"
@@ -205,15 +208,15 @@ export function ContentModerationManager() {
         <TabsList className="bg-muted/30">
           <TabsTrigger value="forum" className="gap-2">
             <MessageSquare className="w-4 h-4" />
-            Forum ({forumPosts.length})
+            {uiI18n.t('app.forum_c1536766')}{forumPosts.length})
           </TabsTrigger>
           <TabsTrigger value="playlists" className="gap-2">
             <Music2 className="w-4 h-4" />
-            Playlists ({playlists.length})
+            {uiI18n.t('app.playlists_23fa7dbe')}{playlists.length})
           </TabsTrigger>
           <TabsTrigger value="tierlists" className="gap-2">
             <Layers className="w-4 h-4" />
-            Tier Lists ({tierLists.length})
+            {uiI18n.t('app.tier_lists_73aa2889')}{tierLists.length})
           </TabsTrigger>
         </TabsList>
 
@@ -233,7 +236,7 @@ export function ContentModerationManager() {
                       <div className="flex items-center gap-2 mb-1">
                         {post.is_spoiler && (
                           <span className="px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-500 text-xs">
-                            Spoiler
+                            {uiI18n.t('app.spoiler_875786ee')}
                           </span>
                         )}
                         {post.flair && (
@@ -245,7 +248,7 @@ export function ContentModerationManager() {
                       <h4 className="font-medium truncate">{post.title}</h4>
                       <RichContent html={post.content} className="text-sm text-muted-foreground line-clamp-2 mt-1" />
                       <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                        <Link to={`/admin/user/${post.user_id}`} className="hover:text-primary transition-colors">By @{post.profile?.username || 'unknown'}</Link>
+                        <Link to={`/admin/user/${post.user_id}`} className="hover:text-primary transition-colors">{uiI18n.t('app.by_538010be')}{post.profile?.username || uiI18n.t('app.unknown_50d8b4a9')}</Link>
                         <span>{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</span>
                         <span className="flex items-center gap-1">
                           <Eye className="w-3 h-3" />
@@ -260,9 +263,9 @@ export function ContentModerationManager() {
                         onClick={async () => {
                           try {
                             await pinPost.mutateAsync({ postId: post.id, isPinned: !post.is_pinned });
-                            toast.success(post.is_pinned ? 'Post unpinned' : 'Post pinned');
+                            toast.success(post.is_pinned ? uiI18n.t('app.post_unpinned_941d8469') : uiI18n.t('app.post_pinned_47d0d269'));
                           } catch (e) {
-                            toast.error('Failed to update pin status');
+                            toast.error(uiI18n.t('app.failed_to_update_pin_status_bc6ec1b2'));
                           }
                         }}
                         className={post.is_pinned ? "text-primary" : "text-muted-foreground"}
@@ -278,7 +281,7 @@ export function ContentModerationManager() {
                         variant="ghost"
                         size="sm"
                         onClick={async () => {
-                          if (await confirm({ title: 'Delete this forum post?', destructive: true })) {
+                          if (await confirm({ get title() { return uiI18n.t('app.delete_this_forum_post_6bf13538'); }, destructive: true })) {
                             deleteForumPost.mutate(post.id);
                           }
                         }}
@@ -293,7 +296,7 @@ export function ContentModerationManager() {
             </div>
           ) : (
             <div className="text-center py-12 text-muted-foreground">
-              No forum posts found
+              {uiI18n.t('app.no_forum_posts_found_f5ad2841')}
             </div>
           )}
         </TabsContent>
@@ -314,21 +317,21 @@ export function ContentModerationManager() {
                       <div className="flex items-center gap-2 mb-1">
                         {playlist.is_public ? (
                           <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-500 text-xs">
-                            Public
+                            {uiI18n.t('app.public_dc5eb704')}
                           </span>
                         ) : (
                           <span className="px-2 py-0.5 rounded-full bg-muted text-muted-foreground text-xs">
-                            Private
+                            {uiI18n.t('app.private_237dfa0a')}
                           </span>
                         )}
                       </div>
                       <h4 className="font-medium truncate">{playlist.name}</h4>
                       <p className="text-sm text-muted-foreground line-clamp-1 mt-1">
-                        {playlist.description || 'No description'}
+                        {playlist.description || uiI18n.t('app.no_description_f354c94f')}
                       </p>
                       <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                        <Link to={`/admin/user/${playlist.user_id}`} className="hover:text-primary transition-colors">By @{playlist.profile?.username || 'unknown'}</Link>
-                        <span>{playlist.items_count || 0} items</span>
+                        <Link to={`/admin/user/${playlist.user_id}`} className="hover:text-primary transition-colors">{uiI18n.t('app.by_538010be')}{playlist.profile?.username || uiI18n.t('app.unknown_50d8b4a9')}</Link>
+                        <span>{playlist.items_count || 0} {uiI18n.t('app.items_7316c8b2')}</span>
                         <span>{formatDistanceToNow(new Date(playlist.created_at), { addSuffix: true })}</span>
                       </div>
                     </div>
@@ -342,7 +345,7 @@ export function ContentModerationManager() {
                         variant="ghost"
                         size="sm"
                         onClick={async () => {
-                          if (await confirm({ title: 'Delete this playlist?', destructive: true })) {
+                          if (await confirm({ get title() { return uiI18n.t('app.delete_this_playlist_5e8bf594'); }, destructive: true })) {
                             deletePlaylist.mutate(playlist.id);
                           }
                         }}
@@ -357,7 +360,7 @@ export function ContentModerationManager() {
             </div>
           ) : (
             <div className="text-center py-12 text-muted-foreground">
-              No playlists found
+              {uiI18n.t('app.no_playlists_found_4a374ffd')}
             </div>
           )}
         </TabsContent>
@@ -378,20 +381,20 @@ export function ContentModerationManager() {
                       <div className="flex items-center gap-2 mb-1">
                         {tierList.is_public ? (
                           <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-500 text-xs">
-                            Public
+                            {uiI18n.t('app.public_dc5eb704')}
                           </span>
                         ) : (
                           <span className="px-2 py-0.5 rounded-full bg-muted text-muted-foreground text-xs">
-                            Private
+                            {uiI18n.t('app.private_237dfa0a')}
                           </span>
                         )}
                       </div>
                       <h4 className="font-medium truncate">{tierList.title}</h4>
                       <p className="text-sm text-muted-foreground line-clamp-1 mt-1">
-                        {tierList.description || 'No description'}
+                        {tierList.description || uiI18n.t('app.no_description_f354c94f')}
                       </p>
                       <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                        <Link to={`/admin/user/${tierList.user_id}`} className="hover:text-primary transition-colors">By @{tierList.profile?.username || 'unknown'}</Link>
+                        <Link to={`/admin/user/${tierList.user_id}`} className="hover:text-primary transition-colors">{uiI18n.t('app.by_538010be')}{tierList.profile?.username || uiI18n.t('app.unknown_50d8b4a9')}</Link>
                         <span>{formatDistanceToNow(new Date(tierList.created_at), { addSuffix: true })}</span>
                         {tierList.views_count > 0 && (
                           <span className="flex items-center gap-1">
@@ -413,7 +416,7 @@ export function ContentModerationManager() {
                         variant="ghost"
                         size="sm"
                         onClick={async () => {
-                          if (await confirm({ title: 'Delete this tier list?', destructive: true })) {
+                          if (await confirm({ get title() { return uiI18n.t('app.delete_this_tier_list_a486e5e4'); }, destructive: true })) {
                             deleteTierList.mutate(tierList.id);
                           }
                         }}
@@ -428,7 +431,7 @@ export function ContentModerationManager() {
             </div>
           ) : (
             <div className="text-center py-12 text-muted-foreground">
-              No tier lists found
+              {uiI18n.t('app.no_tier_lists_found_e64dbd30')}
             </div>
           )}
         </TabsContent>

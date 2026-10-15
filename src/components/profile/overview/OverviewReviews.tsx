@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -43,6 +45,7 @@ export function OverviewReviews({
   history = [],
   isViewingOther = false,
 }: OverviewReviewsProps) {
+  useUiTranslation();
   // Local metadata from the lists already loaded on the profile.
   const localMetaById = useMemo(() => {
     const map = new Map<string, { title: string; poster: string | null }>();
@@ -118,12 +121,12 @@ export function OverviewReviews({
             </div>
             <div>
               <h4 className="font-display font-bold text-base text-foreground tracking-tight">
-                {isViewingOther ? 'Reviews' : 'Your Reviews'}
+                {isViewingOther ? uiI18n.t('app.reviews_b83c4cda') : uiI18n.t('app.your_reviews_e6804e09')}
               </h4>
               <p className="text-xs text-muted-foreground/70 font-medium">
                 {totalReviews > 0
-                  ? `Showing ${reviews.length} of ${totalReviews} ${totalReviews === 1 ? 'review' : 'reviews'}`
-                  : 'Written reviews on rated anime'}
+                  ? uiI18n.t('app.showing_i18n_value_0_of_i18n_value_1_i18n_value__14411fac', { value0: reviews.length, value1: totalReviews, value2: totalReviews === 1 ? 'review' : 'reviews' })
+                  : uiI18n.t('app.written_reviews_on_rated_anime_eb932cdc')}
               </p>
             </div>
           </div>
@@ -179,11 +182,11 @@ export function OverviewReviews({
           <div className="text-center py-8 border border-dashed border-white/[0.08] rounded-xl bg-white/[0.01]">
             <MessageSquareQuote className="w-8 h-8 mx-auto text-muted-foreground/30 mb-2" />
             <p className="text-xs text-muted-foreground/70">
-              {isViewingOther ? 'No reviews written yet' : "You haven't written any reviews yet"}
+              {isViewingOther ? uiI18n.t('app.no_reviews_written_yet_18080e0e') : uiI18n.t('app.you_haven_t_written_any_reviews_yet_21aca852')}
             </p>
             {!isViewingOther && (
               <p className="text-[10px] text-muted-foreground/50 mt-1">
-                Rate an anime and add a review to see it here
+                {uiI18n.t('app.rate_an_anime_and_add_a_review_to_see_it_here_095ac20a')}
               </p>
             )}
           </div>

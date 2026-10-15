@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Background } from '@/components/layout/Background';
 import { Sidebar } from '@/components/layout/Sidebar';
@@ -12,6 +14,7 @@ import { useIsDesktopApp } from '@/hooks/ui/useIsNativeApp';
 
 // Fetch tier list by ID (not share code)
 function useTierListById(id: string) {
+  useUiTranslation();
     const { user } = useAuth();
 
     return useQuery({
@@ -31,6 +34,7 @@ function useTierListById(id: string) {
 }
 
 export default function TierListEditPage() {
+  useUiTranslation();
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const isDesktopApp = useIsDesktopApp();
@@ -62,12 +66,12 @@ export default function TierListEditPage() {
         return (
             <div className="min-h-screen bg-background flex items-center justify-center">
                 <div className="text-center">
-                    <p className="text-muted-foreground mb-4">Tier list not found</p>
+                    <p className="text-muted-foreground mb-4">{uiI18n.t('app.tier_list_not_found_e2e9c995')}</p>
                     <button
                         onClick={() => navigate('/tierlists')}
                         className="text-primary hover:underline"
                     >
-                        Back to Tier Lists
+                        {uiI18n.t('app.back_to_tier_lists_dc1afa2a')}
                     </button>
                 </div>
             </div>
@@ -78,12 +82,12 @@ export default function TierListEditPage() {
         return (
             <div className="min-h-screen bg-background flex items-center justify-center">
                 <div className="text-center">
-                    <p className="text-muted-foreground mb-4">You don't have permission to edit this tier list</p>
+                    <p className="text-muted-foreground mb-4">{uiI18n.t('app.you_don_t_have_permission_to_edit_this_tier_list_8b788648')}</p>
                     <button
                         onClick={() => navigate('/tierlists')}
                         className="text-primary hover:underline"
                     >
-                        Back to Tier Lists
+                        {uiI18n.t('app.back_to_tier_lists_dc1afa2a')}
                     </button>
                 </div>
             </div>
@@ -102,15 +106,15 @@ export default function TierListEditPage() {
                         className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
                     >
                         <ArrowLeft className="w-5 h-5" />
-                        <span>Back</span>
+                        <span>{uiI18n.t('app.back_b52b36b7')}</span>
                     </button>
                 </div>
 
                 <div className="mb-8">
                     <h1 className="font-display text-3xl md:text-4xl font-bold mb-2">
-                        Edit Tier List
+                        {uiI18n.t('app.edit_tier_list_ad3c7aec')}
                     </h1>
-                    <p className="text-muted-foreground">Update your anime ranking</p>
+                    <p className="text-muted-foreground">{uiI18n.t('app.update_your_anime_ranking_53f6f091')}</p>
                 </div>
 
                 <TierListEditor

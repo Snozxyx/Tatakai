@@ -1,3 +1,4 @@
+import { selectPreferredTitle } from '@/lib/titleLanguage';
 import { externalApiGet } from "@/lib/api/api-client";
 import { AnimeCard } from "@/types/anime";
 
@@ -96,7 +97,7 @@ export interface JikanCharacterFullResponse {
 export function jikanToAnimeCard(jikanAnime: JikanAnime): AnimeCard {
   return {
     id: `mal:${jikanAnime.mal_id}`,
-    name: jikanAnime.title_english || jikanAnime.title,
+    name: selectPreferredTitle({romaji:jikanAnime.title,english:jikanAnime.title_english,native:jikanAnime.title_japanese}),
     jname: jikanAnime.title_japanese || undefined,
     poster: jikanAnime.images.jpg.large_image_url || jikanAnime.images.jpg.image_url,
     type: jikanAnime.type || 'TV',

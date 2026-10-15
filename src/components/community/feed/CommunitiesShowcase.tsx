@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
   import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Users, Check, Plus, BadgeCheck, ArrowUpRight } from 'lucide-react';
@@ -7,6 +9,7 @@ import { useCommunities, useToggleCommunityMembership } from '@/hooks/community/
 import { useAuth } from '@/contexts/AuthContext';
 
 export function CommunitiesShowcase({ onOpen }: { onOpen?: (communityId: string) => void }) {
+  useUiTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
   const { data: communities = [], isLoading } = useCommunities();
@@ -20,7 +23,7 @@ export function CommunitiesShowcase({ onOpen }: { onOpen?: (communityId: string)
       <div className="mb-4 flex items-center gap-2 px-1">
         <Users className="h-4 w-4 text-muted-foreground" />
         <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
-          Discover Communities
+          {uiI18n.t('app.discover_communities_96f4f3db')}
         </p>
       </div>
 
@@ -79,13 +82,13 @@ export function CommunitiesShowcase({ onOpen }: { onOpen?: (communityId: string)
                       <p className="flex items-center gap-1 text-base font-bold leading-tight text-foreground transition-colors">
                         <span className="truncate">{c.name}</span>
                         {c.is_verified && (
-                          <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-sky-400" aria-label="Verified community" />
+                          <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-sky-400" aria-label={uiI18n.t('app.verified_community_8777dd86')} />
                         )}
                       </p>
                       
                       {c.description && <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">{c.description}</p>}
                       <div className="mt-2 flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground">
-                        <span>{(c.member_count || 0).toLocaleString()} members</span>
+                        <span>{(c.member_count || 0).toLocaleString(uiI18n.language)} {uiI18n.t('app.members_f13eb585')}</span>
                         <span className="h-1 w-1 shrink-0 rounded-full bg-zinc-400" />
                         <span className="flex shrink-0 items-center gap-1">
                           <span className="relative flex h-1.5 w-1.5">

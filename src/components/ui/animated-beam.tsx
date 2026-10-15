@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 "use client";
 
 import { RefObject, useEffect, useId, useState } from "react";
@@ -44,6 +46,7 @@ export const AnimatedBeam: React.FC<AnimatedBeamProps> = ({
   endXOffset = 0,
   endYOffset = 0,
 }) => {
+  useUiTranslation();
   const id = useId();
   const [pathD, setPathD] = useState("");
   const [svgDimensions, setSvgDimensions] = useState({ width: 0, height: 0 });

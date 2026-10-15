@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { Link } from 'react-router-dom';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { getProxiedImageUrl } from '@/lib/api';
@@ -12,6 +14,7 @@ export function NovelRecommendationGrid({
   recommendations: EngineRecommendation[];
   isLoading: boolean;
 }) {
+  useUiTranslation();
   if (isLoading) {
     return (
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
@@ -26,7 +29,7 @@ export function NovelRecommendationGrid({
     return (
       <GlassPanel className="p-8 text-center">
         <BookOpen className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-        <p className="text-muted-foreground">Add light novels to your library to get personalized novel picks.</p>
+        <p className="text-muted-foreground">{uiI18n.t('app.add_light_novels_to_your_library_to_get_personal_971f420e')}</p>
       </GlassPanel>
     );
   }
@@ -51,7 +54,7 @@ export function NovelRecommendationGrid({
             </div>
             <div className="p-2.5">
               <p className="truncate text-sm font-bold">{rec.anime.title}</p>
-              <p className="mt-0.5 text-[11px] uppercase tracking-wider text-muted-foreground">Novel · {Math.round(rec.score)} match</p>
+              <p className="mt-0.5 text-[11px] uppercase tracking-wider text-muted-foreground">{uiI18n.t('app.novel_5ce28bac')} {Math.round(rec.score)} {uiI18n.t('app.match_ef5c844e')}</p>
             </div>
           </Link>
         </GlassPanel>

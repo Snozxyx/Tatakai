@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
  * The chips every media card overlays on its poster (docs/Plans.md §2 — "Cards
  * (improve polish and consistency)").
@@ -16,8 +18,9 @@ import { cn } from '@/lib/utils';
  * theme squares its corners — so inlining the styles would break those themes.
  */
 export function AdultBadge({ className }: { className?: string }) {
+  useUiTranslation();
   return (
-    <span className={cn('badge-18plus', className)} aria-label="Adult content">
+    <span className={cn('badge-18plus', className)} aria-label={uiI18n.t('app.adult_content_afe5e2bc')}>
       <ShieldAlert className="h-3 w-3" aria-hidden />
       18+
     </span>
@@ -30,6 +33,7 @@ export function AdultBadge({ className }: { className?: string }) {
  * for ratings — rather than a raw Tailwind yellow.
  */
 export function ScoreBadge({ score, className }: { score: string; className?: string }) {
+  useUiTranslation();
   return (
     <span
       className={cn(
@@ -51,6 +55,7 @@ export function MetaBadge({
   children: React.ReactNode;
   className?: string;
 }) {
+  useUiTranslation();
   return (
     <span
       className={cn(

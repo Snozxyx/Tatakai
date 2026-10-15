@@ -1,4 +1,7 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { Download, Monitor, Zap, Shield, Globe, ArrowRight, Apple, Laptop } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { GlassPanel } from '@/components/ui/GlassPanel';
@@ -6,12 +9,14 @@ import { useIsDesktopApp } from '@/hooks/ui/useIsNativeApp';
 import { useLatestRelease, platformForAsset, GITHUB_RELEASES_URL, type PlatformKey } from '@/lib/github';
 
 const FEATURES = [
-  { icon: Zap,     title: 'Offline Playback',   desc: 'Download episodes and watch without internet connection.' },
-  { icon: Shield,  title: 'Ad-Free Experience',  desc: 'No ads, no trackers. A clean, focused otaku experience.' },
-  { icon: Globe,   title: 'Extension Support',   desc: 'Unlock community-built sources via the extension platform.' },
+  { icon: Zap,     titleKey: 'home.downloadFeatureOfflineTitle', descKey: 'home.downloadFeatureOfflineDesc' },
+  { icon: Shield,  titleKey: 'home.downloadFeatureAdFreeTitle',  descKey: 'home.downloadFeatureAdFreeDesc' },
+  { icon: Globe,   titleKey: 'home.downloadFeatureExtTitle',   descKey: 'home.downloadFeatureExtDesc' },
 ];
 
 export function DownloadSection() {
+  useUiTranslation();
+  const { t } = useTranslation();
   const isDesktopApp = useIsDesktopApp();
   const latest = useLatestRelease();
   const linkFor = (key: PlatformKey) => {
@@ -36,21 +41,21 @@ export function DownloadSection() {
           <div className="space-y-4">
             <div className="flex items-center gap-3 text-primary text-xs font-black uppercase tracking-[0.2em] bg-primary/10 w-fit px-4 py-2 rounded-full border border-primary/20">
               <Download className="w-4 h-4" />
-              Available Now
+              {t('home.downloadAvailableNow')}
             </div>
             <h2 className="text-4xl md:text-5xl font-black tracking-tighter leading-none">
-              Get Tatakai<br />
-              <span className="text-primary italic">Desktop App</span>
+              {t('home.downloadTitleA')}<br />
+              <span className="text-primary italic">{t('home.downloadTitleB')}</span>
             </h2>
             <p className="text-muted-foreground max-w-lg leading-relaxed font-medium text-lg">
-              Unlock the full experience with offline downloads, extension support, and a native media player — all in one beautiful app.
+              {t('home.downloadDesc')}
             </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {FEATURES.map((feature, idx) => (
               <motion.div
-                key={feature.title}
+                key={feature.titleKey}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: idx * 0.1 }}
@@ -59,8 +64,8 @@ export function DownloadSection() {
                   <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary mb-4 group-hover:bg-primary group-hover:text-primary-foreground transition-all">
                     <feature.icon className="w-5 h-5" />
                   </div>
-                  <h4 className="font-black text-sm mb-1.5">{feature.title}</h4>
-                  <p className="text-xs text-muted-foreground leading-relaxed font-medium opacity-80">{feature.desc}</p>
+                  <h4 className="font-black text-sm mb-1.5">{t(feature.titleKey)}</h4>
+                  <p className="text-xs text-muted-foreground leading-relaxed font-medium opacity-80">{t(feature.descKey)}</p>
                 </GlassPanel>
               </motion.div>
             ))}
@@ -75,8 +80,8 @@ export function DownloadSection() {
           >
             <Monitor className="w-6 h-6" />
             <div className="text-left">
-              <div className="text-[10px] font-bold uppercase tracking-widest opacity-75">Download for</div>
-              <div className="leading-tight">Windows</div>
+              <div className="text-[10px] font-bold uppercase tracking-widest opacity-75">{t('home.downloadFor')}</div>
+              <div className="leading-tight">{uiI18n.t('app.windows_26d9c28d')}</div>
             </div>
             <ArrowRight className="w-5 h-5 ml-auto" />
           </Button>
@@ -88,8 +93,8 @@ export function DownloadSection() {
           >
             <Apple className="w-6 h-6" />
             <div className="text-left">
-              <div className="text-[10px] font-bold uppercase tracking-widest opacity-75">Download for</div>
-              <div className="leading-tight">macOS</div>
+              <div className="text-[10px] font-bold uppercase tracking-widest opacity-75">{t('home.downloadFor')}</div>
+              <div className="leading-tight">{uiI18n.t('app.macos_cd6fdcbf')}</div>
             </div>
             <ArrowRight className="w-5 h-5 ml-auto" />
           </Button>
@@ -101,13 +106,13 @@ export function DownloadSection() {
           >
             <Laptop className="w-6 h-6" />
             <div className="text-left">
-              <div className="text-[10px] font-bold uppercase tracking-widest opacity-75">Download for</div>
-              <div className="leading-tight">Linux</div>
+              <div className="text-[10px] font-bold uppercase tracking-widest opacity-75">{t('home.downloadFor')}</div>
+              <div className="leading-tight">{uiI18n.t('app.linux_83ad8510')}</div>
             </div>
             <ArrowRight className="w-5 h-5 ml-auto" />
           </Button>
 
-          <p className="text-center text-xs text-muted-foreground/50 font-medium">Free &amp; Open Source · MIT License</p>
+          <p className="text-center text-xs text-muted-foreground/50 font-medium">{t('home.downloadFossNote')}</p>
         </div>
       </div>
     </div>

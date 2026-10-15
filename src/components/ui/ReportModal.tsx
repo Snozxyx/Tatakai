@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -33,6 +35,7 @@ interface ReportModalProps {
 }
 
 export function ReportModal({ isOpen, onClose, targetType, targetId, targetName }: ReportModalProps) {
+  useUiTranslation();
     const { user } = useAuth();
     const [reason, setReason] = useState("");
     const [details, setDetails] = useState("");
@@ -43,17 +46,17 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName 
 
     const handleSubmit = async () => {
         if (!user) {
-            toast.error("You must be logged in to report");
+            toast.error(uiI18n.t('app.you_must_be_logged_in_to_report_cc4ae7d0'));
             return;
         }
 
         if (!reason) {
-            toast.error("Please select a reason");
+            toast.error(uiI18n.t('app.please_select_a_reason_7ca6e0e6'));
             return;
         }
 
         if (turnstileEnabled && !captchaToken) {
-            toast.error("Please complete the verification challenge");
+            toast.error(uiI18n.t('app.please_complete_the_verification_challenge_7dbc0a97'));
             return;
         }
 
@@ -62,7 +65,7 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName 
             if (turnstileEnabled) {
                 const ok = await verifyTurnstileToken(captchaToken);
                 if (!ok) {
-                    toast.error("Verification failed. Please try again.");
+                    toast.error(uiI18n.t('app.verification_failed_please_try_again_79a2796b'));
                     turnstileRef.current?.reset();
                     setCaptchaToken(null);
                     return;
@@ -80,7 +83,7 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName 
 
             if (error) throw error;
 
-            toast.success("Report submitted successfully. Our moderators will review it soon.");
+            toast.success(uiI18n.t('app.report_submitted_successfully_our_moderators_wil_f78c23c3'));
             onClose();
             // Reset form
             setReason("");
@@ -121,18 +124,18 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName 
                     <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center mb-4">
                         <AlertTriangle className="w-6 h-6 text-destructive" />
                     </div>
-                    <DialogTitle className="text-xl font-bold">Report {targetType}</DialogTitle>
+                    <DialogTitle className="text-xl font-bold">{uiI18n.t('app.report_ee45c303')} {targetType}</DialogTitle>
                     <DialogDescription>
-                        Reporting: <span className="text-foreground font-medium">{targetName || targetId}</span>. {user ? '' : 'Please sign in to submit.'}
+                        {uiI18n.t('app.reporting_6c8a7132')} <span className="text-foreground font-medium">{targetName || targetId}</span>. {user ? '' : uiI18n.t('app.please_sign_in_to_submit_a23f34d7')}
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="space-y-4 py-4">
                     <div className="space-y-2">
-                        <label className="text-sm font-medium text-muted-foreground">Reason</label>
+                        <label className="text-sm font-medium text-muted-foreground">{uiI18n.t('app.reason_f219cc06')}</label>
                         <Select onValueChange={setReason} value={reason}>
                             <SelectTrigger className="bg-white/5 border-white/10">
-                                <SelectValue placeholder="Select a reason" />
+                                <SelectValue placeholder={uiI18n.t('app.select_a_reason_e58d562f')} />
                             </SelectTrigger>
                             <SelectContent>
                                 {getReasons().map((r) => (
@@ -143,9 +146,9 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName 
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-sm font-medium text-muted-foreground">Additional Details</label>
+                        <label className="text-sm font-medium text-muted-foreground">{uiI18n.t('app.additional_details_cc7b272d')}</label>
                         <Textarea
-                            placeholder="Please provide more context..."
+                            placeholder={uiI18n.t('app.please_provide_more_context_5e964256')}
                             value={details}
                             onChange={(e) => setDetails(e.target.value)}
                             className="bg-white/5 border-white/10 min-h-[100px] resize-none"
@@ -166,7 +169,7 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName 
 
                 <DialogFooter className="gap-2 sm:gap-0">
                     <Button variant="ghost" onClick={onClose} disabled={isSubmitting}>
-                        Cancel
+                        {uiI18n.t('app.cancel_77dfd213')}
                     </Button>
                     <Button
                         variant="destructive"
@@ -175,7 +178,7 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName 
                         className="shadow-lg shadow-destructive/20"
                     >
                         {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                        Submit Report
+                        {uiI18n.t('app.submit_report_1ca00033')}
                     </Button>
                 </DialogFooter>
             </DialogContent>

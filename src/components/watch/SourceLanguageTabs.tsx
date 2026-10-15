@@ -8,6 +8,7 @@
  */
 
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import {
   normalizeWatchLanguageKey,
@@ -31,6 +32,7 @@ export function SourceLanguageTabs({
   activeLanguage,
   onLanguageChange,
 }: SourceLanguageTabsProps) {
+  const { t } = useTranslation();
   // Derive distinct language tabs from the source list
   const languageTabs = useMemo(() => {
     const seen = new Map<string, string>();
@@ -60,7 +62,7 @@ export function SourceLanguageTabs({
             : "bg-white/5 text-muted-foreground hover:bg-white/10",
         )}
       >
-        All
+        {t('watch.all')}
       </button>
 
       {/* One tab per distinct language */}

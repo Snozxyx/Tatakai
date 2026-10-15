@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -75,13 +77,13 @@ interface SocialLinksEditorProps {
 }
 
 const SOCIAL_PLATFORMS = [
-  { key: 'discord', label: 'Discord', icon: DiscordIcon, placeholder: 'discord.gg/invite', color: '#5865F2' },
-  { key: 'twitter', label: 'X (Twitter)', icon: TwitterIcon, placeholder: '@username or x.com/username', color: '#000000' },
-  { key: 'instagram', label: 'Instagram', icon: InstagramIcon, placeholder: '@username or instagram.com/username', color: '#E4405F' },
-  { key: 'mal', label: 'MyAnimeList', icon: MALIcon, placeholder: 'myanimelist.net/profile/username', color: '#2E51A2' },
-  { key: 'anilist', label: 'AniList', icon: AniListIcon, placeholder: 'anilist.co/user/username', color: '#02A9FF' },
-  { key: 'youtube', label: 'YouTube', icon: YouTubeIcon, placeholder: '@channel or youtube.com/@channel', color: '#FF0000' },
-  { key: 'twitch', label: 'Twitch', icon: TwitchIcon, placeholder: 'twitch.tv/username', color: '#9146FF' },
+  { key: 'discord', get label() { return uiI18n.t('app.discord_bccc14ee'); }, icon: DiscordIcon, placeholder: 'discord.gg/invite', color: '#5865F2' },
+  { key: 'twitter', get label() { return uiI18n.t('app.x_twitter_9ae44c18'); }, icon: TwitterIcon, get placeholder() { return uiI18n.t('app.username_or_x_com_username_b99d17d8'); }, color: '#000000' },
+  { key: 'instagram', get label() { return uiI18n.t('app.instagram_5721bbef'); }, icon: InstagramIcon, get placeholder() { return uiI18n.t('app.username_or_instagram_com_username_b75d91d7'); }, color: '#E4405F' },
+  { key: 'mal', get label() { return uiI18n.t('app.myanimelist_be786904'); }, icon: MALIcon, placeholder: 'myanimelist.net/profile/username', color: '#2E51A2' },
+  { key: 'anilist', get label() { return uiI18n.t('app.anilist_c03a6787'); }, icon: AniListIcon, placeholder: 'anilist.co/user/username', color: '#02A9FF' },
+  { key: 'youtube', get label() { return uiI18n.t('app.youtube_558865a1'); }, icon: YouTubeIcon, get placeholder() { return uiI18n.t('app.channel_or_youtube_com_channel_86b75676'); }, color: '#FF0000' },
+  { key: 'twitch', get label() { return uiI18n.t('app.twitch_e8ea5fe2'); }, icon: TwitchIcon, placeholder: 'twitch.tv/username', color: '#9146FF' },
 ];
 
 export function SocialLinksEditor({ 
@@ -91,6 +93,7 @@ export function SocialLinksEditor({
   showHistory = true,
   trigger 
 }: SocialLinksEditorProps) {
+  useUiTranslation();
   const { user, refreshProfile } = useAuth();
   const [open, setOpen] = useState(false);
   const [links, setLinks] = useState<SocialLinks>(currentLinks);
@@ -124,10 +127,10 @@ export function SocialLinksEditor({
       if (error) throw error;
 
       await refreshProfile();
-      toast.success('Profile settings saved!');
+      toast.success(uiI18n.t('app.profile_settings_saved_653fa658'));
       setOpen(false);
     } catch (error: any) {
-      toast.error(`Failed to save: ${error.message}`);
+      toast.error(uiI18n.t('app.failed_to_save_i18n_value_0_9198d440', { value0: error.message }));
     } finally {
       setIsSaving(false);
     }
@@ -143,7 +146,7 @@ export function SocialLinksEditor({
         {trigger || (
           <Button variant="outline" className="gap-2">
             <Share2 className="w-4 h-4" />
-            Edit Social Links
+            {uiI18n.t('app.edit_social_links_e18dd605')}
           </Button>
         )}
       </DialogTrigger>
@@ -151,7 +154,7 @@ export function SocialLinksEditor({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Share2 className="w-5 h-5 text-primary" />
-            Profile Settings & Social Links
+            {uiI18n.t('app.profile_settings_social_links_e4196633')}
           </DialogTitle>
         </DialogHeader>
 
@@ -164,14 +167,14 @@ export function SocialLinksEditor({
               ) : (
                 <Lock className="w-4 h-4 text-amber-500" />
               )}
-              Privacy Settings
+              {uiI18n.t('app.privacy_settings_af95411f')}
             </h3>
             
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <Label className="font-medium">Public Profile</Label>
-                  <p className="text-xs text-muted-foreground">Allow others to view your profile via @username</p>
+                  <Label className="font-medium">{uiI18n.t('app.public_profile_0da61f53')}</Label>
+                  <p className="text-xs text-muted-foreground">{uiI18n.t('app.allow_others_to_view_your_profile_via_username_fadc72a1')}</p>
                 </div>
                 <Switch
                   checked={privacy.isPublic}
@@ -189,9 +192,9 @@ export function SocialLinksEditor({
                     <div>
                       <Label className="font-medium flex items-center gap-2">
                         <Eye className="w-3 h-3" />
-                        Show Watchlist
+                        {uiI18n.t('app.show_watchlist_394df743')}
                       </Label>
-                      <p className="text-xs text-muted-foreground">Display your anime watchlist publicly</p>
+                      <p className="text-xs text-muted-foreground">{uiI18n.t('app.display_your_anime_watchlist_publicly_d9ebe048')}</p>
                     </div>
                     <Switch
                       checked={privacy.showWatchlist}
@@ -203,9 +206,9 @@ export function SocialLinksEditor({
                     <div>
                       <Label className="font-medium flex items-center gap-2">
                         <Eye className="w-3 h-3" />
-                        Show Watch History
+                        {uiI18n.t('app.show_watch_history_25d808d4')}
                       </Label>
-                      <p className="text-xs text-muted-foreground">Display your watch history publicly</p>
+                      <p className="text-xs text-muted-foreground">{uiI18n.t('app.display_your_watch_history_publicly_701dab68')}</p>
                     </div>
                     <Switch
                       checked={privacy.showHistory}
@@ -221,10 +224,10 @@ export function SocialLinksEditor({
           <div className="space-y-4">
             <h3 className="font-semibold flex items-center gap-2">
               <Share2 className="w-4 h-4 text-primary" />
-              Social Links
+              {uiI18n.t('app.social_links_339c1ea9')}
             </h3>
             <p className="text-sm text-muted-foreground">
-              Add your social profiles to connect with other anime fans.
+              {uiI18n.t('app.add_your_social_profiles_to_connect_with_other_a_d743b44d')}
             </p>
 
             <div className="space-y-3">
@@ -252,7 +255,7 @@ export function SocialLinksEditor({
 
           <Button onClick={handleSave} disabled={isSaving} className="w-full gap-2">
             <Save className="w-4 h-4" />
-            {isSaving ? 'Saving...' : 'Save Settings'}
+            {isSaving ? 'Saving...' : uiI18n.t('app.save_settings_0022a3e1')}
           </Button>
         </div>
       </DialogContent>
@@ -262,6 +265,7 @@ export function SocialLinksEditor({
 
 // Component to display social links on a profile
 export function SocialLinksDisplay({ links }: { links?: SocialLinks }) {
+  useUiTranslation();
   if (!links) return null;
 
   const activeLinks = SOCIAL_PLATFORMS.filter(p => (links as any)[p.key]);
@@ -329,7 +333,7 @@ export function SocialLinksDisplay({ links }: { links?: SocialLinks }) {
               backgroundColor: `${platform.color}20`, 
               color: platform.color,
             }}
-            title={`${platform.label}: ${value}`}
+            title={uiI18n.t('app.i18n_value_0_i18n_value_1_b6af3412', { value0: platform.label, value1: value })}
           >
             <Icon />
           </div>

@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { Background } from '@/components/layout/Background';
 import { Sidebar } from '@/components/layout/Sidebar';
@@ -50,6 +52,7 @@ query ($id: Int) {
 `;
 
 export default function CharacterPage() {
+  useUiTranslation();
     const { charname } = useParams<{ charname: string }>();
     const navigate = useNavigate();
     const isDesktopApp = useIsDesktopApp();
@@ -126,7 +129,7 @@ export default function CharacterPage() {
                 <Background />
                 <main className={cn("relative z-10 p-6 flex flex-col items-center justify-center min-h-[80vh]", isDesktopApp ? "pl-6" : "pl-6 md:pl-32")}>
                     <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mb-6" />
-                    <p className="text-xl font-black uppercase tracking-[0.3em] animate-pulse">Synchronizing Soul...</p>
+                    <p className="text-xl font-black uppercase tracking-[0.3em] animate-pulse">{uiI18n.t('app.synchronizing_soul_b98f7b59')}</p>
                 </main>
             </div>
         );
@@ -138,13 +141,13 @@ export default function CharacterPage() {
                 <Background />
                 <main className={cn("relative z-10 p-6", isDesktopApp ? "pl-6" : "pl-6 md:pl-32")}>
                     <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-muted-foreground hover:text-white mb-12 transition-colors">
-                        <ArrowLeft className="w-5 h-5" /> Back
+                        <ArrowLeft className="w-5 h-5" /> {uiI18n.t('app.back_b52b36b7')}
                     </button>
                     <div className="text-center py-24 space-y-6">
                         <AlertCircle className="w-20 h-20 text-destructive mx-auto opacity-20" />
-                        <h1 className="text-4xl font-black">Character Not Found</h1>
-                        <p className="text-muted-foreground max-w-md mx-auto">We couldn't locate this character in the universal registry.</p>
-                        <Button onClick={() => navigate('/')} variant="outline" className="rounded-xl px-8 h-12">Return Home</Button>
+                        <h1 className="text-4xl font-black">{uiI18n.t('app.character_not_found_6ba1cf21')}</h1>
+                        <p className="text-muted-foreground max-w-md mx-auto">{uiI18n.t('app.we_couldn_t_locate_this_character_in_the_univers_2b756ff1')}</p>
+                        <Button onClick={() => navigate('/')} variant="outline" className="rounded-xl px-8 h-12">{uiI18n.t('app.return_home_27fae254')}</Button>
                     </div>
                 </main>
             </div>
@@ -188,7 +191,7 @@ export default function CharacterPage() {
                                 }}
                                 disabled={toggleFavorite.isPending}
                                 aria-pressed={isFavorited}
-                                aria-label={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
+                                aria-label={isFavorited ? uiI18n.t('app.remove_from_favorites_b6ddf62b') : uiI18n.t('app.add_to_favorites_cb10094b')}
                                 className={cn(
                                     "absolute top-6 right-6 w-14 h-14 rounded-2xl flex items-center justify-center backdrop-blur-2xl border border-white/20 transition-all active:scale-90 shadow-xl disabled:opacity-60",
                                     isFavorited ? "bg-red-500 text-white border-red-400" : "bg-black/40 text-white/60 hover:text-white"
@@ -200,11 +203,11 @@ export default function CharacterPage() {
 
                         <div className="grid grid-cols-2 gap-4">
                             <GlassPanel className="p-6 rounded-[2rem] bg-white/[0.02] border-white/5 flex flex-col items-center text-center">
-                                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Favourites</p>
-                                <p className="text-2xl font-black text-primary">{(char.favourites || 0).toLocaleString()}</p>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">{uiI18n.t('app.favourites_e6ccc0fd')}</p>
+                                <p className="text-2xl font-black text-primary">{(char.favourites || 0).toLocaleString(uiI18n.language)}</p>
                             </GlassPanel>
                             <GlassPanel className="p-6 rounded-[2rem] bg-white/[0.02] border-white/5 flex flex-col items-center text-center">
-                                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Gender</p>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">{uiI18n.t('app.gender_8a754c61')}</p>
                                 <p className="text-2xl font-black capitalize">{char.gender || '?'}</p>
                             </GlassPanel>
                         </div>
@@ -219,7 +222,7 @@ export default function CharacterPage() {
                                 className="flex items-center gap-3 text-primary text-xs font-black uppercase tracking-[0.2em] bg-primary/10 w-fit px-4 py-2 rounded-full border border-primary/20"
                             >
                                 <Sparkles className="w-4 h-4" />
-                                Legendary Character
+                                {uiI18n.t('app.legendary_character_20908e62')}
                             </motion.div>
                             
                             <div className="space-y-2">
@@ -243,10 +246,10 @@ export default function CharacterPage() {
                         <div className="space-y-4">
                             <div className="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-primary">
                                 <Info className="w-4 h-4" />
-                                Biography
+                                {uiI18n.t('app.biography_53c2de2d')}
                             </div>
                             <p className="text-lg text-muted-foreground leading-relaxed font-medium whitespace-pre-line max-h-[400px] overflow-y-auto pr-4 custom-scrollbar">
-                                {char.description || "No biography available for this character."}
+                                {char.description || uiI18n.t('app.no_biography_available_for_this_character_db5dbcde')}
                             </p>
                         </div>
 
@@ -254,19 +257,19 @@ export default function CharacterPage() {
                         <div className="flex flex-wrap gap-8">
                             {char.age && (
                                 <div className="space-y-1">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Age</p>
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">{uiI18n.t('app.age_ff9f1ff3')}</p>
                                     <p className="font-bold text-lg">{char.age}</p>
                                 </div>
                             )}
                             {char.bloodType && (
                                 <div className="space-y-1">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Blood Type</p>
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">{uiI18n.t('app.blood_type_7c88f88b')}</p>
                                     <p className="font-bold text-lg">{char.bloodType}</p>
                                 </div>
                             )}
                             {char.dateOfBirth?.month && (
                                 <div className="space-y-1">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Birthday</p>
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">{uiI18n.t('app.birthday_a6b9d69f')}</p>
                                     <p className="font-bold text-lg">{char.dateOfBirth.day}/{char.dateOfBirth.month}</p>
                                 </div>
                             )}
@@ -278,8 +281,8 @@ export default function CharacterPage() {
                 <div className="space-y-10">
                     <div className="flex items-center justify-between">
                         <div className="space-y-2">
-                            <h2 className="text-4xl font-black tracking-tight">Media <span className="text-primary italic">Appearances</span></h2>
-                            <p className="text-muted-foreground font-medium">Shows and manga where this character plays a role.</p>
+                            <h2 className="text-4xl font-black tracking-tight">{uiI18n.t('app.media_0c77aeec')} <span className="text-primary italic">{uiI18n.t('app.appearances_07a88677')}</span></h2>
+                            <p className="text-muted-foreground font-medium">{uiI18n.t('app.shows_and_manga_where_this_character_plays_a_rol_879da439')}</p>
                         </div>
                         <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-primary border border-white/5">
                             <Film className="w-6 h-6" />

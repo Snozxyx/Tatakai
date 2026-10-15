@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
  * Mobile Offline Library Page — downloads hub for the native app.
  *
@@ -43,13 +45,14 @@ function formatBytes(bytes?: number | null): string {
 function formatDate(iso?: string | null): string {
   if (!iso) return '';
   try {
-    return new Date(iso).toLocaleDateString();
+    return new Date(iso).toLocaleDateString(uiI18n.language);
   } catch {
     return '';
   }
 }
 
 function ActiveRow({ item, onCancel }: { item: MobileDownloadQueueItem; onCancel: (id: string) => void }) {
+  useUiTranslation();
   const pct = Math.max(0, Math.min(100, Math.round(item.progress ?? 0)));
   const sub =
     item.kind === 'manga'
@@ -65,16 +68,16 @@ function ActiveRow({ item, onCancel }: { item: MobileDownloadQueueItem; onCancel
         <span className="flex h-14 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10"><FileVideo className="w-5 h-5 text-primary" /></span>
       )}
       <div className="flex-1 min-w-0">
-        <p className="font-medium text-sm truncate">{item.animeTitle || item.title || 'Download'}</p>
+        <p className="font-medium text-sm truncate">{item.animeTitle || item.title || uiI18n.t('app.download_a479c9c3')}</p>
         <p className="text-xs text-muted-foreground truncate">{sub}</p>
         <div className="mt-1.5 h-1.5 bg-white/10 rounded-full overflow-hidden">
           <div className="h-full bg-primary rounded-full transition-[width]" style={{ width: `${item.status === 'queued' ? 2 : pct}%` }} />
         </div>
         <p className="text-[11px] text-muted-foreground mt-1 tabular-nums">
-          {item.status === 'queued' ? 'Waiting…' : `${pct}%`}
+          {item.status === 'queued' ? uiI18n.t('app.waiting_3650b57a') : uiI18n.t('app.i18n_value_0_cac4fa79', { value0: pct })}
         </p>
       </div>
-      <Button size="sm" variant="ghost" className="h-10 w-10 p-0 shrink-0" onClick={() => { void triggerHaptic('warning'); onCancel(item.id); }} aria-label="Cancel download">
+      <Button size="sm" variant="ghost" className="h-10 w-10 p-0 shrink-0" onClick={() => { void triggerHaptic('warning'); onCancel(item.id); }} aria-label={uiI18n.t('app.cancel_download_67bb11d0')}>
         <X className="w-4 h-4 text-destructive" />
       </Button>
     </div>
@@ -86,6 +89,7 @@ function seriesKey(id: number, title: string): string {
 }
 
 export default function MobileOfflinePage() {
+  useUiTranslation();
   const navigate = useNavigate();
   const { isNative, queue, activeDownloads, cancelDownload, retryDownload } = useMobileDownload();
   const [freeingWatched, setFreeingWatched] = useState(false);
@@ -177,9 +181,9 @@ export default function MobileOfflinePage() {
       <div className="min-h-screen flex items-center justify-center p-4">
         <GlassPanel className="p-8 text-center max-w-md">
           <HardDrive className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-          <h2 className="text-xl font-bold mb-2">Mobile Only</h2>
-          <p className="text-muted-foreground mb-4">Downloads are only available in the mobile app.</p>
-          <Button onClick={() => navigate('/')}>Go Home</Button>
+          <h2 className="text-xl font-bold mb-2">{uiI18n.t('app.mobile_only_3d4144d9')}</h2>
+          <p className="text-muted-foreground mb-4">{uiI18n.t('app.downloads_are_only_available_in_the_mobile_app_fe8dce5a')}</p>
+          <Button onClick={() => navigate('/')}>{uiI18n.t('app.go_home_19445d72')}</Button>
         </GlassPanel>
       </div>
     );
@@ -195,14 +199,14 @@ export default function MobileOfflinePage() {
       const removed = await evictWatchedAnime();
       if (removed > 0) {
         void triggerHaptic('success');
-        toast.success(`Freed ${removed} watched item${removed > 1 ? 's' : ''}`);
+        toast.success(uiI18n.t('app.freed_i18n_value_0_watched_itemi18n_value_1_2ae19113', { value0: removed, value1: removed > 1 ? 's' : '' }));
         await refreshLists();
       } else {
-        toast.info('Nothing to free', { description: 'No watched downloads found, or auto-evict is off in mobile settings.' });
+        toast.info(uiI18n.t('app.nothing_to_free_0ba8374b'), { get description() { return uiI18n.t('app.no_watched_downloads_found_or_auto_evict_is_off__bffe8865'); } });
       }
     } catch {
       void triggerHaptic('error');
-      toast.error('Could not free storage');
+      toast.error(uiI18n.t('app.could_not_free_storage_bbf1f284'));
     } finally {
       setFreeingWatched(false);
     }
@@ -221,7 +225,7 @@ export default function MobileOfflinePage() {
     const localPath = String(entry.localPath || '').trim();
     if (!localPath) {
       void triggerHaptic('error');
-      toast.error('This download has no playable local file.');
+      toast.error(uiI18n.t('app.this_download_has_no_playable_local_file_33e9a8e2'));
       return;
     }
     // Rows written before the size-floor validation (e.g. a few-hundred-byte
@@ -229,8 +233,8 @@ export default function MobileOfflinePage() {
     // the player into "Error loading video".
     if (entry.fileSizeBytes != null && entry.fileSizeBytes < 64 * 1024 && !/^torrent-session:\/\//i.test(localPath)) {
       void triggerHaptic('error');
-      toast.error('This file is broken (too small to be video).', {
-        description: 'Delete it and download the episode again.',
+      toast.error(uiI18n.t('app.this_file_is_broken_too_small_to_be_video_0fea618c'), {
+        get description() { return uiI18n.t('app.delete_it_and_download_the_episode_again_95334846'); },
       });
       return;
     }
@@ -262,10 +266,10 @@ export default function MobileOfflinePage() {
       await deleteOfflineMangaChapter(deleteMangaTarget.anilistId, deleteMangaTarget.chapterKey);
       setMangaChapters((prev) => prev.filter((c) => c.id !== deleteMangaTarget.id));
       void triggerHaptic('success');
-      toast.success('Chapter deleted');
+      toast.success(uiI18n.t('app.chapter_deleted_15135ad5'));
     } catch {
       void triggerHaptic('error');
-      toast.error('Failed to delete');
+      toast.error(uiI18n.t('app.failed_to_delete_07931ff7'));
     } finally {
       setIsDeleting(false);
       setDeleteMangaTarget(null);
@@ -280,13 +284,13 @@ export default function MobileOfflinePage() {
       queue.find((q) => q.kind === 'anime' && q.animeTitle === entry.animeTitle && q.episode === entry.episodeNumber)?.id;
     if (!episodeId) {
       void triggerHaptic('error');
-      toast.info('Re-download from the series page', {
-        description: 'This entry is from an older version and cannot be retried here.',
+      toast.info(uiI18n.t('app.re_download_from_the_series_page_6fb02b8d'), {
+        get description() { return uiI18n.t('app.this_entry_is_from_an_older_version_and_cannot_b_4de05d79'); },
       });
       return;
     }
     if (queue.some((q) => q.id === episodeId && (q.status === 'queued' || q.status === 'downloading'))) {
-      toast.info('Already downloading');
+      toast.info(uiI18n.t('app.already_downloading_7a98b1fa'));
       return;
     }
     setRetryingId(entry.id);
@@ -298,21 +302,21 @@ export default function MobileOfflinePage() {
         // attempt records a fresh row on completion.
         await deleteMobileAnimeDownload(entry.id, entry.animeTitle, entry.episodeNumber);
         void triggerHaptic('success');
-        toast.success(`Re-downloading Episode ${entry.episodeNumber}`);
+        toast.success(uiI18n.t('app.re_downloading_episode_i18n_value_0_5c48db88', { value0: entry.episodeNumber }));
         await refreshLists();
       } else {
         const reason = 'reason' in res && typeof res.reason === 'string' ? res.reason : 'unknown';
         if (reason === 'missing_stream_url') {
-          toast.info('Re-download from the series page', {
-            description: 'The original stream link expired. Open the anime and pick the episode again.',
+          toast.info(uiI18n.t('app.re_download_from_the_series_page_6fb02b8d'), {
+            get description() { return uiI18n.t('app.the_original_stream_link_expired_open_the_anime__c8bb671d'); },
           });
         } else {
-          toast.error('Could not restart the download', { description: String(reason || '') });
+          toast.error(uiI18n.t('app.could_not_restart_the_download_86256d4a'), { description: String(reason || '') });
         }
       }
     } catch (error) {
       void triggerHaptic('error');
-      toast.error('Could not restart the download', {
+      toast.error(uiI18n.t('app.could_not_restart_the_download_86256d4a'), {
         description: error instanceof Error ? error.message : String(error),
       });
     } finally {
@@ -332,11 +336,11 @@ export default function MobileOfflinePage() {
       {
         setAnimeHistory((prev) => prev.filter((h) => h.id !== deleteAnimeTarget.id));
         void triggerHaptic('success');
-        toast.success(`Episode ${deleteAnimeTarget.episodeNumber} deleted from disk`);
+        toast.success(uiI18n.t('app.episode_i18n_value_0_deleted_from_disk_188a11db', { value0: deleteAnimeTarget.episodeNumber }));
       }
     } catch {
       void triggerHaptic('error');
-      toast.error('Failed to delete episode');
+      toast.error(uiI18n.t('app.failed_to_delete_episode_cd5a71e4'));
     } finally {
       setIsDeleting(false);
       setDeleteAnimeTarget(null);
@@ -356,8 +360,8 @@ export default function MobileOfflinePage() {
                 <FolderOpen className="h-6 w-6" />
               </span>
               <div className="min-w-0 flex-1">
-                <h1 className="text-2xl font-bold tracking-tight">Offline library</h1>
-                <p className="text-sm text-muted-foreground">Your anime and manga, ready anywhere</p>
+                <h1 className="text-2xl font-bold tracking-tight">{uiI18n.t('app.offline_library_ac6cdd78')}</h1>
+                <p className="text-sm text-muted-foreground">{uiI18n.t('app.your_anime_and_manga_ready_anywhere_000a37e1')}</p>
               </div>
               {activeDownloads.length > 0 && (
                 <Badge variant="secondary" className="shrink-0 tabular-nums">
@@ -368,9 +372,9 @@ export default function MobileOfflinePage() {
             </div>
 
             <div className="mt-4 grid grid-cols-3 divide-x divide-white/10 rounded-2xl border border-white/[0.07] bg-black/10 py-3 text-center">
-              <div><p className="text-lg font-bold tabular-nums">{libraryStats.titles}</p><p className="text-[10px] uppercase tracking-wider text-muted-foreground">Titles</p></div>
-              <div><p className="text-lg font-bold tabular-nums">{libraryStats.items}</p><p className="text-[10px] uppercase tracking-wider text-muted-foreground">Items</p></div>
-              <div><p className="text-lg font-bold tabular-nums">{formatBytes(libraryStats.bytes)}</p><p className="text-[10px] uppercase tracking-wider text-muted-foreground">Storage</p></div>
+              <div><p className="text-lg font-bold tabular-nums">{libraryStats.titles}</p><p className="text-[10px] uppercase tracking-wider text-muted-foreground">{uiI18n.t('app.titles_a116f725')}</p></div>
+              <div><p className="text-lg font-bold tabular-nums">{libraryStats.items}</p><p className="text-[10px] uppercase tracking-wider text-muted-foreground">{uiI18n.t('app.items_44d25b5d')}</p></div>
+              <div><p className="text-lg font-bold tabular-nums">{formatBytes(libraryStats.bytes)}</p><p className="text-[10px] uppercase tracking-wider text-muted-foreground">{uiI18n.t('app.storage_9e092dda')}</p></div>
             </div>
             {animeHistory.length > 0 && (
               <button
@@ -380,7 +384,7 @@ export default function MobileOfflinePage() {
                 className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground disabled:opacity-50"
               >
                 {freeingWatched ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-                {freeingWatched ? 'Freeing…' : 'Free up watched episodes'}
+                {freeingWatched ? uiI18n.t('app.freeing_86bb725c') : uiI18n.t('app.free_up_watched_episodes_9aad4dbc')}
               </button>
             )}
           </section>
@@ -397,15 +401,15 @@ export default function MobileOfflinePage() {
                 <Sparkles className="h-5 w-5 text-primary" />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-semibold">Up next: Episode {upNext.nextEpisode}</span>
-                <span className="block truncate text-xs text-muted-foreground">{upNext.animeTitle} — tap to open</span>
+                <span className="block truncate text-sm font-semibold">{uiI18n.t('app.up_next_episode_ae0c9365')} {upNext.nextEpisode}</span>
+                <span className="block truncate text-xs text-muted-foreground">{upNext.animeTitle} {uiI18n.t('app.tap_to_open_b5ebec22')}</span>
               </span>
               <Download className="h-4 w-4 shrink-0 text-primary" />
             </button>
           )}
 
           {(animeGroups.length > 0 || mangaGroups.length > 0) && (
-            <div role="tablist" aria-label="Offline library filter" className="mb-5 grid grid-cols-3 rounded-2xl border border-white/10 bg-white/[0.03] p-1">
+            <div role="tablist" aria-label={uiI18n.t('app.offline_library_filter_ad5e4a86')} className="mb-5 grid grid-cols-3 rounded-2xl border border-white/10 bg-white/[0.03] p-1">
               {(['all', 'anime', 'manga'] as const).map((filter) => (
                 <button
                   key={filter}
@@ -415,7 +419,7 @@ export default function MobileOfflinePage() {
                   onClick={() => { void triggerHaptic('select'); setLibraryFilter(filter); }}
                   className={`min-h-10 rounded-xl px-3 text-sm font-semibold capitalize transition-colors ${libraryFilter === filter ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
                 >
-                  {filter}
+                  {uiI18n.t(({"all":"app.all_d87c4480","anime":"app.anime_11a3e059","manga":"app.manga_1c404c69"})[filter])}
                 </button>
               ))}
             </div>
@@ -425,7 +429,7 @@ export default function MobileOfflinePage() {
           {activeDownloads.length > 0 && (
             <section className="mb-6">
               <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">
-                Downloading now
+                {uiI18n.t('app.downloading_now_7620e312')}
               </h2>
               <div className="space-y-2">
                 {activeDownloads.map((item) => (
@@ -442,11 +446,11 @@ export default function MobileOfflinePage() {
           ) : !hasAnything ? (
             <GlassPanel className="p-12 text-center">
               <HardDrive className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-xl font-semibold mb-2">No Downloads</h3>
+              <h3 className="text-xl font-semibold mb-2">{uiI18n.t('app.no_downloads_75c52423')}</h3>
               <p className="text-muted-foreground mb-6">
-                Download episodes from the video player or chapters from a manga page
+                {uiI18n.t('app.download_episodes_from_the_video_player_or_chapt_e6de3c65')}
               </p>
-              <Button onClick={() => { void triggerHaptic('navigate'); navigate('/'); }}>Browse</Button>
+              <Button onClick={() => { void triggerHaptic('navigate'); navigate('/'); }}>{uiI18n.t('app.browse_2f3b5c55')}</Button>
             </GlassPanel>
           ) : (
             <div className="space-y-8">
@@ -454,21 +458,21 @@ export default function MobileOfflinePage() {
               {mangaChapters.length > 0 && libraryFilter !== 'anime' && (
                 <section>
                   <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">
-                    Manga · {mangaGroups.length} title{mangaGroups.length > 1 ? 's' : ''}
+                    {uiI18n.t('app.manga_24d9ab42')} {mangaGroups.length} {uiI18n.t('app.title_3c6de1b7')}{mangaGroups.length > 1 ? 's' : ''}
                   </h2>
                   <div className="space-y-2">
                     {mangaGroups.map((group) => (
                       <details key={group.key} onToggle={(event) => { if (event.currentTarget.open) void triggerHaptic('open'); }} className="group overflow-hidden rounded-2xl border border-white/10 bg-card/65 shadow-sm">
                         <summary className="flex min-h-24 cursor-pointer list-none items-center gap-3 p-3 [&::-webkit-details-marker]:hidden">
                           {group.posterUrl ? (
-                            <img src={group.posterUrl} alt={`${group.title} poster`} className="h-20 w-14 shrink-0 rounded-xl object-cover shadow-md" loading="lazy" />
+                            <img src={group.posterUrl} alt={uiI18n.t('app.i18n_value_0_poster_9f90b803', { value0: group.title })} className="h-20 w-14 shrink-0 rounded-xl object-cover shadow-md" loading="lazy" />
                           ) : (
                             <span className="flex h-20 w-14 shrink-0 items-center justify-center rounded-xl bg-primary/15"><BookOpen className="h-6 w-6 text-primary" /></span>
                           )}
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-semibold">{group.title}</p>
                             <p className="text-xs text-muted-foreground">
-                              {group.items.length} chapter{group.items.length > 1 ? 's' : ''} · {formatBytes(group.items.reduce((sum, item) => sum + (item.sizeBytes || 0), 0))}
+                              {group.items.length} {uiI18n.t('app.chapter_09d4c7f1')}{group.items.length > 1 ? 's' : ''} · {formatBytes(group.items.reduce((sum, item) => sum + (item.sizeBytes || 0), 0))}
                             </p>
                           </div>
                           <ChevronDown className="h-5 w-5 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
@@ -477,15 +481,15 @@ export default function MobileOfflinePage() {
                           {group.items.map((ch) => (
                             <div key={ch.id} className="flex items-center gap-2 rounded-xl px-2 py-2.5 hover:bg-white/[0.04]">
                               <div className="min-w-0 flex-1">
-                                <p className="text-sm font-medium">{ch.chapterNumber != null ? `Chapter ${ch.chapterNumber}` : 'Chapter'}</p>
+                                <p className="text-sm font-medium">{ch.chapterNumber != null ? uiI18n.t('app.chapter_i18n_value_0_e0f6e591', { value0: ch.chapterNumber }) : uiI18n.t('app.chapter_46b00590')}</p>
                                 <p className="truncate text-xs text-muted-foreground">
-                                  {ch.pageCount ? `${ch.pageCount} pages` : ''}{ch.sizeBytes ? ` · ${formatBytes(ch.sizeBytes)}` : ''}{ch.downloadedAt ? ` · ${formatDate(ch.downloadedAt)}` : ''}
+                                  {ch.pageCount ? uiI18n.t('app.i18n_value_0_pages_c74d13bd', { value0: ch.pageCount }) : ''}{ch.sizeBytes ? uiI18n.t('app.i18n_value_0_92e4cd32', { value0: formatBytes(ch.sizeBytes) }) : ''}{ch.downloadedAt ? uiI18n.t('app.i18n_value_0_92e4cd32', { value0: formatDate(ch.downloadedAt) }) : ''}
                                 </p>
                               </div>
                               <Button size="sm" variant="ghost" className="h-9 px-3 gap-1.5" onClick={() => handleReadManga(ch)}>
-                                <Play className="w-4 h-4" /><span className="text-xs font-semibold">Read</span>
+                                <Play className="w-4 h-4" /><span className="text-xs font-semibold">{uiI18n.t('app.read_852b438f')}</span>
                               </Button>
-                              <Button size="sm" variant="ghost" className="h-10 w-10 p-0 text-destructive" onClick={() => { void triggerHaptic('warning'); setDeleteMangaTarget(ch); }} aria-label={`Delete chapter ${ch.chapterNumber ?? ''}`}>
+                              <Button size="sm" variant="ghost" className="h-10 w-10 p-0 text-destructive" onClick={() => { void triggerHaptic('warning'); setDeleteMangaTarget(ch); }} aria-label={uiI18n.t('app.delete_chapter_i18n_value_0_eeb87bd0', { value0: ch.chapterNumber ?? '' })}>
                                 <Trash2 className="w-4 h-4" />
                               </Button>
                             </div>
@@ -501,21 +505,21 @@ export default function MobileOfflinePage() {
               {animeHistory.length > 0 && libraryFilter !== 'manga' && (
                 <section>
                   <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">
-                    Anime · {animeGroups.length} title{animeGroups.length > 1 ? 's' : ''}
+                    {uiI18n.t('app.anime_d84bc466')} {animeGroups.length} {uiI18n.t('app.title_3c6de1b7')}{animeGroups.length > 1 ? 's' : ''}
                   </h2>
                   <div className="space-y-2">
                     {animeGroups.map((group) => (
                       <details key={group.key} onToggle={(event) => { if (event.currentTarget.open) void triggerHaptic('open'); }} className="group overflow-hidden rounded-2xl border border-white/10 bg-card/65 shadow-sm">
                         <summary className="flex min-h-24 cursor-pointer list-none items-center gap-3 p-3 [&::-webkit-details-marker]:hidden">
                           {group.posterUrl ? (
-                            <img src={group.posterUrl} alt={`${group.title} poster`} className="h-20 w-14 shrink-0 rounded-xl object-cover shadow-md" loading="lazy" />
+                            <img src={group.posterUrl} alt={uiI18n.t('app.i18n_value_0_poster_9f90b803', { value0: group.title })} className="h-20 w-14 shrink-0 rounded-xl object-cover shadow-md" loading="lazy" />
                           ) : (
                             <span className="flex h-20 w-14 shrink-0 items-center justify-center rounded-xl bg-primary/15"><FileVideo className="h-6 w-6 text-primary" /></span>
                           )}
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-semibold">{group.title}</p>
                             <p className="text-xs text-muted-foreground">
-                              {group.items.length} episode{group.items.length > 1 ? 's' : ''} · {formatBytes(group.items.reduce((sum, item) => sum + (item.fileSizeBytes || 0), 0))}
+                              {group.items.length} {uiI18n.t('app.episode_39ae6b3c')}{group.items.length > 1 ? 's' : ''} · {formatBytes(group.items.reduce((sum, item) => sum + (item.fileSizeBytes || 0), 0))}
                             </p>
                           </div>
                           <ChevronDown className="h-5 w-5 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
@@ -532,7 +536,7 @@ export default function MobileOfflinePage() {
                                 type="button"
                                 onClick={() => handlePlayAnime(h)}
                                 className="flex min-w-0 flex-1 items-center gap-3 text-left active:bg-white/[0.08]"
-                                aria-label={`Play episode ${h.episodeNumber}`}
+                                aria-label={uiI18n.t('app.play_episode_i18n_value_0_73de362f', { value0: h.episodeNumber })}
                               >
                                 {broken ? (
                                   <XCircle className="h-4 w-4 shrink-0 text-amber-400" />
@@ -540,14 +544,14 @@ export default function MobileOfflinePage() {
                                   <CheckCircle2 className="h-4 w-4 shrink-0 text-green-500" />
                                 )}
                                 <div className="min-w-0 flex-1">
-                                  <p className="text-sm font-medium">Episode {h.episodeNumber}</p>
+                                  <p className="text-sm font-medium">{uiI18n.t('app.episode_8669aa56')} {h.episodeNumber}</p>
                                   <p className="truncate text-xs text-muted-foreground">
-                                    {h.fileSizeBytes ? formatBytes(h.fileSizeBytes) : 'Downloaded'}{h.completedAt ? ` · ${formatDate(h.completedAt)}` : ''}
-                                    {broken ? ' · broken' : ''}
+                                    {h.fileSizeBytes ? formatBytes(h.fileSizeBytes) : uiI18n.t('app.downloaded_c6197029')}{h.completedAt ? uiI18n.t('app.i18n_value_0_92e4cd32', { value0: formatDate(h.completedAt) }) : ''}
+                                    {broken ? uiI18n.t('app.broken_ece1ac31') : ''}
                                   </p>
                                 </div>
                                 <Badge variant="secondary" className="shrink-0 text-[10px]">
-                                  {h.sourceType === 'torrent' ? 'Torrent' : h.sourceType === 'hls' ? 'HLS' : 'Video'}
+                                  {h.sourceType === 'torrent' ? uiI18n.t('app.torrent_4d15a5de') : h.sourceType === 'hls' ? uiI18n.t('app.hls_63d70cec') : uiI18n.t('app.video_bc17c1f0')}
                                 </Badge>
                                 <Play className="h-4 w-4 shrink-0 text-primary" />
                               </button>
@@ -557,8 +561,8 @@ export default function MobileOfflinePage() {
                                 className="h-9 w-9 shrink-0 p-0"
                                 disabled={retryingId === h.id}
                                 onClick={() => { void triggerHaptic('tap'); void handleRetryAnime(h); }}
-                                aria-label={`Re-download episode ${h.episodeNumber}`}
-                                title="Re-download"
+                                aria-label={uiI18n.t('app.re_download_episode_i18n_value_0_68515806', { value0: h.episodeNumber })}
+                                title={uiI18n.t('app.re_download_7cd09bcd')}
                               >
                                 {retryingId === h.id ? (
                                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -571,8 +575,8 @@ export default function MobileOfflinePage() {
                                 variant="ghost"
                                 className="h-9 w-9 shrink-0 p-0 text-destructive"
                                 onClick={() => { void triggerHaptic('warning'); setDeleteAnimeTarget(h); }}
-                                aria-label={`Delete episode ${h.episodeNumber}`}
-                                title="Delete from disk"
+                                aria-label={uiI18n.t('app.delete_episode_i18n_value_0_f00796b4', { value0: h.episodeNumber })}
+                                title={uiI18n.t('app.delete_from_disk_a8a34e56')}
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
@@ -591,16 +595,16 @@ export default function MobileOfflinePage() {
               {failedItems.length > 0 && (
                 <section>
                   <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">
-                    Failed
+                    {uiI18n.t('app.failed_09fef5d8')}
                   </h2>
                   <div className="space-y-2">
                     {failedItems.map((item) => (
                       <div key={item.id} className="flex items-center gap-3 p-3 rounded-xl bg-red-500/[0.06] border border-red-500/20">
                         <XCircle className="w-5 h-5 text-red-400 shrink-0" />
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm truncate">{item.animeTitle || item.title || 'Download'}</p>
+                          <p className="font-medium text-sm truncate">{item.animeTitle || item.title || uiI18n.t('app.download_a479c9c3')}</p>
                           <p className="text-xs text-red-300/80 truncate">
-                            {item.error || 'Download failed.'}
+                            {item.error || uiI18n.t('app.download_failed_1544b795')}
                           </p>
                         </div>
                         {item.kind === 'anime' ? (
@@ -609,9 +613,9 @@ export default function MobileOfflinePage() {
                             variant="ghost"
                             className="h-9 shrink-0 gap-1.5 px-3"
                             onClick={() => { void triggerHaptic('tap'); retryDownload(item.id); }}
-                            aria-label={`Retry download of ${item.animeTitle || 'episode'}`}
+                            aria-label={uiI18n.t('app.retry_download_of_i18n_value_0_1ff9c62c', { value0: item.animeTitle || 'episode' })}
                           >
-                            <RotateCw className="w-4 h-4" /><span className="text-xs font-semibold">Retry</span>
+                            <RotateCw className="w-4 h-4" /><span className="text-xs font-semibold">{uiI18n.t('app.retry_9f5cd8a2')}</span>
                           </Button>
                         ) : item.anilistId ? (
                           <Button
@@ -619,9 +623,9 @@ export default function MobileOfflinePage() {
                             variant="ghost"
                             className="h-9 shrink-0 gap-1.5 px-3"
                             onClick={() => { void triggerHaptic('navigate'); navigate(`/manga/${item.anilistId}`); }}
-                            aria-label="Open manga to re-download"
+                            aria-label={uiI18n.t('app.open_manga_to_re_download_8e4ab91c')}
                           >
-                            <BookOpen className="w-4 h-4" /><span className="text-xs font-semibold">Open</span>
+                            <BookOpen className="w-4 h-4" /><span className="text-xs font-semibold">{uiI18n.t('app.open_cf9b7706')}</span>
                           </Button>
                         ) : null}
                       </div>
@@ -638,19 +642,19 @@ export default function MobileOfflinePage() {
       <Dialog open={!!deleteAnimeTarget} onOpenChange={() => setDeleteAnimeTarget(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Episode?</DialogTitle>
+            <DialogTitle>{uiI18n.t('app.delete_episode_5b551de8')}</DialogTitle>
             <DialogDescription>
-              Delete Episode {deleteAnimeTarget?.episodeNumber} of “{deleteAnimeTarget?.animeTitle}” from disk?
-              {deleteAnimeTarget?.fileSizeBytes ? ` This frees ${formatBytes(deleteAnimeTarget.fileSizeBytes)}.` : ''}
+              {uiI18n.t('app.delete_episode_d97bdfa5')} {deleteAnimeTarget?.episodeNumber} {uiI18n.t('app.of_110df343')}{deleteAnimeTarget?.animeTitle}{uiI18n.t('app.from_disk_bb092799')}
+              {deleteAnimeTarget?.fileSizeBytes ? uiI18n.t('app.this_frees_i18n_value_0_72884aae', { value0: formatBytes(deleteAnimeTarget.fileSizeBytes) }) : ''}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setDeleteAnimeTarget(null)} disabled={isDeleting}>
-              Cancel
+              {uiI18n.t('app.cancel_77dfd213')}
             </Button>
             <Button variant="destructive" onClick={handleDeleteAnime} disabled={isDeleting}>
               {isDeleting && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-              Delete
+              {uiI18n.t('app.delete_f6fdbe48')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -660,18 +664,18 @@ export default function MobileOfflinePage() {
       <Dialog open={!!deleteMangaTarget} onOpenChange={() => setDeleteMangaTarget(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Chapter?</DialogTitle>
+            <DialogTitle>{uiI18n.t('app.delete_chapter_c7ce3b5c')}</DialogTitle>
             <DialogDescription>
-              Delete {deleteMangaTarget?.chapterNumber != null ? `Ch. ${deleteMangaTarget.chapterNumber}` : 'this chapter'} of “{deleteMangaTarget?.title}”?
+              {uiI18n.t('app.delete_f6fdbe48')} {deleteMangaTarget?.chapterNumber != null ? uiI18n.t('app.ch_i18n_value_0_4d827531', { value0: deleteMangaTarget.chapterNumber }) : uiI18n.t('app.this_chapter_b2f51d36')} {uiI18n.t('app.of_110df343')}{deleteMangaTarget?.title}”?
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setDeleteMangaTarget(null)} disabled={isDeleting}>
-              Cancel
+              {uiI18n.t('app.cancel_77dfd213')}
             </Button>
             <Button variant="destructive" onClick={handleDeleteManga} disabled={isDeleting}>
               {isDeleting && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-              Delete
+              {uiI18n.t('app.delete_f6fdbe48')}
             </Button>
           </DialogFooter>
         </DialogContent>

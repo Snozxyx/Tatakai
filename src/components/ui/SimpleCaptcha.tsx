@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { RefreshCw } from 'lucide-react';
@@ -8,6 +10,7 @@ interface SimpleCaptchaProps {
 }
 
 export function SimpleCaptcha({ onValidate }: SimpleCaptchaProps) {
+  useUiTranslation();
   const [num1, setNum1] = useState(0);
   const [num2, setNum2] = useState(0);
   const [userAnswer, setUserAnswer] = useState('');
@@ -36,7 +39,7 @@ export function SimpleCaptcha({ onValidate }: SimpleCaptchaProps) {
 
   return (
     <div className="space-y-2">
-      <label className="text-sm font-medium">Verify you're human</label>
+      <label className="text-sm font-medium">{uiI18n.t('app.verify_you_re_human_d1de4cbb')}</label>
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-muted/50 border border-muted select-none">
           <span className="text-lg font-mono font-bold">
@@ -61,10 +64,10 @@ export function SimpleCaptcha({ onValidate }: SimpleCaptchaProps) {
         </Button>
       </div>
       {userAnswer && !isValid && (
-        <p className="text-xs text-destructive">Incorrect answer</p>
+        <p className="text-xs text-destructive">{uiI18n.t('app.incorrect_answer_705a873f')}</p>
       )}
       {isValid && (
-        <p className="text-xs text-green-500">✓ Verified</p>
+        <p className="text-xs text-green-500">{uiI18n.t('app.verified_2a77d76d')}</p>
       )}
     </div>
   );

@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -33,6 +35,7 @@ export function ShowcaseMedia({
   ratio = "16 / 9",
   focus = "center top",
 }: ShowcaseMediaProps) {
+  useUiTranslation();
   const reduceMotion = useMotionPreference();
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);

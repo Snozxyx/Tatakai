@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useMemo, useEffect } from 'react';
 import { useComments, useAddComment, useDeleteComment, useLikeComment, useEditComment, type CommentEntityType } from '@/hooks/community/useComments';
 import { useAuth } from '@/contexts/AuthContext';
@@ -8,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from '@/lib/localeFormat';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   MessageSquare, Heart, Trash2, Edit2, Save, X, AlertTriangle,
@@ -56,12 +58,12 @@ export interface CommentsProps {
 /** Composer placeholder tuned to the surface. */
 function composePlaceholder(entityType: CommentEntityType, episodeId?: string): string {
   switch (entityType) {
-    case 'anime': return episodeId ? 'Share your thoughts on this episode…' : 'Share your thoughts about this anime…';
-    case 'manga': return 'Share your thoughts about this series…';
-    case 'playlist': return 'Discuss this playlist…';
-    case 'tier_list': return 'Discuss this tier list…';
-    case 'forum_post': return 'Add a comment…';
-    default: return 'Add a comment…';
+    case 'anime': return episodeId ? uiI18n.t('app.share_your_thoughts_on_this_episode_febf9f4d') : uiI18n.t('app.share_your_thoughts_about_this_anime_8180c8c3');
+    case 'manga': return uiI18n.t('app.share_your_thoughts_about_this_series_f8b48598');
+    case 'playlist': return uiI18n.t('app.discuss_this_playlist_816e7d86');
+    case 'tier_list': return uiI18n.t('app.discuss_this_tier_list_5e683cd7');
+    case 'forum_post': return uiI18n.t('app.add_a_comment_3780d9ec');
+    default: return uiI18n.t('app.add_a_comment_3780d9ec');
   }
 }
 
@@ -73,11 +75,11 @@ function episodeNumberOf(episodeId?: string | null): string | null {
 /** Short label for a removable embed chip in the edit view. */
 function embedLabel(e: CommentEmbed): string {
   switch (e.kind) {
-    case 'media': return `${e.mediaType || 'media'}: ${e.name}`;
-    case 'playlist': return 'Playlist';
-    case 'tierlist': return 'Tier list';
-    case 'post': return 'Quoted post';
-    default: return 'Embed';
+    case 'media': return uiI18n.t('app.i18n_value_0_i18n_value_1_b6af3412', { value0: e.mediaType || 'media', value1: e.name });
+    case 'playlist': return uiI18n.t('app.playlist_cd95b41f');
+    case 'tierlist': return uiI18n.t('app.tier_list_b0ba4885');
+    case 'post': return uiI18n.t('app.quoted_post_7567ae51');
+    default: return uiI18n.t('app.embed_ad02e14e');
   }
 }
 
@@ -88,6 +90,7 @@ function embedLabel(e: CommentEmbed): string {
  * mention / embed feature set without them.
  */
 export function Comments({ entityType, entityId, episodeId, entityName, fallbackEpisodeId, quoteDraft }: CommentsProps) {
+  useUiTranslation();
   const { user, profile, isAdmin, isModerator } = useAuth();
   const confirm = useConfirm();
   const navigate = useNavigate();
@@ -207,7 +210,7 @@ export function Comments({ entityType, entityId, episodeId, entityName, fallback
   };
 
   const handleLike = async (id: string, currentlyLiked: boolean) => {
-    if (!user) { toast.error('Sign in to like comments'); return; }
+    if (!user) { toast.error(uiI18n.t('app.sign_in_to_like_comments_a13bfb66')); return; }
     await likeComment.mutateAsync({ commentId: id, liked: currentlyLiked });
   };
 
@@ -310,7 +313,7 @@ export function Comments({ entityType, entityId, episodeId, entityName, fallback
         <div className="flex items-center gap-2 flex-wrap">
           <MessageSquare className="w-5 h-5 text-primary" />
           <h2 className="font-display text-xl font-bold">
-            Comments
+            {uiI18n.t('app.comments_fce06e20')}
           </h2>
           {comments.length > 0 && (
             <Badge variant="secondary" className="text-xs font-bold">
@@ -326,7 +329,7 @@ export function Comments({ entityType, entityId, episodeId, entityName, fallback
                 return epNum ? (
                   <>
                     <span className="text-border/60">·</span>
-                    <span className="text-primary/80">Ep&nbsp;{epNum}</span>
+                    <span className="text-primary/80">{uiI18n.t('app.ep_nbsp_270d0a67')}{epNum}</span>
                   </>
                 ) : null;
               })()}
@@ -351,14 +354,14 @@ export function Comments({ entityType, entityId, episodeId, entityName, fallback
             {composeLocked ? (
               <GlassPanel className="p-4 mb-6 flex items-center gap-3 text-sm text-muted-foreground">
                 <MessageSquareOff className="h-4 w-4 shrink-0" />
-                Comments are paused by a moderator.
+                {uiI18n.t('app.comments_are_paused_by_a_moderator_c8957cea')}
               </GlassPanel>
             ) : user ? (
               <GlassPanel className="p-4 mb-6">
                 {commentsPaused && isStaff && (
                   <div className="mb-3 flex items-center gap-2 rounded-md bg-amber-400/10 px-3 py-1.5 text-xs text-amber-300">
                     <MessageSquareOff className="h-3.5 w-3.5 shrink-0" />
-                    Comments are paused — only staff can post.
+                    {uiI18n.t('app.comments_are_paused_only_staff_can_post_816279e5')}
                   </div>
                 )}
                 <div className="flex gap-3">
@@ -387,8 +390,8 @@ export function Comments({ entityType, entityId, episodeId, entityName, fallback
             ) : (
               <GlassPanel className="p-4 mb-6 text-center">
                 {quoteDraft && <blockquote className="mb-3 whitespace-pre-wrap break-words rounded-lg border border-border bg-muted/40 p-3 text-left text-sm text-muted-foreground">{quoteDraft.text}</blockquote>}
-                <p className="text-sm text-muted-foreground mb-3">Sign in to join the discussion</p>
-                <Button size="sm" onClick={() => navigate('/auth')}>Sign In</Button>
+                <p className="text-sm text-muted-foreground mb-3">{uiI18n.t('app.sign_in_to_join_the_discussion_c8ac10e2')}</p>
+                <Button size="sm" onClick={() => navigate('/auth')}>{uiI18n.t('app.sign_in_f8492cc1')}</Button>
               </GlassPanel>
             )}
 
@@ -396,9 +399,9 @@ export function Comments({ entityType, entityId, episodeId, entityName, fallback
             {isAnime && !epId && comments.length > 0 && (
               <div className="mb-4 flex items-center gap-1.5">
                 {([
-                  { key: 'new', label: 'New', icon: Sparkles },
-                  { key: 'global', label: 'Global', icon: Globe2 },
-                  { key: 'episodes', label: 'Episodes', icon: Film },
+                  { key: 'new', get label() { return uiI18n.t('app.new_6403f2b7'); }, icon: Sparkles },
+                  { key: 'global', get label() { return uiI18n.t('app.global_5f1184f7'); }, icon: Globe2 },
+                  { key: 'episodes', get label() { return uiI18n.t('app.episodes_49d641ba'); }, icon: Film },
                 ] as const).map(({ key, label, icon: Icon }) => (
                   <button
                     key={key}
@@ -421,16 +424,16 @@ export function Comments({ entityType, entityId, episodeId, entityName, fallback
             {isLoading ? (
               <div className="flex items-center justify-center py-12 text-muted-foreground">
                 <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                Loading comments...
+                {uiI18n.t('app.loading_comments_4b98e940')}
               </div>
             ) : sortedComments.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <div className="w-16 h-16 rounded-2xl bg-muted/30 flex items-center justify-center mb-4">
                   <MessageSquare className="w-7 h-7 text-muted-foreground" />
                 </div>
-                <p className="font-medium text-muted-foreground">No comments yet</p>
+                <p className="font-medium text-muted-foreground">{uiI18n.t('app.no_comments_yet_d14da379')}</p>
                 <p className="text-sm text-muted-foreground/60 mt-1">
-                  Be the first to share your thoughts!
+                  {uiI18n.t('app.be_the_first_to_share_your_thoughts_6a509a45')}
                 </p>
               </div>
             ) : (
@@ -539,7 +542,7 @@ export function Comments({ entityType, entityId, episodeId, entityName, fallback
                                       className={cn('text-sm font-semibold hover:opacity-80 transition-opacity truncate', ns.className)}
                                       style={ns.style}
                                     >
-                                      {comment.profile?.display_name || 'User'}
+                                      {comment.profile?.display_name || uiI18n.t('app.user_9f8a2389')}
                                     </button>
                                   </ProfileWidgetCard>
                                 );
@@ -556,13 +559,13 @@ export function Comments({ entityType, entityId, episodeId, entityName, fallback
                               {comment.is_pinned && (
                                 <Badge className="h-4 text-[10px] gap-0.5 px-1.5 bg-amber/15 text-amber border-amber/20">
                                   <Pin className="w-2.5 h-2.5" />
-                                  Pinned
+                                  {uiI18n.t('app.pinned_f9312169')}
                                 </Badge>
                               )}
                               {comment.is_spoiler && (
                                 <Badge className="h-4 text-[10px] gap-0.5 px-1.5 bg-destructive/15 text-destructive border-destructive/20">
                                   <AlertTriangle className="w-2.5 h-2.5" />
-                                  Spoiler
+                                  {uiI18n.t('app.spoiler_875786ee')}
                                 </Badge>
                               )}
                               <span className="text-xs text-muted-foreground ml-auto">
@@ -578,12 +581,12 @@ export function Comments({ entityType, entityId, episodeId, entityName, fallback
                                     className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary/90 hover:bg-primary/20 transition-colors"
                                   >
                                     <Film className="w-2.5 h-2.5" />
-                                    Ep {sourceEp ?? '?'}
+                                    {uiI18n.t('app.ep_91954275')} {sourceEp ?? '?'}
                                   </Link>
                                 ) : (
                                   <span className="inline-flex items-center gap-1 rounded-full bg-muted/50 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
                                     <Globe2 className="w-2.5 h-2.5" />
-                                    Global
+                                    {uiI18n.t('app.global_5f1184f7')}
                                   </span>
                                 )
                               )}
@@ -611,14 +614,14 @@ export function Comments({ entityType, entityId, episodeId, entityName, fallback
                                       <div key={`${a.url}-${i}`} className="group relative">
                                         <img
                                           src={a.preview || a.url}
-                                          alt={a.title || 'attachment'}
+                                          alt={a.title || uiI18n.t('app.attachment_1625e5ed')}
                                           className="h-16 w-16 rounded-lg object-cover bg-muted/40"
                                         />
                                         <button
                                           type="button"
                                           onClick={() => setEditAttachments(prev => prev.filter((_, idx) => idx !== i))}
                                           className="absolute -right-1.5 -top-1.5 rounded-full bg-destructive p-0.5 text-destructive-foreground"
-                                          aria-label="Remove attachment"
+                                          aria-label={uiI18n.t('app.remove_attachment_0fcc6594')}
                                         >
                                           <X className="h-3 w-3" />
                                         </button>
@@ -638,7 +641,7 @@ export function Comments({ entityType, entityId, episodeId, entityName, fallback
                                         <span className="max-w-[180px] truncate">{embedLabel(e)}</span>
                                         <button
                                           type="button"
-                                          aria-label="Remove embed"
+                                          aria-label={uiI18n.t('app.remove_embed_429b01a2')}
                                           onClick={() => setEditEmbeds(prev => prev.filter((_, idx) => idx !== i))}
                                           className="hover:text-primary/70"
                                         >
@@ -653,14 +656,14 @@ export function Comments({ entityType, entityId, episodeId, entityName, fallback
                                 {editHadPoll && !editRemovePoll && (
                                   <div className="flex items-center justify-between rounded-xl border border-border/40 bg-muted/20 px-3 py-2 text-xs">
                                     <span className="flex items-center gap-1.5 text-muted-foreground">
-                                      <ListChecks className="h-3.5 w-3.5" /> Poll attached
+                                      <ListChecks className="h-3.5 w-3.5" /> {uiI18n.t('app.poll_attached_947887aa')}
                                     </span>
                                     <button
                                       type="button"
                                       onClick={() => setEditRemovePoll(true)}
                                       className="font-medium text-destructive hover:underline"
                                     >
-                                      Remove poll
+                                      {uiI18n.t('app.remove_poll_771e6008')}
                                     </button>
                                   </div>
                                 )}
@@ -673,7 +676,7 @@ export function Comments({ entityType, entityId, episodeId, entityName, fallback
                                     className="h-7 text-xs gap-1"
                                   >
                                     <Save className="w-3 h-3" />
-                                    Save
+                                    {uiI18n.t('app.save_efc007a3')}
                                   </Button>
                                   <Button
                                     size="sm"
@@ -682,7 +685,7 @@ export function Comments({ entityType, entityId, episodeId, entityName, fallback
                                     className="h-7 text-xs gap-1"
                                   >
                                     <X className="w-3 h-3" />
-                                    Cancel
+                                    {uiI18n.t('app.cancel_77dfd213')}
                                   </Button>
                                 </div>
                               </div>
@@ -693,7 +696,7 @@ export function Comments({ entityType, entityId, episodeId, entityName, fallback
                               >
                                 <div className="px-3 py-1.5 rounded-lg bg-muted/40 border border-border/50 group-hover:bg-muted/70 transition-colors flex items-center gap-2">
                                   <EyeOff className="w-3.5 h-3.5" />
-                                  Click to reveal spoiler
+                                  {uiI18n.t('app.click_to_reveal_spoiler_4efcfe84')}
                                 </div>
                               </button>
                             ) : (
@@ -731,7 +734,7 @@ export function Comments({ entityType, entityId, episodeId, entityName, fallback
                                 className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all"
                               >
                                 <Reply className="w-3.5 h-3.5" />
-                                Reply
+                                {uiI18n.t('app.reply_6c2bb735')}
                               </button>
                             )}
 
@@ -742,14 +745,14 @@ export function Comments({ entityType, entityId, episodeId, entityName, fallback
                                   className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all"
                                 >
                                   <Edit2 className="w-3 h-3" />
-                                  Edit
+                                  {uiI18n.t('app.edit_5301648d')}
                                 </button>
                                 <button
-                                  onClick={async () => { if (await confirm({ title: 'Delete this comment?', destructive: true })) deleteComment.mutate(comment.id); }}
+                                  onClick={async () => { if (await confirm({ get title() { return uiI18n.t('app.delete_this_comment_b88a2bf0'); }, destructive: true })) deleteComment.mutate(comment.id); }}
                                   className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all"
                                 >
                                   <Trash2 className="w-3 h-3" />
-                                  Delete
+                                  {uiI18n.t('app.delete_f6fdbe48')}
                                 </button>
                               </>
                             )}
@@ -761,7 +764,7 @@ export function Comments({ entityType, entityId, episodeId, entityName, fallback
                                 authorUserId={comment.user_id}
                                 authorName={comment.profile?.display_name}
                                 onStaffDelete={async () => {
-                                  if (await confirm({ title: 'Delete this comment as staff?', description: 'It will show a "Deleted by Admin/Moderator" tombstone.', destructive: true })) {
+                                  if (await confirm({ get title() { return uiI18n.t('app.delete_this_comment_as_staff_c3881bbc'); }, get description() { return uiI18n.t('app.it_will_show_a_deleted_by_admin_moderator_tombst_ec3742e0'); }, destructive: true })) {
                                     deleteComment.mutate(comment.id);
                                   }
                                 }}
@@ -783,7 +786,7 @@ export function Comments({ entityType, entityId, episodeId, entityName, fallback
                               submitting={addComment.isPending}
                               onSubmit={handleReply(comment.id)}
                               onCancel={() => setReplyingId(null)}
-                              placeholder={`Reply to ${comment.profile?.display_name || 'this comment'}…`}
+                              placeholder={uiI18n.t('app.reply_to_i18n_value_0_89f8191b', { value0: comment.profile?.display_name || 'this comment' })}
                             />
                           </div>
                         )}
@@ -827,6 +830,7 @@ export function EpisodeComments({
   animeName?: string;
   fallbackEpisodeId?: string;
 }) {
+  useUiTranslation();
   return (
     <Comments
       entityType="anime"

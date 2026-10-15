@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { toast } from "sonner";
+import i18n from "@/lib/i18n";
 import { normalizeKeyToken, resolveAction } from "@/lib/video/keybindings";
 import type { UseVideoKeyboardParams } from "../VideoPlayer.types";
 
@@ -43,7 +44,7 @@ export function useVideoKeyboard({
 
       const guardSeek = () => {
         if (timelineSeekingLocked) {
-          toast.info("Seeking is temporarily locked.", { id: "torrent-timeline-locked" });
+          toast.info(i18n.t('player.seekingLocked'), { id: "torrent-timeline-locked" });
           return false;
         }
         return true;

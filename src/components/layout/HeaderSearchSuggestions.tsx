@@ -1,9 +1,14 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useEffect, useRef, useState } from "react";
+import { Trans, useTranslation } from "react-i18next";
+import i18n from "@/lib/i18n";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Search, Film, BookOpen, Loader2, Clock, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { resolveApiV3Base } from "@/lib/api/backendOrigin";
+import { getPreferredTitleLanguage, selectMediaTitle } from '@/lib/titleLanguage';
 
 interface Suggestion {
   id: string | number;
@@ -25,8 +30,8 @@ async function fetchSuggestions(q: string): Promise<Suggestion[]> {
   const results: Suggestion[] = [];
   const mediaArr = Array.isArray(raw?.data?.media) ? raw.data.media : [];
   for (const m of mediaArr) {
-    const name = m.titleEnglish || m.titleRomaji || m.titleNative;
-    if (!name || name === "Unknown") continue;
+    const name = selectMediaTitle(m);
+    if (!name || name === 'Unknown') continue;
     const formatUpper = String(m.format ?? "").toUpperCase();
     const isNovel = formatUpper === "NOVEL" || formatUpper === "LIGHT_NOVEL" || m.mediaType === "novel";
     results.push({
@@ -51,19 +56,21 @@ interface Props {
 }
 
 function formatSuggestionType(item: Suggestion): string {
-  if (item.type === "novel") return "Novel";
-  if (item.type !== "manga") return item.format || "Anime";
+  if (item.type === "novel") return i18n.t('nav.novels');
+  if (item.type !== "manga") return item.format || i18n.t('layout.searchTypeAnime');
   const format = String(item.format || "MANGA").toUpperCase();
-  if (item.countryOfOrigin === "KR") return "Manhwa";
-  if (item.countryOfOrigin === "CN") return "Manhua";
-  if (format === "MANHWA") return "Manhwa";
-  if (format === "MANHUA") return "Manhua";
-  if (format === "OEL") return "Comics";
-  if (format === "ONE_SHOT") return "One-shot";
-  return "Manga";
+  if (item.countryOfOrigin === "KR") return i18n.t('layout.searchTypeManhwa');
+  if (item.countryOfOrigin === "CN") return i18n.t('layout.searchTypeManhua');
+  if (format === "MANHWA") return i18n.t('layout.searchTypeManhwa');
+  if (format === "MANHUA") return i18n.t('layout.searchTypeManhua');
+  if (format === "OEL") return i18n.t('layout.searchTypeComics');
+  if (format === "ONE_SHOT") return i18n.t('layout.searchTypeOneShot');
+  return i18n.t('layout.searchTypeManga');
 }
 
 export function HeaderSearchSuggestions({ query, visible, onSelect, onClose }: Props) {
+  useUiTranslation();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const containerRef = useRef<HTMLDivElement>(null);
   const [debouncedQuery, setDebouncedQuery] = useState(query);
@@ -83,7 +90,7 @@ export function HeaderSearchSuggestions({ query, visible, onSelect, onClose }: P
   });
 
   const { data: suggestions = [], isFetching } = useQuery({
-    queryKey: ["header-suggestions", debouncedQuery],
+    queryKey: ["header-suggestions", debouncedQuery, getPreferredTitleLanguage()],
     queryFn: () => fetchSuggestions(debouncedQuery),
     enabled: visible && debouncedQuery.trim().length >= 2,
     staleTime: 30_000,
@@ -144,7 +151,7 @@ export function HeaderSearchSuggestions({ query, visible, onSelect, onClose }: P
         <div className="p-2">
           <div className="flex items-center gap-2 px-2 py-1.5">
             <Clock className="w-3 h-3 text-muted-foreground" />
-            <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Recent</span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{t('layout.searchRecent')}</span>
           </div>
           {history.slice(0, 5).map((term) => (
             <button
@@ -173,7 +180,7 @@ export function HeaderSearchSuggestions({ query, visible, onSelect, onClose }: P
           {(isWaitingForQuery || (isFetching && suggestions.length === 0)) && (
             <div className="flex items-center gap-3 px-3 py-3">
               <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Searching…</span>
+              <span className="text-sm text-muted-foreground">{t('layout.searchSearching')}</span>
             </div>
           )}
 
@@ -181,7 +188,7 @@ export function HeaderSearchSuggestions({ query, visible, onSelect, onClose }: P
             <>
               <div className="flex items-center gap-2 px-2 py-1.5">
                 <TrendingUp className="w-3 h-3 text-muted-foreground" />
-                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Results</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{t('layout.searchResults')}</span>
               </div>
               {suggestions.map((item) => (
                 <button
@@ -237,7 +244,7 @@ export function HeaderSearchSuggestions({ query, visible, onSelect, onClose }: P
 
           {!isWaitingForQuery && !isFetching && suggestions.length === 0 && query.trim().length >= 2 && (
             <div className="px-3 py-3 text-sm text-muted-foreground">
-              No results for "<span className="text-foreground">{query}</span>"
+              <Trans i18nKey="layout.searchNoResultsRich" values={{ query }} components={{ query: <span className="text-foreground" /> }} />
             </div>
           )}
 
@@ -251,7 +258,7 @@ export function HeaderSearchSuggestions({ query, visible, onSelect, onClose }: P
             className="w-full flex items-center gap-2 px-3 py-2.5 mt-1 rounded-xl bg-primary/10 hover:bg-primary/20 transition-colors text-sm font-semibold text-primary border border-primary/20 hover:border-primary/40"
           >
             <Search className="w-4 h-4" />
-            Search all results for "{query}"
+            {t('layout.searchAllResults', { query })}
           </button>
         </div>
       )}

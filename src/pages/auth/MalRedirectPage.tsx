@@ -1,5 +1,8 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { exchangeMalCode, clearMalPendingMarker, clearMalOAuthStorage, getMalAuthUrl, isMalLoginPendingFresh } from '@/lib/mal';
 import { buildDesktopDeepLink, isNativeOAuthApp, isDesktopOAuthState, getWebMalRedirectUri, buildDesktopOAuthState, openOAuthInBrowser } from '@/lib/desktopOAuth';
@@ -18,6 +21,8 @@ function safeReadMalRedirect(): string | null {
 }
 
 export default function MalRedirectPage() {
+  useUiTranslation();
+    const { t } = useTranslation();
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const { refreshProfile, isLoading: authLoading, user } = useAuth();
@@ -49,7 +54,7 @@ export default function MalRedirectPage() {
             if (isNativeOAuthApp()) {
                 const url = getMalAuthUrl(getWebMalRedirectUri(), buildDesktopOAuthState());
                 if (await openOAuthInBrowser(url)) {
-                    toast.info('Complete the MyAnimeList login in your browser, then return to the app.');
+                    toast.info(uiI18n.t('app.complete_the_myanimelist_login_in_your_browser_t_c231915a'));
                     return;
                 }
                 window.location.href = url;
@@ -57,7 +62,7 @@ export default function MalRedirectPage() {
             }
             window.location.href = getMalAuthUrl();
         } catch (e) {
-            toast.error(e instanceof Error ? e.message : 'Could not restart MyAnimeList login.');
+            toast.error(e instanceof Error ? e.message : uiI18n.t('app.could_not_restart_myanimelist_login_88933b79'));
             setIsRetrying(false);
         }
     };
@@ -96,36 +101,36 @@ export default function MalRedirectPage() {
                 ? `${errorParam} — the MAL app must list the sent URI (${sentRedirect || 'unknown'}) on its own line in App Redirect URL (multiple URLs go one per line, never comma-joined).`
                 : errorParam;
             setError(hint);
-            toast.error(`MAL Error: ${errorParam}`);
+            toast.error(t('auth.malError', { error: errorParam }));
             return;
         }
 
         if (!code) {
             setStatus('error');
-            setError('No authorization code found');
+            setError(t('auth.noAuthCode'));
             return;
         }
 
         const completeAuth = async () => {
             try {
-                if (!user) throw new Error('Sign in to Tatakai before linking MyAnimeList.');
+                if (!user) throw new Error(uiI18n.t('app.sign_in_to_tatakai_before_linking_myanimelist_08a172db'));
                 // Validate CSRF state BEFORE marking the single-use code as consumed:
                 // a failed check must not burn a code that was never exchanged.
                 const expectedState = localStorage.getItem('mal_oauth_state');
                 if (!stateParam) {
-                    throw new Error('MyAnimeList did not return a login session (missing state). Please reconnect MyAnimeList again.');
+                    throw new Error(uiI18n.t('app.myanimelist_did_not_return_a_login_session_missi_24618a3c'));
                 }
                 if (!expectedState) {
-                    throw new Error('This browser did not start this MAL login (no login session found here). If you approved MAL in a different browser, a private window, or after clearing site data, restart the login in THIS browser and approve it here.');
+                    throw new Error(uiI18n.t('app.this_browser_did_not_start_this_mal_login_no_log_59d513a9'));
                 }
                 if (stateParam !== expectedState) {
                     // A second Connect click mints a fresh verifier/state and permanently
                     // invalidates the code from the first tab (MAL answers invalid_grant),
                     // so name that case instead of a generic "expired".
                     if (isMalLoginPendingFresh()) {
-                        throw new Error('This MAL login link is stale — a newer login was started. Only the newest MAL tab can complete. Finish that tab, or discard it and start a fresh login.');
+                        throw new Error(uiI18n.t('app.this_mal_login_link_is_stale_a_newer_login_was_s_3de519bb'));
                     }
-                    throw new Error('This MAL login does not match the one this browser started (stale or double login). Please start a fresh login and approve only the newest MAL tab.');
+                    throw new Error(uiI18n.t('app.this_mal_login_does_not_match_the_one_this_brows_e8c7a6d1'));
                 }
                 // Authorization codes are single-use: a reload, HMR remount, or
                 // double-run would otherwise burn the code twice and the retry
@@ -133,7 +138,7 @@ export default function MalRedirectPage() {
                 const usedKey = `mal_exchange_used:${code}`;
                 try {
                     if (sessionStorage.getItem(usedKey) === '1') {
-                        throw new Error('This MAL login link was already used — authorization codes are single-use. Start a fresh login from Settings → Integrations.');
+                        throw new Error(uiI18n.t('app.this_mal_login_link_was_already_used_authorizati_0ae9aa6e'));
                     }
                     sessionStorage.setItem(usedKey, '1');
                 } catch (e) {
@@ -143,7 +148,7 @@ export default function MalRedirectPage() {
                 await exchangeMalCode(code);
                 await refreshProfile();
                 setStatus('success');
-                toast.success('Successfully linked MyAnimeList!');
+                toast.success(t('auth.malLinked'));
                 setTimeout(() => navigate('/profile'), 2000);
             } catch (err: any) {
                 console.error('MAL Exchange Error:', err);
@@ -156,7 +161,7 @@ export default function MalRedirectPage() {
                     const storedState = localStorage.getItem('mal_oauth_state');
                     if (!storedState || storedState === stateParam) clearMalPendingMarker();
                 } catch { /* ignore */ }
-                const raw = err.message || 'Failed to exchange code for tokens';
+                const raw = err.message || t('auth.exchangeCodeFailed');
                 // Token-exchange 400s with `invalid_client`/`redirect_uri` mean the
                 // code was issued for a different redirect_uri than the exchange
                 // sends (or the MAL app registration mismatches) — tell the user
@@ -166,7 +171,7 @@ export default function MalRedirectPage() {
                     ? `${raw} — in the MAL app settings, list the sent URI (${sentRedirect || 'unknown'}) on its own line in App Redirect URL (one URL per line; canonical prod: https://tatakai.me/api/mal/redirect), then reconnect from Settings → Integrations.`
                     : raw;
                 setError(hinted);
-                toast.error('Failed to link MyAnimeList');
+                toast.error(t('auth.malLinkFailed'));
             }
         };
 
@@ -180,12 +185,12 @@ export default function MalRedirectPage() {
                     <>
                         <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto" />
                         <h1 className="text-2xl font-bold">
-                            {status === 'forwarding' ? 'Returning to the app...' : 'Linking MyAnimeList...'}
+                            {status === 'forwarding' ? t('migration.returning') : t('auth.linkingMal')}
                         </h1>
                         <p className="text-muted-foreground">
                             {status === 'forwarding'
-                                ? 'Login approved. Opening the Tatakai app to finish linking.'
-                                : 'Please wait while we complete the authentication process.'}
+                                ? t('migration.loginApproved')
+                                : t('auth.linkingWait')}
                         </p>
                         {status === 'forwarding' && (
                             <a
@@ -193,7 +198,7 @@ export default function MalRedirectPage() {
                                 className="inline-flex items-center gap-2 mt-2 px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
                             >
                                 <ExternalLink className="w-4 h-4" />
-                                Open Tatakai app
+                                {t('migration.openApp')}
                             </a>
                         )}
                     </>
@@ -202,15 +207,15 @@ export default function MalRedirectPage() {
                 {status === 'success' && (
                     <>
                         <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto" />
-                        <h1 className="text-2xl font-bold">Success!</h1>
-                        <p className="text-muted-foreground">Your MyAnimeList account has been linked. Redirecting you back to your profile...</p>
+                        <h1 className="text-2xl font-bold">{t('auth.successTitle')}</h1>
+                        <p className="text-muted-foreground">{t('auth.malLinkedRedirect')}</p>
                     </>
                 )}
 
                 {status === 'error' && (
                     <>
                         <AlertCircle className="w-12 h-12 text-destructive mx-auto" />
-                        <h1 className="text-2xl font-bold">Authentication Failed</h1>
+                        <h1 className="text-2xl font-bold">{t('auth.authFailed')}</h1>
                         <p className="text-destructive font-medium">{error}</p>
                         <div className="mt-4 flex flex-col sm:flex-row items-center justify-center gap-3">
                             <button
@@ -218,13 +223,13 @@ export default function MalRedirectPage() {
                                 disabled={isRetrying}
                                 className="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-wait"
                             >
-                                {isRetrying ? 'Restarting…' : 'Reconnect MyAnimeList'}
+                                {isRetrying ? t('migration.restarting') : t('migration.reconnectMal')}
                             </button>
                             <button
                                 onClick={() => navigate('/profile')}
                                 className="px-6 py-2 rounded-lg border border-white/10 bg-white/5 text-muted-foreground hover:text-foreground hover:bg-white/10 transition-colors"
                             >
-                                Back to Profile
+                                {t('auth.backToProfile')}
                             </button>
                         </div>
                     </>

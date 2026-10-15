@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 "use client";
 
 import { useEffect, useRef } from "react";
@@ -26,15 +28,15 @@ interface Extra {
 
 // Features the media showcase above doesn't cover — the "there's more" list.
 const extras: Extra[] = [
-  { icon: Palette, title: "25+ themes", body: "Light, dark, and accented looks — plus a Lite mode that keeps low-end devices smooth.", accent: "text-violet-300" },
-  { icon: Bell, title: "Airing calendar", body: "Seasonal charts and airing schedules with reminders, so you never miss a premiere.", accent: "text-cyan-300" },
-  { icon: ScanSearch, title: "Search by screenshot", body: "Recognize any scene with image search powered by trace.moe.", accent: "text-pink-300" },
-  { icon: PartyPopper, title: "Watch2Together", body: "Host sync watch parties and react in real time with friends.", accent: "text-amber-300" },
-  { icon: Trophy, title: "Ranks & leaderboards", body: "Climb the ranks, collect badges, and top the contributor board.", accent: "text-emerald-300" },
-  { icon: MessagesSquare, title: "Forums & threads", body: "Reddit-style threaded discussions for every corner of anime.", accent: "text-violet-300" },
-  { icon: ListOrdered, title: "Tier lists", body: "Build, rank, and share your definitive takes.", accent: "text-cyan-300" },
-  { icon: MonitorSmartphone, title: "Web, desktop & mobile", body: "Pick up on the browser, the desktop app and Android or IOS  .", accent: "text-pink-300" },
-  { icon: Bookmark, title: "Plan to watch", body: "A dedicated backlog for everything you plan to watch and read next.", accent: "text-amber-300" },
+  { icon: Palette, get title() { return uiI18n.t('app.25_themes_3e75499d'); }, get body() { return uiI18n.t('app.light_dark_and_accented_looks_plus_a_lite_mode_t_ca61478a'); }, accent: "text-violet-300" },
+  { icon: Bell, get title() { return uiI18n.t('app.airing_calendar_37949cd3'); }, get body() { return uiI18n.t('app.seasonal_charts_and_airing_schedules_with_remind_260bb313'); }, accent: "text-cyan-300" },
+  { icon: ScanSearch, get title() { return uiI18n.t('app.search_by_screenshot_12f98526'); }, get body() { return uiI18n.t('app.recognize_any_scene_with_image_search_powered_by_f0f8afcd'); }, accent: "text-pink-300" },
+  { icon: PartyPopper, get title() { return uiI18n.t('app.watch2together_cde01fad'); }, get body() { return uiI18n.t('app.host_sync_watch_parties_and_react_in_real_time_w_2b37577d'); }, accent: "text-amber-300" },
+  { icon: Trophy, get title() { return uiI18n.t('app.ranks_leaderboards_ef2ca515'); }, get body() { return uiI18n.t('app.climb_the_ranks_collect_badges_and_top_the_contr_4a47b4ac'); }, accent: "text-emerald-300" },
+  { icon: MessagesSquare, get title() { return uiI18n.t('app.forums_threads_71864988'); }, get body() { return uiI18n.t('app.reddit_style_threaded_discussions_for_every_corn_7ff77bbb'); }, accent: "text-violet-300" },
+  { icon: ListOrdered, get title() { return uiI18n.t('app.tier_lists_bfe1b707'); }, get body() { return uiI18n.t('app.build_rank_and_share_your_definitive_takes_74672eb4'); }, accent: "text-cyan-300" },
+  { icon: MonitorSmartphone, get title() { return uiI18n.t('app.web_desktop_mobile_f1509cd0'); }, get body() { return uiI18n.t('app.pick_up_on_the_browser_the_desktop_app_and_andro_7e19412b'); }, accent: "text-pink-300" },
+  { icon: Bookmark, get title() { return uiI18n.t('app.plan_to_watch_4a4ffa92'); }, get body() { return uiI18n.t('app.a_dedicated_backlog_for_everything_you_plan_to_w_d9b0d028'); }, accent: "text-amber-300" },
 ];
 
 // Breadth strip — scrolled by GSAP, kept honest against the feature list.
@@ -45,6 +47,7 @@ const marquee = [
 ];
 
 export function MoreFeatures() {
+  useUiTranslation();
   const reduceMotion = useMotionPreference();
   const gridRef = useRef<HTMLDivElement>(null);
   const marqueeRef = useRef<HTMLDivElement>(null);
@@ -100,10 +103,10 @@ export function MoreFeatures() {
     <section className="py-16 lg:py-24">
       <div className="mb-12 max-w-2xl">
         <h2 className="font-display text-[clamp(1.9rem,4vw,3.25rem)] font-medium leading-[1.02] tracking-[-0.03em] text-white">
-          {"There’s even more inside"}
+          {uiI18n.t('app.there_s_even_more_inside_245c026d')}
         </h2>
         <p className="mt-4 text-base leading-relaxed text-white/55 lg:text-lg">
-          {"The showcase only scratches the surface — here’s a little of what else is waiting once you’re in."}
+          {uiI18n.t('app.the_showcase_only_scratches_the_surface_here_s_a_dd322cbb')}
         </p>
       </div>
 

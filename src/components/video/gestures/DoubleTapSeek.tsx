@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useCallback, useRef, useEffect } from "react";
 
 interface DoubleTapSeekProps {
@@ -6,6 +8,7 @@ interface DoubleTapSeekProps {
 }
 
 export function DoubleTapSeek({ onSeek, children }: DoubleTapSeekProps) {
+  useUiTranslation();
   const [ripple, setRipple] = useState<{ side: "left" | "right"; x: number; y: number; id: number } | null>(null);
   const lastTapRef = useRef<{ time: number; side: "left" | "right" } | null>(null);
   const rippleIdRef = useRef(0);

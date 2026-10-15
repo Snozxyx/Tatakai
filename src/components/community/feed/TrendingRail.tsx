@@ -1,9 +1,12 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { Link } from 'react-router-dom';
 import { Hash, Flame, TrendingUp } from 'lucide-react';
 import { useTrendingTags } from '@/hooks/community/useTrending';
 import { cn } from '@/lib/utils';
 
 export function TrendingRail({ className }: { className?: string }) {
+  useUiTranslation();
   const { data: tags = [], isLoading } = useTrendingTags(6);
   if (!isLoading && tags.length === 0) return null;
 
@@ -25,7 +28,7 @@ export function TrendingRail({ className }: { className?: string }) {
             <Flame className="h-3.5 w-3.5 text-primary" />
           </div>
           <span className="text-[11px] font-bold uppercase tracking-widest text-primary">
-            Trending Topics
+            {uiI18n.t('app.trending_topics_4435e732')}
           </span>
         </div>
         <TrendingUp className="h-4 w-4 text-primary/50" />

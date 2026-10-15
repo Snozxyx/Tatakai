@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useRef, useCallback } from 'react';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { searchNovels } from '@/core/content/novel-client';
@@ -26,18 +28,18 @@ const SECTION_ICONS: Record<string, NovelSectionIcon> = {
 
 // Same shelf rhythm as the manga endless feed, pointed at novel genres.
 const SHELVES: Array<{ id: string; title: string; genre: string; icon: string }> = [
-  { id: 'novel-fantasy', title: 'Fantasy Worlds', genre: 'Fantasy', icon: 'Sparkles' },
-  { id: 'novel-action', title: 'Action Packed', genre: 'Action', icon: 'Sword' },
-  { id: 'novel-romance', title: 'Romance Tales', genre: 'Romance', icon: 'Heart' },
-  { id: 'novel-isekai', title: 'Otherworld Journeys', genre: 'Isekai', icon: 'Rocket' },
-  { id: 'novel-mystery', title: 'Mysteries & Thrills', genre: 'Mystery', icon: 'Search' },
-  { id: 'novel-horror', title: 'Dark & Haunting', genre: 'Horror', icon: 'Ghost' },
-  { id: 'novel-comedy', title: 'Laugh Out Loud', genre: 'Comedy', icon: 'Laugh' },
-  { id: 'novel-drama', title: 'Dramatic Sagas', genre: 'Drama', icon: 'Flower2' },
-  { id: 'novel-adventure', title: 'Grand Adventures', genre: 'Adventure', icon: 'Compass' },
-  { id: 'novel-scifi', title: 'Beyond Tomorrow', genre: 'Sci-Fi', icon: 'Zap' },
-  { id: 'novel-psychological', title: 'Mind Benders', genre: 'Psychological', icon: 'Brain' },
-  { id: 'novel-historical', title: 'Echoes of History', genre: 'Historical', icon: 'BookOpen' },
+  { id: 'novel-fantasy', get title() { return uiI18n.t('app.fantasy_worlds_0afad65b'); }, genre: 'Fantasy', icon: 'Sparkles' },
+  { id: 'novel-action', get title() { return uiI18n.t('app.action_packed_25c21d11'); }, genre: 'Action', icon: 'Sword' },
+  { id: 'novel-romance', get title() { return uiI18n.t('app.romance_tales_eda7f54b'); }, genre: 'Romance', icon: 'Heart' },
+  { id: 'novel-isekai', get title() { return uiI18n.t('app.otherworld_journeys_8ff7f87a'); }, genre: 'Isekai', icon: 'Rocket' },
+  { id: 'novel-mystery', get title() { return uiI18n.t('app.mysteries_thrills_cb7c6ced'); }, genre: 'Mystery', icon: 'Search' },
+  { id: 'novel-horror', get title() { return uiI18n.t('app.dark_haunting_5c553caa'); }, genre: 'Horror', icon: 'Ghost' },
+  { id: 'novel-comedy', get title() { return uiI18n.t('app.laugh_out_loud_b2c96947'); }, genre: 'Comedy', icon: 'Laugh' },
+  { id: 'novel-drama', get title() { return uiI18n.t('app.dramatic_sagas_fd0d835d'); }, genre: 'Drama', icon: 'Flower2' },
+  { id: 'novel-adventure', get title() { return uiI18n.t('app.grand_adventures_762e2c4c'); }, genre: 'Adventure', icon: 'Compass' },
+  { id: 'novel-scifi', get title() { return uiI18n.t('app.beyond_tomorrow_c9a45004'); }, genre: 'Sci-Fi', icon: 'Zap' },
+  { id: 'novel-psychological', get title() { return uiI18n.t('app.mind_benders_8af0b0b4'); }, genre: 'Psychological', icon: 'Brain' },
+  { id: 'novel-historical', get title() { return uiI18n.t('app.echoes_of_history_0cc7c578'); }, genre: 'Historical', icon: 'BookOpen' },
 ];
 
 const SHELVES_PER_PAGE = 2;
@@ -79,6 +81,7 @@ function mapRowsToItems(rawItems: any[], canShowAdult: boolean): UnifiedMediaCar
  * shelves per scroll page, each shelf a `searchNovels` genre query.
  */
 export function useInfiniteNovelSections() {
+  useUiTranslation();
   const { settings } = useContentSafetySettings();
   const showAdult = settings.showAdultEverywhere;
 
@@ -119,6 +122,7 @@ export function useInfiniteNovelSections() {
 
 /** Within-shelf pagination — second genre page appended to a shelf rail. */
 export function useNovelSectionItems(sectionId: string) {
+  useUiTranslation();
   const shelf = SHELVES.find((s) => s.id === sectionId);
   const pageRef = useRef(1);
   const query = useQuery({

@@ -1,3 +1,5 @@
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
+import uiI18n from '@/lib/uiI18n';
 /**
  * The horizontal "pick this back up" card, shared by the manga continue-reading
  * row and the torrent session row.
@@ -68,10 +70,11 @@ export function ResumeCard({
   busy = false,
   dimmed = false,
   onRemove,
-  removeLabel = 'Remove',
+  removeLabel = uiI18n.t('app.remove_e963907d'),
   fallbackIcon: FallbackIcon,
   className,
 }: ResumeCardProps) {
+  useUiTranslation();
   const percent =
     typeof progress === 'number' && Number.isFinite(progress)
       ? Math.max(0, Math.min(100, Math.round(progress)))
@@ -208,6 +211,7 @@ export function ResumeCard({
 
 /** Matches the card's footprint so the grid does not reflow when data lands. */
 export function ResumeCardSkeleton() {
+  useUiTranslation();
   return (
     <div className="flex gap-4 rounded-2xl border border-white/[0.07] bg-white/[0.02] p-4">
       <div className="h-28 w-20 shrink-0 animate-pulse rounded-xl bg-white/[0.05]" />

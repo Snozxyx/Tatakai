@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -19,6 +21,7 @@ export interface FollowUser {
  * `profiles.id` would return no rows.
  */
 export function useFollowList(targetUserId: string | undefined, type: 'followers' | 'following') {
+  useUiTranslation();
   return useQuery<FollowUser[]>({
     queryKey: ['followList', type, targetUserId],
     queryFn: async () => {
@@ -50,6 +53,7 @@ export function useFollowList(targetUserId: string | undefined, type: 'followers
 }
 
 export function useFollow(targetUserId?: string) {
+  useUiTranslation();
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
@@ -98,7 +102,7 @@ export function useFollow(targetUserId?: string) {
 
   const followMutation = useMutation({
     mutationFn: async () => {
-      if (!user || !targetUserId) throw new Error('Not authenticated');
+      if (!user || !targetUserId) throw new Error(uiI18n.t('app.not_authenticated_0c91acba'));
 
       const { error } = await supabase
         .from('user_follows')
@@ -113,7 +117,7 @@ export function useFollow(targetUserId?: string) {
       queryClient.invalidateQueries({ queryKey: ['isFollowing', user?.id, targetUserId] });
       queryClient.invalidateQueries({ queryKey: ['followStats', targetUserId] });
       analytics.trackEvent('follow_user', { target_user_id: targetUserId });
-      toast.success('Followed user');
+      toast.success(uiI18n.t('app.followed_user_b415041d'));
     },
     onError: (error) => {
       toast.error('Failed to follow: ' + error.message);
@@ -122,7 +126,7 @@ export function useFollow(targetUserId?: string) {
 
   const unfollowMutation = useMutation({
     mutationFn: async () => {
-      if (!user || !targetUserId) throw new Error('Not authenticated');
+      if (!user || !targetUserId) throw new Error(uiI18n.t('app.not_authenticated_0c91acba'));
 
       const { error } = await supabase
         .from('user_follows')
@@ -136,7 +140,7 @@ export function useFollow(targetUserId?: string) {
       queryClient.invalidateQueries({ queryKey: ['isFollowing', user?.id, targetUserId] });
       queryClient.invalidateQueries({ queryKey: ['followStats', targetUserId] });
       analytics.trackEvent('unfollow_user', { target_user_id: targetUserId });
-      toast.success('Unfollowed user');
+      toast.success(uiI18n.t('app.unfollowed_user_91acbf80'));
     },
     onError: (error) => {
       toast.error('Failed to unfollow: ' + error.message);

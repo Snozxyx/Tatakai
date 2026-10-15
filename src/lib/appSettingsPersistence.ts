@@ -5,6 +5,7 @@ const GUEST_SETTINGS_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 const ACCOUNT_SETTINGS_LOCAL_PREFIX = "tatakai_account_settings_v1:";
 
 export interface PersistedAppSettings {
+  locale?: string;
   contentSafety?: {
     showAdultEverywhere?: boolean;
     warnBeforeAdultOpen?: boolean;
@@ -40,6 +41,7 @@ const mergeSettings = (
 ): PersistedAppSettings => ({
   ...base,
   ...patch,
+  ...(typeof patch.locale === 'string' ? { locale: patch.locale } : {}),
   contentSafety: {
     ...(isObject(base.contentSafety) ? base.contentSafety : {}),
     ...(isObject(patch.contentSafety) ? patch.contentSafety : {}),

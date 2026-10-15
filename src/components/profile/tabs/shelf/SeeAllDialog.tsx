@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState } from 'react';
 import { Search } from 'lucide-react';
 import {
@@ -35,6 +37,7 @@ export function SeeAllDialog<T>({
   renderCard,
   gridClass,
 }: SeeAllDialogProps<T>) {
+  useUiTranslation();
   const [q, setQ] = useState('');
   const term = q.trim().toLowerCase();
   const filtered = term
@@ -58,7 +61,7 @@ export function SeeAllDialog<T>({
           <Input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search this shelf…"
+            placeholder={uiI18n.t('app.search_this_shelf_d156dc01')}
             className="pl-9 rounded-full bg-white/[0.03] border-white/[0.08]"
           />
         </div>
@@ -71,7 +74,7 @@ export function SeeAllDialog<T>({
               ))}
             </div>
           ) : (
-            <div className="text-center py-12 text-muted-foreground text-sm">No matches.</div>
+            <div className="text-center py-12 text-muted-foreground text-sm">{uiI18n.t('app.no_matches_0be6a257')}</div>
           )}
         </ScrollArea>
       </DialogContent>

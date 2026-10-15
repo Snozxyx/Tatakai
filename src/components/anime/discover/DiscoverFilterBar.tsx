@@ -6,6 +6,7 @@
  * and genre pickers change the route/query the grid runs, so everything in this
  * bar is real filtering rather than presentation.
  */
+import { useTranslation } from 'react-i18next';
 import { Check, ChevronDown, Tag } from 'lucide-react';
 import {
   DropdownMenu,
@@ -39,20 +40,21 @@ export function DiscoverFilterBar({
   onGenreChange,
   className,
 }: DiscoverFilterBarProps) {
+  const { t } = useTranslation();
   const { genres: anilistGenres } = useAniListGenres();
 
   return (
     <div className={cn('flex flex-wrap items-center gap-2', className)}>
-      <PillGroup options={DISCOVER_SORTS} value={sort} onChange={onSortChange} label="Sort" />
+      <PillGroup options={DISCOVER_SORTS} value={sort} onChange={onSortChange} label={t('discover.sort')} />
 
       <DropdownMenu>
         <DropdownMenuTrigger className={controlTriggerClass}>
-          {year ?? 'Any year'}
+          {year ?? t('discover.anyYear')}
           <ChevronDown className="h-3.5 w-3.5 opacity-60" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className={controlMenuClass}>
           <DropdownMenuItem className={controlItemClass} onSelect={() => onYearChange(null)}>
-            Any year
+            {t('discover.anyYear')}
             {year === null && <Check className="h-3.5 w-3.5 text-primary" />}
           </DropdownMenuItem>
           {discoverYears().map((value) => (
@@ -71,12 +73,12 @@ export function DiscoverFilterBar({
       <DropdownMenu>
         <DropdownMenuTrigger className={controlTriggerClass}>
           <Tag className="h-3.5 w-3.5 opacity-60" />
-          {genre ?? 'Genre'}
+          {genre ?? t('discover.genre')}
           <ChevronDown className="h-3.5 w-3.5 opacity-60" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className={controlMenuClass}>
           <DropdownMenuItem className={controlItemClass} onSelect={() => onGenreChange(undefined)}>
-            All genres
+            {t('discover.allGenres')}
             {!genre && <Check className="h-3.5 w-3.5 text-primary" />}
           </DropdownMenuItem>
           {anilistGenres.map((value) => (

@@ -1,8 +1,10 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useCallback, useEffect, useState } from 'react';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from '@/lib/localeFormat';
 import {
   Github,
   RefreshCw,
@@ -53,15 +55,16 @@ function cleanVersion(tag: string): string {
 
 /** One downloadable artefact: platform icon, size, download count, and actions. */
 function AssetRow({ asset }: { asset: GitHubReleaseAsset }) {
+  useUiTranslation();
   const platform = platformForAsset(asset.name);
   const Icon = platform ? PLATFORM_ICON[platform] : Package;
 
   const copyUrl = async () => {
     try {
       await navigator.clipboard.writeText(asset.browser_download_url);
-      toast.success('Download URL copied');
+      toast.success(uiI18n.t('app.download_url_copied_608a3f2a'));
     } catch {
-      toast.error('Clipboard unavailable');
+      toast.error(uiI18n.t('app.clipboard_unavailable_bec46a29'));
     }
   };
 
@@ -73,7 +76,7 @@ function AssetRow({ asset }: { asset: GitHubReleaseAsset }) {
       <div className="min-w-0 flex-1">
         <p className="truncate font-mono text-xs text-foreground">{asset.name}</p>
         <p className="text-[11px] text-muted-foreground">
-          {formatBytes(asset.size)} · {formatCompact(asset.download_count)} downloads
+          {formatBytes(asset.size)} · {formatCompact(asset.download_count)} {uiI18n.t('app.downloads_a2a55e68')}
         </p>
       </div>
       <Button
@@ -81,7 +84,7 @@ function AssetRow({ asset }: { asset: GitHubReleaseAsset }) {
         size="sm"
         onClick={copyUrl}
         className="h-8 w-8 shrink-0 p-0 text-muted-foreground hover:text-foreground"
-        title="Copy download URL"
+        title={uiI18n.t('app.copy_download_url_5fe16626')}
       >
         <Copy className="h-3.5 w-3.5" />
       </Button>
@@ -93,7 +96,7 @@ function AssetRow({ asset }: { asset: GitHubReleaseAsset }) {
       >
         <a href={asset.browser_download_url} target="_blank" rel="noreferrer">
           <Download className="h-3.5 w-3.5" />
-          Download
+          {uiI18n.t('app.download_a479c9c3')}
         </a>
       </Button>
     </div>
@@ -112,6 +115,7 @@ function ReleaseCard({
   onToggle: () => void;
   onCreatePolicy?: (version: string) => void;
 }) {
+  useUiTranslation();
   const version = cleanVersion(release.tag_name);
   const canSeedPolicy = SEMVER_RE.test(version) && !!onCreatePolicy;
 
@@ -127,18 +131,18 @@ function ReleaseCard({
             {!release.prerelease && !release.draft && (
               <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-bold text-emerald-400">
                 <CheckCircle2 className="h-3 w-3" />
-                Stable
+                {uiI18n.t('app.stable_d96e5b2d')}
               </span>
             )}
             {release.prerelease && (
               <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-bold text-amber-400">
                 <FlaskConical className="h-3 w-3" />
-                Pre-release
+                {uiI18n.t('app.pre_release_96308068')}
               </span>
             )}
             {release.draft && (
               <span className="rounded-full border border-white/10 bg-muted/20 px-2 py-0.5 text-[11px] font-bold text-muted-foreground">
-                Draft
+                {uiI18n.t('app.draft_23d33e22')}
               </span>
             )}
           </div>
@@ -146,11 +150,11 @@ function ReleaseCard({
             <p className="text-sm font-medium">{release.name}</p>
           )}
           <p className="text-[11px] text-muted-foreground/70">
-            Published {formatDistanceToNow(new Date(release.published_at), { addSuffix: true })}
+            {uiI18n.t('app.published_483bf207')} {formatDistanceToNow(new Date(release.published_at), { addSuffix: true })}
             {' · '}
-            {new Date(release.published_at).toLocaleDateString()}
+            {new Date(release.published_at).toLocaleDateString(uiI18n.language)}
             {' · '}
-            {release.assets.length} asset{release.assets.length === 1 ? '' : 's'}
+            {release.assets.length} {uiI18n.t('app.asset_05fac943')}{release.assets.length === 1 ? '' : 's'}
           </p>
         </div>
 
@@ -160,13 +164,13 @@ function ReleaseCard({
               size="sm"
               onClick={() => onCreatePolicy!(version)}
               className="h-8 gap-1.5 text-xs"
-              title={`Create an update policy targeting v${version}`}
+              title={uiI18n.t('app.create_an_update_policy_targeting_vi18n_value_0_69f92cbc', { value0: version })}
             >
               <PlusCircle className="h-3.5 w-3.5" />
-              Create policy
+              {uiI18n.t('app.create_policy_780584fb')}
             </Button>
           )}
-          <Button variant="ghost" size="sm" asChild className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground" title="View on GitHub">
+          <Button variant="ghost" size="sm" asChild className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground" title={uiI18n.t('app.view_on_github_0c77991f')}>
             <a href={release.html_url} target="_blank" rel="noreferrer">
               <ExternalLink className="h-3.5 w-3.5" />
             </a>
@@ -192,7 +196,7 @@ function ReleaseCard({
             className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
             {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-            Release notes
+            {uiI18n.t('app.release_notes_cd5af734')}
           </button>
           {expanded && (
             <pre className="mt-2 max-h-72 overflow-y-auto whitespace-pre-wrap rounded-lg border border-white/5 bg-black/20 p-3 font-sans text-xs leading-relaxed text-muted-foreground">
@@ -219,6 +223,7 @@ export function GitHubReleasesPanel({
 }: {
   onCreatePolicy?: (version: string) => void;
 }) {
+  useUiTranslation();
   const [releases, setReleases] = useState<GitHubRelease[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -248,14 +253,14 @@ export function GitHubReleasesPanel({
         <div>
           <h3 className="flex items-center gap-2 text-lg font-bold">
             <Github className="h-5 w-5 text-primary" />
-            GitHub Releases
+            {uiI18n.t('app.github_releases_e61fe3de')}
           </h3>
           <p className="text-xs text-muted-foreground">
-            Live from{' '}
+            {uiI18n.t('app.live_from_01c4a4aa')}{' '}
             <a href={GITHUB_RELEASES_URL} target="_blank" rel="noreferrer" className="underline hover:text-foreground">
               snozxyx/Tatakai
             </a>{' '}
-            — pick a version to seed a policy, or grab an installer directly.
+            {uiI18n.t('app.pick_a_version_to_seed_a_policy_or_grab_an_insta_56f9a7a5')}
           </p>
         </div>
         <Button
@@ -266,7 +271,7 @@ export function GitHubReleasesPanel({
           className="gap-2 text-muted-foreground hover:text-foreground"
         >
           <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
+          {uiI18n.t('app.refresh_56e3badc')}
         </Button>
       </div>
 
@@ -278,17 +283,17 @@ export function GitHubReleasesPanel({
         <GlassPanel className="border-destructive/20 bg-destructive/5 p-10 text-center">
           <XCircle className="mx-auto mb-3 h-8 w-8 text-destructive/50" />
           <p className="mb-4 text-sm font-medium text-destructive">
-            Couldn't reach GitHub. It may be rate-limited (60 requests/hour) — try again shortly.
+            {uiI18n.t('app.couldn_t_reach_github_it_may_be_rate_limited_60__6770a1ed')}
           </p>
           <Button variant="outline" size="sm" onClick={() => load(true)} className="gap-2 border-destructive/30 text-destructive hover:bg-destructive/10">
             <RefreshCw className="h-4 w-4" />
-            Retry
+            {uiI18n.t('app.retry_9f5cd8a2')}
           </Button>
         </GlassPanel>
       ) : !releases || releases.length === 0 ? (
         <GlassPanel className="border-dashed border-white/5 p-12 text-center">
           <Package className="mx-auto mb-3 h-8 w-8 text-muted-foreground/25" />
-          <p className="text-sm text-muted-foreground">No published releases found.</p>
+          <p className="text-sm text-muted-foreground">{uiI18n.t('app.no_published_releases_found_a120d6ad')}</p>
         </GlassPanel>
       ) : (
         <div className="space-y-3">

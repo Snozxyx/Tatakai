@@ -1,3 +1,5 @@
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
+import uiI18n from '@/lib/uiI18n';
 /**
  * useAnimeSeasons.ts
  *
@@ -253,6 +255,7 @@ async function fetchCompleteAniListChain(rootId: number): Promise<AniListMediaNo
 }
 
 export function useAnimeSeasons(animeId: string | undefined) {
+  useUiTranslation();
   return useQuery({
     queryKey: ['anime-watch-order-v2', animeId],
     queryFn: async (): Promise<WatchOrderEntry[]> => {
@@ -344,7 +347,7 @@ export function useAnimeSeasons(animeId: string | undefined) {
         // ── 3. Convert AniList nodes into WatchOrderEntry items ─────────────────
         const currentTargetId = String(numericAnilistId ?? animeId);
         const entries: WatchOrderEntry[] = nodes.map((node) => {
-          const title = node.title?.english || node.title?.romaji || node.title?.native || 'Unknown';
+          const title = node.title?.english || node.title?.romaji || node.title?.native || uiI18n.t('app.unknown_bc7819b3');
           const poster = node.bannerImage || node.coverImage?.extraLarge || node.coverImage?.large || '';
           const rating = node.averageScore ? (node.averageScore / 10).toFixed(1) : undefined;
           const year = node.startDate?.year || undefined;

@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 "use client";
 
 import { useEffect, useRef } from "react";
@@ -21,6 +23,7 @@ import {
 const PREVIEW_SCORE = 1500;
 
 export function Progression() {
+  useUiTranslation();
   const reduceMotion = useMotionPreference();
   const rootRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
@@ -86,15 +89,13 @@ export function Progression() {
           <div>
             <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 backdrop-blur-md">
               <Trophy className="h-3.5 w-3.5 text-amber-300" />
-              <span className="text-xs font-medium text-white/70">Progression</span>
+              <span className="text-xs font-medium text-white/70">{uiI18n.t('app.progression_685e2622')}</span>
             </div>
             <h2 className="mb-4 font-display text-[clamp(1.6rem,3vw,2.5rem)] font-medium leading-[1.05] tracking-[-0.03em] text-white">
-              Every episode counts
+              {uiI18n.t('app.every_episode_counts_d0bda121')}
             </h2>
             <p className="mb-6 max-w-md text-base leading-relaxed text-white/60">
-              One rank climbs as you watch and read across the whole app — anime, manga, manhwa
-              and comics all feed the same score. Sixteen tiers, each with its own effect, and a
-              leaderboard to prove it.
+              {uiI18n.t('app.one_rank_climbs_as_you_watch_and_read_across_the_11340c96')}
             </p>
             <ul className="flex flex-wrap gap-2">
               {["16 ranks", "One unified score", "Per-rank effects", "Leaderboards"].map((p) => (
@@ -118,13 +119,13 @@ export function Progression() {
               </div>
               <div className="min-w-0">
                 <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-widest text-white/50">
-                  Current rank
+                  {uiI18n.t('app.current_rank_affa548e')}
                 </p>
                 <h3 className={cn("font-display text-2xl font-bold tracking-tight", getRankClassForRank(current.rank))}>
                   {current.name}
                 </h3>
                 <p className="font-mono text-xs text-white/40">
-                  Rank {current.rank} / 16 · {PREVIEW_SCORE.toLocaleString()} RP
+                  {uiI18n.t('app.rank_dd48a114')} {current.rank} / 16 · {PREVIEW_SCORE.toLocaleString(uiI18n.language)} {uiI18n.t('app.rp_d31618d2')}
                 </p>
               </div>
             </div>
@@ -133,8 +134,8 @@ export function Progression() {
             {next && (
               <div className="mb-6 space-y-1.5">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-white/55">Progress to {next.tier.name}</span>
-                  <span className="font-mono text-white/45">{next.needed} RP left</span>
+                  <span className="text-white/55">{uiI18n.t('app.progress_to_bc5e6d58')} {next.tier.name}</span>
+                  <span className="font-mono text-white/45">{next.needed} {uiI18n.t('app.rp_left_f7e9aa71')}</span>
                 </div>
                 <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
                   <div
@@ -149,7 +150,7 @@ export function Progression() {
             {/* Rank ladder — all 16 real badges, unlocked/locked like the profile */}
             <div className="mb-3 flex items-center gap-2">
               <Trophy className="h-4 w-4 text-amber-300/80" />
-              <span className="font-display text-sm font-medium text-white">Rank badges</span>
+              <span className="font-display text-sm font-medium text-white">{uiI18n.t('app.rank_badges_ba12d7d8')}</span>
               <span className="text-xs text-white/40">{unlockedCount} / 16</span>
             </div>
             <div className="grid grid-cols-8 gap-2">
@@ -160,7 +161,7 @@ export function Progression() {
                   <div
                     key={tier.rank}
                     data-badge
-                    title={`${tier.name} — ${tier.minScore.toLocaleString()} RP`}
+                    title={uiI18n.t('app.i18n_value_0_i18n_value_1_rp_f9741354', { value0: tier.name, value1: tier.minScore.toLocaleString(uiI18n.language) })}
 
                     className={cn(
                       "group relative flex items-center justify-center rounded-lg border p-1.5 transition-colors duration-300",

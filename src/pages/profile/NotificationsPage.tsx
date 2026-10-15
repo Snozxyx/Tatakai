@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
  * Dedicated notifications page (docs/Plans.md §6 "unified notification alerts
  * across the in-app notification bar and dedicated notification page").
@@ -9,7 +11,7 @@
  */
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from '@/lib/localeFormat';
 import {
   Bell,
   Check,
@@ -48,6 +50,7 @@ function typeIcon(n: Notification) {
 }
 
 export default function NotificationsPage() {
+  useUiTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
   const isDesktopApp = useIsDesktopApp();
@@ -84,9 +87,9 @@ export default function NotificationsPage() {
               <Bell className="h-5 w-5 text-primary" />
             </span>
             <div>
-              <h1 className="font-display text-2xl font-black tracking-tight">Notifications</h1>
+              <h1 className="font-display text-2xl font-black tracking-tight">{uiI18n.t('app.notifications_753a22b2')}</h1>
               <p className="text-sm text-muted-foreground">
-                {unreadCount > 0 ? `${unreadCount} unread` : 'You’re all caught up'}
+                {unreadCount > 0 ? uiI18n.t('app.i18n_value_0_unread_241c6e40', { value0: unreadCount }) : uiI18n.t('app.you_re_all_caught_up_2266fe4b')}
               </p>
             </div>
           </div>
@@ -102,7 +105,7 @@ export default function NotificationsPage() {
                     filter === f ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:text-foreground',
                   )}
                 >
-                  {f}
+                  {uiI18n.t(({"all":"app.all_d87c4480","unread":"app.unread_1b9aebd6"})[f])}
                 </button>
               ))}
             </div>
@@ -114,15 +117,15 @@ export default function NotificationsPage() {
               disabled={unreadCount === 0 || markAllAsRead.isPending}
             >
               <CheckCircle2 className="h-3.5 w-3.5" />
-              Mark all read
+              {uiI18n.t('app.mark_all_read_8958e22c')}
             </Button>
           </div>
         </div>
 
         {!user ? (
           <GlassPanel className="p-10 text-center">
-            <p className="mb-3 text-muted-foreground">Sign in to see your notifications.</p>
-            <Button onClick={() => navigate('/auth')}>Sign In</Button>
+            <p className="mb-3 text-muted-foreground">{uiI18n.t('app.sign_in_to_see_your_notifications_257a89ec')}</p>
+            <Button onClick={() => navigate('/auth')}>{uiI18n.t('app.sign_in_f8492cc1')}</Button>
           </GlassPanel>
         ) : isLoading ? (
           <div className="flex justify-center py-20">
@@ -133,9 +136,9 @@ export default function NotificationsPage() {
             <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted/30">
               <Bell className="h-7 w-7 text-muted-foreground/40" />
             </div>
-            <h3 className="text-lg font-bold">{filter === 'unread' ? 'No unread notifications' : 'Nothing here yet'}</h3>
+            <h3 className="text-lg font-bold">{filter === 'unread' ? uiI18n.t('app.no_unread_notifications_257616b8') : uiI18n.t('app.nothing_here_yet_e892255d')}</h3>
             <p className="mt-1 max-w-xs text-sm text-muted-foreground">
-              Mentions, replies and announcements will show up here.
+              {uiI18n.t('app.mentions_replies_and_announcements_will_show_up__0e526bed')}
             </p>
           </GlassPanel>
         ) : (

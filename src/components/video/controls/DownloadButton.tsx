@@ -1,6 +1,9 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { Download, Check, RotateCw, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 import { useDownload } from "@/hooks/media/useDownload";
 import { readProxyQuerySnapshot } from "@/lib/api/proxy-utils";
 import { consumeAutoDownloadNext, peekAutoDownloadNext } from "@/core/download/mobile/autoDownloadNext";
@@ -79,6 +82,8 @@ export function DownloadButton({
   animeId,
   subtitles,
 }: DownloadButtonProps) {
+  useUiTranslation();
+  const { t } = useTranslation();
   const { isEnabled, downloadStates, startDownload } = useDownload();
 
   // Only treat the episode as a torrent when the *playing* source is one.
@@ -123,12 +128,12 @@ export function DownloadButton({
   const startNow = useCallback(async () => {
     if (busy) return;
     if (!episodeId) {
-      toast.error("Can't download: episode is not identified yet");
+      toast.error(t('player.downloadNotIdentified'));
       return;
     }
     if (!effectiveUrl) {
       toast.error(
-        isTorrent ? "Torrent source not ready to download yet" : "No stream URL to download",
+        isTorrent ? t('player.downloadTorrentNotReady') : t('player.downloadNoStreamUrl'),
       );
       return;
     }
@@ -152,31 +157,36 @@ export function DownloadButton({
     });
 
     if (res.ok) {
-      toast.success(`Downloading ${animeName || "episode"}${episodeNumber ? ` · Ep ${episodeNumber}` : ""}`);
+      const name = animeName || t('player.downloadEpisodeFallback');
+      toast.success(
+        episodeNumber
+          ? t('player.downloadStartedEpisode', { name, number: episodeNumber })
+          : t('player.downloadStartedGeneric', { name }),
+      );
       return;
     }
     switch (res.reason) {
       case "missing_download_path":
-        toast.error("Set a download folder in the Offline Library first");
+        toast.error(t('player.downloadSetFolderFirst'));
         break;
       case "feature_disabled":
-        toast.error("Downloads are disabled");
+        toast.error(t('player.downloadsDisabled'));
         break;
       case "missing_stream_url":
-        toast.error("No stream URL to download");
+        toast.error(t('player.downloadNoStreamUrl'));
         break;
       case "mobile_download_failed": {
         const detail = typeof (res as { error?: unknown }).error === "string" ? String((res as { error?: unknown }).error) : "";
         // The mobile queue reports "already queued" through this reason.
-        if (detail.includes("already_downloading")) toast.info("Already downloading");
-        else toast.error(detail || "Download failed");
+        if (detail.includes("already_downloading")) toast.info(uiI18n.t('app.already_downloading_7a98b1fa'));
+        else toast.error(detail || uiI18n.t('app.download_failed_01125e1b'));
         break;
       }
       case "ipc_error":
-        toast.error(typeof res.error === "string" ? res.error : "Failed to start download");
+        toast.error(typeof res.error === "string" ? res.error : t('player.downloadFailedStart'));
         break;
       default:
-        toast.error("Downloads are only available on desktop");
+        toast.error(t('player.downloadDesktopOnly'));
     }
   }, [busy, episodeId, effectiveUrl, isTorrent, headers, startDownload, animeName, episodeNumber, posterUrl, numericAnimeId, downloadableSubtitles, originalUrl]);
 
@@ -212,26 +222,26 @@ export function DownloadButton({
     } catch {
       /* intent already peeked — proceed anyway */
     }
-    toast.success(`Auto-downloading Ep ${episodeNumber} on WiFi`);
+    toast.success(uiI18n.t('app.auto_downloading_ep_i18n_value_0_on_wifi_da948fda', { value0: episodeNumber }));
     void startNow();
   }, [busy, status, effectiveUrl, episodeId, episodeNumber, numericAnimeId, startNow]);
 
   if (!isEnabled) return null;
 
   let icon = <Download className="w-4 h-4 md:w-5 md:h-5" />;
-  let title = "Download episode";
+  let title = t('player.downloadEpisode');
   if (status === "downloading") {
     icon = <Loader2 className="w-4 h-4 md:w-5 md:h-5 animate-spin text-primary" />;
-    title = `Downloading… ${progress}%`;
+    title = t('player.downloadingPercent', { progress });
   } else if (status === "queued") {
     icon = <Loader2 className="w-4 h-4 md:w-5 md:h-5 animate-spin" />;
-    title = "Queued…";
+    title = t('player.downloadQueued');
   } else if (status === "completed") {
     icon = <Check className="w-4 h-4 md:w-5 md:h-5 text-green-400" />;
-    title = "Downloaded — click to download again";
+    title = t('player.downloadedRetry');
   } else if (status === "failed") {
     icon = <RotateCw className="w-4 h-4 md:w-5 md:h-5 text-red-400" />;
-    title = state?.error ? `Failed: ${state.error} — retry` : "Download failed — retry";
+    title = state?.error ? t('player.downloadFailedRetry', { error: state.error }) : t('player.downloadFailedRetryGeneric');
   }
 
   return (

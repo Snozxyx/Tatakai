@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -41,11 +43,12 @@ interface SavedRow {
 }
 
 function Countdown({ airingAt, now }: { airingAt: number; now: number }) {
+  useUiTranslation();
   const diff = airingAt * 1000 - now;
   if (diff <= 0) {
     return (
       <span className="font-display text-xs font-bold text-primary tabular-nums animate-pulse">
-        Airing now
+        {uiI18n.t('app.airing_now_ee610954')}
       </span>
     );
   }
@@ -87,6 +90,7 @@ export function OverviewCalendarSaves({
   isPublic = false,
   showCalendar = true,
 }: OverviewCalendarSavesProps = {}) {
+  useUiTranslation();
   // Own profile reads via the auth-scoped hook; other profiles via the public
   // hook. Both hooks run (rules of hooks), but the inactive one is disabled by
   // its `enabled` gate so only one request fires.
@@ -157,14 +161,14 @@ export function OverviewCalendarSaves({
               </div>
               <div>
                 <h4 className="font-display font-bold text-base text-foreground tracking-tight">
-                  Tatakai Calendar
+                  {uiI18n.t('app.tatakai_calendar_36e4bd5e')}
                 </h4>
                 <p className="text-xs text-muted-foreground/70 font-medium">
                   {upcomingCount > 0
-                    ? `${upcomingCount} saved ${upcomingCount === 1 ? 'show' : 'shows'} airing soon`
+                    ? uiI18n.t('app.i18n_value_0_saved_i18n_value_1_airing_soon_b73af60e', { value0: upcomingCount, value1: upcomingCount === 1 ? 'show' : 'shows' })
                     : isViewingOther
-                      ? 'Saved shows and episode countdowns'
-                      : 'Your saved shows and episode countdowns'}
+                      ? uiI18n.t('app.saved_shows_and_episode_countdowns_23ba079c')
+                      : uiI18n.t('app.your_saved_shows_and_episode_countdowns_437b6f64')}
                 </p>
               </div>
             </div>
@@ -173,7 +177,7 @@ export function OverviewCalendarSaves({
               to="/calendar"
               className="flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary/80 transition-colors group shrink-0"
             >
-              <span>Calendar</span>
+              <span>{uiI18n.t('app.calendar_adab5090')}</span>
               <ChevronRight className="w-3.5 h-3.5 transition-transform duration-200 group-hover:translate-x-0.5" />
             </Link>
           </div>
@@ -221,10 +225,10 @@ export function OverviewCalendarSaves({
                         </h5>
                         <span className="text-[10px] text-muted-foreground/70 font-medium">
                           {row.airingAt && row.episode
-                            ? `Episode ${row.episode}${row.totalEpisodes ? ` of ${row.totalEpisodes}` : ''}`
+                            ? uiI18n.t('app.episode_i18n_value_0i18n_value_1_1a1e8c5e', { value0: row.episode, value1: row.totalEpisodes ? ` of ${row.totalEpisodes}` : '' })
                             : row.finished
-                              ? 'Finished airing'
-                              : 'No upcoming episode'}
+                              ? uiI18n.t('app.finished_airing_e0bc4a60')
+                              : uiI18n.t('app.no_upcoming_episode_6fc15076')}
                         </span>
                       </div>
                     </div>
@@ -234,7 +238,7 @@ export function OverviewCalendarSaves({
                         <>
                           <Countdown airingAt={row.airingAt} now={now} />
                           <span className="block text-[10px] text-muted-foreground/70 font-medium">
-                            {new Date(row.airingAt * 1000).toLocaleDateString(undefined, {
+                            {new Date(row.airingAt * 1000).toLocaleDateString(uiI18n.language, {
                               weekday: 'short',
                               month: 'short',
                               day: 'numeric',
@@ -244,10 +248,10 @@ export function OverviewCalendarSaves({
                       ) : row.finished ? (
                         <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-muted-foreground/60">
                           <Check className="w-3 h-3" />
-                          Complete
+                          {uiI18n.t('app.complete_1f5a1abf')}
                         </span>
                       ) : (
-                        <span className="text-[10px] font-semibold text-muted-foreground/50">TBA</span>
+                        <span className="text-[10px] font-semibold text-muted-foreground/50">{uiI18n.t('app.tba_ae50ce81')}</span>
                       )}
                     </div>
                   </Link>
@@ -257,10 +261,10 @@ export function OverviewCalendarSaves({
           ) : (
             <div className="text-center py-8 border border-dashed border-white/[0.08] rounded-xl bg-white/[0.01]">
               <CalendarClock className="w-8 h-8 mx-auto text-muted-foreground/30 mb-2" />
-              <p className="text-xs text-muted-foreground/70">No saved shows yet</p>
+              <p className="text-xs text-muted-foreground/70">{uiI18n.t('app.no_saved_shows_yet_fef63ac1')}</p>
               {!isViewingOther && (
                 <p className="text-[10px] text-muted-foreground/50 mt-1">
-                  Track a show from its page or the calendar to see countdowns here
+                  {uiI18n.t('app.track_a_show_from_its_page_or_the_calendar_to_se_77a64f6b')}
                 </p>
               )}
             </div>
@@ -273,7 +277,7 @@ export function OverviewCalendarSaves({
             to="/calendar"
             className="w-full py-2.5 px-3 rounded-xl bg-white/[0.03] hover:bg-primary/10 border border-white/[0.06] hover:border-primary/20 text-xs font-bold text-center block text-foreground hover:text-primary transition-all duration-200"
           >
-            Open Tatakai Calendar →
+            {uiI18n.t('app.open_tatakai_calendar_c722566d')}
           </Link>
         </div>
       </div>

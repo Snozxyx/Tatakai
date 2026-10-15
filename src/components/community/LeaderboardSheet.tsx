@@ -1,4 +1,7 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -39,12 +42,12 @@ export const LEADERBOARD_TYPES: Array<{
   scoreLabel: string;
   color: string;
 }> = [
-  { value: 'watched', label: 'Most Watched', icon: Trophy, scoreLabel: 'episodes', color: 'text-amber-400' },
-  { value: 'streak', label: 'Best Streak', icon: Flame, scoreLabel: 'days', color: 'text-rose-400' },
-  { value: 'rated', label: 'Most Rated', icon: Star, scoreLabel: 'ratings', color: 'text-amber-300' },
-  { value: 'comments', label: 'Most Comments', icon: MessageSquare, scoreLabel: 'comments', color: 'text-sky-400' },
-  { value: 'active', label: 'Most Active', icon: TrendingUp, scoreLabel: 'points', color: 'text-emerald-400' },
-  { value: 'followers', label: 'Most Followers', icon: UserPlus, scoreLabel: 'followers', color: 'text-purple-400' },
+  { value: 'watched', get label() { return uiI18n.t('app.most_watched_0965cbc0'); }, icon: Trophy, scoreLabel: 'episodes', color: 'text-amber-400' },
+  { value: 'streak', get label() { return uiI18n.t('app.best_streak_3b03fa81'); }, icon: Flame, scoreLabel: 'days', color: 'text-rose-400' },
+  { value: 'rated', get label() { return uiI18n.t('app.most_rated_4cae6b99'); }, icon: Star, scoreLabel: 'ratings', color: 'text-amber-300' },
+  { value: 'comments', get label() { return uiI18n.t('app.most_comments_081355ea'); }, icon: MessageSquare, scoreLabel: 'comments', color: 'text-sky-400' },
+  { value: 'active', get label() { return uiI18n.t('app.most_active_cf01766b'); }, icon: TrendingUp, scoreLabel: 'points', color: 'text-emerald-400' },
+  { value: 'followers', get label() { return uiI18n.t('app.most_followers_d8cd8410'); }, icon: UserPlus, scoreLabel: 'followers', color: 'text-purple-400' },
 ];
 
 const PODIUM = [
@@ -68,6 +71,7 @@ function PodiumCard({
   scoreLabel: string;
   onClose: () => void;
 }) {
+  useUiTranslation();
   const rankTier = getRankTier(entry.score);
   return (
     <Link
@@ -128,6 +132,7 @@ function LeaderboardRow({
   scoreLabel: string;
   onClose: () => void;
 }) {
+  useUiTranslation();
   const isCurrentUser = entry.user_id === currentUserId;
   const rankTier = getRankTier(entry.score);
 
@@ -155,7 +160,7 @@ function LeaderboardRow({
             </p>
             {isCurrentUser && (
               <span className="rounded-full bg-primary/20 px-1.5 py-0.2 text-[9px] font-bold uppercase text-primary">
-                You
+                {uiI18n.t('app.you_905cb326')}
               </span>
             )}
           </div>
@@ -167,7 +172,7 @@ function LeaderboardRow({
 
         <div className="text-right">
           <p className="font-display text-sm font-bold tabular-nums text-white">
-            {entry.score.toLocaleString()}
+            {entry.score.toLocaleString(uiI18n.language)}
           </p>
           <p className="text-[9px] uppercase tracking-wider text-muted-foreground/60">{scoreLabel}</p>
         </div>
@@ -179,6 +184,8 @@ function LeaderboardRow({
 }
 
 export function LeaderboardSheet({ open, onOpenChange, defaultType = 'watched' }: LeaderboardSheetProps) {
+  useUiTranslation();
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [type, setType] = useState<LeaderboardType>(defaultType);
   const limit = type === 'streak' ? 25 : 100;
@@ -212,10 +219,10 @@ export function LeaderboardSheet({ open, onOpenChange, defaultType = 'watched' }
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500/30 to-amber-500/5 border border-amber-500/20 text-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.2)]">
               <Trophy className="h-5 w-5" />
             </div>
-            Hall of Fame
+            {uiI18n.t('app.hall_of_fame_e10f9491')}
           </SheetTitle>
           <p className="text-xs font-medium text-muted-foreground/80 mt-1">
-            Top ranked members across the Tatakai community
+            {uiI18n.t('app.top_ranked_members_across_the_tatakai_community_940057ba')}
           </p>
         </SheetHeader>
 
@@ -232,20 +239,20 @@ export function LeaderboardSheet({ open, onOpenChange, defaultType = 'watched' }
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-white">Your Standing</span>
+                      <span className="text-xs font-bold text-white">{uiI18n.t('app.your_standing_34779804')}</span>
                       <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-amber-300">
-                        Top {Math.max(1, Math.round((userRank.rank / Math.max(1, userRank.totalUsers)) * 100))}%
+                        {uiI18n.t('app.top_cae0435c')} {Math.max(1, Math.round((userRank.rank / Math.max(1, userRank.totalUsers)) * 100))}%
                       </span>
                     </div>
                     <p className="text-xs text-muted-foreground/80 mt-0.5">
-                      Out of {userRank.totalUsers.toLocaleString()} active community members
+                      {uiI18n.t('app.out_of_99f14028')} {userRank.totalUsers.toLocaleString(uiI18n.language)} {uiI18n.t('app.active_community_members_460f23e0')}
                     </p>
                   </div>
                 </div>
 
                 <div className="text-right">
                   <p className="font-display text-xl font-black tabular-nums text-white">
-                    {userRank.score.toLocaleString()}
+                    {userRank.score.toLocaleString(uiI18n.language)}
                   </p>
                   <p className="text-[10px] uppercase font-bold tracking-wider text-amber-400/80">{scoreLabel}</p>
                 </div>
@@ -308,7 +315,7 @@ export function LeaderboardSheet({ open, onOpenChange, defaultType = 'watched' }
               {/* Remaining list */}
               <div className="space-y-2">
                 <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/70 px-1 pt-2">
-                  {top3.length === 3 ? 'Community Standings' : 'Top Members'}
+                  {top3.length === 3 ? uiI18n.t('app.community_standings_304956b2') : uiI18n.t('app.top_members_0628bc80')}
                 </p>
                 {(top3.length === 3 ? rest : leaderboard).map((entry) => (
                   <LeaderboardRow
@@ -324,8 +331,8 @@ export function LeaderboardSheet({ open, onOpenChange, defaultType = 'watched' }
           ) : (
             <div className="rounded-[2rem] border border-dashed border-white/10 bg-white/[0.01] p-10 text-center">
               <Trophy className="mx-auto mb-3 h-10 w-10 text-muted-foreground/30" />
-              <p className="text-sm font-bold text-white">No leaderboard records yet</p>
-              <p className="text-xs text-muted-foreground/70 mt-1">Start watching and engaging to get ranked!</p>
+              <p className="text-sm font-bold text-white">{t("leaderboard.emptyTitle")}</p>
+              <p className="text-xs text-muted-foreground/70 mt-1">{t("leaderboard.emptyDescription")}</p>
             </div>
           )}
         </div>

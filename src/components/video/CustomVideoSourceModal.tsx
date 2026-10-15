@@ -1,4 +1,7 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useEffect, type CSSProperties } from 'react';
+import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Search, Film, PlayCircle, Loader2, ArrowLeft, Play, Sparkles } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -24,6 +27,8 @@ interface CustomVideoSourceModalProps {
 }
 
 export function CustomVideoSourceModal({ isOpen, onClose, onSelect }: CustomVideoSourceModalProps) {
+  useUiTranslation();
+    const { t } = useTranslation();
     const reduceMotion = useReducedMotion();
     const [searchQuery, setSearchQuery] = useState('');
     const debouncedSearch = useDebounce(searchQuery, 400);
@@ -97,7 +102,7 @@ export function CustomVideoSourceModal({ isOpen, onClose, onSelect }: CustomVide
                             <button
                                 onClick={() => setSelectedAnime(null)}
                                 className="grid h-7 w-7 place-items-center rounded-full bg-white/5 text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
-                                aria-label="Back to search"
+                                aria-label={t('watch.backToSearch')}
                             >
                                 <ArrowLeft className="h-4 w-4" />
                             </button>
@@ -106,7 +111,7 @@ export function CustomVideoSourceModal({ isOpen, onClose, onSelect }: CustomVide
                                 <Film className="h-4 w-4" />
                             </span>
                         )}
-                        {selectedAnime ? 'Choose an episode' : 'Change anime'}
+                        {selectedAnime ? t('watch.chooseEpisode') : t('watch.changeAnime')}
                     </DialogTitle>
                 </DialogHeader>
 
@@ -126,7 +131,7 @@ export function CustomVideoSourceModal({ isOpen, onClose, onSelect }: CustomVide
                                     <Input
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
-                                        placeholder="Search for an anime…"
+                                        placeholder={t('watch.searchAnimePlaceholder')}
                                         className="h-11 rounded-full border-white/10 bg-white/5 pl-10 focus-visible:border-[hsl(var(--isshoni-accent)/0.5)] focus-visible:ring-[hsl(var(--isshoni-accent)/0.25)]"
                                         autoFocus
                                     />
@@ -139,12 +144,12 @@ export function CustomVideoSourceModal({ isOpen, onClose, onSelect }: CustomVide
                                             {searchQuery.trim().length > 2 ? (
                                                 <>
                                                     <Search className="mb-3 h-10 w-10 opacity-40" />
-                                                    <p className="text-sm opacity-70">No results for “{searchQuery}”</p>
+                                                    <p className="text-sm opacity-70">{t('watch.noResultsFor', { query: searchQuery })}</p>
                                                 </>
                                             ) : (
                                                 <>
                                                     <Sparkles className="mb-3 h-10 w-10 text-[hsl(var(--isshoni-accent))] opacity-30" />
-                                                    <p className="text-sm opacity-50">Type to search the library</p>
+                                                    <p className="text-sm opacity-50">{t('watch.typeToSearchLibrary')}</p>
                                                 </>
                                             )}
                                         </div>
@@ -166,8 +171,8 @@ export function CustomVideoSourceModal({ isOpen, onClose, onSelect }: CustomVide
                                                 <div className="min-w-0 flex-1">
                                                     <h4 className="truncate text-sm font-semibold transition-colors group-hover:text-[hsl(var(--isshoni-accent))] md:text-base">{anime.name}</h4>
                                                     <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
-                                                        <span className="rounded bg-white/10 px-1.5 py-0.5 font-medium uppercase tracking-wide">{anime.type || 'TV'}</span>
-                                                        <span className="tabular-nums">{anime.episodes.sub || '?'} eps</span>
+                                                        <span className="rounded bg-white/10 px-1.5 py-0.5 font-medium uppercase tracking-wide">{anime.type || uiI18n.t('app.tv_56ab49a5')}</span>
+                                                        <span className="tabular-nums">{t('watch.episodesShort', { count: anime.episodes.sub || '?' })}</span>
                                                     </div>
                                                 </div>
                                                 <PlayCircle className="h-5 w-5 flex-shrink-0 text-[hsl(var(--isshoni-accent))] opacity-0 transition-all -translate-x-1 group-hover:translate-x-0 group-hover:opacity-100" />
@@ -189,7 +194,7 @@ export function CustomVideoSourceModal({ isOpen, onClose, onSelect }: CustomVide
                                     <img src={selectedAnime.poster} alt={selectedAnime.name} className="h-24 w-16 flex-shrink-0 rounded-lg object-cover shadow-xl" />
                                     <div className="min-w-0 flex-1">
                                         <h3 className="mb-0.5 truncate font-display text-lg font-black leading-tight">{selectedAnime.name}</h3>
-                                        <p className="mb-3 text-xs text-muted-foreground tabular-nums">{selectedAnime.episodes.sub || '?'} episodes</p>
+                                        <p className="mb-3 text-xs text-muted-foreground tabular-nums">{t('watch.episodesLong', { count: selectedAnime.episodes.sub || '?' })}</p>
                                         <Button
                                             size="sm"
                                             onClick={handleStartFromFirst}
@@ -197,13 +202,13 @@ export function CustomVideoSourceModal({ isOpen, onClose, onSelect }: CustomVide
                                             className="h-8 gap-1.5 rounded-full bg-[hsl(var(--isshoni-accent))] px-3.5 text-xs font-semibold text-white hover:bg-[hsl(var(--isshoni-accent)/0.85)]"
                                         >
                                             <Play className="h-3.5 w-3.5 fill-current" />
-                                            Start from Episode 1
+                                            {t('watch.startFromEpisode1')}
                                         </Button>
                                     </div>
                                 </div>
 
                                 <div className="space-y-2">
-                                    <p className="px-1 text-[11px] font-black uppercase tracking-wider text-muted-foreground/70">Or pick an episode</p>
+                                    <p className="px-1 text-[11px] font-black uppercase tracking-wider text-muted-foreground/70">{t('watch.orPickEpisode')}</p>
                                     <ScrollArea className="h-[240px] md:h-[280px]">
                                         {loadingEpisodes ? (
                                             <div className="grid grid-cols-3 gap-2 p-1 md:grid-cols-5">
@@ -214,8 +219,8 @@ export function CustomVideoSourceModal({ isOpen, onClose, onSelect }: CustomVide
                                         ) : episodes.length === 0 ? (
                                             <div className="flex h-[220px] flex-col items-center justify-center text-center text-muted-foreground md:h-[260px]">
                                                 <Film className="mb-3 h-10 w-10 opacity-40" />
-                                                <p className="text-sm opacity-70">No episode list for this title</p>
-                                                <p className="mt-1 text-xs opacity-50">Use “Start from Episode 1” — the room resolves episodes on its own.</p>
+                                                <p className="text-sm opacity-70">{t('watch.noEpisodeList')}</p>
+                                                <p className="mt-1 text-xs opacity-50">{t('watch.startFromFirstHint')}</p>
                                             </div>
                                         ) : (
                                             <div className="grid grid-cols-3 gap-2 p-1 md:grid-cols-4 lg:grid-cols-5">
@@ -228,7 +233,7 @@ export function CustomVideoSourceModal({ isOpen, onClose, onSelect }: CustomVide
                                                             'h-10 rounded-lg border-white/10 text-xs font-medium tabular-nums',
                                                             'hover:border-[hsl(var(--isshoni-accent)/0.5)] hover:bg-[hsl(var(--isshoni-accent)/0.15)] hover:text-[hsl(var(--isshoni-accent))]'
                                                         )}
-                                                        title={ep.title || `Episode ${ep.number}`}
+                                                        title={ep.title || t('header.episode', { number: ep.number })}
                                                     >
                                                         {ep.number}
                                                     </Button>

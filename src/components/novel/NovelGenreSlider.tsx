@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueries } from "@tanstack/react-query";
@@ -30,7 +32,7 @@ interface GenreConfig {
 const BASE_GENRES: GenreConfig[] = [
   {
     genre: "action",
-    label: "Action",
+    get label() { return uiI18n.t('app.action_97c89a4d'); },
     poster: "/placeholder.svg",
     pool: "warm",
     accent: "from-amber-600/60 via-orange-700/30 to-black/80",
@@ -39,7 +41,7 @@ const BASE_GENRES: GenreConfig[] = [
   },
   {
     genre: "fantasy",
-    label: "Fantasy",
+    get label() { return uiI18n.t('app.fantasy_b5f1592a'); },
     poster: "/placeholder.svg",
     pool: "blue",
     accent: "from-cyan-600/60 via-blue-700/30 to-black/80",
@@ -48,7 +50,7 @@ const BASE_GENRES: GenreConfig[] = [
   },
   {
     genre: "romance",
-    label: "Romance",
+    get label() { return uiI18n.t('app.romance_c6c0500d'); },
     poster: "/placeholder.svg",
     pool: "red",
     accent: "from-rose-500/60 via-pink-700/30 to-black/80",
@@ -57,7 +59,7 @@ const BASE_GENRES: GenreConfig[] = [
   },
   {
     genre: "isekai",
-    label: "Isekai",
+    get label() { return uiI18n.t('app.isekai_8f383a56'); },
     poster: "/placeholder.svg",
     pool: "blue",
     accent: "from-sky-500/60 via-indigo-700/30 to-black/80",
@@ -66,7 +68,7 @@ const BASE_GENRES: GenreConfig[] = [
   },
   {
     genre: "mystery",
-    label: "Mystery",
+    get label() { return uiI18n.t('app.mystery_2c8ffcac'); },
     poster: "/placeholder.svg",
     pool: "mono",
     accent: "from-stone-500/60 via-amber-900/30 to-black/80",
@@ -75,7 +77,7 @@ const BASE_GENRES: GenreConfig[] = [
   },
   {
     genre: "drama",
-    label: "Drama",
+    get label() { return uiI18n.t('app.drama_553745b0'); },
     poster: "/placeholder.svg",
     pool: "purple",
     accent: "from-fuchsia-500/60 via-purple-700/30 to-black/80",
@@ -84,7 +86,7 @@ const BASE_GENRES: GenreConfig[] = [
   },
   {
     genre: "adventure",
-    label: "Adventure",
+    get label() { return uiI18n.t('app.adventure_db56e2e1'); },
     poster: "/placeholder.svg",
     pool: "green",
     accent: "from-emerald-500/60 via-teal-700/30 to-black/80",
@@ -93,7 +95,7 @@ const BASE_GENRES: GenreConfig[] = [
   },
   {
     genre: "horror",
-    label: "Horror",
+    get label() { return uiI18n.t('app.horror_cf80dcfc'); },
     poster: "/placeholder.svg",
     pool: "mono",
     accent: "from-stone-500/60 via-amber-900/30 to-black/80",
@@ -104,7 +106,7 @@ const BASE_GENRES: GenreConfig[] = [
 
 const HENTAI_CONFIG: GenreConfig = {
   genre: "hentai",
-  label: "18+ Novels",
+  get label() { return uiI18n.t('app.18_novels_f4a93802'); },
   poster: "/placeholder.svg",
   pool: null,
   accent: "from-rose-700/70 via-red-900/40 to-black/90",
@@ -125,6 +127,7 @@ function TiltGlassCard({
   onClick: () => void;
   isLarge?: boolean;
 }) {
+  useUiTranslation();
   const cardRef = useRef<HTMLButtonElement>(null);
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const [isHovered, setIsHovered] = useState(false);
@@ -167,10 +170,7 @@ function TiltGlassCard({
           : "transform 0.45s cubic-bezier(0.23, 1, 0.32, 1)",
       }}
       data-mobile-browse-card
-      className={`relative w-full rounded-2xl overflow-hidden text-left
-        border border-white/10 shadow-xl
-        focus:outline-none focus:ring-2 focus:ring-white/30
-        ${isLarge ? "row-span-2" : ""}`}
+      className={`relative w-full rounded-2xl overflow-hidden text-left border border-white/10 shadow-xl focus:outline-none focus:ring-2 focus:ring-white/30 ${isLarge ? "row-span-2" : ""}`}
     >
       {/* Background Poster — random cover from this genre's color family */}
       <img
@@ -215,7 +215,7 @@ function TiltGlassCard({
           </span>
         ) : (
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-black/40 border border-white/15 text-[10px] font-bold uppercase tracking-wider text-white/75 backdrop-blur-sm">
-            Genre
+            {uiI18n.t('app.genre_2aa31fca')}
           </span>
         )}
       </div>
@@ -238,7 +238,7 @@ function TiltGlassCard({
               {config.label}
             </h3>
             {isLarge && (
-              <p className="text-xs text-white/50 font-medium mt-1">Tap to explore lane</p>
+              <p className="text-xs text-white/50 font-medium mt-1">{uiI18n.t('app.tap_to_explore_lane_36fbce2a')}</p>
             )}
           </div>
           <div
@@ -254,6 +254,7 @@ function TiltGlassCard({
 }
 
 export function NovelGenreSlider() {
+  useUiTranslation();
   const refreshed = useMobileAppearance();
   const navigate = useNavigate();
   const { settings: contentSafetySettings } = useContentSafetySettings();
@@ -293,7 +294,7 @@ export function NovelGenreSlider() {
     <section data-mobile-browse-section className="mb-16 relative">
       <HomeSectionHeading
         icon={<Flame className="w-5 h-5 text-primary" />}
-        title="Novel Genres"
+        title={uiI18n.t('app.novel_genres_e39637d8')}
       />
 
       {/* ── Bento Grid ─────────────────────────────────────────────

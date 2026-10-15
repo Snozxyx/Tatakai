@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useEffect, useRef } from 'react';
 import { Loader2, MessageSquare, Pin } from 'lucide-react';
 
@@ -27,6 +29,7 @@ export function FeedList({
   /** `masonry` renders the timeline as balanced 2-column cards; the main feed stays `timeline`. */
   layout?: 'timeline' | 'masonry';
 }) {
+  useUiTranslation();
   const { user } = useAuth();
 
   const {
@@ -129,17 +132,17 @@ export function FeedList({
           </div>
           <h3 className="font-display text-[19px] font-semibold tracking-tight text-foreground">
             {tag
-              ? `No posts tagged #${tag}`
+              ? uiI18n.t('app.no_posts_tagged_i18n_value_0_fb7dc424', { value0: tag })
               : tab === 'following'
-                ? 'Nothing from people you follow'
+                ? uiI18n.t('app.nothing_from_people_you_follow_8f32d9cd')
                 : tab === 'news'
-                  ? 'No news updates yet'
-                  : 'Nothing here yet'}
+                  ? uiI18n.t('app.no_news_updates_yet_f40997c1')
+                  : uiI18n.t('app.nothing_here_yet_e892255d')}
           </h3>
           <p className="mt-2 max-w-sm text-sm text-muted-foreground">
             {tab === 'following'
-              ? 'Follow more members to see their posts here.'
-              : 'Be the first to share something with the community.'}
+              ? uiI18n.t('app.follow_more_members_to_see_their_posts_here_f2b7bfcc')
+              : uiI18n.t('app.be_the_first_to_share_something_with_the_communi_f0f74790')}
           </p>
         </div>
       </div>
@@ -162,7 +165,7 @@ export function FeedList({
           <div className="flex items-center gap-2 px-1">
             <Pin className="h-4 w-4 text-emerald-400" />
             <span className="text-xs font-bold uppercase tracking-widest text-emerald-400">
-              {isCommunityView ? 'Pinned' : 'Pinned · Global'}
+              {isCommunityView ? uiI18n.t('app.pinned_f9312169') : uiI18n.t('app.pinned_global_effd929b')}
             </span>
           </div>
           
@@ -215,7 +218,7 @@ export function FeedList({
         {isFetchingNextPage && (
           <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin text-primary" />
-            <span>Loading more...</span>
+            <span>{uiI18n.t('app.loading_more_35e3dc3d')}</span>
           </div>
         )}
       </div>

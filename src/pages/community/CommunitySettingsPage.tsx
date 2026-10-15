@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -26,6 +28,7 @@ import { useCommunityBySlug, useUpdateCommunity, useDeleteCommunity } from '@/ho
 type ImageState = { file?: File; preview: string } | null;
 
 export default function CommunitySettingsPage() {
+  useUiTranslation();
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const isDesktopApp = useIsDesktopApp();
@@ -69,7 +72,7 @@ export default function CommunitySettingsPage() {
   const pickImage = (e: React.ChangeEvent<HTMLInputElement>, set: (v: ImageState) => void) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) return toast.error('Image must be under 5MB');
+    if (file.size > 5 * 1024 * 1024) return toast.error(uiI18n.t('app.image_must_be_under_5mb_5b768c5f'));
     const reader = new FileReader();
     reader.onloadend = () => set({ file, preview: reader.result as string });
     reader.readAsDataURL(file);
@@ -77,7 +80,7 @@ export default function CommunitySettingsPage() {
 
   const save = async () => {
     if (!community) return;
-    if (!name.trim()) return toast.error('Name is required');
+    if (!name.trim()) return toast.error(uiI18n.t('app.name_is_required_222c72b1'));
     setSaving(true);
     try {
       // Only newly-picked files upload; untouched previews keep the stored URL.
@@ -92,10 +95,10 @@ export default function CommunitySettingsPage() {
         icon_url,
         banner_url,
       });
-      toast.success('Community updated');
+      toast.success(uiI18n.t('app.community_updated_c2aa564d'));
       navigate(`/community/c/${community.slug}`);
     } catch (err) {
-      toast.error('Failed to save', { description: err instanceof Error ? err.message : undefined });
+      toast.error(uiI18n.t('app.failed_to_save_23778b5f'), { description: err instanceof Error ? err.message : undefined });
     } finally {
       setSaving(false);
     }
@@ -105,10 +108,10 @@ export default function CommunitySettingsPage() {
     if (!community) return;
     try {
       await deleteCommunity.mutateAsync(community.id);
-      toast.success('Community deleted');
+      toast.success(uiI18n.t('app.community_deleted_e7490cad'));
       navigate('/community');
     } catch (err) {
-      toast.error('Failed to delete', { description: err instanceof Error ? err.message : undefined });
+      toast.error(uiI18n.t('app.failed_to_delete_07931ff7'), { description: err instanceof Error ? err.message : undefined });
     }
   };
 
@@ -126,9 +129,9 @@ export default function CommunitySettingsPage() {
         <CommunitySidebar />
         <main className={cn('relative z-10 w-full', isDesktopApp ? 'pl-24 lg:pl-28' : 'pl-0 md:pl-24 lg:pl-28')}>
           <div className="mx-auto max-w-2xl px-4 py-16 text-center">
-            <h1 className="font-display text-2xl font-bold">{community ? 'You can’t manage this community' : 'Community not found'}</h1>
+            <h1 className="font-display text-2xl font-bold">{community ? uiI18n.t('app.you_can_t_manage_this_community_4f840424') : uiI18n.t('app.community_not_found_7f77fcb2')}</h1>
             <Button className="mt-4 rounded-full" onClick={() => navigate(community ? `/community/c/${community.slug}` : '/community')}>
-              {community ? 'Back to community' : 'Back to Community'}
+              {community ? uiI18n.t('app.back_to_community_4f159752') : uiI18n.t('app.back_to_community_58498a50')}
             </Button>
           </div>
         </main>
@@ -160,16 +163,16 @@ export default function CommunitySettingsPage() {
             <button
               onClick={() => navigate(`/community/c/${community.slug}`)}
               className="group/back flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.03] text-white/80 transition-colors hover:bg-white/[0.08] hover:text-white"
-              aria-label="Back to community"
+              aria-label={uiI18n.t('app.back_to_community_4f159752')}
             >
               <ArrowLeft className="h-4 w-4 transition-transform group-hover/back:-translate-x-0.5" />
             </button>
             <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-bold uppercase tracking-widest text-primary/80">Settings</p>
+              <p className="text-[11px] font-bold uppercase tracking-widest text-primary/80">{uiI18n.t('app.settings_c7f73bb5')}</p>
               <h1 className="truncate font-display text-2xl font-black tracking-tight">{community.name}</h1>
             </div>
             <Button size="sm" className="gap-1.5 rounded-full font-bold" disabled={saving} onClick={save}>
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} {uiI18n.t('app.save_efc007a3')}
             </Button>
           </div>
 
@@ -183,10 +186,10 @@ export default function CommunitySettingsPage() {
               {banner ? (
                 <img src={banner.preview} alt="" className="h-full w-full object-cover transition-transform group-hover/banner:scale-[1.02]" />
               ) : (
-                <span className="flex items-center gap-2 text-sm text-muted-foreground"><ImagePlus className="h-4 w-4" /> Add banner</span>
+                <span className="flex items-center gap-2 text-sm text-muted-foreground"><ImagePlus className="h-4 w-4" /> {uiI18n.t('app.add_banner_ba3ca5b3')}</span>
               )}
               <span className="absolute inset-0 flex items-center justify-center bg-black/40 text-xs font-semibold text-white opacity-0 transition-opacity group-hover/banner:opacity-100">
-                Change banner
+                {uiI18n.t('app.change_banner_0ad38169')}
               </span>
             </button>
             <button
@@ -208,18 +211,18 @@ export default function CommunitySettingsPage() {
           {/* Fields */}
           <div className="space-y-4 pt-6">
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold uppercase tracking-widest text-white/60">Name</label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} placeholder="Community name" className="rounded-xl" />
+              <label className="text-[11px] font-bold uppercase tracking-widest text-white/60">{uiI18n.t('app.name_709a2322')}</label>
+              <Input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} placeholder={uiI18n.t('app.community_name_37cd9874')} className="rounded-xl" />
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold uppercase tracking-widest text-white/60">Description</label>
+              <label className="text-[11px] font-bold uppercase tracking-widest text-white/60">{uiI18n.t('app.description_55f8ebc8')}</label>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={3}
                 maxLength={300}
-                placeholder="What's this community about?"
+                placeholder={uiI18n.t('app.what_s_this_community_about_e845f678')}
                 className="w-full resize-none rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm focus:border-primary/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
               />
             </div>
@@ -235,17 +238,17 @@ export default function CommunitySettingsPage() {
                 <Info className="h-4 w-4 text-white/80" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-white">Rules &amp; About</p>
-                <p className="text-xs text-muted-foreground">Edit inline from the Information widget — playlists, tier lists, media and more.</p>
+                <p className="text-sm font-semibold text-white">{uiI18n.t('app.rules_amp_about_0c15836b')}</p>
+                <p className="text-xs text-muted-foreground">{uiI18n.t('app.edit_inline_from_the_information_widget_playlist_2eb57243')}</p>
               </div>
               <ArrowLeft className="h-4 w-4 shrink-0 rotate-180 text-white/50 transition-transform group-hover/info:translate-x-0.5" />
             </button>
           </div>
 
           <div className="mt-6 flex justify-end gap-2">
-            <Button variant="ghost" className="rounded-full" onClick={() => navigate(`/community/c/${community.slug}`)}>Cancel</Button>
+            <Button variant="ghost" className="rounded-full" onClick={() => navigate(`/community/c/${community.slug}`)}>{uiI18n.t('app.cancel_77dfd213')}</Button>
             <Button className="gap-1.5 rounded-full px-5 font-bold" disabled={saving} onClick={save}>
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save changes
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} {uiI18n.t('app.save_changes_179359b3')}
             </Button>
           </div>
 
@@ -254,9 +257,9 @@ export default function CommunitySettingsPage() {
             <div className="mt-10 rounded-2xl border border-rose-500/20 bg-rose-500/[0.04] p-5">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
-                  <h3 className="font-display text-sm font-bold text-rose-300">Delete community</h3>
+                  <h3 className="font-display text-sm font-bold text-rose-300">{uiI18n.t('app.delete_community_fe8ef8aa')}</h3>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Permanently removes this community, its memberships and staff. Posts stay but lose their community. This can’t be undone.
+                    {uiI18n.t('app.permanently_removes_this_community_its_membershi_ec660290')}
                   </p>
                 </div>
                 <Button
@@ -265,7 +268,7 @@ export default function CommunitySettingsPage() {
                   className="shrink-0 gap-1.5 rounded-full"
                   onClick={() => setDeleteOpen(true)}
                 >
-                  <Trash2 className="h-4 w-4" /> Delete
+                  <Trash2 className="h-4 w-4" /> {uiI18n.t('app.delete_f6fdbe48')}
                 </Button>
               </div>
             </div>
@@ -274,20 +277,20 @@ export default function CommunitySettingsPage() {
           <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Delete “{community.name}”?</AlertDialogTitle>
+                <AlertDialogTitle>{uiI18n.t('app.delete_4b267561')}{community.name}”?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This permanently deletes the community and removes all members. Posts made here will remain but will no longer belong to a community. This action cannot be undone.
+                  {uiI18n.t('app.this_permanently_deletes_the_community_and_remov_f9b55627')}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel disabled={deleteCommunity.isPending}>Cancel</AlertDialogCancel>
+                <AlertDialogCancel disabled={deleteCommunity.isPending}>{uiI18n.t('app.cancel_77dfd213')}</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={remove}
                   disabled={deleteCommunity.isPending}
                   className="bg-rose-600 text-white hover:bg-rose-600/90"
                 >
                   {deleteCommunity.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Trash2 className="mr-1.5 h-4 w-4" />}
-                  Delete community
+                  {uiI18n.t('app.delete_community_fe8ef8aa')}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>

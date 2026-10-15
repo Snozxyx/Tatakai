@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Playlist, usePlaylistItems } from '@/hooks/user/usePlaylist';
 import { getProxiedImageUrl } from '@/lib/api';
 import { Music2, Globe, Lock, MoreVertical, Trash2, Edit2, Play, Heart, User } from 'lucide-react';
@@ -38,6 +39,7 @@ export function PlaylistCard({
   showActions = true,
   author,
 }: PlaylistCardProps) {
+  const { t } = useTranslation();
   // Fall back to deriving covers from the playlist's items when none are supplied.
   const needsFetch = !coverImages || coverImages.length === 0;
   const { data: fetchedItems = [] } = usePlaylistItems(needsFetch ? playlist.id : undefined);
@@ -90,12 +92,12 @@ export function PlaylistCard({
             {playlist.is_public ? (
               <>
                 <Globe className="w-3 h-3 text-emerald-400" />
-                Public
+                {t('privacy.public')}
               </>
             ) : (
               <>
                 <Lock className="w-3 h-3 text-amber-400" />
-                Private
+                {t('privacy.private')}
               </>
             )}
           </span>
@@ -111,7 +113,7 @@ export function PlaylistCard({
 
         <div className="flex items-center justify-between gap-2 mt-2">
           <span className="text-sm text-muted-foreground">
-            {playlist.items_count} {playlist.items_count === 1 ? 'item' : 'items'}
+            {t('playlist.itemCount', { count: playlist.items_count })}
           </span>
           {typeof playlist.likes_count === 'number' && (
             <span className="flex items-center gap-1 text-xs text-muted-foreground shrink-0">
@@ -134,7 +136,7 @@ export function PlaylistCard({
                 </AvatarFallback>
               </Avatar>
               <span className="text-sm text-muted-foreground truncate group-hover/author:text-foreground transition-colors">
-                {author.username || author.display_name || 'Anonymous'}
+                {author.username || author.display_name || t('playlist.anonymous')}
               </span>
             </Link>
             <UserBadges badges={authorBadges} size={14} max={3} />
@@ -158,13 +160,13 @@ export function PlaylistCard({
             {onEdit && (
               <DropdownMenuItem onClick={onEdit}>
                 <Edit2 className="w-4 h-4 mr-2" />
-                Edit
+                {t('playlist.edit')}
               </DropdownMenuItem>
             )}
             {onDelete && (
               <DropdownMenuItem onClick={onDelete} className="text-destructive">
                 <Trash2 className="w-4 h-4 mr-2" />
-                Delete
+                {t('common.delete')}
               </DropdownMenuItem>
             )}
           </DropdownMenuContent>
@@ -176,6 +178,7 @@ export function PlaylistCard({
 
 // Compact version for sidebars
 export function PlaylistCardCompact({ playlist }: { playlist: Playlist }) {
+  const { t } = useTranslation();
   return (
     <Link
       to={`/playlist/${playlist.id}`}
@@ -189,7 +192,7 @@ export function PlaylistCardCompact({ playlist }: { playlist: Playlist }) {
           {playlist.name}
         </p>
         <p className="text-xs text-muted-foreground">
-          {playlist.items_count} {playlist.items_count === 1 ? 'item' : 'items'}
+          {t('playlist.itemCount', { count: playlist.items_count })}
         </p>
       </div>
     </Link>

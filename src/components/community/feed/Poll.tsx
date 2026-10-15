@@ -1,6 +1,8 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { cn } from '@/lib/utils';
 import { Check, BarChart2 } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from '@/lib/localeFormat';
 import { getProxiedImageUrl } from '@/lib/api';
 import type { PollResult } from '@/hooks/community/usePostPolls';
 
@@ -25,14 +27,15 @@ export function Poll({
   onVote,
   disabled = false,
 }: PollProps) {
+  useUiTranslation();
   const hasVoted = userVote !== null;
   const showResults = hasVoted || isClosed;
   const locked = disabled || isClosed;
 
   const endsLabel = endsAt
     ? isClosed
-      ? 'Final results'
-      : `Ends ${formatDistanceToNow(new Date(endsAt), { addSuffix: true })}`
+      ? uiI18n.t('app.final_results_2851a38c')
+      : uiI18n.t('app.ends_i18n_value_0_6892db87', { value0: formatDistanceToNow(new Date(endsAt), { addSuffix: true }) })
     : null;
 
   return (
@@ -100,7 +103,7 @@ export function Poll({
                     {/* Explicit "Your Vote" Indicator underneath text */}
                     {showResults && isChoice && (
                       <span className="flex items-center gap-1 mt-1 text-[11px] font-bold uppercase tracking-wider text-primary">
-                        <Check className="h-3.5 w-3.5 stroke-[3]" /> Your Vote
+                        <Check className="h-3.5 w-3.5 stroke-[3]" /> {uiI18n.t('app.your_vote_6f668e61')}
                       </span>
                     )}
                   </div>
@@ -127,7 +130,7 @@ export function Poll({
       <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground/70 px-1 pt-0.5">
         <span className="flex items-center gap-1.5 tabular-nums">
           <BarChart2 className="h-3.5 w-3.5" />
-          {votesCount.toLocaleString()} {votesCount === 1 ? 'vote' : 'votes'}
+          {votesCount.toLocaleString(uiI18n.language)} {votesCount === 1 ? uiI18n.t('app.vote_fd63f1ed') : uiI18n.t('app.votes_f2ec5354')}
         </span>
         {endsLabel && (
           <>

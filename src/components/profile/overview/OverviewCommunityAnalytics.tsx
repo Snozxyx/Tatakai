@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { motion } from 'framer-motion';
 import { Users, MessageSquare, FileText, ThumbsUp, UserPlus, Trophy, Award } from 'lucide-react';
 import { GlassPanel } from '@/components/ui/GlassPanel';
@@ -26,11 +28,12 @@ export function OverviewCommunityAnalytics({
   leaderboardRank = null,
   totalRankedUsers = null,
 }: OverviewCommunityAnalyticsProps) {
+  useUiTranslation();
   const tiles = [
-    { label: 'Comments', value: commentCount, icon: MessageSquare, color: 'text-sky-400' },
-    { label: 'Forum Posts', value: forumPostCount, icon: FileText, color: 'text-indigo-400' },
-    { label: 'Upvotes', value: forumUpvotes, icon: ThumbsUp, color: 'text-emerald-400' },
-    { label: 'Followers', value: followersCount, icon: UserPlus, color: 'text-rose-400' },
+    { get label() { return uiI18n.t('app.comments_fce06e20'); }, value: commentCount, icon: MessageSquare, color: 'text-sky-400' },
+    { get label() { return uiI18n.t('app.forum_posts_2c921448'); }, value: forumPostCount, icon: FileText, color: 'text-indigo-400' },
+    { get label() { return uiI18n.t('app.upvotes_d96bff7d'); }, value: forumUpvotes, icon: ThumbsUp, color: 'text-emerald-400' },
+    { get label() { return uiI18n.t('app.followers_78eaabf4'); }, value: followersCount, icon: UserPlus, color: 'text-rose-400' },
   ];
 
   return (
@@ -42,10 +45,10 @@ export function OverviewCommunityAnalytics({
           <div className="flex items-center gap-2 mb-1">
             <Users className="w-4 h-4 text-primary/80" />
             <h3 className="font-display font-bold text-base sm:text-lg text-foreground tracking-tight">
-              Community Analytics
+              {uiI18n.t('app.community_analytics_7f8559ba')}
             </h3>
           </div>
-          <p className="text-xs text-muted-foreground/70">Your presence across the community</p>
+          <p className="text-xs text-muted-foreground/70">{uiI18n.t('app.your_presence_across_the_community_c425de29')}</p>
         </div>
         {leaderboardRank != null ? (
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 shrink-0">
@@ -55,7 +58,7 @@ export function OverviewCommunityAnalytics({
         ) : (
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.04] border border-white/[0.05] text-muted-foreground/60 shrink-0">
             <Trophy className="w-3.5 h-3.5" />
-            <span className="text-[11px] font-semibold">Unranked</span>
+            <span className="text-[11px] font-semibold">{uiI18n.t('app.unranked_af211a25')}</span>
           </div>
         )}
       </div>
@@ -87,7 +90,7 @@ export function OverviewCommunityAnalytics({
               <div className="flex items-center gap-1.5">
                 <Award className="w-3.5 h-3.5 text-muted-foreground/60" />
                 <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">
-                  Reputation
+                  {uiI18n.t('app.reputation_5f21606b')}
                 </span>
               </div>
               <span className="font-display font-bold text-foreground tabular-nums">
@@ -122,7 +125,7 @@ export function OverviewCommunityAnalytics({
 
             {leaderboardRank != null && totalRankedUsers ? (
               <p className="text-[10px] text-muted-foreground/50 mt-3">
-                Ranked #{leaderboardRank} of {totalRankedUsers} active members
+                {uiI18n.t('app.ranked_33673214')}{leaderboardRank} {uiI18n.t('app.of_de04fa0e')} {totalRankedUsers} {uiI18n.t('app.active_members_a5d44e42')}
               </p>
             ) : null}
           </div>

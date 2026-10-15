@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { Link } from 'react-router-dom';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { getProxiedImageUrl } from '@/lib/api';
@@ -14,6 +16,7 @@ export function MangaRecommendationGrid({
   recommendations: EngineRecommendation[];
   isLoading: boolean;
 }) {
+  useUiTranslation();
   if (isLoading) {
     return (
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
@@ -28,7 +31,7 @@ export function MangaRecommendationGrid({
     return (
       <GlassPanel className="p-8 text-center">
         <BookOpen className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-        <p className="text-muted-foreground">Add manga to your readlist to get personalized manga, manhwa and manhua picks.</p>
+        <p className="text-muted-foreground">{uiI18n.t('app.add_manga_to_your_readlist_to_get_personalized_m_135ebbff')}</p>
       </GlassPanel>
     );
   }
@@ -69,9 +72,9 @@ export function MangaRecommendationGrid({
                 </div>
               )}
               {rec.tier && (
-                <div className={`absolute bottom-3 left-3 px-2 py-1 rounded-md text-[10px] font-bold flex items-center gap-1.5 bg-black/60 text-white`} title={rec.tier === 'strong' ? 'Strong match' : rec.tier === 'possible' ? 'Possible match' : 'Weak match'}>
+                <div className={"absolute bottom-3 left-3 px-2 py-1 rounded-md text-[10px] font-bold flex items-center gap-1.5 bg-black/60 text-white"} title={rec.tier === 'strong' ? uiI18n.t('app.strong_match_a99cde57') : rec.tier === 'possible' ? uiI18n.t('app.possible_match_d11ba676') : uiI18n.t('app.weak_match_7334132e')}>
                   <span className={`w-1.5 h-1.5 rounded-full ${rec.tier === 'strong' ? 'bg-green-500' : rec.tier === 'possible' ? 'bg-yellow-500' : 'bg-gray-500'}`} />
-                  {rec.tier === 'strong' ? 'Strong' : rec.tier === 'possible' ? 'Possible' : 'Weak'}
+                  {rec.tier === 'strong' ? uiI18n.t('app.strong_cf846870') : rec.tier === 'possible' ? uiI18n.t('app.possible_dd8bd0b5') : uiI18n.t('app.weak_8bfada82')}
                 </div>
               )}
             </div>

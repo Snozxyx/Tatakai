@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { TATAKAI_API_URL, withClientHeaders, unwrapApiData } from '@/lib/api/api-client';
@@ -26,13 +28,14 @@ export interface CreateNewsInput {
 }
 
 export function useCreateNews() {
+  useUiTranslation();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (input: CreateNewsInput) => {
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData.session?.access_token;
-      if (!token) throw new Error('You must be signed in as an admin to publish news.');
+      if (!token) throw new Error(uiI18n.t('app.you_must_be_signed_in_as_an_admin_to_publish_new_ba92a265'));
 
       const res = await fetch(`${TATAKAI_API_URL}/admin/news`, {
         method: 'POST',

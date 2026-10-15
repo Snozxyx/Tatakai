@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useEffect, useState, useRef } from 'react';
 import { useIsNativeApp } from '@/hooks/ui/useIsNativeApp';
 import { X, Terminal, Trash2, Copy, Download, Search, Filter, ChevronDown, Check } from 'lucide-react';
@@ -15,6 +17,7 @@ interface LogEntry {
 type LogFilter = 'all' | 'info' | 'warn' | 'error' | 'debug';
 
 export function LogViewer() {
+  useUiTranslation();
   const isNative = useIsNativeApp();
   const [isOpen, setIsOpen] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -53,7 +56,7 @@ export function LogViewer() {
     };
 
     const addLog = (level: LogEntry['level'], message: any, ...args: any[]) => {
-      const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false });
+      const timestamp = new Date().toLocaleTimeString(uiI18n.language, { hour12: false });
       let formattedMessage = String(message);
       let data: any = args.length > 0 ? args : undefined;
 
@@ -150,29 +153,29 @@ export function LogViewer() {
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-lg border border-white/10">
                 <Terminal className="w-4 h-4 text-purple-400" />
-                <span className="font-mono text-sm font-semibold text-white/90">Console</span>
+                <span className="font-mono text-sm font-semibold text-white/90">{uiI18n.t('app.console_9f3341d3')}</span>
               </div>
               
               {/* Stats */}
               <div className="hidden md:flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 text-[10px] font-bold">{logCounts.info} INFO</span>
-                <span className="px-2 py-0.5 rounded bg-yellow-500/10 text-yellow-400 text-[10px] font-bold">{logCounts.warn} WARN</span>
-                <span className="px-2 py-0.5 rounded bg-red-500/10 text-red-400 text-[10px] font-bold">{logCounts.error} ERR</span>
+                <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 text-[10px] font-bold">{logCounts.info} {uiI18n.t('app.info_9c9cf999')}</span>
+                <span className="px-2 py-0.5 rounded bg-yellow-500/10 text-yellow-400 text-[10px] font-bold">{logCounts.warn} {uiI18n.t('app.warn_c2fd77bf')}</span>
+                <span className="px-2 py-0.5 rounded bg-red-500/10 text-red-400 text-[10px] font-bold">{logCounts.error} {uiI18n.t('app.err_b9c7a527')}</span>
               </div>
             </div>
             
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon" onClick={() => setLogs([])} title="Clear" className="h-8 w-8 hover:bg-white/5">
+              <Button variant="ghost" size="icon" onClick={() => setLogs([])} title={uiI18n.t('app.clear_719ea396')} className="h-8 w-8 hover:bg-white/5">
                 <Trash2 className="w-4 h-4 text-zinc-400" />
               </Button>
-              <Button variant="ghost" size="icon" onClick={copyLogs} title="Copy" className="h-8 w-8 hover:bg-white/5">
+              <Button variant="ghost" size="icon" onClick={copyLogs} title={uiI18n.t('app.copy_af74f7c5')} className="h-8 w-8 hover:bg-white/5">
                 <Copy className="w-4 h-4 text-zinc-400" />
               </Button>
-              <Button variant="ghost" size="icon" onClick={exportLogs} title="Export" className="h-8 w-8 hover:bg-white/5">
+              <Button variant="ghost" size="icon" onClick={exportLogs} title={uiI18n.t('app.export_f3e4fadb')} className="h-8 w-8 hover:bg-white/5">
                 <Download className="w-4 h-4 text-zinc-400" />
               </Button>
               <div className="w-px h-5 bg-white/10 mx-1" />
-              <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)} title="Close (Esc)" className="h-8 w-8 hover:bg-red-500/20 hover:text-red-400">
+              <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)} title={uiI18n.t('app.close_esc_6ae84e4a')} className="h-8 w-8 hover:bg-red-500/20 hover:text-red-400">
                 <X className="w-4 h-4" />
               </Button>
             </div>
@@ -185,7 +188,7 @@ export function LogViewer() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
               <input
                 type="text"
-                placeholder="Filter logs..."
+                placeholder={uiI18n.t('app.filter_logs_c5856fe9')}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="w-full h-8 pl-9 pr-3 bg-white/5 border border-white/10 rounded-lg text-sm text-white/80 placeholder:text-zinc-600 focus:outline-none focus:border-purple-500/50"
@@ -214,7 +217,7 @@ export function LogViewer() {
                         filter === f ? "text-purple-400" : "text-white/60"
                       )}
                     >
-                      <span className="capitalize">{f}</span>
+                      <span className="capitalize">{uiI18n.t(({"all":"app.all_d87c4480","info":"app.info_59bd0a3f","warn":"app.warn_4c8ea476","error":"app.error_11f9578d","debug":"app.debug_32faaeca"})[f])}</span>
                       {filter === f && <Check className="w-3 h-3" />}
                     </button>
                   ))}
@@ -267,16 +270,16 @@ export function LogViewer() {
                 <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center">
                   <Terminal className="w-8 h-8 opacity-30" />
                 </div>
-                <p className="text-sm">No logs captured yet</p>
-                <p className="text-xs text-zinc-600">Console output will appear here</p>
+                <p className="text-sm">{uiI18n.t('app.no_logs_captured_yet_0eb713f4')}</p>
+                <p className="text-xs text-zinc-600">{uiI18n.t('app.console_output_will_appear_here_f8a7ae79')}</p>
               </div>
             )}
           </div>
 
           {/* Footer */}
           <div className="flex items-center justify-between px-4 py-2 border-t border-white/5 bg-zinc-900/30 text-[10px] text-zinc-600">
-            <span>Press <kbd className="px-1.5 py-0.5 bg-white/5 rounded text-zinc-400">F12</kbd> or <kbd className="px-1.5 py-0.5 bg-white/5 rounded text-zinc-400">Ctrl+Shift+I</kbd> to toggle</span>
-            <span>{filteredLogs.length} entries</span>
+            <span>{uiI18n.t('app.press_ea683ad6')} <kbd className="px-1.5 py-0.5 bg-white/5 rounded text-zinc-400">F12</kbd> {uiI18n.t('app.or_1758356d')} <kbd className="px-1.5 py-0.5 bg-white/5 rounded text-zinc-400">{uiI18n.t('app.ctrl_shift_i_f54c4d27')}</kbd> {uiI18n.t('app.to_toggle_6d192f60')}</span>
+            <span>{filteredLogs.length} {uiI18n.t('app.entries_c2e311d6')}</span>
           </div>
         </motion.div>
       </motion.div>

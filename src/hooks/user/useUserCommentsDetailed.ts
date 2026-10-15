@@ -1,3 +1,5 @@
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
+import uiI18n from '@/lib/uiI18n';
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -66,6 +68,7 @@ const digits = (v: string) => v.match(/(\d+)/)?.[1] ?? v;
  * from AniList (batched); playlist / tier_list / forum titles from Supabase.
  */
 function useEnrichedComments(rows: RawComment[], withAuthors: boolean) {
+  useUiTranslation();
   const animeIds = useMemo(
     () => rows.filter((r) => r.entity_type === 'anime').map((r) => r.entity_id),
     [rows],
@@ -164,7 +167,7 @@ function useEnrichedComments(rows: RawComment[], withAuthors: boolean) {
   return useMemo<DetailedComment[]>(() => {
     return rows.map((r) => {
       const hash = `#comment-${r.id}`;
-      let title = 'Comment';
+      let title = uiI18n.t('app.comment_153d7a58');
       let target = '#';
       switch (r.entity_type) {
         case 'anime': {
@@ -220,6 +223,7 @@ function useEnrichedComments(rows: RawComment[], withAuthors: boolean) {
  * `#comment-<id>` deep-link and its structured media.
  */
 export function useUserCommentsDetailed(userId: string | undefined) {
+  useUiTranslation();
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ['user-comments-detailed', userId],
     queryFn: async () => {
@@ -246,6 +250,7 @@ export function useUserCommentsDetailed(userId: string | undefined) {
  * "Recent Comments" panel.
  */
 export function useRecentCommentsDetailed(limit = 30) {
+  useUiTranslation();
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ['recent-comments-detailed', limit],
     queryFn: async () => {

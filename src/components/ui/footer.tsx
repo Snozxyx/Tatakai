@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 "use client";
 
 import { ArrowUpRight } from "lucide-react";
@@ -38,6 +40,7 @@ const socialLinks = [
 ];
 
 function AnimatedWaveCanvas() {
+  useUiTranslation();
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -96,13 +99,14 @@ function AnimatedWaveCanvas() {
 }
 
 export function FooterSection() {
+  useUiTranslation();
   return (
     <footer className="relative bg-black text-white">
       {/* Panoramic banner image */}
       <div className="relative w-full h-[340px] md:h-[420px] overflow-hidden">
         <img
           src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Upscaled%20Image%20%2810%29-UnDKstODkIENp5xqTYUEpt0Sm8tNOw.png"
-          alt="Bioluminescent landscape"
+          alt={uiI18n.t('app.bioluminescent_landscape_a15d07f4')}
           className="w-full h-full object-cover object-center"
         />
         {/* Gradient fade to black at bottom */}
@@ -119,12 +123,12 @@ export function FooterSection() {
             {/* Brand Column */}
             <div className="col-span-2">
               <Link to="/" className="inline-flex items-center gap-2 mb-6">
-                <span className="text-2xl font-display text-white">TATAKAI</span>
-                <span className="text-xs text-white/40 font-mono">OTAKU</span>
+                <span className="text-2xl font-display text-white">{uiI18n.t('app.tatakai_72f9bae9')}</span>
+                <span className="text-xs text-white/40 font-mono">{uiI18n.t('app.otaku_a5eeaea7')}</span>
               </Link>
 
               <p className="text-white/50 leading-relaxed mb-8 max-w-xs text-sm">
-                The extension-based otaku community. Track anime and manga, build tier lists and playlists, and connect with fellow fans.
+                {uiI18n.t('app.the_extension_based_otaku_community_track_anime__9e4cada4')}
               </p>
 
               {/* Social Links */}
@@ -179,13 +183,13 @@ export function FooterSection() {
         {/* Bottom Bar */}
         <div className="py-8 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-sm text-white/30">
-            &copy; 2025 TATAKAI. All rights reserved.
+            {uiI18n.t('app.copy_2025_tatakai_all_rights_reserved_8b6f987a')}
           </p>
 
           <div className="flex items-center gap-4 text-sm text-white/30">
             <span className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-[#eca8d6] animate-ping" />
-              Streaming live
+              {uiI18n.t('app.streaming_live_8057c443')}
             </span>
           </div>
         </div>

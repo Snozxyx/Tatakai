@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
  * ExtensionUpdateSheet — a bottom sheet that surfaces available updates for the
  * extensions the user has installed, on both desktop and mobile.
@@ -36,6 +38,7 @@ function remoteHost(manifestUrl: string): string | null {
 }
 
 export function ExtensionUpdateSheet() {
+  useUiTranslation();
   const { pendingUpdates, dismiss } = useExtensionUpdates();
   const { pendingRemote, dismissRemote, applyRemoteUpdate } =
     useRemoteExtensionUpdates();
@@ -131,12 +134,12 @@ export function ExtensionUpdateSheet() {
         <SheetHeader className="pr-10">
           <SheetTitle className="flex items-center gap-2">
             <RefreshCw className="h-5 w-5 text-primary" />
-            Extension update{totalPending === 1 ? '' : 's'} available
+            {uiI18n.t('app.extension_update_ed536a67')}{totalPending === 1 ? '' : 's'} {uiI18n.t('app.available_7b231a50')}
           </SheetTitle>
           <SheetDescription>
             {totalPending === 1
-              ? 'A newer version of an installed extension is ready.'
-              : `${totalPending} installed extensions have newer versions ready.`}
+              ? uiI18n.t('app.a_newer_version_of_an_installed_extension_is_rea_71dbda28')
+              : uiI18n.t('app.i18n_value_0_installed_extensions_have_newer_ver_e307e7e7', { value0: totalPending })}
           </SheetDescription>
         </SheetHeader>
 
@@ -162,7 +165,7 @@ export function ExtensionUpdateSheet() {
                       ) : (
                         <RefreshCw className="h-4 w-4" />
                       )}
-                      {busy ? 'Updating' : 'Update'}
+                      {busy ? uiI18n.t('app.updating_ec6952e0') : uiI18n.t('app.update_fb91e24f')}
                     </Button>
                   </div>
                   <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -184,7 +187,7 @@ export function ExtensionUpdateSheet() {
         {pendingRemote.length > 0 && (
           <div className="mt-5">
             <p className="mb-2 px-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-              Installed add-ons &amp; providers
+              {uiI18n.t('app.installed_add_ons_amp_providers_23778851')}
             </p>
             <div className="flex flex-col gap-3">
               {pendingRemote.map((update) => {
@@ -207,7 +210,7 @@ export function ExtensionUpdateSheet() {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
                         <p className="truncate font-semibold text-foreground">
-                          {update.row.manifest.name || 'Unnamed add-on'}
+                          {update.row.manifest.name || uiI18n.t('app.unnamed_add_on_f8c844cb')}
                         </p>
                         <Button
                           size="sm"
@@ -219,7 +222,7 @@ export function ExtensionUpdateSheet() {
                           ) : (
                             <RefreshCw className="h-4 w-4" />
                           )}
-                          {busy ? 'Updating' : 'Update'}
+                          {busy ? uiI18n.t('app.updating_ec6952e0') : uiI18n.t('app.update_fb91e24f')}
                         </Button>
                       </div>
                       <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -228,8 +231,8 @@ export function ExtensionUpdateSheet() {
                         <span className="font-mono text-primary">v{update.latestVersion}</span>
                       </div>
                       <p className="mt-1 truncate text-[11px] text-muted-foreground/70">
-                        {update.row.ecosystem === 'stremio' ? 'Stremio add-on' : 'Seanime provider'}
-                        {host ? ` · ${host}` : ''}
+                        {update.row.ecosystem === 'stremio' ? uiI18n.t('app.stremio_add_on_33add510') : uiI18n.t('app.seanime_provider_5f4a728d')}
+                        {host ? uiI18n.t('app.i18n_value_0_92e4cd32', { value0: host }) : ''}
                       </p>
                     </div>
                   </div>
@@ -241,12 +244,12 @@ export function ExtensionUpdateSheet() {
 
         <div className="mt-4 flex items-center justify-end gap-2">
           <Button variant="ghost" onClick={() => handleOpenChange(false)} disabled={anyBusy}>
-            Later
+            {uiI18n.t('app.later_56e2f5d3')}
           </Button>
           {totalPending > 1 && (
             <Button onClick={updateAll} disabled={anyBusy}>
               {anyBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-              Update all
+              {uiI18n.t('app.update_all_bca6296d')}
             </Button>
           )}
         </div>

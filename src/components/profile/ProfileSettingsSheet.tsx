@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useEffect, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -36,6 +38,7 @@ interface ProfileSettingsSheetProps {
 }
 
 export function ProfileSettingsSheet({ trigger, overlayClassName, contentClassName }: ProfileSettingsSheetProps) {
+  useUiTranslation();
   const { user, profile, refreshProfile } = useAuth();
   const reduceMotion = useReducedMotion();
   const updateSettings = useUpdateProfileSettings();
@@ -84,7 +87,7 @@ export function ProfileSettingsSheet({ trigger, overlayClassName, contentClassNa
 
   const handleSave = async () => {
     if (!user) {
-      toast.error('Sign in first');
+      toast.error(uiI18n.t('app.sign_in_first_77a74f57'));
       return;
     }
     setSaving(true);
@@ -106,7 +109,7 @@ export function ProfileSettingsSheet({ trigger, overlayClassName, contentClassNa
 
       if (identityError) {
         if ((identityError as any).code === '23505') {
-          toast.error('That username is already taken');
+          toast.error(uiI18n.t('app.that_username_is_already_taken_ab9e54fb'));
           setSaving(false);
           return;
         }
@@ -117,10 +120,10 @@ export function ProfileSettingsSheet({ trigger, overlayClassName, contentClassNa
       await updateSettings.mutateAsync({ ambientColor: ambientColor ?? undefined, backgroundEffect, avatarDecoration, profileEffect, nameplate });
 
       await refreshProfile();
-      toast.success('Profile settings saved');
+      toast.success(uiI18n.t('app.profile_settings_saved_2ea46ddb'));
       setOpen(false);
     } catch (e: any) {
-      toast.error(e?.message || 'Failed to save settings');
+      toast.error(e?.message || uiI18n.t('app.failed_to_save_settings_b3cc6cc8'));
     } finally {
       setSaving(false);
     }
@@ -146,7 +149,7 @@ export function ProfileSettingsSheet({ trigger, overlayClassName, contentClassNa
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/30 to-primary/5 border border-primary/20 text-primary shadow-[0_0_20px_rgba(var(--primary),0.2)]">
               <Settings className="h-5 w-5" />
             </div>
-            Profile Settings
+            {uiI18n.t('app.profile_settings_df4b0814')}
           </SheetTitle>
         </SheetHeader>
 
@@ -155,32 +158,32 @@ export function ProfileSettingsSheet({ trigger, overlayClassName, contentClassNa
           {/* Identity */}
           <section className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5 space-y-4">
             <h3 className="flex items-center gap-2 text-sm font-bold text-white">
-              <User className="h-4 w-4 text-primary" /> Identity
+              <User className="h-4 w-4 text-primary" /> {uiI18n.t('app.identity_7e5a975b')}
             </h3>
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-muted-foreground">Display Name</Label>
+              <Label className="text-xs font-medium text-muted-foreground">{uiI18n.t('app.display_name_8d6b3481')}</Label>
               <Input
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="Your display name"
+                placeholder={uiI18n.t('app.your_display_name_33a61428')}
                 className="rounded-xl border-white/[0.08] bg-white/[0.03]"
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-muted-foreground">Username</Label>
+              <Label className="text-xs font-medium text-muted-foreground">{uiI18n.t('app.username_84c29015')}</Label>
               <Input
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="username"
+                placeholder={uiI18n.t('app.username_249ba360')}
                 className="rounded-xl border-white/[0.08] bg-white/[0.03]"
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-muted-foreground">Bio</Label>
+              <Label className="text-xs font-medium text-muted-foreground">{uiI18n.t('app.bio_b31fc969')}</Label>
               <Textarea
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
-                placeholder="Tell others about yourself"
+                placeholder={uiI18n.t('app.tell_others_about_yourself_bec7d634')}
                 rows={3}
                 className="rounded-xl border-white/[0.08] bg-white/[0.03] resize-none"
               />
@@ -190,10 +193,10 @@ export function ProfileSettingsSheet({ trigger, overlayClassName, contentClassNa
           {/* Ambient Color */}
           <section className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5 space-y-4">
             <h3 className="flex items-center gap-2 text-sm font-bold text-white">
-              <Palette className="h-4 w-4 text-primary" /> Ambient Color
+              <Palette className="h-4 w-4 text-primary" /> {uiI18n.t('app.ambient_color_ca9caa6e')}
             </h3>
             <p className="text-xs text-muted-foreground/70">
-              Sets the glow accent across your profile cards. Everyone viewing your profile sees it.
+              {uiI18n.t('app.sets_the_glow_accent_across_your_profile_cards_e_bb0e5b28')}
             </p>
             <div className="grid grid-cols-6 gap-2.5">
               {AMBIENT_PRESETS.map((preset) => {
@@ -218,7 +221,7 @@ export function ProfileSettingsSheet({ trigger, overlayClassName, contentClassNa
             </div>
             <div className="flex items-center gap-3 pt-1">
               <label className="flex items-center gap-2 cursor-pointer">
-                <span className="text-xs font-medium text-muted-foreground">Custom</span>
+                <span className="text-xs font-medium text-muted-foreground">{uiI18n.t('app.custom_081ae3fd')}</span>
                 <input
                   type="color"
                   onChange={(e) => setAmbientColor(toHslTriplet(e.target.value))}
@@ -230,7 +233,7 @@ export function ProfileSettingsSheet({ trigger, overlayClassName, contentClassNa
                   onClick={() => setAmbientColor(null)}
                   className="text-xs font-medium text-muted-foreground/60 hover:text-white transition-colors"
                 >
-                  Reset to default
+                  {uiI18n.t('app.reset_to_default_39c90eb7')}
                 </button>
               )}
             </div>
@@ -239,7 +242,7 @@ export function ProfileSettingsSheet({ trigger, overlayClassName, contentClassNa
           {/* Background Effect */}
           <section className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5 space-y-4">
             <h3 className="flex items-center gap-2 text-sm font-bold text-white">
-              <Sparkles className="h-4 w-4 text-primary" /> Background Effect
+              <Sparkles className="h-4 w-4 text-primary" /> {uiI18n.t('app.background_effect_1cbf08b0')}
             </h3>
             <div className="grid grid-cols-3 gap-2.5">
               {EFFECT_OPTIONS.map((opt) => {
@@ -252,7 +255,7 @@ export function ProfileSettingsSheet({ trigger, overlayClassName, contentClassNa
                     type="button"
                     aria-pressed={active}
                     disabled={locked}
-                    title={locked ? 'Requires a Premium Go, Pro, or Ultra badge, or admin access' : opt.description}
+                    title={locked ? uiI18n.t('app.requires_a_premium_go_pro_or_ultra_badge_or_admi_ba321bdc') : opt.description}
                     onClick={() => setBackgroundEffect(opt.key)}
                     className={cn(
                       'relative flex flex-col items-center gap-1.5 rounded-xl border p-3 transition-colors disabled:cursor-not-allowed disabled:opacity-60',
@@ -270,7 +273,7 @@ export function ProfileSettingsSheet({ trigger, overlayClassName, contentClassNa
                 );
               })}
             </div>
-            <p className="text-xs leading-relaxed text-muted-foreground">The four crown-marked scenes are included with Premium Go, Pro, and Ultra badges, or admin access.</p>
+            <p className="text-xs leading-relaxed text-muted-foreground">{uiI18n.t('app.the_four_crown_marked_scenes_are_included_with_p_1fb310c3')}</p>
           </section>
 
           <ProfileCosmeticsPicker
@@ -287,12 +290,12 @@ export function ProfileSettingsSheet({ trigger, overlayClassName, contentClassNa
           <section className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5 space-y-4">
             <h3 className="flex items-center gap-2 text-sm font-bold text-white">
               {isPublic ? <Globe className="h-4 w-4 text-green-500" /> : <Lock className="h-4 w-4 text-amber-500" />}
-              Privacy
+              {uiI18n.t('app.privacy_cf01481f')}
             </h3>
             <div className="flex items-center justify-between">
               <div>
-                <Label className="font-medium">Public Profile</Label>
-                <p className="text-xs text-muted-foreground">Allow others to view your profile via @username</p>
+                <Label className="font-medium">{uiI18n.t('app.public_profile_0da61f53')}</Label>
+                <p className="text-xs text-muted-foreground">{uiI18n.t('app.allow_others_to_view_your_profile_via_username_fadc72a1')}</p>
               </div>
               <Switch checked={isPublic} onCheckedChange={setIsPublic} />
             </div>
@@ -304,19 +307,19 @@ export function ProfileSettingsSheet({ trigger, overlayClassName, contentClassNa
               >
                 <div className="flex items-center justify-between">
                   <Label className="font-medium flex items-center gap-2">
-                    <Eye className="h-3 w-3" /> Show Watchlist
+                    <Eye className="h-3 w-3" /> {uiI18n.t('app.show_watchlist_394df743')}
                   </Label>
                   <Switch checked={showWatchlist} onCheckedChange={setShowWatchlist} />
                 </div>
                 <div className="flex items-center justify-between">
                   <Label className="font-medium flex items-center gap-2">
-                    <Eye className="h-3 w-3" /> Show Watch History
+                    <Eye className="h-3 w-3" /> {uiI18n.t('app.show_watch_history_25d808d4')}
                   </Label>
                   <Switch checked={showHistory} onCheckedChange={setShowHistory} />
                 </div>
                 <div className="flex items-center justify-between">
                   <Label className="font-medium flex items-center gap-2">
-                    <Eye className="h-3 w-3" /> Show Tatakai Calendar
+                    <Eye className="h-3 w-3" /> {uiI18n.t('app.show_tatakai_calendar_8269e0f9')}
                   </Label>
                   <Switch checked={showCalendar} onCheckedChange={setShowCalendar} />
                 </div>
@@ -328,7 +331,7 @@ export function ProfileSettingsSheet({ trigger, overlayClassName, contentClassNa
         {/* Footer */}
         <div className="relative z-20 flex shrink-0 justify-end gap-3 border-t border-white/[0.08] bg-background/60 p-5 backdrop-blur-2xl">
           <Button variant="ghost" onClick={() => setOpen(false)} className="h-12 rounded-full px-6 font-bold hover:bg-white/10">
-            Cancel
+            {uiI18n.t('app.cancel_77dfd213')}
           </Button>
           <Button
             onClick={handleSave}
@@ -336,7 +339,7 @@ export function ProfileSettingsSheet({ trigger, overlayClassName, contentClassNa
             className="h-12 rounded-full px-8 text-sm font-black uppercase tracking-widest shadow-[0_0_20px_rgba(var(--primary),0.3)] transition-all hover:scale-105"
           >
             {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
-            Save Changes
+            {uiI18n.t('app.save_changes_fa2984b3')}
           </Button>
         </div>
       </SheetContent>

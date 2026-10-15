@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import {
   DropdownMenu,
@@ -72,6 +73,7 @@ export function ModerationMenuItems({
   onStaffDelete,
 }: ModerationMenuItemsProps) {
   const { user, isAdmin, isModerator } = useAuth();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const isStaff = isAdmin || isModerator;
   const isSelf = !!user?.id && !!authorUserId && user.id === authorUserId;
@@ -90,22 +92,22 @@ export function ModerationMenuItems({
   const togglePin = async () => {
     try {
       await setPinned.mutateAsync({ commentId: contentId, pinned: !isPinned });
-      toast.success(isPinned ? 'Comment unpinned' : 'Comment pinned');
+      toast.success(t(isPinned ? 'moderation.unpinned' : 'moderation.pinned'));
     } catch (err: any) {
-      toast.error('Failed: ' + (err?.message ?? 'unknown error'));
+      toast.error(t('moderation.actionFailed', { error: err?.message ?? 'unknown error' }));
     }
   };
 
   const toggle = async (
     key: 'comments_paused' | 'allow_repost' | 'allow_requote',
     next: boolean,
-    okMsg: string,
+    okKey: string,
   ) => {
     try {
       await setFlags.mutateAsync({ contentType, contentId, [key]: next } as any);
-      toast.success(okMsg);
+      toast.success(t(okKey));
     } catch (err: any) {
-      toast.error('Failed: ' + (err?.message ?? 'unknown error'));
+      toast.error(t('moderation.actionFailed', { error: err?.message ?? 'unknown error' }));
     }
   };
 
@@ -113,7 +115,7 @@ export function ModerationMenuItems({
     <>
       {user && !isSelf && (
         <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setReportOpen(true); }}>
-          <Flag className="mr-2 h-4 w-4" /> Report
+          <Flag className="mr-2 h-4 w-4" /> {t('social.report')}
         </DropdownMenuItem>
       )}
 
@@ -121,7 +123,7 @@ export function ModerationMenuItems({
         <>
           <DropdownMenuSeparator />
           <DropdownMenuLabel className="text-[11px] uppercase tracking-wide text-muted-foreground">
-            Staff
+            {t('moderation.staff')}
           </DropdownMenuLabel>
 
           {onStaffDelete && !isSelf && (
@@ -129,7 +131,7 @@ export function ModerationMenuItems({
               className="text-rose-400 focus:text-rose-400 focus:bg-rose-400/10"
               onSelect={(e) => { e.preventDefault(); onStaffDelete(); }}
             >
-              <Trash2 className="mr-2 h-4 w-4" /> Delete (tombstone)
+              <Trash2 className="mr-2 h-4 w-4" /> {t('moderation.deleteTombstone')}
             </DropdownMenuItem>
           )}
 
@@ -139,8 +141,8 @@ export function ModerationMenuItems({
               onSelect={(e) => { e.preventDefault(); togglePin(); }}
             >
               {isPinned
-                ? <><PinOff className="mr-2 h-4 w-4" /> Unpin comment</>
-                : <><Pin className="mr-2 h-4 w-4" /> Pin comment</>}
+                ? <><PinOff className="mr-2 h-4 w-4" /> {t('moderation.unpinComment')}</>
+                : <><Pin className="mr-2 h-4 w-4" /> {t('moderation.pinComment')}</>}
             </DropdownMenuItem>
           )}
 
@@ -150,12 +152,12 @@ export function ModerationMenuItems({
               onSelect={(e) => {
                 e.preventDefault();
                 toggle('comments_paused', !flags?.comments_paused,
-                  flags?.comments_paused ? 'Comments resumed' : 'Comments paused');
+                  flags?.comments_paused ? 'moderation.commentsResumed' : 'moderation.commentsPaused');
               }}
             >
               {flags?.comments_paused
-                ? <><MessageSquare className="mr-2 h-4 w-4" /> Resume comments</>
-                : <><MessageSquareOff className="mr-2 h-4 w-4" /> Pause comments</>}
+                ? <><MessageSquare className="mr-2 h-4 w-4" /> {t('moderation.resumeComments')}</>
+                : <><MessageSquareOff className="mr-2 h-4 w-4" /> {t('moderation.pauseComments')}</>}
             </DropdownMenuItem>
           )}
 
@@ -166,22 +168,22 @@ export function ModerationMenuItems({
                 onSelect={(e) => {
                   e.preventDefault();
                   toggle('allow_repost', !flags?.allow_repost,
-                    flags?.allow_repost ? 'Reposting disabled' : 'Reposting enabled');
+                    flags?.allow_repost ? 'moderation.repostingDisabled' : 'moderation.repostingEnabled');
                 }}
               >
                 <Repeat2 className="mr-2 h-4 w-4" />
-                {flags?.allow_repost ? 'Disable reposting' : 'Enable reposting'}
+                {flags?.allow_repost ? t('moderation.disableReposting') : t('moderation.enableReposting')}
               </DropdownMenuItem>
               <DropdownMenuItem
                 disabled={setFlags.isPending}
                 onSelect={(e) => {
                   e.preventDefault();
                   toggle('allow_requote', !flags?.allow_requote,
-                    flags?.allow_requote ? 'Quoting disabled' : 'Quoting enabled');
+                    flags?.allow_requote ? 'moderation.quotingDisabled' : 'moderation.quotingEnabled');
                 }}
               >
                 <Quote className="mr-2 h-4 w-4" />
-                {flags?.allow_requote ? 'Disable quoting' : 'Enable quoting'}
+                {flags?.allow_requote ? t('moderation.disableQuoting') : t('moderation.enableQuoting')}
               </DropdownMenuItem>
             </>
           )}
@@ -191,12 +193,12 @@ export function ModerationMenuItems({
               className="text-rose-400 focus:text-rose-400 focus:bg-rose-400/10"
               onSelect={(e) => { e.preventDefault(); setBanOpen(true); }}
             >
-              <Ban className="mr-2 h-4 w-4" /> Ban author
+              <Ban className="mr-2 h-4 w-4" /> {t('moderation.banAuthor')}
             </DropdownMenuItem>
           )}
           {authorUserId && (
             <DropdownMenuItem onSelect={() => navigate(`/admin/user/${authorUserId}`)}>
-              <ShieldCheck className="mr-2 h-4 w-4" /> View in Admin
+              <ShieldCheck className="mr-2 h-4 w-4" /> {t('moderation.viewInAdmin')}
             </DropdownMenuItem>
           )}
         </>
@@ -226,13 +228,14 @@ export interface ModerationMenuProps extends ModerationMenuItemsProps {
 /** Standalone kebab menu for surfaces without their own options menu. */
 export function ModerationMenu({ align = 'end', triggerClassName, ...items }: ModerationMenuProps) {
   const { user } = useAuth();
+  const { t } = useTranslation();
   if (!user) return null;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          aria-label="Moderation"
+          aria-label={t('moderation.menuLabel')}
           onClick={(e) => e.stopPropagation()}
           className={triggerClassName ?? 'shrink-0 rounded-full p-1.5 text-muted-foreground hover:bg-white/10 hover:text-foreground transition-colors'}
         >

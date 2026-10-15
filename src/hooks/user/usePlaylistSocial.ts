@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -13,6 +15,7 @@ import type { Playlist, PlaylistItem } from './usePlaylist';
 
 // Whether the current user has liked a given playlist (drives the filled heart).
 export function usePlaylistLikeState(playlistId: string | undefined) {
+  useUiTranslation();
   const { user } = useAuth();
 
   return useQuery({
@@ -33,12 +36,13 @@ export function usePlaylistLikeState(playlistId: string | undefined) {
 }
 
 export function useTogglePlaylistLike() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
   return useMutation({
     mutationFn: async ({ playlistId, liked }: { playlistId: string; liked: boolean }) => {
-      if (!user) throw new Error('You must be signed in to like playlists.');
+      if (!user) throw new Error(uiI18n.t('app.you_must_be_signed_in_to_like_playlists_a750fc73'));
       if (liked) {
         const { error } = await supabase
           .from('playlist_likes')
@@ -61,7 +65,7 @@ export function useTogglePlaylistLike() {
       queryClient.invalidateQueries({ queryKey: ['user-playlists'] });
     },
     onError: (err: unknown) => {
-      toast.error(err instanceof Error ? err.message : 'Could not update like.');
+      toast.error(err instanceof Error ? err.message : uiI18n.t('app.could_not_update_like_19e72141'));
     },
   });
 }
@@ -71,6 +75,7 @@ export function useTogglePlaylistLike() {
 // ---------------------------------------------------------------------------
 
 export function useIsPlaylistSaved(playlistId: string | undefined) {
+  useUiTranslation();
   const { user } = useAuth();
 
   return useQuery({
@@ -91,12 +96,13 @@ export function useIsPlaylistSaved(playlistId: string | undefined) {
 }
 
 export function useToggleSavePlaylist() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
   return useMutation({
     mutationFn: async ({ playlistId, saved }: { playlistId: string; saved: boolean }) => {
-      if (!user) throw new Error('You must be signed in to save playlists.');
+      if (!user) throw new Error(uiI18n.t('app.you_must_be_signed_in_to_save_playlists_d0752da7'));
       if (saved) {
         const { error } = await supabase
           .from('saved_playlists')
@@ -115,10 +121,10 @@ export function useToggleSavePlaylist() {
     onSuccess: (saved, { playlistId }) => {
       queryClient.invalidateQueries({ queryKey: ['playlist-saved', playlistId] });
       queryClient.invalidateQueries({ queryKey: ['saved-playlists'] });
-      toast.success(saved ? 'Added to your library.' : 'Removed from your library.');
+      toast.success(saved ? uiI18n.t('app.added_to_your_library_d8f0f34d') : uiI18n.t('app.removed_from_your_library_d3784c48'));
     },
     onError: (err: unknown) => {
-      toast.error(err instanceof Error ? err.message : 'Could not update your library.');
+      toast.error(err instanceof Error ? err.message : uiI18n.t('app.could_not_update_your_library_3c59cb51'));
     },
   });
 }
@@ -126,6 +132,7 @@ export function useToggleSavePlaylist() {
 // The current user's saved playlists, resolved to full playlist rows (RLS drops
 // any that are no longer visible).
 export function useSavedPlaylists() {
+  useUiTranslation();
   const { user } = useAuth();
 
   return useQuery({
@@ -157,6 +164,7 @@ export interface PlaylistProgress {
 }
 
 export function usePlaylistProgress(items: PlaylistItem[] | undefined): PlaylistProgress {
+  useUiTranslation();
   const { user } = useAuth();
   const { data: watchlist } = useWatchlist();
   const { data: completedManga } = useMangaReadlist(['completed']);

@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 "use client";
 
 import { useEffect, useRef } from "react";
@@ -25,6 +27,7 @@ const sources: Ext[] = [
 ];
 
 export function Extensions() {
+  useUiTranslation();
   const reduceMotion = useMotionPreference();
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -68,26 +71,24 @@ export function Extensions() {
     <section className="py-16 lg:py-24">
       <div className="grid items-center gap-8 lg:grid-cols-2 lg:gap-16">
         <Reveal className="lg:order-1">
-          <ShowcaseMedia type="video" src={`${BRAND}/extension.mp4`} label="Extensions — preview" />
+          <ShowcaseMedia type="video" src={`${BRAND}/extension.mp4`} label={uiI18n.t('app.extensions_preview_729c8ac3')} />
         </Reveal>
 
         <Reveal className="lg:order-2">
           <div>
             <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 backdrop-blur-md">
               <Puzzle className="h-3.5 w-3.5 text-violet-300" />
-              <span className="text-xs font-medium text-white/70">Extensions</span>
+              <span className="text-xs font-medium text-white/70">{uiI18n.t('app.extensions_656bcfe2')}</span>
             </div>
             <h2 className="mb-4 font-display text-[clamp(1.6rem,3vw,2.5rem)] font-medium leading-[1.05] tracking-[-0.03em] text-white">
-              Make it yours
+              {uiI18n.t('app.make_it_yours_54135155')}
             </h2>
             <p className="mb-6 max-w-md text-base leading-relaxed text-white/60">
-              Tatakai is built around extensions. Add community-made extras, theme the app to
-              taste, and run several at once — nothing is hard-wired, and everything stays in your
-              hands.
+              {uiI18n.t('app.tatakai_is_built_around_extensions_add_community_70889f30')}
             </p>
             <ul className="flex flex-wrap gap-2">
               {["Add-ons", "Themeable", "Community-built", "Mix & match"].map((p) => (
-                <li key={p} className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/70">{p}</li>
+                <li key={p} className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/70">{uiI18n.t(({"Add-ons":"app.add_ons_41b634ed","Themeable":"app.themeable_67d60184","Community-built":"app.community_built_0f97846a","Mix & match":"app.mix_match_03429e10"})[p])}</li>
               ))}
             </ul>
           </div>

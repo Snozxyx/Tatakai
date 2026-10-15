@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -37,6 +39,7 @@ const formatTorrentBytes = (bytes: number) => {
 };
 
 export function MagnetAlignmentModal({ isOpen, onClose, initialMagnet, initialTorrentBuffer }: MagnetAlignmentModalProps) {
+  useUiTranslation();
   const navigate = useNavigate();
   const torrentFileInputRef = useRef<HTMLInputElement | null>(null);
   const [magnetLink, setMagnetLink] = useState(initialMagnet || '');
@@ -116,12 +119,12 @@ export function MagnetAlignmentModal({ isOpen, onClose, initialMagnet, initialTo
       }
 
       if (preview?.success) {
-        toast.success(`Loaded ${previewName}`);
+        toast.success(uiI18n.t('app.loaded_i18n_value_0_f66d9e9c', { value0: previewName }));
       } else if (preview?.blocked || preview?.error) {
-        toast.error(preview.error || 'This torrent cannot be played.');
+        toast.error(preview.error || uiI18n.t('app.this_torrent_cannot_be_played_6b01ad3c'));
       }
     } catch {
-      toast.error('Failed to open torrent file');
+      toast.error(uiI18n.t('app.failed_to_open_torrent_file_d10e47e0'));
     }
   };
 
@@ -228,10 +231,10 @@ export function MagnetAlignmentModal({ isOpen, onClose, initialMagnet, initialTo
         setConfirmLowConfidence((result?.confidence || 0) < 60);
         setStep(2);
       } else {
-        toast.error(result.error || 'Failed to resolve magnet metadata');
+        toast.error(result.error || uiI18n.t('app.failed_to_resolve_magnet_metadata_cf40f77f'));
       }
     } catch (err) {
-      toast.error('IPC Error resolving magnet');
+      toast.error(uiI18n.t('app.ipc_error_resolving_magnet_7c72cad0'));
     } finally {
       setResolving(false);
     }
@@ -246,7 +249,7 @@ export function MagnetAlignmentModal({ isOpen, onClose, initialMagnet, initialTo
       const buffer = await file.arrayBuffer();
       await loadTorrentPreview(buffer, file.name);
     } catch {
-      toast.error('Failed to open torrent file');
+      toast.error(uiI18n.t('app.failed_to_open_torrent_file_d10e47e0'));
     }
   };
 
@@ -259,11 +262,11 @@ export function MagnetAlignmentModal({ isOpen, onClose, initialMagnet, initialTo
     if (!asGeneric) {
       const totalEpisodes = Number(selectedAnime?.episodes || 0);
       if (resolvedEpisode && totalEpisodes > 0 && resolvedEpisode > totalEpisodes) {
-        toast.error(`Episode ${resolvedEpisode} exceeds total episodes (${totalEpisodes}) for selected anime.`);
+        toast.error(uiI18n.t('app.episode_i18n_value_0_exceeds_total_episodes_i18n_f7e5a72d', { value0: resolvedEpisode, value1: totalEpisodes }));
         return;
       }
       if ((metadata!.confidence || 0) < 60 && !confirmLowConfidence) {
-        toast.error('Low confidence mapping. Confirm low-confidence mapping to continue.');
+        toast.error(uiI18n.t('app.low_confidence_mapping_confirm_low_confidence_ma_0c81b3d4'));
         return;
       }
     }
@@ -272,11 +275,11 @@ export function MagnetAlignmentModal({ isOpen, onClose, initialMagnet, initialTo
     try {
       toast.loading('Importing and aligning magnet...', { id: toastId });
       if (isP2PDisabled()) {
-        toast.error('P2P torrents are disabled in Settings. Re-enable them to import this magnet.', { id: toastId });
+        toast.error(uiI18n.t('app.p2p_torrents_are_disabled_in_settings_re_enable__6e1f9606'), { id: toastId });
         return;
       }
       if (torrentBuffer && torrentPreview?.blocked) {
-        toast.error(torrentPreview.error || 'This torrent cannot be played.', { id: toastId });
+        toast.error(torrentPreview.error || uiI18n.t('app.this_torrent_cannot_be_played_6b01ad3c'), { id: toastId });
         return;
       }
 
@@ -285,7 +288,7 @@ export function MagnetAlignmentModal({ isOpen, onClose, initialMagnet, initialTo
         if (existingSessionId && (window as any).tatakaiRuntime?.getTorrentStreamUrl) {
           const existing = await (window as any).tatakaiRuntime.getTorrentStreamUrl(existingSessionId);
           if (existing?.success && existing.url) {
-            toast.success('Torrent is already open.', { id: toastId });
+            toast.success(uiI18n.t('app.torrent_is_already_open_f6163025'), { id: toastId });
             navigate(`/watch/torrent-${existingSessionId}?torrent=true&sessionId=${existingSessionId}`);
             onClose();
             return;
@@ -341,8 +344,8 @@ export function MagnetAlignmentModal({ isOpen, onClose, initialMagnet, initialTo
         });
         toast.success(
           isPendingMetadata
-            ? 'Metadata is still resolving. Opening the torrent session...'
-            : 'Magnet imported successfully!',
+            ? uiI18n.t('app.metadata_is_still_resolving_opening_the_torrent__18701774')
+            : uiI18n.t('app.magnet_imported_successfully_c4bea9fe'),
           { id: toastId }
         );
         
@@ -357,18 +360,18 @@ export function MagnetAlignmentModal({ isOpen, onClose, initialMagnet, initialTo
         
         onClose();
       } else {  
-        toast.error(result.error || 'Failed to start torrent', { id: toastId });
+        toast.error(result.error || uiI18n.t('app.failed_to_start_torrent_c2605118'), { id: toastId });
       }
     } catch (err) {
-      toast.error('Failed to communicate with torrent core', { id: toastId });
+      toast.error(uiI18n.t('app.failed_to_communicate_with_torrent_core_3db68082'), { id: toastId });
     }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-xl bg-background/95 backdrop-blur-3xl border-border/50 p-0 overflow-hidden rounded-[2rem] max-h-[90vh] flex flex-col">
-        <DialogTitle className="sr-only">Import & Align Torrent</DialogTitle>
-        <DialogDescription className="sr-only">Step {step} of 2: {step === 1 ? 'Source Input' : 'Anime Mapping'}</DialogDescription>
+        <DialogTitle className="sr-only">{uiI18n.t('app.import_align_torrent_e3d38117')}</DialogTitle>
+        <DialogDescription className="sr-only">{uiI18n.t('app.step_dc416e10')} {step} {uiI18n.t('app.of_2_c65d485e')} {step === 1 ? uiI18n.t('app.source_input_3eb91479') : uiI18n.t('app.anime_mapping_21535c01')}</DialogDescription>
         
         {/* Header */}
         <div className="p-8 border-b border-white/5 flex items-center justify-between bg-primary/5">
@@ -377,8 +380,8 @@ export function MagnetAlignmentModal({ isOpen, onClose, initialMagnet, initialTo
               <Magnet className="w-6 h-6" />
             </div>
             <div>
-              <h2 className="text-2xl font-black tracking-tight">Import & <span className="text-primary italic">Align</span></h2>
-              <p className="text-xs text-muted-foreground font-medium">Step {step} of 2: {step === 1 ? 'Source Input' : 'Anime Mapping'}</p>
+              <h2 className="text-2xl font-black tracking-tight">{uiI18n.t('app.import_fdf802ee')} <span className="text-primary italic">{uiI18n.t('app.align_c83b0ec2')}</span></h2>
+              <p className="text-xs text-muted-foreground font-medium">{uiI18n.t('app.step_dc416e10')} {step} {uiI18n.t('app.of_2_c65d485e')} {step === 1 ? uiI18n.t('app.source_input_3eb91479') : uiI18n.t('app.anime_mapping_21535c01')}</p>
             </div>
           </div>
           <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full hover:bg-white/5">
@@ -400,13 +403,13 @@ export function MagnetAlignmentModal({ isOpen, onClose, initialMagnet, initialTo
                 <div className="space-y-4">
                   <h3 className="font-bold text-lg flex items-center gap-2">
                     <Search className="w-4 h-4 text-primary" />
-                    Magnet Link or .magnet File
+                    {uiI18n.t('app.magnet_link_or_magnet_file_9419ece1')}
                   </h3>
                   <div className="grid gap-4">
                     <div className="space-y-3">
-                      <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Paste Magnet Link</label>
+                      <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">{uiI18n.t('app.paste_magnet_link_58ecdfd7')}</label>
                       <textarea 
-                        placeholder="magnet:?xt=urn:btih:..." 
+                        placeholder={uiI18n.t('app.magnet_xt_urn_btih_85fb9918')}
                         value={magnetLink}
                         onChange={e => {
                           resetAlignmentState();
@@ -418,7 +421,7 @@ export function MagnetAlignmentModal({ isOpen, onClose, initialMagnet, initialTo
                     
                     <div className="relative py-4">
                       <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/5" /></div>
-                      <div className="relative flex justify-center text-[10px] font-black uppercase tracking-widest"><span className="bg-card px-4 text-muted-foreground">OR</span></div>
+                      <div className="relative flex justify-center text-[10px] font-black uppercase tracking-widest"><span className="bg-card px-4 text-muted-foreground">{uiI18n.t('app.or_f579c523')}</span></div>
                     </div>
 
                     <Button 
@@ -426,7 +429,7 @@ export function MagnetAlignmentModal({ isOpen, onClose, initialMagnet, initialTo
                       className="h-14 rounded-2xl border-dashed border-white/10 hover:border-primary/50 hover:bg-primary/5 group"
                       onClick={async () => {
                         const path = await (window as any).electron.selectFile({
-                          title: 'Select .magnet File',
+                          get title() { return uiI18n.t('app.select_magnet_file_ab48d86c'); },
                           filters: [{ name: 'Magnet Files', extensions: ['magnet'] }]
                         });
                         if (path) {
@@ -439,7 +442,7 @@ export function MagnetAlignmentModal({ isOpen, onClose, initialMagnet, initialTo
                       }}
                     >
                       <Search className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform" />
-                      Browse .magnet file
+                      {uiI18n.t('app.browse_magnet_file_f51cfa72')}
                     </Button>
 
                     <input
@@ -456,7 +459,7 @@ export function MagnetAlignmentModal({ isOpen, onClose, initialMagnet, initialTo
                       onClick={() => torrentFileInputRef.current?.click()}
                     >
                       <FolderOpen className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform" />
-                      Browse .torrent file
+                      {uiI18n.t('app.browse_torrent_file_022d4193')}
                     </Button>
                   </div>
                 </div>
@@ -464,7 +467,7 @@ export function MagnetAlignmentModal({ isOpen, onClose, initialMagnet, initialTo
                 <div className="p-4 rounded-2xl bg-amber-500/5 border border-amber-500/10 flex gap-4">
                   <Info className="w-5 h-5 text-amber-500 flex-shrink-0" />
                   <p className="text-xs text-amber-200/70 leading-relaxed font-medium">
-                    Importing a magnet will allow Tatakai to track and align its content with our internal library for seamless playback.
+                    {uiI18n.t('app.importing_a_magnet_will_allow_tatakai_to_track_a_d3e4591c')}
                   </p>
                 </div>
               </motion.div>
@@ -480,19 +483,19 @@ export function MagnetAlignmentModal({ isOpen, onClose, initialMagnet, initialTo
                   <div className="flex items-center justify-between">
                     <h3 className="font-bold text-lg flex items-center gap-2">
                       <Film className="w-4 h-4 text-primary" />
-                      Detected Metadata
+                      {uiI18n.t('app.detected_metadata_6f6a2500')}
                     </h3>
                     <div className="px-3 py-1 rounded-full bg-primary/10 text-[10px] font-black text-primary border border-primary/20">
-                      CONFIDENCE: {(metadata?.confidence || 0) >= 75 ? 'HIGH' : (metadata?.confidence || 0) >= 60 ? 'MEDIUM' : 'LOW'}
+                      {uiI18n.t('app.confidence_d032932f')} {(metadata?.confidence || 0) >= 75 ? uiI18n.t('app.high_d77d0b27') : (metadata?.confidence || 0) >= 60 ? uiI18n.t('app.medium_f68525ad') : uiI18n.t('app.low_d8b9679f')}
                     </div>
                   </div>
                   
                   <GlassPanel className="p-4 border-white/5 bg-white/[0.02]">
-                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">Source Name</p>
+                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">{uiI18n.t('app.source_name_b8191a52')}</p>
                     <p className="text-sm font-medium line-clamp-2">{metadata?.name}</p>
                     <div className="mt-2 text-[11px] text-muted-foreground flex flex-wrap gap-2">
-                      {metadata?.parsed?.episodeNumber != null && <span>Episode: {metadata.parsed.episodeNumber}</span>}
-                      {metadata?.parsed?.season != null && <span>Season: {metadata.parsed.season}</span>}
+                      {metadata?.parsed?.episodeNumber != null && <span>{uiI18n.t('app.episode_8bffcf5b')} {metadata.parsed.episodeNumber}</span>}
+                      {metadata?.parsed?.season != null && <span>{uiI18n.t('app.season_87803401')} {metadata.parsed.season}</span>}
                       {metadata?.parsed?.resolution && <span>{metadata.parsed.resolution}</span>}
                       {metadata?.parsed?.source && <span>{metadata.parsed.source}</span>}
                       {metadata?.parsed?.codec && <span>{metadata.parsed.codec}</span>}
@@ -502,35 +505,35 @@ export function MagnetAlignmentModal({ isOpen, onClose, initialMagnet, initialTo
                   {episodeOptions.length > 0 && (
                     <GlassPanel className="p-4 border-white/5 bg-white/[0.02] space-y-3">
                       <div>
-                        <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">Episode Setting</p>
-                        <p className="text-sm text-muted-foreground">Choose the episode you want to start from for this pack.</p>
+                        <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">{uiI18n.t('app.episode_setting_c2744cef')}</p>
+                        <p className="text-sm text-muted-foreground">{uiI18n.t('app.choose_the_episode_you_want_to_start_from_for_th_fbb6948b')}</p>
                       </div>
                       <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_160px] items-end">
                         <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Detected Episodes</label>
+                          <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">{uiI18n.t('app.detected_episodes_7e87624b')}</label>
                           <Select
                             value={String(manualEpisode || episodeOptions[0] || '')}
                             onValueChange={(value) => setManualEpisode(Number(value))}
                           >
                             <SelectTrigger className="h-11 bg-white/5 border-white/10 rounded-xl">
-                              <SelectValue placeholder="Choose episode" />
+                              <SelectValue placeholder={uiI18n.t('app.choose_episode_236ea65a')} />
                             </SelectTrigger>
                             <SelectContent>
                               {episodeOptions.map((episodeNumber) => (
                                 <SelectItem key={episodeNumber} value={String(episodeNumber)}>
-                                  Episode {episodeNumber}
+                                  {uiI18n.t('app.episode_8669aa56')} {episodeNumber}
                                 </SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
                         </div>
                         <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Manual Override</label>
+                          <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">{uiI18n.t('app.manual_override_1d1a6f07')}</label>
                           <Input
                             type="number"
                             value={manualEpisode}
                             onChange={(e) => setManualEpisode(e.target.value ? Number(e.target.value) : '')}
-                            placeholder="Episode #"
+                            placeholder={uiI18n.t('app.episode_51c65506')}
                             className="h-11 bg-white/5 border-white/10 rounded-xl"
                           />
                         </div>
@@ -542,8 +545,8 @@ export function MagnetAlignmentModal({ isOpen, onClose, initialMagnet, initialTo
                     <GlassPanel className="p-4 border-white/5 bg-white/[0.02] space-y-3">
                       <div className="flex items-center justify-between gap-3">
                         <div>
-                          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">Torrent Output</p>
-                          <p className="text-sm font-semibold">{torrentPreview.selectedFile?.name || torrentPreview.name || 'No playable file detected'}</p>
+                          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">{uiI18n.t('app.torrent_output_dabb9efd')}</p>
+                          <p className="text-sm font-semibold">{torrentPreview.selectedFile?.name || torrentPreview.name || uiI18n.t('app.no_playable_file_detected_a75130fb')}</p>
                         </div>
                         <div className={cn(
                           "px-3 py-1 rounded-full text-[10px] font-black border",
@@ -551,7 +554,7 @@ export function MagnetAlignmentModal({ isOpen, onClose, initialMagnet, initialTo
                             ? "bg-red-500/10 text-red-300 border-red-500/20"
                             : "bg-emerald-500/10 text-emerald-300 border-emerald-500/20"
                         )}>
-                          {torrentPreview.blocked ? 'BLOCKED' : 'PLAYABLE'}
+                          {torrentPreview.blocked ? uiI18n.t('app.blocked_fcc4cce1') : uiI18n.t('app.playable_1575bae5')}
                         </div>
                       </div>
 
@@ -562,16 +565,16 @@ export function MagnetAlignmentModal({ isOpen, onClose, initialMagnet, initialTo
                       )}
 
                       <div className="grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
-                        <div className="rounded-xl bg-white/5 px-3 py-2">Files: {torrentPreview.files?.length || 0}</div>
-                        <div className="rounded-xl bg-white/5 px-3 py-2">Playable: {torrentPreview.playableFiles?.length || 0}</div>
+                        <div className="rounded-xl bg-white/5 px-3 py-2">{uiI18n.t('app.files_7b40ca44')} {torrentPreview.files?.length || 0}</div>
+                        <div className="rounded-xl bg-white/5 px-3 py-2">{uiI18n.t('app.playable_2e8336bd')} {torrentPreview.playableFiles?.length || 0}</div>
                         {episodeOptions.length > 0 && (
                           <div className="col-span-2 rounded-xl bg-white/5 px-3 py-2">
-                            Detected episodes: {episodeOptions.join(', ')}
+                            {uiI18n.t('app.detected_episodes_4a42d44d')} {episodeOptions.join(', ')}
                           </div>
                         )}
                         {torrentPreview.selectedFile && (
                           <div className="col-span-2 rounded-xl bg-white/5 px-3 py-2">
-                            Selected: {torrentPreview.selectedFile.name} ({formatTorrentBytes(torrentPreview.selectedFile.size || torrentPreview.selectedFile.length || 0)})
+                            {uiI18n.t('app.selected_2e084478')} {torrentPreview.selectedFile.name} ({formatTorrentBytes(torrentPreview.selectedFile.size || torrentPreview.selectedFile.length || 0)})
                           </div>
                         )}
                       </div>
@@ -592,9 +595,9 @@ export function MagnetAlignmentModal({ isOpen, onClose, initialMagnet, initialTo
                               <p className="text-[10px] text-muted-foreground">{formatTorrentBytes(file.size || 0)}</p>
                               {(file.episodeNumber != null || file.season != null) && (
                                 <p className="text-[10px] text-muted-foreground">
-                                  {file.season != null ? `Season ${file.season}` : 'Season ?'}
-                                  {file.episodeNumber != null ? ` • Episode ${file.episodeNumber}` : ''}
-                                  {file.episodeEnd != null ? `-${file.episodeEnd}` : ''}
+                                  {file.season != null ? uiI18n.t('app.season_i18n_value_0_52a3e0d2', { value0: file.season }) : uiI18n.t('app.season_7edf90f6')}
+                                  {file.episodeNumber != null ? uiI18n.t('app.episode_i18n_value_0_62a4e71d', { value0: file.episodeNumber }) : ''}
+                                  {file.episodeEnd != null ? uiI18n.t('app.i18n_value_0_a5b0d94d', { value0: file.episodeEnd }) : ''}
                                 </p>
                               )}
                             </div>
@@ -605,10 +608,10 @@ export function MagnetAlignmentModal({ isOpen, onClose, initialMagnet, initialTo
                                   ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/20"
                                   : "bg-red-500/10 text-red-300 border-red-500/20"
                               )}>
-                                {file.isVideo ? 'Playable' : 'Unsupported'}
+                                {file.isVideo ? uiI18n.t('app.playable_cf8d6514') : uiI18n.t('app.unsupported_fb52c13a')}
                               </span>
                               {torrentPreview.selectedFileIndex === file.index && (
-                                <span className="text-[10px] font-black uppercase tracking-widest text-primary">Will play</span>
+                                <span className="text-[10px] font-black uppercase tracking-widest text-primary">{uiI18n.t('app.will_play_c89dba3e')}</span>
                               )}
                             </div>
                           </div>
@@ -618,11 +621,11 @@ export function MagnetAlignmentModal({ isOpen, onClose, initialMagnet, initialTo
                   )}
 
                   <div className="space-y-3">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Map to Anime</label>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">{uiI18n.t('app.map_to_anime_60186781')}</label>
                     <Input
                       value={manualSearch}
                       onChange={(e) => setManualSearch(e.target.value)}
-                      placeholder="Search anime title manually..."
+                      placeholder={uiI18n.t('app.search_anime_title_manually_1dd28a75')}
                       className="h-11 bg-white/5 border-white/10 rounded-xl"
                     />
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -631,12 +634,12 @@ export function MagnetAlignmentModal({ isOpen, onClose, initialMagnet, initialTo
                           type="number"
                           value={manualEpisode}
                           onChange={(e) => setManualEpisode(e.target.value ? Number(e.target.value) : '')}
-                          placeholder="Episode number (optional)"
+                          placeholder={uiI18n.t('app.episode_number_optional_69699cd7')}
                           className="h-11 bg-white/5 border-white/10 rounded-xl"
                         />
                       ) : (
                         <div className="h-11 rounded-xl border border-white/10 bg-white/5 px-4 flex items-center text-xs text-muted-foreground">
-                          Episode set above: {manualEpisode || episodeOptions[0] || 'auto'}
+                          {uiI18n.t('app.episode_set_above_9f26acd1')} {manualEpisode || episodeOptions[0] || uiI18n.t('app.auto_0d612c12')}
                         </div>
                       )}
                       <label className="flex items-center gap-2 text-xs text-muted-foreground px-2">
@@ -645,7 +648,7 @@ export function MagnetAlignmentModal({ isOpen, onClose, initialMagnet, initialTo
                           checked={confirmLowConfidence}
                           onChange={(e) => setConfirmLowConfidence(e.target.checked)}
                         />
-                        Confirm low-confidence mapping
+                        {uiI18n.t('app.confirm_low_confidence_mapping_45411de6')}
                       </label>
                     </div>
                     
@@ -677,7 +680,7 @@ export function MagnetAlignmentModal({ isOpen, onClose, initialMagnet, initialTo
                                 {anime.title.romaji}
                               </h4>
                               <p className="text-[10px] text-muted-foreground mt-1 font-medium">
-                                {anime.format} • {anime.episodes || '?'} Episodes
+                                {anime.format} • {anime.episodes || '?'} {uiI18n.t('app.episodes_49d641ba')}
                               </p>
                             </div>
                             {selectedAnime?.id === anime.id && (
@@ -689,8 +692,8 @@ export function MagnetAlignmentModal({ isOpen, onClose, initialMagnet, initialTo
                         {!matches || matches.length === 0 && (
                           <div className="flex flex-col items-center justify-center py-8 text-center bg-white/5 rounded-2xl border border-dashed border-white/10">
                             <AlertCircle className="w-8 h-8 text-muted-foreground/30 mb-2" />
-                            <p className="text-xs text-muted-foreground">No automatic matches found.</p>
-                            <p className="text-[10px] text-muted-foreground mt-1">Edit the search title above and pick the anime manually.</p>
+                            <p className="text-xs text-muted-foreground">{uiI18n.t('app.no_automatic_matches_found_e66116a6')}</p>
+                            <p className="text-[10px] text-muted-foreground mt-1">{uiI18n.t('app.edit_the_search_title_above_and_pick_the_anime_m_846dfe4e')}</p>
                           </div>
                         )}
                       </div>
@@ -710,7 +713,7 @@ export function MagnetAlignmentModal({ isOpen, onClose, initialMagnet, initialTo
               onClick={step === 1 ? onClose : () => setStep(1)}
               className="rounded-2xl h-14 px-8 font-bold"
             >
-              {step === 1 ? 'Cancel' : 'Back'}
+              {step === 1 ? uiI18n.t('app.cancel_77dfd213') : uiI18n.t('app.back_b52b36b7')}
             </Button>
             
             {step === 2 && (
@@ -720,7 +723,7 @@ export function MagnetAlignmentModal({ isOpen, onClose, initialMagnet, initialTo
                 className="rounded-2xl h-14 px-8 font-bold border-white/10 hover:bg-white/5"
                 disabled={Boolean(torrentBuffer && torrentPreview?.blocked)}
               >
-                Watch Generic
+                {uiI18n.t('app.watch_generic_05f4028c')}
               </Button>
             )}
           </div>
@@ -733,9 +736,9 @@ export function MagnetAlignmentModal({ isOpen, onClose, initialMagnet, initialTo
             {resolving ? (
               <><Loader2 className="w-5 h-5 mr-3 animate-spin" /> Resolving...</>
             ) : step === 1 ? (
-              <><ArrowRight className="w-5 h-5 mr-3" /> Resolve Metadata</>
+              <><ArrowRight className="w-5 h-5 mr-3" /> {uiI18n.t('app.resolve_metadata_9b412e31')}</>
             ) : (
-              <><CheckCircle2 className="w-5 h-5 mr-3" /> Align & Watch</>
+              <><CheckCircle2 className="w-5 h-5 mr-3" /> {uiI18n.t('app.align_watch_54c3f8d7')}</>
             )}
           </Button>
         </div>

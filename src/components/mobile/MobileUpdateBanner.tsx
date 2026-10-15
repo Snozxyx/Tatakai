@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState } from 'react';
 import { Download, Loader2, RefreshCw, X } from 'lucide-react';
 import { isCapacitor } from '@/lib/platform/platform';
@@ -20,6 +22,7 @@ import {
  * Mounted in MainLayout above the app content.
  */
 export function MobileUpdateBanner() {
+  useUiTranslation();
   const update = useMobileUpdateState();
   const [dismissed, setDismissed] = useState<string | null>(null);
 
@@ -42,11 +45,11 @@ export function MobileUpdateBanner() {
             <Download className="h-4 w-4 shrink-0 text-primary" />
           )}
           <p className="flex-1 text-sm text-foreground/90">
-            {update.phase === 'downloading' && `Downloading Tatakai ${update.latestVersion}… ${progress}%`}
-            {update.phase === 'downloaded' && `Tatakai ${update.latestVersion} is ready to install.`}
-            {update.phase === 'installing' && 'Opening the installer…'}
+            {update.phase === 'downloading' && uiI18n.t('app.downloading_tatakai_i18n_value_0_i18n_value_1_e9cdf41e', { value0: update.latestVersion, value1: progress })}
+            {update.phase === 'downloaded' && uiI18n.t('app.tatakai_i18n_value_0_is_ready_to_install_7fa95f9c', { value0: update.latestVersion })}
+            {update.phase === 'installing' && uiI18n.t('app.opening_the_installer_e8883229')}
             {update.phase === 'available' && (
-              <>Tatakai {update.latestVersion} is available{update.currentVersion ? ` (you have ${update.currentVersion})` : ''}.</>
+              <>{uiI18n.t('app.tatakai_28bda6bd')} {update.latestVersion} {uiI18n.t('app.is_available_6b7a7a3e')}{update.currentVersion ? uiI18n.t('app.you_have_i18n_value_0_2c7c5e44', { value0: update.currentVersion }) : ''}.</>
             )}
           </p>
           {update.phase === 'available' && autoCapable && (
@@ -55,7 +58,7 @@ export function MobileUpdateBanner() {
               onClick={() => void downloadMobileUpdate()}
               className="shrink-0 rounded-lg bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
             >
-              Download
+              {uiI18n.t('app.download_a479c9c3')}
             </button>
           )}
           {update.phase === 'available' && !autoCapable && (
@@ -64,7 +67,7 @@ export function MobileUpdateBanner() {
               onClick={() => void openMobileReleasePage(update.releaseUrl)}
               className="shrink-0 rounded-lg bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
             >
-              Update
+              {uiI18n.t('app.update_fb91e24f')}
             </button>
           )}
           {update.phase === 'downloading' && (
@@ -73,7 +76,7 @@ export function MobileUpdateBanner() {
               onClick={() => void cancelMobileUpdateDownload()}
               className="shrink-0 rounded-lg border border-white/10 bg-white/[0.03] px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-primary/5"
             >
-              Cancel
+              {uiI18n.t('app.cancel_77dfd213')}
             </button>
           )}
           {(update.phase === 'downloaded' || update.phase === 'installing') && (
@@ -83,13 +86,13 @@ export function MobileUpdateBanner() {
               onClick={() => void installMobileUpdate()}
               className="shrink-0 rounded-lg bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
             >
-              Install
+              {uiI18n.t('app.install_fd6c3ebf')}
             </button>
           )}
           <button
             type="button"
-            title="Check again"
-            aria-label="Check again"
+            title={uiI18n.t('app.check_again_e185048c')}
+            aria-label={uiI18n.t('app.check_again_e185048c')}
             onClick={() => void checkMobileUpdate({ announce: true })}
             className="shrink-0 rounded-lg p-1 text-muted-foreground transition-colors hover:bg-foreground/10 hover:text-foreground"
           >
@@ -97,8 +100,8 @@ export function MobileUpdateBanner() {
           </button>
           <button
             type="button"
-            title="Dismiss"
-            aria-label="Dismiss"
+            title={uiI18n.t('app.dismiss_70afe9ef')}
+            aria-label={uiI18n.t('app.dismiss_70afe9ef')}
             onClick={() => setDismissed(update.latestVersion ?? 'x')}
             className="shrink-0 rounded-lg p-1 text-muted-foreground transition-colors hover:bg-foreground/10 hover:text-foreground"
           >

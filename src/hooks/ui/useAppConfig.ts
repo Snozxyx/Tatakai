@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -10,6 +12,7 @@ export interface AppConfigItem {
 }
 
 export function useAppConfig() {
+  useUiTranslation();
     const queryClient = useQueryClient();
 
     const query = useQuery({
@@ -38,11 +41,11 @@ export function useAppConfig() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['app_config'] });
-            toast.success('Configuration updated');
+            toast.success(uiI18n.t('app.configuration_updated_d89c4a85'));
         },
         onError: (error) => {
             console.error('Error updating config:', error);
-            toast.error('Failed to update configuration');
+            toast.error(uiI18n.t('app.failed_to_update_configuration_3f2c815e'));
         },
     });
 

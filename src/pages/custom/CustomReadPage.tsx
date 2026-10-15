@@ -1,3 +1,5 @@
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
+import uiI18n from '@/lib/uiI18n';
 import { SourceDebug } from '@/components/extensions/SourceDebug';
 /**
  * Custom-source read page (`kind: 'read'`).
@@ -12,6 +14,7 @@ import { SourceDebug } from '@/components/extensions/SourceDebug';
 
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { ReaderImage } from "@/components/reader/ReaderImage";
@@ -22,6 +25,8 @@ import { readerPageRenderKey } from "@/lib/reader/imageLifecycle";
 import { useCustomRead, useCustomInfo, useCustomSource } from "@/hooks/api/useCustomSource";
 
 export default function CustomReadPage() {
+  useUiTranslation();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { namespace, sourceId, id, chapterId } = useParams<{
     namespace: string;
@@ -71,7 +76,7 @@ export default function CustomReadPage() {
   const goNextPage = () => setPageIndex((i) => Math.min(total - 1, i + 1));
   const goPrevPage = () => setPageIndex((i) => Math.max(0, i - 1));
   const progressPct = total ? ((pageIndex + 1) / total) * 100 : 0;
-  const progressLabel = `${Math.min(pageIndex + 1, total || 1)} / ${total || "…"}`;
+  const progressLabel = uiI18n.t('app.i18n_value_0_i18n_value_1_68ff458e', { value0: Math.min(pageIndex + 1, total || 1), value1: total || "…" });
 
   return (
     <div className="relative min-h-screen text-foreground" style={{ backgroundColor: settings.backgroundColor }}>
@@ -79,7 +84,7 @@ export default function CustomReadPage() {
         <button
           onClick={() => navigate(`${base}/info/${encodeURIComponent(id || "")}`)}
           className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 px-2.5 py-1.5 text-sm font-semibold hover:bg-white/10"
-          title="Back to info"
+          title={t('animeDetail.backToInfo')}
         >
           <ArrowLeft className="h-4 w-4" />
         </button>
@@ -88,10 +93,10 @@ export default function CustomReadPage() {
           onClick={() => prev && goEntry(prev.id)}
           className="inline-flex items-center gap-1 rounded-lg border border-white/15 px-2.5 py-1.5 text-sm font-semibold hover:bg-white/10 disabled:opacity-40"
         >
-          <ChevronLeft className="h-4 w-4" /> Prev
+          <ChevronLeft className="h-4 w-4" /> {t('common.previous')}
         </button>
         <div className="flex min-w-0 flex-1 flex-col items-center px-2 text-center">
-          <span className="w-full truncate text-sm font-bold">{info?.title || source?.name || "Read"}</span>
+          <span className="w-full truncate text-sm font-bold">{info?.title || source?.name || t('animeDetail.read')}</span>
           <span className="w-full truncate text-xs text-muted-foreground">{currentLabel}</span>
         </div>
         <button
@@ -99,7 +104,7 @@ export default function CustomReadPage() {
           onClick={() => next && goEntry(next.id)}
           className="inline-flex items-center gap-1 rounded-lg border border-white/15 px-2.5 py-1.5 text-sm font-semibold hover:bg-white/10 disabled:opacity-40"
         >
-          Next <ChevronRight className="h-4 w-4" />
+          {t('common.next')} <ChevronRight className="h-4 w-4" />
         </button>
       </div>
 
@@ -107,13 +112,13 @@ export default function CustomReadPage() {
         <SourceDebug kind="custom" unit="pages" sources={pages.map(() => ({ providerKey: namespace, providerName: source?.name }))} />
         {isLoading ? (
           <div className="flex items-center justify-center gap-2 py-24 text-muted-foreground">
-            <Loader2 className="h-5 w-5 animate-spin" /> Loading pages…
+            <Loader2 className="h-5 w-5 animate-spin" /> {t('discover.loadingPages')}
           </div>
         ) : total === 0 || isError ? (
           <GlassPanel className="mx-auto max-w-xl border border-white/10 p-6">
-            <h2 className="text-xl font-bold">Unable to load this chapter</h2>
+            <h2 className="text-xl font-bold">{t('discover.unableToLoadChapter')}</h2>
             <p className="mt-2 text-muted-foreground">
-              The source returned no pages. Try another chapter or check that the extension is running.
+              {t('discover.unableToLoadChapterDesc')}
             </p>
           </GlassPanel>
         ) : settings.readingMode === "vertical" ? (
@@ -138,7 +143,7 @@ export default function CustomReadPage() {
                 <button
                   type="button"
                   tabIndex={-1}
-                  aria-label="Previous page"
+                  aria-label={t('manga.previousPage')}
                   onClick={(e) => {
                     goPrevPage();
                     // Keep the invisible tap zone from holding focus and
@@ -150,7 +155,7 @@ export default function CustomReadPage() {
                 <button
                   type="button"
                   tabIndex={-1}
-                  aria-label="Next page"
+                  aria-label={t('manga.nextPage')}
                   onClick={(e) => {
                     goNextPage();
                     e.currentTarget.blur();

@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,6 +11,7 @@ const PROFILE_COLS = 'user_id, display_name, avatar_url, username';
 
 /** The current user's bookmarked posts, shaped as feed posts. */
 export function useBookmarkedPosts() {
+  useUiTranslation();
   const { user } = useAuth();
   return useQuery({
     queryKey: ['post-bookmarks', user?.id],
@@ -77,12 +80,13 @@ export function useBookmarkedPosts() {
 
 /** Toggle a repost on a post. */
 export function useToggleRepost() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
   return useMutation({
     mutationFn: async ({ postId, reposted }: { postId: string; reposted: boolean }) => {
-      if (!user) throw new Error('Must be logged in');
+      if (!user) throw new Error(uiI18n.t('app.must_be_logged_in_9cf435d8'));
       const db = supabase as any;
       if (reposted) {
         const { error } = await db.from('post_reposts').delete().eq('post_id', postId).eq('user_id', user.id);
@@ -95,20 +99,21 @@ export function useToggleRepost() {
     },
     onSuccess: (reposted) => {
       queryClient.invalidateQueries({ queryKey: ['feed'] });
-      toast.success(reposted ? 'Reposted' : 'Repost removed');
+      toast.success(reposted ? uiI18n.t('app.reposted_0c3053e4') : uiI18n.t('app.repost_removed_6831761a'));
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : 'Failed to repost'),
+    onError: (err) => toast.error(err instanceof Error ? err.message : uiI18n.t('app.failed_to_repost_5a337564')),
   });
 }
 
 /** Toggle a bookmark on a post. */
 export function useToggleBookmark() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
   return useMutation({
     mutationFn: async ({ postId, bookmarked }: { postId: string; bookmarked: boolean }) => {
-      if (!user) throw new Error('Must be logged in');
+      if (!user) throw new Error(uiI18n.t('app.must_be_logged_in_9cf435d8'));
       const db = supabase as any;
       if (bookmarked) {
         const { error } = await db.from('post_bookmarks').delete().eq('post_id', postId).eq('user_id', user.id);

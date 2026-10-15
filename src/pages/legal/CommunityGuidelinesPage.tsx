@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useNavigate } from "react-router-dom";
 import { Background } from "@/components/layout/Background";
 import { Sidebar } from "@/components/layout/Sidebar";
@@ -21,7 +23,7 @@ const RULES: RuleSection[] = [
   {
     id: 'respect',
     n: 1,
-    title: 'Be respectful',
+    get title() { return uiI18n.t('app.be_respectful_c53e6434'); },
     tagline: 'Disagree with the take, not the person.',
     intro: `Arguing about anime and manga is the point of this place. Insulting or targeting the people you're arguing with is not.`,
     notAllowed: [
@@ -41,7 +43,7 @@ const RULES: RuleSection[] = [
   {
     id: 'hate',
     n: 2,
-    title: 'No hate speech',
+    get title() { return uiI18n.t('app.no_hate_speech_556adf87'); },
     tagline: `What matters is what you're doing with the word, not that the word exists.`,
     intro: `Slurs used to harass someone or to push prejudice are not allowed anywhere: comments, posts, images, GIFs, usernames, bios, and the names of your lists, tier lists, and communities.`,
     notAllowed: [
@@ -59,7 +61,7 @@ const RULES: RuleSection[] = [
   {
     id: 'sfw',
     n: 3,
-    title: 'Keep it safe for work',
+    get title() { return uiI18n.t('app.keep_it_safe_for_work_88f88689'); },
     tagline: 'Match the space you’re in. The 18+ gate exists; everything outside it stays SFW.',
     intro: `Adult series sit behind the 18+ content setting, and discussing them frankly there is fine. Everything outside that gate is a SFW space. Anything attached to your identity stays SFW everywhere, because avatars and usernames follow you around the site.`,
     notAllowed: [
@@ -76,7 +78,7 @@ const RULES: RuleSection[] = [
   {
     id: 'spoilers',
     n: 4,
-    title: 'Tag your spoilers',
+    get title() { return uiI18n.t('app.tag_your_spoilers_e5e456e2'); },
     tagline: 'Use the spoiler tag. It exists so everyone can read and watch at their own pace.',
     intro: `If you've read or watched ahead in the source material, good for you. The comments under episode 12 are for episode 12.`,
     notAllowed: [
@@ -93,7 +95,7 @@ const RULES: RuleSection[] = [
   {
     id: 'spam',
     n: 5,
-    title: `Don't spam`,
+    get title() { return uiI18n.t('app.don_t_spam_c41e17a3'); },
     tagline: 'One good comment beats twenty copy-pasted ones.',
     intro: `Comment sections live and die by signal to noise. Flooding them with the same message, meme chains, or machine-generated filler buries the actual discussion.`,
     notAllowed: [
@@ -112,7 +114,7 @@ const RULES: RuleSection[] = [
   {
     id: 'advertising',
     n: 6,
-    title: `No advertising`,
+    get title() { return uiI18n.t('app.no_advertising_5a2b6d58'); },
     tagline: `Don't use Tatakai to promote your stuff, or anyone else's.`,
     intro: `This applies to comments, forums, profiles, lists, and communities. If the point of a post is to send people somewhere else or make money, it doesn't belong here.`,
     notAllowed: [
@@ -130,7 +132,7 @@ const RULES: RuleSection[] = [
   {
     id: 'reputation',
     n: 7,
-    title: `Don't farm reputation`,
+    get title() { return uiI18n.t('app.don_t_farm_reputation_5c6f5243'); },
     tagline: `Reputation measures whether people liked your contribution, not how hard you grinded for it.`,
     intro: `Earn likes and reactions by being funny, insightful, or helpful. The moment you start engineering them it's farming, and farmed reputation gets wiped.`,
     notAllowed: [
@@ -150,7 +152,7 @@ const RULES: RuleSection[] = [
   {
     id: 'votes',
     n: 8,
-    title: `Don't weaponize votes`,
+    get title() { return uiI18n.t('app.don_t_weaponize_votes_bfad69a7'); },
     tagline: `The downvote and report buttons are for bad contributions, not for people you dislike.`,
     intro: `Reacting to a comment you think is bad is the button working. Turning it on a person is what this rule is about, and votes cast that way get reversed.`,
     notAllowed: [
@@ -166,7 +168,7 @@ const RULES: RuleSection[] = [
   {
     id: 'accounts',
     n: 9,
-    title: 'One person, one account',
+    get title() { return uiI18n.t('app.one_person_one_account_61cbf4f0'); },
     tagline: 'Alt accounts used to break any other rule make it worse, not safer.',
     intro: `Having a second account isn't a crime by itself. Using one to manipulate the site is.`,
     notAllowed: [
@@ -181,7 +183,7 @@ const RULES: RuleSection[] = [
   {
     id: 'privacy',
     n: 10,
-    title: 'Respect privacy, yours and theirs',
+    get title() { return uiI18n.t('app.respect_privacy_yours_and_theirs_45078f80'); },
     tagline: `If it isn't yours to share, don't post it.`,
     notAllowed: [
       `Posting anyone's personal information: name, face, location, socials, private conversations, anything.`,
@@ -194,6 +196,7 @@ const RULES: RuleSection[] = [
 ];
 
 export default function CommunityGuidelinesPage() {
+  useUiTranslation();
   const navigate = useNavigate();
   const isDesktopApp = useIsDesktopApp();
 
@@ -208,39 +211,39 @@ export default function CommunityGuidelinesPage() {
           className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6"
         >
           <ArrowLeft className="w-5 h-5" />
-          <span>Back</span>
+          <span>{uiI18n.t('app.back_b52b36b7')}</span>
         </button>
 
         <div className="mb-6">
           <h1 className="text-3xl md:text-4xl font-black tracking-tight mb-2 flex items-center gap-3">
             <Users className="w-8 h-8 text-primary" />
-            Community Guidelines
+            {uiI18n.t('app.community_guidelines_75343669')}
           </h1>
-          <p className="text-muted-foreground">Last updated: September 28, 2026</p>
+          <p className="text-muted-foreground">{uiI18n.t('app.last_updated_september_28_2026_13b452ee')}</p>
         </div>
 
         <Card className="mb-6">
           <CardContent className="space-y-4 pt-6">
             <p>
-              Tatakai is a community-driven, extension-based otaku platform. These rules exist so the comments stay worth reading and everyone can enjoy them. They apply everywhere: comments, forums, reviews, polls, community walls, playlists, tier lists, and your profile.
+              {uiI18n.t('app.tatakai_is_a_community_driven_extension_based_ot_df1752d2')}
             </p>
             <p>
-              In practice, using Tatakai normally and being cordial with the people around you is enough. Read, watch, comment, and argue about episodes and chapters — none of this will ever come up. The list below is long because it's specific, not because the bar is high.
+              {uiI18n.t('app.in_practice_using_tatakai_normally_and_being_cor_c77058ff')}
             </p>
             <p className="font-semibold text-foreground">
-              By posting your first comment or post, you confirm you've read and agree to these guidelines.
+              {uiI18n.t('app.by_posting_your_first_comment_or_post_you_confir_0d5329e1')}
             </p>
           </CardContent>
         </Card>
 
         <Card className="mb-6">
-          <CardHeader><CardTitle className="text-base">On this page</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base">{uiI18n.t('app.on_this_page_7e439c35')}</CardTitle></CardHeader>
           <CardContent>
             <ol className="grid sm:grid-cols-2 gap-x-6 gap-y-1 list-none">
               {RULES.map((r) => (
                 <li key={r.id}>
                   <a href={`#${r.id}`} className="text-sm text-muted-foreground hover:text-primary transition-colors">
-                    {String(r.n).padStart(2, '0')}&nbsp;&nbsp;{r.title}
+                    {String(r.n).padStart(2, '0')}{"  "}{r.title}
                   </a>
                 </li>
               ))}
@@ -258,7 +261,7 @@ export default function CommunityGuidelinesPage() {
                 {r.intro && <p>{r.intro}</p>}
                 {r.notAllowed?.length ? (
                   <div>
-                    <p className="text-sm font-semibold text-red-400 mb-2">Not allowed</p>
+                    <p className="text-sm font-semibold text-red-400 mb-2">{uiI18n.t('app.not_allowed_e0315131')}</p>
                     <ul className="list-disc list-inside space-y-2 ml-4 text-muted-foreground">
                       {r.notAllowed.map((t, i) => <li key={i}>{t}</li>)}
                     </ul>
@@ -266,7 +269,7 @@ export default function CommunityGuidelinesPage() {
                 ) : null}
                 {r.fine?.length ? (
                   <div>
-                    <p className="text-sm font-semibold text-emerald-400 mb-2">Totally fine</p>
+                    <p className="text-sm font-semibold text-emerald-400 mb-2">{uiI18n.t('app.totally_fine_910a095c')}</p>
                     <ul className="list-disc list-inside space-y-2 ml-4 text-muted-foreground">
                       {r.fine.map((t, i) => <li key={i}>{t}</li>)}
                     </ul>
@@ -276,7 +279,7 @@ export default function CommunityGuidelinesPage() {
                   <div className="flex items-start gap-3 p-4 rounded-lg border border-red-500/30 bg-red-500/10">
                     <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
                     <p className="text-sm">
-                      <span className="font-semibold text-red-400">Zero tolerance:</span> {r.zeroTolerance}
+                      <span className="font-semibold text-red-400">{uiI18n.t('app.zero_tolerance_4a21a5c7')}</span> {r.zeroTolerance}
                     </p>
                   </div>
                 )}
@@ -284,22 +287,22 @@ export default function CommunityGuidelinesPage() {
             </Card>
           ))}
           <Card id="reporting" className="scroll-mt-24">
-            <CardHeader><CardTitle>Reporting</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{uiI18n.t('app.reporting_c9e579d6')}</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <p>
-                See something that breaks these rules? Report it. Every report gets reviewed by a moderator. Pick the reason that actually fits and add details for anything unusual — a clear report gets handled faster. Don't report content just because you disagree with it, and don't organize report campaigns against users. Deliberately false reports are themselves a violation.
+                {uiI18n.t('app.see_something_that_breaks_these_rules_report_it__c1e51c8f')}
               </p>
             </CardContent>
           </Card>
 
           <Card id="enforcement" className="scroll-mt-24">
-            <CardHeader><CardTitle>Enforcement</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{uiI18n.t('app.enforcement_2ef3dfe3')}</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <p>
-                Moderators may remove content, purge votes and farmed reputation, reset usernames and profile content, restrict features, and warn or ban accounts at their discretion. Most first offenses get a removal and a warning. Warnings stack, and enough of them turn into a ban on their own; the worst offenses skip straight there. Vote manipulation gets reversed retroactively, so cheated reputation and review rankings don't survive the cleanup. Bans extend to alt accounts.
+                {uiI18n.t('app.moderators_may_remove_content_purge_votes_and_fa_b136f9dd')}
               </p>
               <p>
-                These guidelines can't list everything. Anything done with the intent to manipulate, harm, or abuse the community, its members, or the platform is not allowed, and reasonable judgement decides the rest. If you think a moderation action was a mistake, or you're unsure whether something is okay to post, ask us on Discord.
+                {uiI18n.t('app.these_guidelines_can_t_list_everything_anything__a4a9e122')}
               </p>
             </CardContent>
           </Card>

@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { Star, BookOpen, Pause, Play } from "lucide-react";
 import { GlassPanel } from "@/components/ui/GlassPanel";
 import { UnifiedMediaCardProps } from "@/components/UnifiedMediaCard";
@@ -20,6 +22,7 @@ interface NovelHeroSectionProps {
 
 
 export function NovelHeroSection({ spotlight, spotlights, onActiveSpotlightChange }: NovelHeroSectionProps) {
+  useUiTranslation();
   const refreshed = useMobileAppearance();
   const items = useMemo(() => (spotlights?.length ? spotlights : [spotlight]).map(toMangaSpotlight), [spotlight, spotlights]);
   return refreshed ? <CinematicHero spotlights={items} mediaType="novel" onActiveSpotlightChange={onActiveSpotlightChange} />
@@ -27,6 +30,7 @@ export function NovelHeroSection({ spotlight, spotlights, onActiveSpotlightChang
 }
 
 function ClassicNovelHeroSection({ spotlight, spotlights = [] }: NovelHeroSectionProps) {
+  useUiTranslation();
   const navigate = useNavigate();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -108,9 +112,7 @@ function ClassicNovelHeroSection({ spotlight, spotlights = [] }: NovelHeroSectio
         </div>
 
         <div
-          className={`relative z-10 pt-8 px-4 pb-5 transition-opacity duration-300 ${
-            isTransitioning ? "opacity-0" : "opacity-100"
-          }`}
+          className={`relative z-10 pt-8 px-4 pb-5 transition-opacity duration-300 ${isTransitioning ? "opacity-0" : "opacity-100"}`}
         >
           <div className="flex gap-4 mb-6">
             <div className="w-32 flex-shrink-0">
@@ -126,7 +128,7 @@ function ClassicNovelHeroSection({ spotlight, spotlights = [] }: NovelHeroSectio
             <div className="flex-1 min-w-0 py-2">
               <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-amber/30 bg-amber-500/15 backdrop-blur-md text-amber text-[10px] font-bold tracking-wider uppercase mb-2 shadow-lg shadow-black/30">
                 <Star className="w-2.5 h-2.5 fill-amber" />
-                Featured Novel
+                {uiI18n.t('app.featured_novel_5932b971')}
               </div>
 
               <h1 className="font-display text-xl font-black tracking-tight leading-tight text-white text-balance drop-shadow-lg mb-2 line-clamp-3">
@@ -136,7 +138,7 @@ function ClassicNovelHeroSection({ spotlight, spotlights = [] }: NovelHeroSectio
               <div className="text-xs font-medium text-white/65">
                 {spotlightType} •{" "}
                 {activeSpotlight.chapters
-                  ? `${activeSpotlight.chapters} Chapters`
+                  ? uiI18n.t('app.i18n_value_0_chapters_a5ec6adf', { value0: activeSpotlight.chapters })
                   : spotlightStatus}
               </div>
             </div>
@@ -148,26 +150,24 @@ function ClassicNovelHeroSection({ spotlight, spotlights = [] }: NovelHeroSectio
               className="flex-1 h-12 rounded-2xl bg-white text-black font-bold text-sm hover:bg-white/90 motion-safe:active:scale-[.98] transition-[opacity,transform,background-color] flex items-center justify-center gap-2 shadow-xl shadow-black/40 ring-1 ring-white/40"
             >
               <BookOpen className="w-4 h-4 fill-black" />
-              Read Now
+              {uiI18n.t('app.read_now_1d9d0f1e')}
             </button>
           </div>
 
           {allSpotlights.length > 1 && (
             <div className="flex items-center justify-center gap-1 pt-4">
-              {!reduced && <button type="button" onClick={() => setPaused(value => !value)} aria-label={paused ? 'Resume spotlight rotation' : 'Pause spotlight rotation'} aria-pressed={paused} className="flex h-11 w-11 items-center justify-center rounded-full hover:bg-muted/30">{paused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}</button>}
+              {!reduced && <button type="button" onClick={() => setPaused(value => !value)} aria-label={paused ? uiI18n.t('app.resume_spotlight_rotation_ea6487a4') : uiI18n.t('app.pause_spotlight_rotation_95348f6f')} aria-pressed={paused} className="flex h-11 w-11 items-center justify-center rounded-full hover:bg-muted/30">{paused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}</button>}
               {allSpotlights.map((_, idx) => (
                 <button
                   key={idx}
                   onClick={() => goTo(idx)}
-                  aria-label={`Show spotlight ${idx + 1}`}
+                  aria-label={uiI18n.t('app.show_spotlight_i18n_value_0_03b2df1b', { value0: idx + 1 })}
                   aria-pressed={idx === currentIndex} className="flex h-11 w-11 items-center justify-center rounded-full"
                 >
                   <span
-                    className={`transition-[opacity,transform,background-color] duration-300 rounded-full ${
-                      idx === currentIndex
+                    className={`transition-[opacity,transform,background-color] duration-300 rounded-full ${idx === currentIndex
                         ? "w-6 h-1.5 bg-white"
-                        : "w-1.5 h-1.5 bg-white/35"
-                    }`}
+                        : "w-1.5 h-1.5 bg-white/35"}`}
                   />
                 </button>
               ))}
@@ -178,13 +178,11 @@ function ClassicNovelHeroSection({ spotlight, spotlights = [] }: NovelHeroSectio
 
       <div className="hidden lg:grid grid-cols-12 gap-8 items-center">
         <div
-          className={`col-span-5 space-y-8 z-20 transition-opacity duration-300 ${
-            isTransitioning ? "opacity-0" : "opacity-100 "
-          }`}
+          className={`col-span-5 space-y-8 z-20 transition-opacity duration-300 ${isTransitioning ? "opacity-0" : "opacity-100 "}`}
         >
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-amber/30 bg-amber/10 text-amber text-xs font-bold tracking-wider uppercase">
             <Star className="w-3 h-3 fill-amber" />
-            Featured Novel
+            {uiI18n.t('app.featured_novel_5932b971')}
           </div>
 
           <h1 data-long-title={spotlightName.length > 60} className="spotlight-heading font-display text-5xl font-bold tracking-tight leading-[1.04] text-foreground">
@@ -206,7 +204,7 @@ function ClassicNovelHeroSection({ spotlight, spotlights = [] }: NovelHeroSectio
             </span>
             {activeSpotlight.chapters && (
               <span className="px-4 py-1.5 rounded-lg border border-border bg-muted/50 text-sm font-medium hover:bg-muted cursor-default transition-colors">
-                {activeSpotlight.chapters} Chapters
+                {activeSpotlight.chapters} {uiI18n.t('app.chapters_034e2733')}
               </span>
             )}
           </div>
@@ -217,18 +215,18 @@ function ClassicNovelHeroSection({ spotlight, spotlights = [] }: NovelHeroSectio
               className="h-14 px-8 rounded-full bg-foreground text-background font-bold text-lg hover:scale-105 active:scale-95 transition-[opacity,transform,background-color] flex items-center gap-2 glow-primary"
             >
               <BookOpen className="w-5 h-5 fill-background" />
-              Read Now
+              {uiI18n.t('app.read_now_1d9d0f1e')}
             </button>
           </div>
 
           {allSpotlights.length > 1 && (
             <div className="flex items-center gap-2 pt-4">
-              {!reduced && <button type="button" onClick={() => setPaused(value => !value)} aria-label={paused ? 'Resume spotlight rotation' : 'Pause spotlight rotation'} aria-pressed={paused} className="flex h-11 w-11 items-center justify-center rounded-full hover:bg-muted/30">{paused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}</button>}
+              {!reduced && <button type="button" onClick={() => setPaused(value => !value)} aria-label={paused ? uiI18n.t('app.resume_spotlight_rotation_ea6487a4') : uiI18n.t('app.pause_spotlight_rotation_95348f6f')} aria-pressed={paused} className="flex h-11 w-11 items-center justify-center rounded-full hover:bg-muted/30">{paused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}</button>}
               {allSpotlights.map((_, idx) => (
                 <button
                   key={idx}
                   onClick={() => goTo(idx)}
-                  aria-label={`Show spotlight ${idx + 1}`}
+                  aria-label={uiI18n.t('app.show_spotlight_i18n_value_0_03b2df1b', { value0: idx + 1 })}
                   aria-pressed={idx === currentIndex}
                   className="flex h-11 w-11 items-center justify-center rounded-full"
                 ><span className={`h-2 rounded-full ${idx === currentIndex ? 'w-8 bg-foreground' : 'w-2 bg-muted-foreground/50'}`} /></button>
@@ -238,9 +236,7 @@ function ClassicNovelHeroSection({ spotlight, spotlights = [] }: NovelHeroSectio
         </div>
 
         <div
-          className={`col-span-7 relative transition-[opacity,transform,background-color] duration-700 ease-out ${
-            isTransitioning ? "opacity-0" : "opacity-100"
-          }`}
+          className={`col-span-7 relative transition-[opacity,transform,background-color] duration-700 ease-out ${isTransitioning ? "opacity-0" : "opacity-100"}`}
         >
           <div className="relative aspect-[16/9] w-full rounded-[2.5rem] overflow-hidden group">
             <img

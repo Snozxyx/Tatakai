@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { motion } from 'framer-motion';
 import { useWatchStreaks, type WatchStreak } from '@/hooks/user/useWatchStreaks';
 import { GlassPanel } from '@/components/ui/GlassPanel';
@@ -23,6 +25,7 @@ interface WatchStreaksProps {
 }
 
 function StreakIcon({ streak }: { streak: number }) {
+  useUiTranslation();
   if (streak === 0) return <Moon className="w-8 h-8 text-muted-foreground" />;
   if (streak >= 30) return <Mountain className="w-8 h-8 text-orange-400" />;
   if (streak >= 14) return <Zap className="w-8 h-8 text-yellow-400" />;
@@ -36,6 +39,7 @@ export function WatchStreaks({
   streak: streakProp,
   stats: statsProp,
 }: WatchStreaksProps) {
+  useUiTranslation();
   const own = useWatchStreaks();
   const navigate = useNavigate();
 
@@ -62,9 +66,9 @@ export function WatchStreaks({
           <div className="flex flex-col items-center gap-1">
             <StreakIcon streak={streak.currentStreak} />
             <div className="text-2xl font-black font-display">{streak.currentStreak}</div>
-            <div className="text-xs text-muted-foreground font-medium">Day Streak</div>
+            <div className="text-xs text-muted-foreground font-medium">{uiI18n.t('app.day_streak_ca4b28ae')}</div>
             {streak.isActiveToday && (
-              <div className="text-[10px] text-orange-400 font-semibold">Active Today!</div>
+              <div className="text-[10px] text-orange-400 font-semibold">{uiI18n.t('app.active_today_c57265f4')}</div>
             )}
           </div>
         </GlassPanel>
@@ -74,7 +78,7 @@ export function WatchStreaks({
           <div className="flex flex-col items-center gap-1">
             <Trophy className="w-8 h-8 text-amber-400" />
             <div className="text-2xl font-black font-display">{streak.longestStreak}</div>
-            <div className="text-xs text-muted-foreground font-medium">Best Streak</div>
+            <div className="text-xs text-muted-foreground font-medium">{uiI18n.t('app.best_streak_3b03fa81')}</div>
           </div>
         </GlassPanel>
 
@@ -83,7 +87,7 @@ export function WatchStreaks({
           <div className="flex flex-col items-center gap-1">
             <Tv2 className="w-8 h-8 text-blue-400" />
             <div className="text-2xl font-black font-display">{stats.totalEpisodes}</div>
-            <div className="text-xs text-muted-foreground font-medium">Episodes</div>
+            <div className="text-xs text-muted-foreground font-medium">{uiI18n.t('app.episodes_49d641ba')}</div>
           </div>
         </GlassPanel>
 
@@ -92,7 +96,7 @@ export function WatchStreaks({
           <div className="flex flex-col items-center gap-1">
             <Clock className="w-8 h-8 text-primary" />
             <div className="text-2xl font-black font-display">{stats.totalHours}</div>
-            <div className="text-xs text-muted-foreground font-medium">Hours</div>
+            <div className="text-xs text-muted-foreground font-medium">{uiI18n.t('app.hours_9e25a34e')}</div>
           </div>
         </GlassPanel>
       </div>
@@ -102,7 +106,7 @@ export function WatchStreaks({
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Trophy className="w-4 h-4 text-amber-400" />
-            <h3 className="font-display text-base font-bold">Rank Badges</h3>
+            <h3 className="font-display text-base font-bold">{uiI18n.t('app.rank_badges_8f907804')}</h3>
             <span className="text-xs text-muted-foreground">
               {unlockedCount}/{badges.length}
             </span>
@@ -112,7 +116,7 @@ export function WatchStreaks({
               onClick={() => navigate('/stats')}
               className="text-xs text-primary hover:underline"
             >
-              View full stats →
+              {uiI18n.t('app.view_full_stats_fc10786e')}
             </button>
           )}
         </div>

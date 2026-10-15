@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { languageLabel } from '@/core/extensions/remote/metadata';
 /**
  * MangaChapterProviderRows.tsx
@@ -70,11 +72,12 @@ export function MangaChapterProviderRows({
   onNavigate,
   className,
 }: MangaChapterProviderRowsProps) {
+  useUiTranslation();
   // Build the chapter header label
   const chapterLabel =
     chapter.chapterNumber != null
-      ? `Chapter ${chapter.chapterNumber}`
-      : chapter.chapterTitle || "Chapter";
+      ? uiI18n.t('app.chapter_i18n_value_0_e0f6e591', { value0: chapter.chapterNumber })
+      : chapter.chapterTitle || uiI18n.t('app.chapter_46b00590');
 
   // Show title after the label only when it differs (Req 2.7.1 — header shows number + title)
   const titleSuffix =
@@ -102,7 +105,7 @@ export function MangaChapterProviderRows({
         {chapterLabel}
         {titleSuffix}
       </div>
-      {chapter.sources.length === 0 && <p className="px-4 py-3 text-sm text-muted-foreground">Release listed on MangaUpdates. No reading source available yet.</p>}
+      {chapter.sources.length === 0 && <p className="px-4 py-3 text-sm text-muted-foreground">{uiI18n.t('app.release_listed_on_mangaupdates_no_reading_source_a041b816')}</p>}
 
       {/* Sub-rows — one per filtered source (Req 2.7.1, 2.7.2) */}
       {filteredSources.map((src, idx) => {
@@ -117,8 +120,8 @@ export function MangaChapterProviderRows({
         // Req 2.7.3 / 2.7.4 — label format
         const label =
           src.scanlator && src.scanlator.trim()
-            ? `${src.providerName || src.provider} • ${src.scanlator} (${langLabel})`
-            : `${src.providerName || src.provider} (${langLabel})`;
+            ? uiI18n.t('app.i18n_value_0_i18n_value_1_i18n_value_2_a8d53279', { value0: src.providerName || src.provider, value1: src.scanlator, value2: langLabel })
+            : uiI18n.t('app.i18n_value_0_i18n_value_1_8568f691', { value0: src.providerName || src.provider, value1: langLabel });
 
         return (
           <button

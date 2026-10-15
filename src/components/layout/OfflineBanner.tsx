@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { CloudOff, Download, HardDrive, RefreshCw, X } from 'lucide-react';
 import { useBackendStatus } from '@/contexts/BackendStatusContext';
@@ -22,6 +23,7 @@ import { useMobileDownload } from '@/hooks/media/useMobileDownload';
  * exists to fall back to. On web it renders nothing.
  */
 export function OfflineBanner() {
+  const { t } = useTranslation();
   const { status, recheck } = useBackendStatus();
   const isNative = useIsNativeApp();
   const location = useLocation();
@@ -45,11 +47,11 @@ export function OfflineBanner() {
       <div className="pointer-events-auto mt-2 flex w-full max-w-2xl items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 backdrop-blur-md shadow-lg">
         <CloudOff className="h-4 w-4 shrink-0 text-amber-500" />
         <p className="flex-1 text-sm text-foreground/90">
-          Our servers are unreachable right now. Your downloads are still available offline.
+          {t('layout.offlineBannerMessage')}
           {activeDownloads.length > 0 && (
             <span className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
               <Download className="h-3 w-3 animate-pulse" />
-              {activeDownloads.length} download{activeDownloads.length > 1 ? 's' : ''} still running
+              {t('migration.runningDownloads', { count: activeDownloads.length })}
             </span>
           )}
         </p>
@@ -58,18 +60,18 @@ export function OfflineBanner() {
           className="flex shrink-0 items-center gap-1.5 rounded-lg bg-foreground/10 px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:bg-foreground/20"
         >
           <HardDrive className="h-3.5 w-3.5" />
-          Downloads
+          {t('nav.downloads')}
         </button>
         <button
           onClick={() => recheck()}
-          title="Retry connection"
+          title={t('common.retryConnection')}
           className="flex shrink-0 items-center rounded-lg p-1 text-muted-foreground transition-colors hover:bg-foreground/10 hover:text-foreground"
         >
           <RefreshCw className="h-3.5 w-3.5" />
         </button>
         <button
           onClick={() => setDismissed(true)}
-          title="Dismiss"
+          title={t('common.close')}
           className="flex shrink-0 items-center rounded-lg p-1 text-muted-foreground transition-colors hover:bg-foreground/10 hover:text-foreground"
         >
           <X className="h-3.5 w-3.5" />

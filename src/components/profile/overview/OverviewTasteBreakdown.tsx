@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Building2, Star, Shuffle } from 'lucide-react';
@@ -10,12 +12,13 @@ export interface OverviewTasteBreakdownProps {
 }
 
 function diversityLabel(score: number): string {
-  if (score > 0.7) return 'Very diverse taste';
-  if (score > 0.4) return 'Moderate diversity';
-  return 'Focused preferences';
+  if (score > 0.7) return uiI18n.t('app.very_diverse_taste_67ea62c6');
+  if (score > 0.4) return uiI18n.t('app.moderate_diversity_143890c1');
+  return uiI18n.t('app.focused_preferences_645d118e');
 }
 
 export function OverviewTasteBreakdown({ profile, isLoading = false }: OverviewTasteBreakdownProps) {
+  useUiTranslation();
   const hasProfile = !!profile && (profile.topStudios.length > 0 || profile.sampleSize > 0);
 
   return (
@@ -26,10 +29,10 @@ export function OverviewTasteBreakdown({ profile, isLoading = false }: OverviewT
         <div className="flex items-center gap-2 mb-1">
           <Building2 className="w-4 h-4 text-primary/80" />
           <h3 className="font-display font-bold text-base sm:text-lg text-foreground tracking-tight">
-            Taste Breakdown
+            {uiI18n.t('app.taste_breakdown_0ad34418')}
           </h3>
         </div>
-        <p className="text-xs text-muted-foreground/70">Favorite studios, rating range, and diversity</p>
+        <p className="text-xs text-muted-foreground/70">{uiI18n.t('app.favorite_studios_rating_range_and_diversity_43bec12a')}</p>
       </div>
 
       <div className="relative z-10 flex-1">
@@ -39,10 +42,10 @@ export function OverviewTasteBreakdown({ profile, isLoading = false }: OverviewT
           <div className="flex flex-col items-center justify-center h-[200px] text-center">
             <Building2 className="w-10 h-10 text-muted-foreground/30 mb-3" />
             <p className="text-sm text-muted-foreground/60 max-w-[220px]">
-              No taste profile yet. Generate one to see your favorite studios.
+              {uiI18n.t('app.no_taste_profile_yet_generate_one_to_see_your_fa_f859246c')}
             </p>
             <Link to="/recommendations" className="mt-3 text-xs font-medium text-primary hover:underline">
-              Build your taste profile →
+              {uiI18n.t('app.build_your_taste_profile_64b625f3')}
             </Link>
           </div>
         ) : (
@@ -53,7 +56,7 @@ export function OverviewTasteBreakdown({ profile, isLoading = false }: OverviewT
                 <div className="flex items-center gap-1.5 mb-2.5">
                   <Building2 className="w-3.5 h-3.5 text-muted-foreground/60" />
                   <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">
-                    Favorite Studios
+                    {uiI18n.t('app.favorite_studios_a8418fa3')}
                   </span>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -74,7 +77,7 @@ export function OverviewTasteBreakdown({ profile, isLoading = false }: OverviewT
               <div className="flex items-center gap-1.5 mb-2.5">
                 <Star className="w-3.5 h-3.5 text-muted-foreground/60" />
                 <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">
-                  Preferred Rating
+                  {uiI18n.t('app.preferred_rating_98ceb372')}
                 </span>
               </div>
               <div className="flex items-center gap-3">
@@ -92,7 +95,7 @@ export function OverviewTasteBreakdown({ profile, isLoading = false }: OverviewT
                 </span>
               </div>
               <p className="text-[10px] text-muted-foreground/50 mt-1">
-                Avg {profile!.ratingRange.average.toFixed(1)}/10
+                {uiI18n.t('app.avg_cdc93143')} {profile!.ratingRange.average.toFixed(1)}/10
               </p>
             </div>
 
@@ -101,7 +104,7 @@ export function OverviewTasteBreakdown({ profile, isLoading = false }: OverviewT
               <div className="flex items-center gap-1.5 mb-2.5">
                 <Shuffle className="w-3.5 h-3.5 text-muted-foreground/60" />
                 <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">
-                  Diversity Score
+                  {uiI18n.t('app.diversity_score_5370dacb')}
                 </span>
               </div>
               <div className="flex items-center gap-3">

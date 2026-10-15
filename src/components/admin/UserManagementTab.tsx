@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -9,7 +11,7 @@ import { TabsContent } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from '@/lib/localeFormat';
 import { deriveIsAdmin, deriveIsModerator } from '@/lib/roles';
 import { BulkBanToolbar } from '@/components/admin/BulkBanToolbar';
 import {
@@ -20,7 +22,7 @@ import {
 const USERS_PER_PAGE = 50;
 
 const formatDate = (dateString: string) =>
-  new Date(dateString).toLocaleDateString('en-US', {
+  new Date(dateString).toLocaleDateString(uiI18n.language, {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -42,6 +44,7 @@ export function UserManagementTab({
   onMessageUser: (userId: string) => void;
   onViewActivity: (userId: string) => void;
 }) {
+  useUiTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { isAdmin, isModerator, profile } = useAuth();
@@ -121,14 +124,14 @@ export function UserManagementTab({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin_users'] });
-      toast.success('User banned successfully');
+      toast.success(uiI18n.t('app.user_banned_successfully_e3e7b094'));
       setShowBanModal(false);
       setBanReason('');
       setUserToBan(null);
     },
     onError: (error: any) => {
       console.error('Ban error:', error);
-      toast.error(error.message || 'Failed to ban user');
+      toast.error(error.message || uiI18n.t('app.failed_to_ban_user_e83bd0bd'));
     },
   });
 
@@ -143,11 +146,11 @@ export function UserManagementTab({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin_users'] });
-      toast.success('User unbanned successfully');
+      toast.success(uiI18n.t('app.user_unbanned_successfully_885d6c5e'));
     },
     onError: (error: any) => {
       console.error('Unban error:', error);
-      toast.error(error.message || 'Failed to unban user');
+      toast.error(error.message || uiI18n.t('app.failed_to_unban_user_a8661088'));
     },
   });
 
@@ -170,10 +173,10 @@ export function UserManagementTab({
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['admin_users'] });
-      toast.success(variables.makeAdmin ? 'User promoted to admin' : 'Admin privileges revoked');
+      toast.success(variables.makeAdmin ? uiI18n.t('app.user_promoted_to_admin_fcfe7ac0') : uiI18n.t('app.admin_privileges_revoked_b7f17ae9'));
     },
     onError: (error: any) => {
-      toast.error(error?.message || 'Failed to update admin status');
+      toast.error(error?.message || uiI18n.t('app.failed_to_update_admin_status_93ec1fca'));
     },
   });
 
@@ -189,10 +192,10 @@ export function UserManagementTab({
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['admin_users'] });
-      toast.success(variables.makeModerator ? 'User promoted to moderator' : 'Moderator privileges revoked');
+      toast.success(variables.makeModerator ? uiI18n.t('app.user_promoted_to_moderator_e8fe1ce5') : uiI18n.t('app.moderator_privileges_revoked_9e26758d'));
     },
     onError: (error: any) => {
-      toast.error(error?.message || 'Failed to update moderator status');
+      toast.error(error?.message || uiI18n.t('app.failed_to_update_moderator_status_12c4cf05'));
     },
   });
 
@@ -204,7 +207,7 @@ export function UserManagementTab({
           <div className="flex items-center justify-between mb-6">
             <h2 className="font-display text-xl font-semibold flex items-center gap-2">
               <Users className="w-5 h-5 text-primary" />
-              Manage Users
+              {uiI18n.t('app.manage_users_751f7d62')}
             </h2>
             <div className="flex items-center gap-3">
               <Button
@@ -212,12 +215,12 @@ export function UserManagementTab({
                 className="flex items-center gap-2 bg-primary hover:bg-primary/90"
               >
                 <Megaphone className="w-4 h-4" />
-                Broadcast Message
+                {uiI18n.t('app.broadcast_message_4e7be8b3')}
               </Button>
               <div className="relative w-64">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search users..."
+                  placeholder={uiI18n.t('app.search_users_8cdc4c09')}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10 bg-muted/50"
@@ -254,11 +257,11 @@ export function UserManagementTab({
                           }
                         }} />
                     </th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">User</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Username</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Status</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Joined</th>
-                    <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">Actions</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">{uiI18n.t('app.user_9f8a2389')}</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">{uiI18n.t('app.username_84c29015')}</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">{uiI18n.t('app.status_bae7d5be')}</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">{uiI18n.t('app.joined_43a1c626')}</th>
+                    <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">{uiI18n.t('app.actions_c3cd636a')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -290,14 +293,14 @@ export function UserManagementTab({
                           </Link>
                           <div className="min-w-0">
                             <Link to={`/@${user.username || user.id}`} className="font-medium hover:text-primary transition-colors block truncate">
-                              {user.display_name || 'Unknown'}
+                              {user.display_name || uiI18n.t('app.unknown_bc7819b3')}
                             </Link>
                             <div className="flex items-center gap-1.5 mt-0.5">
                               {deriveIsAdmin(user) && (
-                                <span className="px-1.5 py-0.5 rounded bg-primary/20 text-primary text-[10px] font-bold uppercase tracking-wider">Admin</span>
+                                <span className="px-1.5 py-0.5 rounded bg-primary/20 text-primary text-[10px] font-bold uppercase tracking-wider">{uiI18n.t('app.admin_4e7afebc')}</span>
                               )}
                               {deriveIsModerator(user) && !deriveIsAdmin(user) && (
-                                <span className="px-1.5 py-0.5 rounded bg-secondary/20 text-secondary text-[10px] font-bold uppercase tracking-wider">Moderator</span>
+                                <span className="px-1.5 py-0.5 rounded bg-secondary/20 text-secondary text-[10px] font-bold uppercase tracking-wider">{uiI18n.t('app.moderator_ad3b15c3')}</span>
                               )}
                             </div>
                           </div>
@@ -305,29 +308,28 @@ export function UserManagementTab({
                       </td>
                       <td className="py-3 px-4">
                         <span className="text-muted-foreground font-mono text-xs">
-                          {user.username ? `@${user.username}` : '-'}
+                          {user.username ? uiI18n.t('app.i18n_value_0_627c0e28', { value0: user.username }) : '-'}
                         </span>
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex flex-col gap-1">
                           {user.is_banned ? (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-destructive/20 text-destructive text-[10px] font-bold uppercase tracking-wider w-fit">
-                              <Ban className="w-3 h-3" /> Banned
+                              <Ban className="w-3 h-3" /> {uiI18n.t('app.banned_c8cd83f6')}
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-500 text-[10px] font-bold uppercase tracking-wider w-fit">
-                              <CheckCircle className="w-3 h-3" /> Active
+                              <CheckCircle className="w-3 h-3" /> {uiI18n.t('app.active_a733b809')}
                             </span>
                           )}
                           {user.last_seen && (
                             <span className="text-[10px] text-muted-foreground flex items-center gap-1">
                               <div className={`w-1.5 h-1.5 rounded-full ${new Date().getTime() - new Date(user.last_seen).getTime() < 300000
                                 ? 'bg-emerald-500 animate-pulse'
-                                : 'bg-muted-foreground/30'
-                                }`} />
+                                : 'bg-muted-foreground/30'}`} />
                               {new Date().getTime() - new Date(user.last_seen).getTime() < 300000
-                                ? 'Online'
-                                : `Last seen ${formatDistanceToNow(new Date(user.last_seen), { addSuffix: true })}`}
+                                ? uiI18n.t('app.online_c3e839df')
+                                : uiI18n.t('app.last_seen_i18n_value_0_63be8639', { value0: formatDistanceToNow(new Date(user.last_seen), { addSuffix: true }) })}
                             </span>
                           )}
                         </div>
@@ -342,7 +344,7 @@ export function UserManagementTab({
                             size="sm"
                             onClick={() => navigate(`/admin/user/${user.user_id}`)}
                             className="text-primary hover:text-primary hover:bg-primary/10"
-                            title="Manage user"
+                            title={uiI18n.t('app.manage_user_579e3b12')}
                           >
                             <UserCog className="w-4 h-4" />
                           </Button>
@@ -360,7 +362,7 @@ export function UserManagementTab({
                                 onClick={() => toggleModerator.mutate({ userId: user.user_id, makeModerator: !rowIsModerator })}
                                 disabled={toggleModerator.isPending || rowIsAdmin}
                                 className={rowIsModerator ? "text-primary hover:text-primary" : "text-muted-foreground hover:text-primary"}
-                                title={rowIsModerator ? "Remove moderator" : "Make moderator"}
+                                title={rowIsModerator ? uiI18n.t('app.remove_moderator_d4fa524d') : uiI18n.t('app.make_moderator_b91e0210')}
                               >
                                 {rowIsModerator ? <ShieldCheck className="w-4 h-4" /> : <Shield className="w-4 h-4" />}
                               </Button>
@@ -371,7 +373,7 @@ export function UserManagementTab({
                                 onClick={() => toggleAdmin.mutate({ userId: user.user_id, makeAdmin: !rowIsAdmin })}
                                 disabled={toggleAdmin.isPending}
                                 className={rowIsAdmin ? "text-primary hover:text-primary" : "text-muted-foreground hover:text-primary"}
-                                title={rowIsAdmin ? "Remove admin" : "Make admin"}
+                                title={rowIsAdmin ? uiI18n.t('app.remove_admin_8f02f7fe') : uiI18n.t('app.make_admin_84ec1c9a')}
                               >
                                 {rowIsAdmin ? <ShieldCheck className="w-4 h-4" /> : <ShieldOff className="w-4 h-4" />}
                               </Button>
@@ -384,7 +386,7 @@ export function UserManagementTab({
                               size="sm"
                               onClick={() => onMessageUser(user.user_id)}
                               className="text-primary hover:text-primary hover:bg-primary/10"
-                              title="Send direct message"
+                              title={uiI18n.t('app.send_direct_message_7fba4035')}
                             >
                               <Send className="w-4 h-4" />
                             </Button>
@@ -394,7 +396,7 @@ export function UserManagementTab({
                             size="sm"
                             onClick={() => onViewActivity(user.user_id)}
                             className="text-secondary hover:text-secondary hover:bg-secondary/10"
-                            title="View Activity"
+                            title={uiI18n.t('app.view_activity_e53ff6dc')}
                           >
                             <Activity className="w-4 h-4" />
                           </Button>
@@ -406,7 +408,7 @@ export function UserManagementTab({
                                 onClick={() => unbanUser.mutate(user.user_id)}
                                 disabled={unbanUser.isPending}
                                 className="text-emerald-500 hover:text-emerald-500"
-                                title="Unban user"
+                                title={uiI18n.t('app.unban_user_163f3ff2')}
                               >
                                 <Unlock className="w-4 h-4" />
                               </Button>
@@ -422,7 +424,7 @@ export function UserManagementTab({
                                 }}
                                 disabled={banUser.isPending}
                                 className="text-destructive hover:text-destructive"
-                                title="Ban user"
+                                title={uiI18n.t('app.ban_user_f1476b41')}
                               >
                                 <Ban className="w-4 h-4" />
                               </Button>
@@ -439,9 +441,9 @@ export function UserManagementTab({
                 is right whether or not a search is active. */}
             <div className="mt-4 flex items-center justify-between gap-4 text-sm">
               <span className="text-muted-foreground">
-                {matchedUsersCount.toLocaleString()} {debouncedSearch ? 'matching ' : ''}user{matchedUsersCount === 1 ? '' : 's'}
+                {matchedUsersCount.toLocaleString(uiI18n.language)} {debouncedSearch ? uiI18n.t('app.matching_5ed085de') : ''}{uiI18n.t('app.user_12dea96f')}{matchedUsersCount === 1 ? '' : 's'}
                 {matchedUsersCount > 0 && (
-                  <> · page {userPage + 1} of {userPageCount}</>
+                  <> {uiI18n.t('app.page_34ef9e67')} {userPage + 1} {uiI18n.t('app.of_de04fa0e')} {userPageCount}</>
                 )}
               </span>
               <div className="flex items-center gap-2">
@@ -451,7 +453,7 @@ export function UserManagementTab({
                   onClick={() => setUserPage((p) => Math.max(0, p - 1))}
                   disabled={userPage === 0}
                 >
-                  Previous
+                  {uiI18n.t('app.previous_50f94286')}
                 </Button>
                 <Button
                   variant="outline"
@@ -459,7 +461,7 @@ export function UserManagementTab({
                   onClick={() => setUserPage((p) => p + 1)}
                   disabled={userPage + 1 >= userPageCount}
                 >
-                  Next
+                  {uiI18n.t('app.next_bc981983')}
                 </Button>
               </div>
             </div>
@@ -473,28 +475,28 @@ export function UserManagementTab({
           <GlassPanel className="p-6 max-w-md w-full">
             <h3 className="font-display text-xl font-bold mb-4 flex items-center gap-2">
               <Ban className="w-5 h-5 text-destructive" />
-              Ban User
+              {uiI18n.t('app.ban_user_61945043')}
             </h3>
             <div className="space-y-4">
               <div>
-                <label className="text-sm font-medium mb-2 block">Reason for ban</label>
+                <label className="text-sm font-medium mb-2 block">{uiI18n.t('app.reason_for_ban_7ac8aa03')}</label>
                 <Textarea
                   value={banReason}
                   onChange={(e) => setBanReason(e.target.value)}
-                  placeholder="Enter reason for banning this user..."
+                  placeholder={uiI18n.t('app.enter_reason_for_banning_this_user_5f5fc946')}
                   className="bg-muted/50"
                 />
               </div>
               <div className="flex gap-3 justify-end">
                 <Button variant="ghost" onClick={() => { setShowBanModal(false); setUserToBan(null); }}>
-                  Cancel
+                  {uiI18n.t('app.cancel_77dfd213')}
                 </Button>
                 <Button
                   variant="destructive"
                   onClick={() => userToBan && banUser.mutate({ userId: userToBan, reason: banReason })}
                   disabled={banUser.isPending}
                 >
-                  {banUser.isPending ? 'Banning...' : 'Ban User'}
+                  {banUser.isPending ? 'Banning...' : uiI18n.t('app.ban_user_61945043')}
                 </Button>
               </div>
             </div>
@@ -507,22 +509,22 @@ export function UserManagementTab({
           <GlassPanel className="p-6 max-w-md w-full">
             <h3 className="font-display text-xl font-bold mb-4 flex items-center gap-2">
               <Megaphone className="w-5 h-5 text-primary" />
-              Broadcast Message to All Users
+              {uiI18n.t('app.broadcast_message_to_all_users_277327d6')}
             </h3>
             <div className="space-y-4">
               <div>
-                <label className="text-sm font-medium text-muted-foreground">Title</label>
+                <label className="text-sm font-medium text-muted-foreground">{uiI18n.t('app.title_768e0c1c')}</label>
                 <Input
-                  placeholder="Enter broadcast title..."
+                  placeholder={uiI18n.t('app.enter_broadcast_title_d2ac0b79')}
                   value={broadcastTitle}
                   onChange={(e) => setBroadcastTitle(e.target.value)}
                   className="mt-1"
                 />
               </div>
               <div>
-                <label className="text-sm font-medium text-muted-foreground">Message</label>
+                <label className="text-sm font-medium text-muted-foreground">{uiI18n.t('app.message_68f4145f')}</label>
                 <Textarea
-                  placeholder="Enter your message to all users..."
+                  placeholder={uiI18n.t('app.enter_your_message_to_all_users_795ea1fd')}
                   value={broadcastMessage}
                   onChange={(e) => setBroadcastMessage(e.target.value)}
                   className="mt-1 min-h-[120px]"
@@ -534,7 +536,7 @@ export function UserManagementTab({
                   setBroadcastTitle('');
                   setBroadcastMessage('');
                 }}>
-                  Cancel
+                  {uiI18n.t('app.cancel_77dfd213')}
                 </Button>
                 <Button
                   onClick={async () => {
@@ -546,7 +548,7 @@ export function UserManagementTab({
                         .neq('is_banned', true);
 
                       if (!users || users.length === 0) {
-                        toast.error('No users found to notify');
+                        toast.error(uiI18n.t('app.no_users_found_to_notify_93a1bcd6'));
                         return;
                       }
 
@@ -569,18 +571,18 @@ export function UserManagementTab({
                       // Invalidate all notification queries to refresh for all users
                       queryClient.invalidateQueries({ queryKey: ['notifications'] });
 
-                      toast.success(`Broadcast notification sent to ${users.length} users!`);
+                      toast.success(uiI18n.t('app.broadcast_notification_sent_to_i18n_value_0_user_47119c0a', { value0: users.length }));
                       setShowBroadcastModal(false);
                       setBroadcastTitle('');
                       setBroadcastMessage('');
                     } catch (error) {
                       console.error('Error sending broadcast notification:', error);
-                      toast.error('Failed to send broadcast notification');
+                      toast.error(uiI18n.t('app.failed_to_send_broadcast_notification_cf680318'));
                     }
                   }}
                   disabled={!broadcastTitle || !broadcastMessage}
                 >
-                  Send Broadcast Notification
+                  {uiI18n.t('app.send_broadcast_notification_20b5ce27')}
                 </Button>
               </div>
             </div>

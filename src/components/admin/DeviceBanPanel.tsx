@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -12,7 +14,7 @@ import {
   Trash2,
   PlusCircle,
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format } from '@/lib/localeFormat';
 import { validateDeviceBan, truncateDeviceId } from '@/utils/banUtils';
 import type { DeviceBan } from '@/types/admin-dashboard';
 
@@ -25,6 +27,7 @@ const QUERY_KEY = ['admin_device_bans'] as const;
 // Component
 // ---------------------------------------------------------------------------
 export function DeviceBanPanel() {
+  useUiTranslation();
   const queryClient = useQueryClient();
 
   // Form state
@@ -72,14 +75,14 @@ export function DeviceBanPanel() {
       setExpiresAt('');
       setFormError(null);
       setShowForm(false);
-      toast.success('Device banned successfully');
+      toast.success(uiI18n.t('app.device_banned_successfully_f6b92b8f'));
     },
     onError: (error: unknown) => {
       const msg = error instanceof Error ? error.message : String(error);
       if (msg.toLowerCase().includes('unique') || msg.toLowerCase().includes('duplicate') || msg.toLowerCase().includes('already')) {
         setFormError('This device is already banned');
       } else {
-        toast.error(`Failed to ban device: ${msg}`);
+        toast.error(uiI18n.t('app.failed_to_ban_device_i18n_value_0_b6a984bf', { value0: msg }));
       }
     },
   });
@@ -97,11 +100,11 @@ export function DeviceBanPanel() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEY });
-      toast.success('Device ban removed');
+      toast.success(uiI18n.t('app.device_ban_removed_5d41d524'));
     },
     onError: (error: unknown) => {
       const msg = error instanceof Error ? error.message : String(error);
-      toast.error(`Failed to remove ban: ${msg}`);
+      toast.error(uiI18n.t('app.failed_to_remove_ban_i18n_value_0_7a9835e4', { value0: msg }));
     },
   });
 
@@ -126,7 +129,7 @@ export function DeviceBanPanel() {
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold flex items-center gap-2">
           <Shield className="w-6 h-6 text-primary" />
-          Device Bans
+          {uiI18n.t('app.device_bans_5acbaebf')}
         </h2>
         <div className="flex items-center gap-2">
           <Button
@@ -136,7 +139,7 @@ export function DeviceBanPanel() {
             className="gap-1.5 text-xs"
           >
             <PlusCircle className="w-3.5 h-3.5" />
-            Add Ban
+            {uiI18n.t('app.add_ban_d743fc07')}
           </Button>
           <Button
             variant="ghost"
@@ -146,7 +149,7 @@ export function DeviceBanPanel() {
             className="gap-2 text-muted-foreground hover:text-foreground"
           >
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-            Refresh
+            {uiI18n.t('app.refresh_56e3badc')}
           </Button>
         </div>
       </div>
@@ -156,7 +159,7 @@ export function DeviceBanPanel() {
         <GlassPanel className="p-5 border-white/10">
           <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
             <PlusCircle className="w-4 h-4 text-primary" />
-            Ban Device
+            {uiI18n.t('app.ban_device_df15e6de')}
           </h3>
           <form onSubmit={handleSubmit} className="space-y-4">
             {formError && (
@@ -166,28 +169,28 @@ export function DeviceBanPanel() {
             )}
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
-                Device ID <span className="text-destructive">*</span>
+                {uiI18n.t('app.device_id_7c9f0f8d')} <span className="text-destructive">*</span>
               </label>
               <input
                 type="text"
                 value={deviceId}
                 onChange={(e) => { setDeviceId(e.target.value); setFormError(null); }}
-                placeholder="Enter device identifier (1–255 chars)"
+                placeholder={uiI18n.t('app.enter_device_identifier_1_255_chars_42594e6f')}
                 maxLength={255}
                 className="w-full bg-white/5 border border-white/10 rounded px-3 py-1.5 text-sm font-mono text-white placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary"
               />
               {deviceId && (deviceId.length < 1 || deviceId.length > 255) && (
-                <p className="text-xs text-destructive">Must be 1–255 characters</p>
+                <p className="text-xs text-destructive">{uiI18n.t('app.must_be_1_255_characters_e68812ba')}</p>
               )}
             </div>
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
-                Reason <span className="text-destructive">*</span>
+                {uiI18n.t('app.reason_f219cc06')} <span className="text-destructive">*</span>
               </label>
               <textarea
                 value={reason}
                 onChange={(e) => { setReason(e.target.value); setFormError(null); }}
-                placeholder="Reason for banning this device…"
+                placeholder={uiI18n.t('app.reason_for_banning_this_device_d3adb200')}
                 maxLength={500}
                 rows={3}
                 className="w-full bg-white/5 border border-white/10 rounded px-3 py-1.5 text-sm text-white placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary resize-none"
@@ -196,7 +199,7 @@ export function DeviceBanPanel() {
             </div>
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
-                Expiry (optional)
+                {uiI18n.t('app.expiry_optional_728bac66')}
               </label>
               <input
                 type="datetime-local"
@@ -217,7 +220,7 @@ export function DeviceBanPanel() {
                 ) : (
                   <Shield className="w-3.5 h-3.5" />
                 )}
-                Ban Device
+                {uiI18n.t('app.ban_device_df15e6de')}
               </Button>
               <Button
                 type="button"
@@ -226,7 +229,7 @@ export function DeviceBanPanel() {
                 onClick={() => { setShowForm(false); setDeviceId(''); setReason(''); setExpiresAt(''); setFormError(null); }}
                 className="text-muted-foreground"
               >
-                Cancel
+                {uiI18n.t('app.cancel_77dfd213')}
               </Button>
             </div>
           </form>
@@ -241,7 +244,7 @@ export function DeviceBanPanel() {
       ) : isError ? (
         <GlassPanel className="p-10 text-center border-destructive/20 bg-destructive/5">
           <XCircle className="w-8 h-8 text-destructive/50 mx-auto mb-3" />
-          <p className="text-sm font-medium text-destructive mb-4">Failed to load device bans</p>
+          <p className="text-sm font-medium text-destructive mb-4">{uiI18n.t('app.failed_to_load_device_bans_fba5b7b5')}</p>
           <Button
             variant="outline"
             size="sm"
@@ -249,13 +252,13 @@ export function DeviceBanPanel() {
             className="gap-2 border-destructive/30 hover:bg-destructive/10 text-destructive"
           >
             <RefreshCw className="w-4 h-4" />
-            Retry
+            {uiI18n.t('app.retry_9f5cd8a2')}
           </Button>
         </GlassPanel>
       ) : !bans || bans.length === 0 ? (
         <GlassPanel className="p-12 text-center border-dashed border-white/5">
           <Shield className="w-10 h-10 text-muted-foreground/25 mx-auto mb-3" />
-          <p className="text-sm text-muted-foreground">No active device bans</p>
+          <p className="text-sm text-muted-foreground">{uiI18n.t('app.no_active_device_bans_29d114b1')}</p>
         </GlassPanel>
       ) : (
         <GlassPanel className="border-white/5">
@@ -263,10 +266,10 @@ export function DeviceBanPanel() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-white/10">
-                  <th className="text-left py-3 px-4 text-xs text-muted-foreground font-medium uppercase tracking-wide">Device ID</th>
-                  <th className="text-left py-3 px-4 text-xs text-muted-foreground font-medium uppercase tracking-wide">Reason</th>
-                  <th className="text-left py-3 px-4 text-xs text-muted-foreground font-medium uppercase tracking-wide">Banned By</th>
-                  <th className="text-left py-3 px-4 text-xs text-muted-foreground font-medium uppercase tracking-wide">Expires</th>
+                  <th className="text-left py-3 px-4 text-xs text-muted-foreground font-medium uppercase tracking-wide">{uiI18n.t('app.device_id_7c9f0f8d')}</th>
+                  <th className="text-left py-3 px-4 text-xs text-muted-foreground font-medium uppercase tracking-wide">{uiI18n.t('app.reason_f219cc06')}</th>
+                  <th className="text-left py-3 px-4 text-xs text-muted-foreground font-medium uppercase tracking-wide">{uiI18n.t('app.banned_by_b5d48b82')}</th>
+                  <th className="text-left py-3 px-4 text-xs text-muted-foreground font-medium uppercase tracking-wide">{uiI18n.t('app.expires_a99be3da')}</th>
                   <th className="py-3 px-4" />
                 </tr>
               </thead>
@@ -288,7 +291,7 @@ export function DeviceBanPanel() {
                       <td className="py-3 px-4 text-xs text-muted-foreground">
                         {ban.expires_at
                           ? format(new Date(ban.expires_at), 'MMM d, yyyy HH:mm')
-                          : 'Permanent'}
+                          : uiI18n.t('app.permanent_af0fa7cd')}
                       </td>
                       <td className="py-3 px-4 text-right">
                         <Button
@@ -303,7 +306,7 @@ export function DeviceBanPanel() {
                           ) : (
                             <Trash2 className="w-3 h-3" />
                           )}
-                          Remove
+                          {uiI18n.t('app.remove_e963907d')}
                         </Button>
                       </td>
                     </tr>

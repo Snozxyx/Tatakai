@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
  * The home/collection anime card, with the hover video preview
  * (docs/Plans.md §2 — "Cards (improve polish and consistency)").
@@ -11,6 +13,7 @@
  */
 import { Play, Plus, Check, Loader2, Star, RefreshCw } from "lucide-react";
 import { MediaCardFrame } from "@/components/MediaCardFrame";
+import { useTranslation } from "react-i18next";
 import { BlurhashImage } from "@/components/ui/blurhash-image";
 import { AnimeCard as AnimeCardType, getHighQualityPoster } from "@/lib/api";
 import { FeatureFlag, useFeatureFlag } from '@/core/feature-flags';
@@ -42,6 +45,8 @@ const resolveAniListId = (value: unknown): number | null => {
 };
 
 function AnimeCardWithPreviewInner({ anime, showPreview = true, disableClick = false }: AnimeCardWithPreviewProps) {
+  useUiTranslation();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { user } = useAuth();
   const blurhashEnabled = useFeatureFlag(FeatureFlag.BLURHASH_IMAGES);
@@ -173,7 +178,7 @@ function AnimeCardWithPreviewInner({ anime, showPreview = true, disableClick = f
         muted loop playsInline crossOrigin="anonymous" onError={preview.onError} />}
       {preview.showFallback && <div aria-hidden className="media-card-preview pointer-events-none absolute inset-0 z-20 flex items-center justify-center opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
         <span className={`flex items-center justify-center bg-black/75 text-white ${preview.unavailable ? 'rounded-lg px-3 py-2 text-xs' : 'h-11 w-11 rounded-full'}`}>
-          {preview.unavailable ? 'Preview unavailable' : preview.isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Play className="ml-0.5 h-5 w-5" />}
+          {preview.unavailable ? t('migration.previewUnavailable') : preview.isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Play className="ml-0.5 h-5 w-5" />}
         </span>
       </div>}
     </>}
@@ -183,14 +188,14 @@ function AnimeCardWithPreviewInner({ anime, showPreview = true, disableClick = f
     </>}
     actions={<button type="button" onClick={handleWatchlistClick} onPointerDown={event => event.stopPropagation()} disabled={isBusy} aria-busy={isBusy} aria-pressed={Boolean(watchlistItem)}
       className={`media-card-action absolute right-1 top-10 z-40 flex h-11 w-11 items-center justify-center rounded-full border border-white/20 transition-[opacity,background-color] duration-150 ${watchlistItem ? 'bg-primary text-primary-foreground' : 'bg-black/70 text-white hover:bg-black/90'}`}
-      title={saveFailed ? 'Couldn’t update watchlist. Try again.' : undefined}
-      aria-label={saveFailed ? `Retry updating ${anime.name} in watchlist` : watchlistItem ? `Remove ${anime.name} from watchlist` : `Add ${anime.name} to watchlist`}>
+      title={saveFailed ? t('migration.watchlistFailed') : undefined}
+      aria-label={saveFailed ? t('migration.retryWatchlist', { name: anime.name }) : watchlistItem ? t('discover.removeFromWatchlistLabel', { name: anime.name }) : t('discover.addToWatchlistLabel', { name: anime.name })}>
       {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : saveFailed ? <RefreshCw className="h-4 w-4" /> : watchlistItem ? <Check className="ui-save-check h-4 w-4" /> : <Plus className="h-4 w-4" />}
     </button>}
     metadata={<div className="flex flex-wrap items-center gap-x-1.5">
-      <span>{anime.type || 'Anime'}</span>{anime.year && <span>· {anime.year}</span>}
-      {!!anime.episodes?.sub && <span>· {anime.episodes.sub} sub</span>}
-      {!!anime.episodes?.dub && <span>· {anime.episodes.dub} dub</span>}
+      <span>{anime.type || uiI18n.t('app.anime_f1b32a19')}</span>{anime.year && <span>· {anime.year}</span>}
+      {!!anime.episodes?.sub && <span>· {anime.episodes.sub} {t('anime.sub')}</span>}
+      {!!anime.episodes?.dub && <span>· {anime.episodes.dub} {t('anime.dub')}</span>}
       {label && <span>· {label}</span>}
     </div>} />;
 }

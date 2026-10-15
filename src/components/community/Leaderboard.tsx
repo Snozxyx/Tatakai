@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -11,13 +13,13 @@ import { AnimatedCounter } from '@/components/profile/overview/AnimatedCounter';
 import { cn } from '@/lib/utils';
 
 const LEADERBOARD_TYPES: Array<{ value: LeaderboardType; label: string; icon: any; scoreLabel: string }> = [
-  { value: 'watched', label: 'Most Watched', icon: Trophy, scoreLabel: 'episodes' },
-  { value: 'novels', label: 'Top Novel Readers', icon: BookOpen, scoreLabel: 'novels' },
-  { value: 'streak', label: 'Best Streak', icon: Flame, scoreLabel: 'days' },
-  { value: 'rated', label: 'Most Rated', icon: Star, scoreLabel: 'ratings' },
-  { value: 'comments', label: 'Most Comments', icon: MessageSquare, scoreLabel: 'comments' },
-  { value: 'active', label: 'Most Active', icon: TrendingUp, scoreLabel: 'points' },
-  { value: 'followers', label: 'Most Followers', icon: UserPlus, scoreLabel: 'followers' },
+  { value: 'watched', get label() { return uiI18n.t('app.most_watched_0965cbc0'); }, icon: Trophy, scoreLabel: 'episodes' },
+  { value: 'novels', get label() { return uiI18n.t('app.top_novel_readers_65f5c2be'); }, icon: BookOpen, scoreLabel: 'novels' },
+  { value: 'streak', get label() { return uiI18n.t('app.best_streak_3b03fa81'); }, icon: Flame, scoreLabel: 'days' },
+  { value: 'rated', get label() { return uiI18n.t('app.most_rated_4cae6b99'); }, icon: Star, scoreLabel: 'ratings' },
+  { value: 'comments', get label() { return uiI18n.t('app.most_comments_081355ea'); }, icon: MessageSquare, scoreLabel: 'comments' },
+  { value: 'active', get label() { return uiI18n.t('app.most_active_cf01766b'); }, icon: TrendingUp, scoreLabel: 'points' },
+  { value: 'followers', get label() { return uiI18n.t('app.most_followers_d8cd8410'); }, icon: UserPlus, scoreLabel: 'followers' },
 ];
 
 const PODIUM = [
@@ -31,6 +33,7 @@ function displayName(entry: any) {
 }
 
 function PodiumCard({ entry, config, scoreLabel }: { entry: any; config: (typeof PODIUM)[number]; scoreLabel: string }) {
+  useUiTranslation();
   const rankTier = getRankTier(entry.score);
   return (
     <Link to={`/user/${entry.username || entry.user_id}`} className={cn('flex-1', config.order)}>
@@ -63,6 +66,7 @@ function PodiumCard({ entry, config, scoreLabel }: { entry: any; config: (typeof
 }
 
 function LeaderboardRow({ entry, currentUserId, scoreLabel }: { entry: any; currentUserId?: string; scoreLabel: string }) {
+  useUiTranslation();
   const isCurrentUser = entry.user_id === currentUserId;
   const rankTier = getRankTier(entry.score);
   return (
@@ -84,7 +88,7 @@ function LeaderboardRow({ entry, currentUserId, scoreLabel }: { entry: any; curr
           <div className="flex items-center gap-2">
             <p className="truncate font-display font-bold tracking-tight">{displayName(entry)}</p>
             {isCurrentUser && (
-              <span className="rounded-full bg-primary/20 px-2 py-0.5 text-[10px] font-bold uppercase text-primary">You</span>
+              <span className="rounded-full bg-primary/20 px-2 py-0.5 text-[10px] font-bold uppercase text-primary">{uiI18n.t('app.you_905cb326')}</span>
             )}
           </div>
           <div className="mt-0.5 flex items-center gap-1.5">
@@ -93,7 +97,7 @@ function LeaderboardRow({ entry, currentUserId, scoreLabel }: { entry: any; curr
           </div>
         </div>
         <div className="text-right">
-          <p className="font-display text-lg font-bold tabular-nums">{entry.score.toLocaleString()}</p>
+          <p className="font-display text-lg font-bold tabular-nums">{entry.score.toLocaleString(uiI18n.language)}</p>
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70">{scoreLabel}</p>
         </div>
       </div>
@@ -102,6 +106,7 @@ function LeaderboardRow({ entry, currentUserId, scoreLabel }: { entry: any; curr
 }
 
 export function Leaderboard() {
+  useUiTranslation();
   const { user } = useAuth();
   const [type, setType] = useState<LeaderboardType>('watched');
   const limit = type === 'streak' ? 10 : 100;
@@ -122,8 +127,8 @@ export function Leaderboard() {
       <div className="relative mb-4 flex items-center gap-2.5">
         <Trophy className="h-4 w-4 text-amber" />
         <div>
-          <h3 className="font-display text-lg font-bold tracking-tight">Leaderboard</h3>
-          <p className="text-xs text-muted-foreground/70">Top community members</p>
+          <h3 className="font-display text-lg font-bold tracking-tight">{uiI18n.t('app.leaderboard_0381247a')}</h3>
+          <p className="text-xs text-muted-foreground/70">{uiI18n.t('app.top_community_members_bd7a4d0f')}</p>
         </div>
       </div>
 
@@ -151,15 +156,15 @@ export function Leaderboard() {
       {userRank && (
         <div className="relative mb-5 flex items-center justify-between overflow-hidden rounded-2xl border border-primary/20 bg-primary/[0.06] px-4 py-3">
           <div>
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70">Your Rank</p>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70">{uiI18n.t('app.your_rank_deed0132')}</p>
             <p className="font-display text-xl font-black tabular-nums">
-              #{userRank.rank} <span className="text-sm font-normal text-muted-foreground">of {userRank.totalUsers.toLocaleString()}</span>
+              #{userRank.rank} <span className="text-sm font-normal text-muted-foreground">{uiI18n.t('app.of_de04fa0e')} {userRank.totalUsers.toLocaleString(uiI18n.language)}</span>
             </p>
           </div>
           <div className="text-right">
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70">Your Score</p>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70">{uiI18n.t('app.your_score_efd1c977')}</p>
             <p className="font-display text-xl font-black tabular-nums">
-              {userRank.score.toLocaleString()} <span className="text-sm font-normal text-muted-foreground">{scoreLabel}</span>
+              {userRank.score.toLocaleString(uiI18n.language)} <span className="text-sm font-normal text-muted-foreground">{scoreLabel}</span>
             </p>
           </div>
         </div>
@@ -195,7 +200,7 @@ export function Leaderboard() {
       ) : (
         <div className="relative rounded-2xl border border-dashed border-white/10 bg-white/[0.01] py-12 text-center">
           <Trophy className="mx-auto mb-3 h-10 w-10 text-muted-foreground/30" />
-          <p className="text-sm text-muted-foreground">No leaderboard data available</p>
+          <p className="text-sm text-muted-foreground">{uiI18n.t('app.no_leaderboard_data_available_f6f2f0b1')}</p>
         </div>
       )}
     </GlassPanel>

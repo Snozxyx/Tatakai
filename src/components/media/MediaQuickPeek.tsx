@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
@@ -47,6 +49,7 @@ export function Peekable({
   media: QuickPeekMedia | null;
   children: ReactNode;
 }) {
+  useUiTranslation();
   const longPress = useLongPress({
     onLongPress: () => {
       if (media) openMediaQuickPeek(media);
@@ -65,6 +68,7 @@ function stripHtml(value: string): string {
 }
 
 export function MediaQuickPeekHost() {
+  useUiTranslation();
   const peeked = useSyncExternalStore(subscribeMediaQuickPeek, getMediaQuickPeekSnapshot);
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -281,7 +285,7 @@ export function MediaQuickPeekHost() {
                 ) : null}
                 {score && countLine ? <span className="text-muted-foreground">·</span> : null}
                 {countLine ? <span className="text-muted-foreground">{countLine}</span> : null}
-                {!score && !countLine ? <span className="text-muted-foreground">Details inside</span> : null}
+                {!score && !countLine ? <span className="text-muted-foreground">{uiI18n.t('app.details_inside_293f9a1b')}</span> : null}
               </p>
             </div>
           </div>
@@ -306,17 +310,17 @@ export function MediaQuickPeekHost() {
             </div>
           ) : null}
 
-          {detailLoading && !description ? <div className="mt-3 space-y-2" aria-label="Loading details" role="status">
-            <span className="sr-only">Loading details…</span>
+          {detailLoading && !description ? <div className="mt-3 space-y-2" aria-label={uiI18n.t('app.loading_details_448da065')} role="status">
+            <span className="sr-only">{uiI18n.t('app.loading_details_d6b61171')}</span>
             {[100, 95, 70].map(width => <div key={width} aria-hidden className="h-3 animate-pulse rounded bg-muted" style={{ width: `${width}%` }} />)}
           </div> : description ? (
             <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground line-clamp-3">{description}</p>
-          ) : !detailError ? <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground">No synopsis available. You can still open the full page.</p> : null}
+          ) : !detailError ? <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground">{uiI18n.t('app.no_synopsis_available_you_can_still_open_the_ful_551403cf')}</p> : null}
           {detailError && <div role="status" className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-muted/40 px-3 py-2">
-            <p className="text-xs text-muted-foreground">Additional details couldn’t load.</p>
+            <p className="text-xs text-muted-foreground">{uiI18n.t('app.additional_details_couldn_t_load_ef5d3db2')}</p>
             <button type="button" disabled={detailFetching} onClick={() => { void (isAnime ? retryAnime() : retryManga()); }}
               className="ui-button inline-flex min-h-9 items-center gap-2 rounded-lg px-2 text-xs font-semibold text-primary disabled:opacity-60">
-              <RefreshCw aria-hidden className={cn('h-3.5 w-3.5', detailFetching && 'animate-spin')} />{detailFetching ? 'Retrying…' : 'Retry details'}
+              <RefreshCw aria-hidden className={cn('h-3.5 w-3.5', detailFetching && 'animate-spin')} />{detailFetching ? uiI18n.t('app.retrying_2310131b') : uiI18n.t('app.retry_details_2d9fbf10')}
             </button>
           </div>}
           </div>
@@ -350,7 +354,7 @@ export function MediaQuickPeekHost() {
                 ) : (
                   <Bookmark className="h-5 w-5" />
                 )}
-                <span className="truncate">{saved ? "Saved" : isAnime ? "Watchlist" : "Bookmark"}</span>
+                <span className="truncate">{saved ? uiI18n.t('app.saved_c0ae8f6e') : isAnime ? uiI18n.t('app.watchlist_48a616d9') : uiI18n.t('app.bookmark_441da1bf')}</span>
               </button>
             ) : null}
             <button
@@ -359,21 +363,21 @@ export function MediaQuickPeekHost() {
               className="ui-button flex h-[52px] min-w-0 flex-[1.2] items-center justify-center gap-2 rounded-2xl bg-primary px-3 text-[15px] font-semibold text-primary-foreground transition-[background-color,transform] hover:bg-primary/90 motion-safe:active:scale-[0.98]"
             >
               {isAnime ? <Play className="h-5 w-5 fill-primary-foreground" /> : <BookOpen className="h-5 w-5" />}
-              <span className="truncate">{isAnime ? "Start watching" : "Start reading"}</span>
+              <span className="truncate">{isAnime ? uiI18n.t('app.start_watching_da441255') : uiI18n.t('app.start_reading_9cc0a0cb')}</span>
             </button>
             <button
               type="button"
               onClick={() => go(media.routeTo)}
-              aria-label={`View ${media.name}`}
+              aria-label={uiI18n.t('app.view_i18n_value_0_06355651', { value0: media.name })}
               className="ui-button flex h-[52px] w-[52px] shrink-0 items-center justify-center gap-0.5 rounded-2xl border border-border bg-muted/50 text-[15px] font-semibold text-foreground transition-[background-color,transform] hover:bg-muted motion-safe:active:scale-[.97]"
             >
-              <span className="hidden min-[380px]:inline">View</span>
+              <span className="hidden min-[380px]:inline">{uiI18n.t('app.view_69bd4ef9')}</span>
               <ChevronRight className="h-5 w-5" />
             </button>
           </div>
           {canSave && <p role="status" className={cn('mt-2 min-h-5 text-center text-xs', saveFailed ? 'text-destructive' : 'text-muted-foreground')}>
-            {saveLoading ? 'Updating your list…' : saveMessage}
-            {saveFailed && <button type="button" onClick={toggleSave} className="ml-2 rounded px-1 font-semibold underline underline-offset-4">Retry</button>}
+            {saveLoading ? uiI18n.t('app.updating_your_list_f716f24d') : saveMessage}
+            {saveFailed && <button type="button" onClick={toggleSave} className="ml-2 rounded px-1 font-semibold underline underline-offset-4">{uiI18n.t('app.retry_9f5cd8a2')}</button>}
           </p>}
 
           {/* Extra save affordance for anime parity with card hover actions */}
@@ -384,7 +388,7 @@ export function MediaQuickPeekHost() {
               disabled={saveLoading}
               className="mt-2.5 flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-white/10 px-3 py-2.5 text-[13px] font-semibold text-muted-foreground transition-colors hover:bg-white/[0.04] hover:text-foreground"
             >
-              <Plus className="h-4 w-4" /> Add to watchlist
+              <Plus className="h-4 w-4" /> {uiI18n.t('app.add_to_watchlist_c1adf59b')}
             </button>
           ) : null}
         </div>

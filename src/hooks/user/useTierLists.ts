@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -155,6 +157,7 @@ export const DEFAULT_TIERS: Tier[] = [
 
 // Fetch user's tier lists
 export function useUserTierLists(userId?: string) {
+  useUiTranslation();
   const { user } = useAuth();
   const targetUserId = userId || user?.id;
 
@@ -205,6 +208,7 @@ export function useUserTierLists(userId?: string) {
 
 // Fetch public tier lists
 export function usePublicTierLists(limit = 20) {
+  useUiTranslation();
   const { user } = useAuth();
 
   return useQuery({
@@ -267,6 +271,7 @@ export function usePublicTierLists(limit = 20) {
 
 // Fetch single tier list by share code
 export function useTierListByShareCode(shareCode: string) {
+  useUiTranslation();
   const { user } = useAuth();
 
   return useQuery({
@@ -320,6 +325,7 @@ export function useTierListByShareCode(shareCode: string) {
 
 // Create tier list
 export function useCreateTierList() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
@@ -335,9 +341,9 @@ export function useCreateTierList() {
       items: TierListItem[];
       is_public?: boolean;
     }) => {
-      if (!user) throw new Error('Must be logged in');
+      if (!user) throw new Error(uiI18n.t('app.must_be_logged_in_9cf435d8'));
       const trimmedName = name.trim();
-      if (!trimmedName) throw new Error('Tier list name is required');
+      if (!trimmedName) throw new Error(uiI18n.t('app.tier_list_name_is_required_339c71fb'));
 
       const data = await insertTierListWithFallback({
         user_id: user.id,
@@ -356,6 +362,7 @@ export function useCreateTierList() {
 
 // Update tier list
 export function useUpdateTierList() {
+  useUiTranslation();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -378,7 +385,7 @@ export function useUpdateTierList() {
       if (items !== undefined) updates.items = items;
       if (is_public !== undefined) updates.is_public = is_public;
       if (typeof updates.title === 'string' && !updates.title) {
-        throw new Error('Tier list name is required');
+        throw new Error(uiI18n.t('app.tier_list_name_is_required_339c71fb'));
       }
 
       const data = await updateTierListWithFallback(id, updates);
@@ -392,6 +399,7 @@ export function useUpdateTierList() {
 
 // Delete tier list
 export function useDeleteTierList() {
+  useUiTranslation();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -407,12 +415,13 @@ export function useDeleteTierList() {
 
 // Like/unlike tier list
 export function useLikeTierList() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
   return useMutation({
     mutationFn: async ({ tierListId, liked }: { tierListId: string; liked: boolean }) => {
-      if (!user) throw new Error('Must be logged in');
+      if (!user) throw new Error(uiI18n.t('app.must_be_logged_in_9cf435d8'));
 
       if (liked) {
         const { error } = await supabase

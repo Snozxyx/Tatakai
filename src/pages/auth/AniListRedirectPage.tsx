@@ -1,5 +1,6 @@
 
 import { useEffect, useState, useRef, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useSettingsModal } from '@/contexts/SettingsModalContext';
 import { exchangeAniListCode } from '@/lib/externalIntegrations';
@@ -10,6 +11,7 @@ import { Loader2, CheckCircle2, AlertCircle, ExternalLink } from 'lucide-react';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 
 export default function AniListRedirectPage() {
+    const { t } = useTranslation();
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const { openSettings } = useSettingsModal();
@@ -52,21 +54,21 @@ export default function AniListRedirectPage() {
             hasRun.current = true;
             setStatus('error');
             setError(errorParam);
-            toast.error(`AniList Error: ${errorParam}`);
+            toast.error(t('auth.anilistError', { error: errorParam }));
             return;
         }
 
         if (!code) {
             hasRun.current = true;
             setStatus('error');
-            setError('No authorization code found');
+            setError(t('auth.noAuthCode'));
             return;
         }
 
         if (!user) {
             hasRun.current = true;
             setStatus('error');
-            setError('You must be logged in to link AniList');
+            setError(t('auth.mustLoginToLinkAnilist'));
             return;
         }
 
@@ -76,13 +78,13 @@ export default function AniListRedirectPage() {
                 await exchangeAniListCode(code, user.id);
                 await refreshProfile();
                 setStatus('success');
-                toast.success('Successfully linked AniList!');
+                toast.success(t('auth.anilistLinked'));
                 setTimeout(() => { navigate('/', { replace: true }); openSettings('integrations'); }, 2000);
             } catch (err: any) {
                 console.error('AniList Exchange Error:', err);
                 setStatus('error');
-                setError(err.message || 'Failed to exchange code for tokens');
-                toast.error('Failed to link AniList');
+                setError(err.message || t('auth.exchangeCodeFailed'));
+                toast.error(t('auth.anilistLinkFailed'));
             }
         };
 
@@ -96,12 +98,12 @@ export default function AniListRedirectPage() {
                     <>
                         <Loader2 className="w-12 h-12 text-[#02A9FF] animate-spin mx-auto" />
                         <h1 className="text-2xl font-bold">
-                            {status === 'forwarding' ? 'Returning to the app...' : 'Linking AniList...'}
+                            {status === 'forwarding' ? t('migration.returning') : t('auth.linkingAnilist')}
                         </h1>
                         <p className="text-muted-foreground">
                             {status === 'forwarding'
-                                ? 'Login approved. Opening the Tatakai app to finish linking.'
-                                : 'Please wait while we complete the authentication process.'}
+                                ? t('migration.loginApproved')
+                                : t('auth.linkingWait')}
                         </p>
                         {status === 'forwarding' && (
                             <a
@@ -109,7 +111,7 @@ export default function AniListRedirectPage() {
                                 className="inline-flex items-center gap-2 mt-2 px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
                             >
                                 <ExternalLink className="w-4 h-4" />
-                                Open Tatakai app
+                                {t('migration.openApp')}
                             </a>
                         )}
                     </>
@@ -118,21 +120,21 @@ export default function AniListRedirectPage() {
                 {status === 'success' && (
                     <>
                         <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto" />
-                        <h1 className="text-2xl font-bold">Success!</h1>
-                        <p className="text-muted-foreground">Your AniList account has been linked. Redirecting you back to settings...</p>
+                        <h1 className="text-2xl font-bold">{t('auth.successTitle')}</h1>
+                        <p className="text-muted-foreground">{t('auth.anilistLinkedRedirect')}</p>
                     </>
                 )}
 
                 {status === 'error' && (
                     <>
                         <AlertCircle className="w-12 h-12 text-destructive mx-auto" />
-                        <h1 className="text-2xl font-bold">Authentication Failed</h1>
+                        <h1 className="text-2xl font-bold">{t('auth.authFailed')}</h1>
                         <p className="text-destructive font-medium">{error}</p>
                         <button
                             onClick={() => { navigate('/', { replace: true }); openSettings('integrations'); }}
                             className="mt-4 px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
                         >
-                            Back to Settings
+                            {t('auth.backToSettings')}
                         </button>
                     </>
                 )}

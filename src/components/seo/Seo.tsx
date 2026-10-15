@@ -1,3 +1,5 @@
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
+import uiI18n from '@/lib/uiI18n';
 /**
  * <Seo> — per-page Open Graph / Twitter / canonical meta for SPA navigation.
  *
@@ -99,8 +101,9 @@ export function Seo({
   suffix,
   imageAlt,
 }: SeoProps) {
+  useUiTranslation();
   const fullTitle =
-    suffix === "" ? title : `${title}${suffix ?? ` — ${SITE_NAME}`}`;
+    suffix === "" ? title : uiI18n.t('app.i18n_value_0i18n_value_1_bb0b4be1', { value0: title, value1: suffix ?? ` — ${SITE_NAME}` });
   const desc = clamp(description || "");
   const img = absolute(image) || DEFAULT_IMAGE;
   const canonical =

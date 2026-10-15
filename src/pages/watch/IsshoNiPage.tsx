@@ -1,7 +1,9 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from '@/lib/localeFormat';
 import { toast } from 'sonner';
 import {
   Users, Plus, Lock, Globe, Key, ArrowLeft, Play, Clock,
@@ -35,14 +37,15 @@ import { cn } from '@/lib/utils';
    REUSABLE ROOM CARD
    ============================================================================== */
 export function WatchRoomCard({ room }: { room: WatchRoom }) {
+  useUiTranslation();
   const navigate = useNavigate();
   const { data: hostBadges } = useUserBadges(room.host_id);
 
   const accessBadge = {
-    public: { icon: Globe, color: 'bg-white/10 text-white border-white/20', label: 'Public' },
-    invite: { icon: UserPlus, color: 'bg-sky-500/10 text-sky-400 border-sky-500/20', label: 'Invite' },
-    password: { icon: Lock, color: 'bg-rose-500/10 text-rose-400 border-rose-500/20', label: 'Private' },
-  }[room.access_type] || { icon: Globe, color: 'bg-white/10 text-white border-white/20', label: 'Public' };
+    public: { icon: Globe, color: 'bg-white/10 text-white border-white/20', get label() { return uiI18n.t('app.public_dc5eb704'); } },
+    invite: { icon: UserPlus, color: 'bg-sky-500/10 text-sky-400 border-sky-500/20', get label() { return uiI18n.t('app.invite_b136609f'); } },
+    password: { icon: Lock, color: 'bg-rose-500/10 text-rose-400 border-rose-500/20', get label() { return uiI18n.t('app.private_237dfa0a'); } },
+  }[room.access_type] || { icon: Globe, color: 'bg-white/10 text-white border-white/20', get label() { return uiI18n.t('app.public_dc5eb704'); } };
 
   const AccessIcon = accessBadge.icon;
 
@@ -79,7 +82,7 @@ export function WatchRoomCard({ room }: { room: WatchRoom }) {
           {room.is_playing && (
             <div className="absolute right-3 top-3 flex items-center gap-1.5 rounded-full border border-rose-500/30 bg-rose-500/20 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-rose-400 backdrop-blur-md">
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-rose-400" />
-              Live
+              {uiI18n.t('app.live_65c821a5')}
             </div>
           )}
 
@@ -90,7 +93,7 @@ export function WatchRoomCard({ room }: { room: WatchRoom }) {
               {accessBadge.label}
             </span>
             <span className="inline-flex items-center rounded-md border border-white/10 bg-black/60 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white/80 backdrop-blur-md">
-              {room.category || 'SUB'}
+              {room.category || uiI18n.t('app.sub_49b60b33')}
             </span>
           </div>
         </div>
@@ -110,7 +113,7 @@ export function WatchRoomCard({ room }: { room: WatchRoom }) {
               </span>
               <span className="truncate">
                 {room.anime_title}
-                {room.episode_number ? <span className="text-white/40 font-normal"> • Ep {room.episode_number}</span> : ''}
+                {room.episode_number ? <span className="text-white/40 font-normal"> {uiI18n.t('app.ep_017ba692')} {room.episode_number}</span> : ''}
               </span>
             </p>
           )}
@@ -122,7 +125,7 @@ export function WatchRoomCard({ room }: { room: WatchRoom }) {
                 <Crown className="h-3 w-3 text-white/70" />
               </div>
               <span className="max-w-[100px] truncate text-xs font-semibold text-white/80">
-                {room.host_profile?.display_name || room.host_profile?.username || 'Host'}
+                {room.host_profile?.display_name || room.host_profile?.username || uiI18n.t('app.host_3960ec4c')}
               </span>
               <span onClick={(e) => e.stopPropagation()}>
                 <UserBadges badges={hostBadges} size={14} max={3} />
@@ -149,6 +152,7 @@ export function WatchRoomCard({ room }: { room: WatchRoom }) {
    PAGE COMPONENT
    ============================================================================== */
 export default function IsshoNiPage() {
+  useUiTranslation();
   const navigate = useNavigate();
   const isDesktopApp = useIsDesktopApp();
   const [searchParams] = useSearchParams();
@@ -237,8 +241,8 @@ export default function IsshoNiPage() {
   }, [debouncedAnimeSearch]);
 
   const handleCreate = async () => {
-    if (!newRoom.name.trim()) return toast.error('Please enter a room name');
-    if (newRoom.access_type === 'password' && !newRoom.password.trim()) return toast.error('Please enter a password');
+    if (!newRoom.name.trim()) return toast.error(uiI18n.t('app.please_enter_a_room_name_320cc0ce'));
+    if (newRoom.access_type === 'password' && !newRoom.password.trim()) return toast.error(uiI18n.t('app.please_enter_a_password_2e195609'));
 
     let scheduledStartAt = null;
     if (scheduledStart !== 'now') {
@@ -258,11 +262,11 @@ export default function IsshoNiPage() {
       scheduled_start_at: scheduledStartAt
     }, {
       onSuccess: (room) => {
-        toast.success('Room created successfully!');
+        toast.success(uiI18n.t('app.room_created_successfully_9cbfef33'));
         setIsCreateOpen(false);
         navigate(`/isshoni/room/${room.id}`);
       },
-      onError: (error: any) => toast.error(error.message || 'Failed to create room')
+      onError: (error: any) => toast.error(error.message || uiI18n.t('app.failed_to_create_room_acd8d179'))
     });
   };
 
@@ -286,7 +290,7 @@ export default function IsshoNiPage() {
           <div className="flex items-center gap-4 mb-6">
             <button onClick={() => navigate(-1)} className="group flex items-center gap-2 text-muted-foreground transition-colors hover:text-white">
               <ArrowLeft className="h-5 w-5 transition-transform group-hover:-translate-x-1" />
-              <span className="text-sm font-medium">Back</span>
+              <span className="text-sm font-medium">{uiI18n.t('app.back_b52b36b7')}</span>
             </button>
           </div>
 
@@ -309,7 +313,7 @@ export default function IsshoNiPage() {
                   animate={{ opacity: 1, y: 0 }}
                   className="mb-1 text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80"
                 >
-                  Synchronized Viewing
+                  {uiI18n.t('app.synchronized_viewing_796af379')}
                 </motion.p>
                 <motion.h1
                   initial={{ opacity: 0, y: 5 }}
@@ -317,7 +321,7 @@ export default function IsshoNiPage() {
                   transition={{ delay: 0.1 }}
                   className="font-display text-4xl font-black tracking-tight text-white md:text-5xl lg:text-6xl"
                 >
-                  Watch2Together
+                  {uiI18n.t('app.watch2together_cde01fad')}
                 </motion.h1>
                 <motion.div
                   initial={{ opacity: 0 }}
@@ -327,11 +331,11 @@ export default function IsshoNiPage() {
                 >
                   <span className="inline-flex items-center gap-1.5 rounded-full border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-rose-400">
                     <Radio className="h-3.5 w-3.5 animate-pulse" />
-                    <AnimatedCounter value={liveRooms.length} className="tabular-nums" /> Live
+                    <AnimatedCounter value={liveRooms.length} className="tabular-nums" /> {uiI18n.t('app.live_65c821a5')}
                   </span>
                   <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-white/80">
                     <Users className="h-3.5 w-3.5 text-white/50" />
-                    <AnimatedCounter value={totalParticipants} className="tabular-nums" /> Watching
+                    <AnimatedCounter value={totalParticipants} className="tabular-nums" /> {uiI18n.t('app.watching_96d9e027')}
                   </span>
                 </motion.div>
               </div>
@@ -344,7 +348,7 @@ export default function IsshoNiPage() {
                   <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.2 }}>
                     <Button size="lg" className="gap-2 rounded-full bg-white text-black hover:bg-white/90 font-bold shadow-xl px-8 h-12 transition-transform active:scale-95">
                       <Plus className="h-5 w-5" />
-                      Create Room
+                      {uiI18n.t('app.create_room_7a913eaa')}
                     </Button>
                   </motion.div>
                 </DialogTrigger>
@@ -358,7 +362,7 @@ export default function IsshoNiPage() {
                         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 text-white">
                           <Tv className="h-4 w-4" />
                         </div>
-                        Create Watch Room
+                        {uiI18n.t('app.create_watch_room_677e8023')}
                       </DialogTitle>
                     </DialogHeader>
                   </div>
@@ -366,11 +370,11 @@ export default function IsshoNiPage() {
                   <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
                     {/* Anime Search Selection */}
                     <div className="space-y-2">
-                      <Label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Select Anime (Optional)</Label>
+                      <Label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground ml-1">{uiI18n.t('app.select_anime_optional_616d304f')}</Label>
                       <div className="relative">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50" />
                         <input
-                          placeholder="Search for an anime..."
+                          placeholder={uiI18n.t('app.search_for_an_anime_15fb9435')}
                           className={cn(inputCls, "pl-11")}
                           value={animeSearchQuery}
                           onChange={(e) => setAnimeSearchQuery(e.target.value)}
@@ -403,7 +407,7 @@ export default function IsshoNiPage() {
                                 <img src={getProxiedImageUrl(anime.poster)} alt="" className="w-10 h-14 object-cover rounded-md bg-black/50" />
                                 <div className="flex-1 min-w-0">
                                   <p className="text-sm font-semibold text-white line-clamp-1">{anime.name}</p>
-                                  <p className="text-xs text-muted-foreground mt-0.5">{anime.type || 'Anime'}</p>
+                                  <p className="text-xs text-muted-foreground mt-0.5">{anime.type || uiI18n.t('app.anime_f1b32a19')}</p>
                                 </div>
                               </div>
                             ))}
@@ -423,7 +427,7 @@ export default function IsshoNiPage() {
                               onClick={() => setNewRoom({ ...newRoom, anime_id: '', anime_title: '', anime_poster: '' })}
                               className="text-[11px] font-bold uppercase tracking-wider text-rose-400 hover:text-rose-300 mt-1"
                             >
-                              Remove Selection
+                              {uiI18n.t('app.remove_selection_33461603')}
                             </button>
                           </div>
                         </div>
@@ -432,9 +436,9 @@ export default function IsshoNiPage() {
 
                     {/* Room Name */}
                     <div className="space-y-2">
-                      <Label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Room Name *</Label>
+                      <Label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground ml-1">{uiI18n.t('app.room_name_ee6b5955')}</Label>
                       <input
-                        placeholder="e.g., Chill Anime Night 🌙"
+                        placeholder={uiI18n.t('app.e_g_chill_anime_night_634be3ed')}
                         value={newRoom.name}
                         onChange={(e) => setNewRoom({ ...newRoom, name: e.target.value })}
                         className={inputCls}
@@ -443,27 +447,27 @@ export default function IsshoNiPage() {
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Access Type</Label>
+                        <Label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground ml-1">{uiI18n.t('app.access_type_f7338d14')}</Label>
                         <Select value={newRoom.access_type} onValueChange={(v) => setNewRoom({ ...newRoom, access_type: v as any })}>
                           <SelectTrigger className={cn(inputCls, "py-0 h-12")}>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent className="bg-[#111] border-white/10">
-                            <SelectItem value="public"><span className="flex items-center gap-2"><Globe className="w-4 h-4 text-white/50" />Public</span></SelectItem>
-                            <SelectItem value="password"><span className="flex items-center gap-2"><Lock className="w-4 h-4 text-rose-400" />Password</span></SelectItem>
+                            <SelectItem value="public"><span className="flex items-center gap-2"><Globe className="w-4 h-4 text-white/50" />{uiI18n.t('app.public_dc5eb704')}</span></SelectItem>
+                            <SelectItem value="password"><span className="flex items-center gap-2"><Lock className="w-4 h-4 text-rose-400" />{uiI18n.t('app.password_8be3c943')}</span></SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
 
                       <div className="space-y-2">
-                        <Label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Version</Label>
+                        <Label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground ml-1">{uiI18n.t('app.version_2da600bf')}</Label>
                         <Select value={newRoom.category} onValueChange={(v) => setNewRoom({ ...newRoom, category: v as 'sub' | 'dub' })}>
                           <SelectTrigger className={cn(inputCls, "py-0 h-12")}>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent className="bg-[#111] border-white/10">
-                            <SelectItem value="sub"><span className="flex items-center gap-2"><Subtitles className="w-4 h-4 text-white/50" />Subbed</span></SelectItem>
-                            <SelectItem value="dub"><span className="flex items-center gap-2"><Mic2 className="w-4 h-4 text-white/50" />Dubbed</span></SelectItem>
+                            <SelectItem value="sub"><span className="flex items-center gap-2"><Subtitles className="w-4 h-4 text-white/50" />{uiI18n.t('app.subbed_7cff0399')}</span></SelectItem>
+                            <SelectItem value="dub"><span className="flex items-center gap-2"><Mic2 className="w-4 h-4 text-white/50" />{uiI18n.t('app.dubbed_4362fd30')}</span></SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -471,31 +475,31 @@ export default function IsshoNiPage() {
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Schedule</Label>
+                        <Label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground ml-1">{uiI18n.t('app.schedule_0a8adac9')}</Label>
                         <Select value={scheduledStart} onValueChange={setScheduledStart}>
                           <SelectTrigger className={cn(inputCls, "py-0 h-12")}>
-                            <SelectValue placeholder="When to start?" />
+                            <SelectValue placeholder={uiI18n.t('app.when_to_start_a17e57fe')} />
                           </SelectTrigger>
                           <SelectContent className="bg-[#111] border-white/10">
-                            <SelectItem value="now">Start Immediately</SelectItem>
-                            <SelectItem value="1">In 1 minute</SelectItem>
-                            <SelectItem value="5">In 5 minutes</SelectItem>
-                            <SelectItem value="custom">Custom wait time...</SelectItem>
+                            <SelectItem value="now">{uiI18n.t('app.start_immediately_affcd404')}</SelectItem>
+                            <SelectItem value="1">{uiI18n.t('app.in_1_minute_5f5eaac8')}</SelectItem>
+                            <SelectItem value="5">{uiI18n.t('app.in_5_minutes_27ab4741')}</SelectItem>
+                            <SelectItem value="custom">{uiI18n.t('app.custom_wait_time_ecf4256e')}</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
 
                       <div className="space-y-2">
-                        <Label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Max Viewers</Label>
+                        <Label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground ml-1">{uiI18n.t('app.max_viewers_709167b4')}</Label>
                         <Select value={newRoom.max_participants.toString()} onValueChange={(v) => setNewRoom({ ...newRoom, max_participants: parseInt(v) })}>
                           <SelectTrigger className={cn(inputCls, "py-0 h-12")}>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent className="bg-[#111] border-white/10">
-                            <SelectItem value="5">5 Viewers</SelectItem>
-                            <SelectItem value="10">10 Viewers</SelectItem>
-                            <SelectItem value="20">20 Viewers</SelectItem>
-                            <SelectItem value="50">50 Viewers</SelectItem>
+                            <SelectItem value="5">{uiI18n.t('app.5_viewers_0e70888c')}</SelectItem>
+                            <SelectItem value="10">{uiI18n.t('app.10_viewers_5044d818')}</SelectItem>
+                            <SelectItem value="20">{uiI18n.t('app.20_viewers_1e4730fd')}</SelectItem>
+                            <SelectItem value="50">{uiI18n.t('app.50_viewers_798990e6')}</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -503,7 +507,7 @@ export default function IsshoNiPage() {
 
                     {scheduledStart === 'custom' && (
                       <div className="space-y-2">
-                        <Label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Minutes from now</Label>
+                        <Label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground ml-1">{uiI18n.t('app.minutes_from_now_8abaaa92')}</Label>
                         <div className="flex items-center gap-3">
                           <input
                             type="number"
@@ -513,19 +517,19 @@ export default function IsshoNiPage() {
                             onChange={(e) => setCustomMinutes(e.target.value)}
                             className={inputCls}
                           />
-                          <span className="text-sm text-muted-foreground">minutes</span>
+                          <span className="text-sm text-muted-foreground">{uiI18n.t('app.minutes_be2e2bb6')}</span>
                         </div>
                       </div>
                     )}
 
                     {newRoom.access_type === 'password' && (
                       <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="space-y-2">
-                        <Label className="text-[11px] font-bold uppercase tracking-widest text-rose-400 ml-1">Room Password *</Label>
+                        <Label className="text-[11px] font-bold uppercase tracking-widest text-rose-400 ml-1">{uiI18n.t('app.room_password_65cf9dfa')}</Label>
                         <div className="relative">
                           <Key className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50" />
                           <input
                             type="password"
-                            placeholder="Enter a secret password"
+                            placeholder={uiI18n.t('app.enter_a_secret_password_e26d309a')}
                             value={newRoom.password}
                             onChange={(e) => setNewRoom({ ...newRoom, password: e.target.value })}
                             className={cn(inputCls, "pl-11")}
@@ -537,21 +541,21 @@ export default function IsshoNiPage() {
 
                   <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-white/5 bg-white/[0.01]">
                     <Button variant="ghost" onClick={() => setIsCreateOpen(false)} className="rounded-full hover:bg-white/5 font-semibold">
-                      Cancel
+                      {uiI18n.t('app.cancel_77dfd213')}
                     </Button>
                     <Button
                       onClick={handleCreate}
                       disabled={createRoom.isPending}
                       className="rounded-full bg-white text-black hover:bg-white/90 font-bold px-8 h-10 shadow-lg active:scale-95 transition-transform"
                     >
-                      {createRoom.isPending ? 'Creating...' : 'Create Room'}
+                      {createRoom.isPending ? 'Creating...' : uiI18n.t('app.create_room_7a913eaa')}
                     </Button>
                   </div>
                 </DialogContent>
               </Dialog>
             ) : (
               <Button onClick={() => navigate('/auth')} size="lg" className="rounded-full bg-white text-black hover:bg-white/90 font-bold px-8 shadow-xl">
-                Sign in to Create
+                {uiI18n.t('app.sign_in_to_create_0424f1c0')}
               </Button>
             )}
           </div>
@@ -565,8 +569,8 @@ export default function IsshoNiPage() {
                 <Crown className="h-5 w-5" />
               </div>
               <div>
-                <h2 className="font-display text-xl font-bold tracking-tight">Your Active Rooms</h2>
-                <p className="text-sm text-muted-foreground/70">Manage your hosted sessions</p>
+                <h2 className="font-display text-xl font-bold tracking-tight">{uiI18n.t('app.your_active_rooms_e191af88')}</h2>
+                <p className="text-sm text-muted-foreground/70">{uiI18n.t('app.manage_your_hosted_sessions_06c063eb')}</p>
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
@@ -581,9 +585,9 @@ export default function IsshoNiPage() {
             <div className="flex items-center gap-3 mb-6">
               <div className="flex items-center gap-2 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-1.5">
                 <Radio className="h-4 w-4 animate-pulse text-rose-400" />
-                <span className="text-sm font-bold uppercase tracking-wider text-rose-300">Live Now</span>
+                <span className="text-sm font-bold uppercase tracking-wider text-rose-300">{uiI18n.t('app.live_now_f7ebe74c')}</span>
               </div>
-              <span className="text-sm text-muted-foreground tabular-nums font-medium">{liveRooms.length} public rooms broadcasting</span>
+              <span className="text-sm text-muted-foreground tabular-nums font-medium">{liveRooms.length} {uiI18n.t('app.public_rooms_broadcasting_db3f97b1')}</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
               {liveRooms.map((room) => <WatchRoomCard key={room.id} room={room} />)}
@@ -598,8 +602,8 @@ export default function IsshoNiPage() {
               <Globe className="h-5 w-5 text-white/70" />
             </div>
             <div>
-              <h2 className="font-display text-xl font-bold tracking-tight">Discover Lobbies</h2>
-              <p className="text-sm text-muted-foreground/70">Find open communities to watch with</p>
+              <h2 className="font-display text-xl font-bold tracking-tight">{uiI18n.t('app.discover_lobbies_c0566992')}</h2>
+              <p className="text-sm text-muted-foreground/70">{uiI18n.t('app.find_open_communities_to_watch_with_a400dfe6')}</p>
             </div>
           </div>
 
@@ -629,13 +633,13 @@ export default function IsshoNiPage() {
               <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-white/[0.03] ring-1 ring-white/10">
                 <Tv className="h-10 w-10 text-muted-foreground/40" />
               </div>
-              <h3 className="font-display text-xl font-semibold tracking-tight text-white mb-2">The Lobby is Empty</h3>
+              <h3 className="font-display text-xl font-semibold tracking-tight text-white mb-2">{uiI18n.t('app.the_lobby_is_empty_c6082736')}</h3>
               <p className="max-w-[320px] text-sm text-muted-foreground leading-relaxed mb-8">
-                Be the trendsetter! Create your own room and start a watch party for others to join.
+                {uiI18n.t('app.be_the_trendsetter_create_your_own_room_and_star_7541c447')}
               </p>
               {user && (
                 <Button onClick={() => setIsCreateOpen(true)} size="lg" className="rounded-full bg-white text-black hover:bg-white/90 font-bold px-8 shadow-lg active:scale-95">
-                  Host a Room
+                  {uiI18n.t('app.host_a_room_71557b26')}
                 </Button>
               )}
             </div>

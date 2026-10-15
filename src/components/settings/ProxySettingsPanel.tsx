@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState } from 'react';
 import {
   ShieldAlert,
@@ -38,6 +40,7 @@ import { cn } from '@/lib/utils';
 import { SettingsSection, SettingRow, SettingsBadge } from '@/components/settings/SettingsPrimitives';
 
 export function ProxySettingsPanel() {
+  useUiTranslation();
   const {
     proxies,
     addProxy,
@@ -82,15 +85,15 @@ export function ProxySettingsPanel() {
       clearTimeout(timeout);
 
       if (res && (res.ok || res.status === 400 || res.status === 403 || res.status === 404)) {
-        toast.success(`Connected to ${proxy.name} successfully! (HTTP ${res.status})`, { id: toastId });
+        toast.success(uiI18n.t('app.connected_to_i18n_value_0_successfully_http_i18n_217dcea0', { value0: proxy.name, value1: res.status }), { id: toastId });
       } else {
-        toast.warning(`Proxy reached but responded with status ${res?.status || 'unknown'}. Verify proxy credentials.`, { id: toastId });
+        toast.warning(uiI18n.t('app.proxy_reached_but_responded_with_status_i18n_val_5196a022', { value0: res?.status || 'unknown' }), { id: toastId });
       }
     } catch (err: any) {
       if (err.name === 'AbortError') {
-        toast.error(`Connection to ${proxy.name} timed out after 6 seconds.`, { id: toastId });
+        toast.error(uiI18n.t('app.connection_to_i18n_value_0_timed_out_after_6_sec_1061fc0f', { value0: proxy.name }), { id: toastId });
       } else {
-        toast.error(`Failed to reach ${proxy.name}: ${err.message || 'Connection refused'}`, { id: toastId });
+        toast.error(uiI18n.t('app.failed_to_reach_i18n_value_0_i18n_value_1_1c6e4668', { value0: proxy.name, value1: err.message || 'Connection refused' }), { id: toastId });
       }
     } finally {
       setTestingId(null);
@@ -100,14 +103,14 @@ export function ProxySettingsPanel() {
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newUrl.trim()) {
-      toast.error('Please specify a valid proxy URL');
+      toast.error(uiI18n.t('app.please_specify_a_valid_proxy_url_b0c374ce'));
       return;
     }
 
     try {
       new URL(newUrl.trim());
     } catch {
-      toast.error('Invalid URL format. Include http:// or https://');
+      toast.error(uiI18n.t('app.invalid_url_format_include_http_or_https_49891ae9'));
       return;
     }
 
@@ -120,7 +123,7 @@ export function ProxySettingsPanel() {
       isDefault: false,
     });
 
-    toast.success(`Added proxy "${created.name}"`);
+    toast.success(uiI18n.t('app.added_proxy_i18n_value_0_a5a89694', { value0: created.name }));
     setIsAddOpen(false);
     setNewName('');
     setNewUrl('');
@@ -138,14 +141,12 @@ export function ProxySettingsPanel() {
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <h4 className="font-display font-bold text-sm text-destructive tracking-wide uppercase">
-              Advanced Users Warning
+              {uiI18n.t('app.advanced_users_warning_9e47521c')}
             </h4>
-            <SettingsBadge tone="danger">Expert Mode</SettingsBadge>
+            <SettingsBadge tone="danger">{uiI18n.t('app.expert_mode_e20bdc89')}</SettingsBadge>
           </div>
           <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-            You need to know what you are doing. Custom streaming proxies alter how Tatakai fetches media,
-            resolves video segments, and bypasses Cloudflare protections. Supplying an unresponsive or invalid
-            proxy will break streaming playback.
+            {uiI18n.t('app.you_need_to_know_what_you_are_doing_custom_strea_3d7b8f0a')}
           </p>
         </div>
       </div>
@@ -158,10 +159,10 @@ export function ProxySettingsPanel() {
           </div>
           <div className="space-y-0.5">
             <h4 className="font-semibold text-sm flex items-center gap-2">
-              Want to host your own dedicated proxy?
+              {uiI18n.t('app.want_to_host_your_own_dedicated_proxy_d68b8cea')}
             </h4>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Deploy your private Tatakai streaming proxy instance with Docker, Render, or Cloudflare Workers.
+              {uiI18n.t('app.deploy_your_private_tatakai_streaming_proxy_inst_e7ec1f71')}
             </p>
           </div>
         </div>
@@ -171,7 +172,7 @@ export function ProxySettingsPanel() {
           rel="noopener noreferrer"
           className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground hover:brightness-110 active:scale-95 transition-all shadow-md shadow-primary/20 shrink-0"
         >
-          <span>tatakai-proxy on GitHub</span>
+          <span>{uiI18n.t('app.tatakai_proxy_on_github_acd54bb0')}</span>
           <ExternalLink className="h-3.5 w-3.5" />
         </a>
       </div>
@@ -180,8 +181,8 @@ export function ProxySettingsPanel() {
       <SettingsSection
         icon={Radio}
         eyebrow="Type 1 Proxy"
-        title="App-Based Local Proxy"
-        description="The local loopback proxy running directly in your app runtime to bypass host header restrictions and mint secure stream tokens."
+        title={uiI18n.t('app.app_based_local_proxy_504c20c4')}
+        description={uiI18n.t('app.the_local_loopback_proxy_running_directly_in_you_2fda517f')}
         action={
           <Button
             size="sm"
@@ -195,7 +196,7 @@ export function ProxySettingsPanel() {
             }}
           >
             <Plus className="h-3.5 w-3.5" />
-            Add Local Proxy
+            {uiI18n.t('app.add_local_proxy_24227985')}
           </Button>
         }
       >
@@ -211,9 +212,9 @@ export function ProxySettingsPanel() {
               <div className="min-w-0 space-y-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-semibold text-sm">{proxy.name}</span>
-                  <SettingsBadge tone="primary">Type 1 · App</SettingsBadge>
+                  <SettingsBadge tone="primary">{uiI18n.t('app.type_1_app_2336e7c4')}</SettingsBadge>
                   {proxy.isDefault && (
-                    <SettingsBadge tone="success">Active Runtime</SettingsBadge>
+                    <SettingsBadge tone="success">{uiI18n.t('app.active_runtime_b2031ae9')}</SettingsBadge>
                   )}
                 </div>
                 <p className="font-mono text-xs text-muted-foreground truncate">{proxy.url}</p>
@@ -228,7 +229,7 @@ export function ProxySettingsPanel() {
                   onClick={() => handleTestProxy(proxy)}
                 >
                   <Wifi className="h-3 w-3" />
-                  {testingId === proxy.id ? 'Testing...' : 'Test'}
+                  {testingId === proxy.id ? 'Testing...' : uiI18n.t('app.test_640ab2ba')}
                 </Button>
 
                 {!proxy.isDefault && (
@@ -238,14 +239,14 @@ export function ProxySettingsPanel() {
                     className="h-8 px-2.5 text-xs font-semibold border-white/10"
                     onClick={() => setDefaultProxy(proxy.id)}
                   >
-                    Set Active
+                    {uiI18n.t('app.set_active_758d7f72')}
                   </Button>
                 )}
 
                 <Switch
                   checked={proxy.enabled}
                   onCheckedChange={(checked) => toggleProxy(proxy.id, checked)}
-                  aria-label={`Toggle ${proxy.name}`}
+                  aria-label={uiI18n.t('app.toggle_i18n_value_0_8b9bc075', { value0: proxy.name })}
                 />
 
                 {proxies.length > 2 && (
@@ -254,7 +255,7 @@ export function ProxySettingsPanel() {
                     variant="ghost"
                     className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
                     onClick={() => removeProxy(proxy.id)}
-                    title="Remove proxy"
+                    title={uiI18n.t('app.remove_proxy_a5f80012')}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
@@ -269,8 +270,8 @@ export function ProxySettingsPanel() {
       <SettingsSection
         icon={Globe}
         eyebrow="Type 2 Proxy"
-        title="External & Environment Proxies"
-        description="Remote streaming and Cloudflare-bypassing proxies. User-added proxies take precedence over the fallback .env values."
+        title={uiI18n.t('app.external_environment_proxies_6bf8d85b')}
+        description={uiI18n.t('app.remote_streaming_and_cloudflare_bypassing_proxie_6c159769')}
         action={
           <div className="flex items-center gap-2">
             <Button
@@ -280,7 +281,7 @@ export function ProxySettingsPanel() {
               onClick={resetToDefaults}
             >
               <RefreshCw className="h-3.5 w-3.5" />
-              Reset Defaults
+              {uiI18n.t('app.reset_defaults_4f97ffa9')}
             </Button>
             <Button
               size="sm"
@@ -293,7 +294,7 @@ export function ProxySettingsPanel() {
               }}
             >
               <Plus className="h-3.5 w-3.5" />
-              Add Proxy
+              {uiI18n.t('app.add_proxy_8afe820b')}
             </Button>
           </div>
         }
@@ -310,13 +311,13 @@ export function ProxySettingsPanel() {
               <div className="min-w-0 space-y-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-semibold text-sm">{proxy.name}</span>
-                  <SettingsBadge tone="muted">Type 2 · External</SettingsBadge>
+                  <SettingsBadge tone="muted">{uiI18n.t('app.type_2_external_499e6937')}</SettingsBadge>
                   {proxy.isDefault && (
-                    <SettingsBadge tone="success">Primary Stream Proxy</SettingsBadge>
+                    <SettingsBadge tone="success">{uiI18n.t('app.primary_stream_proxy_055219cd')}</SettingsBadge>
                   )}
                   {proxy.password && (
                     <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground font-mono bg-white/5 px-2 py-0.5 rounded-full border border-white/10">
-                      <Lock className="h-2.5 w-2.5" /> Auth Protected
+                      <Lock className="h-2.5 w-2.5" /> {uiI18n.t('app.auth_protected_d1e97b85')}
                     </span>
                   )}
                 </div>
@@ -332,7 +333,7 @@ export function ProxySettingsPanel() {
                   onClick={() => handleTestProxy(proxy)}
                 >
                   <Wifi className="h-3 w-3" />
-                  {testingId === proxy.id ? 'Testing...' : 'Test'}
+                  {testingId === proxy.id ? 'Testing...' : uiI18n.t('app.test_640ab2ba')}
                 </Button>
 
                 {!proxy.isDefault && (
@@ -342,14 +343,14 @@ export function ProxySettingsPanel() {
                     className="h-8 px-2.5 text-xs font-semibold border-white/10"
                     onClick={() => setDefaultProxy(proxy.id)}
                   >
-                    Set Primary
+                    {uiI18n.t('app.set_primary_6f286973')}
                   </Button>
                 )}
 
                 <Switch
                   checked={proxy.enabled}
                   onCheckedChange={(checked) => toggleProxy(proxy.id, checked)}
-                  aria-label={`Toggle ${proxy.name}`}
+                  aria-label={uiI18n.t('app.toggle_i18n_value_0_8b9bc075', { value0: proxy.name })}
                 />
 
                 {envProxies.length > 1 && (
@@ -358,7 +359,7 @@ export function ProxySettingsPanel() {
                     variant="ghost"
                     className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
                     onClick={() => removeProxy(proxy.id)}
-                    title="Remove proxy"
+                    title={uiI18n.t('app.remove_proxy_a5f80012')}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
@@ -373,16 +374,16 @@ export function ProxySettingsPanel() {
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
         <DialogContent className="sm:max-w-md bg-card/95 border-white/10 backdrop-blur-xl">
           <DialogHeader>
-            <DialogTitle className="font-display font-bold text-lg">Add Custom Streaming Proxy</DialogTitle>
+            <DialogTitle className="font-display font-bold text-lg">{uiI18n.t('app.add_custom_streaming_proxy_e80ef48b')}</DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground">
-              Configure a personal streaming or app proxy. The URL will be checked and prioritized for video playback.
+              {uiI18n.t('app.configure_a_personal_streaming_or_app_proxy_the__cc5e7897')}
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleCreate} className="space-y-4 py-2">
             <div className="space-y-1.5">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Proxy Type
+                {uiI18n.t('app.proxy_type_c97f01e6')}
               </label>
               <div className="grid grid-cols-2 gap-2">
                 <button
@@ -395,7 +396,7 @@ export function ProxySettingsPanel() {
                       : 'border-white/10 bg-background/50 text-muted-foreground hover:border-white/20'
                   )}
                 >
-                  Type 2: External / Remote
+                  {uiI18n.t('app.type_2_external_remote_31c436e5')}
                 </button>
                 <button
                   type="button"
@@ -407,17 +408,17 @@ export function ProxySettingsPanel() {
                       : 'border-white/10 bg-background/50 text-muted-foreground hover:border-white/20'
                   )}
                 >
-                  Type 1: App Local Host
+                  {uiI18n.t('app.type_1_app_local_host_dc6f4fd4')}
                 </button>
               </div>
             </div>
 
             <div className="space-y-1.5">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Friendly Name
+                {uiI18n.t('app.friendly_name_e2e83686')}
               </label>
               <Input
-                placeholder="e.g. My Frankfurt VPS Node"
+                placeholder={uiI18n.t('app.e_g_my_frankfurt_vps_node_aaf47565')}
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 className="h-10 rounded-xl bg-background/60 border-white/10 text-sm"
@@ -426,7 +427,7 @@ export function ProxySettingsPanel() {
 
             <div className="space-y-1.5">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Proxy Endpoint URL
+                {uiI18n.t('app.proxy_endpoint_url_552e1bfb')}
               </label>
               <Input
                 placeholder={newType === 'app' ? 'http://127.0.0.1:8099' : 'https://proxy.example.com/api/v1/streamingProxy'}
@@ -439,11 +440,11 @@ export function ProxySettingsPanel() {
 
             <div className="space-y-1.5">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Proxy Secret / Password (Optional)
+                {uiI18n.t('app.proxy_secret_password_optional_b74a8b2a')}
               </label>
               <Input
                 type="password"
-                placeholder="Shared secret if protected"
+                placeholder={uiI18n.t('app.shared_secret_if_protected_6292e5ce')}
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 className="h-10 rounded-xl bg-background/60 border-white/10 text-sm font-mono"
@@ -457,13 +458,13 @@ export function ProxySettingsPanel() {
                 onClick={() => setIsAddOpen(false)}
                 className="rounded-xl text-xs"
               >
-                Cancel
+                {uiI18n.t('app.cancel_77dfd213')}
               </Button>
               <Button
                 type="submit"
                 className="rounded-xl text-xs font-bold bg-primary text-primary-foreground"
               >
-                Add Proxy
+                {uiI18n.t('app.add_proxy_8afe820b')}
               </Button>
             </DialogFooter>
           </form>

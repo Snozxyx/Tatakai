@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import { toast } from "sonner";
+import i18n from "@/lib/i18n";
 import type { UseVideoControlsParams } from "../VideoPlayer.types";
 
 export function useVideoControls({
@@ -85,7 +86,7 @@ export function useVideoControls({
     const wasPlaying = !videoRef.current.paused;
     const currentTimeSnapshot = videoRef.current.currentTime;
 
-    toast.info("Refreshing video stream...");
+    toast.info(i18n.t('player.refreshingStream'));
 
     videoRef.current.load();
 

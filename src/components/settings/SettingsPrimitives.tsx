@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import type { LucideIcon } from "lucide-react";
 import { Search, SearchX, X } from "lucide-react";
 import { type ReactNode, useId } from "react";
@@ -43,6 +45,7 @@ export function SettingsBadge({
   className?: string;
   children: ReactNode;
 }) {
+  useUiTranslation();
   return (
     <span
       className={cn(
@@ -84,6 +87,7 @@ export function SettingsSection({
   bodyClassName?: string;
   children?: ReactNode;
 }) {
+  useUiTranslation();
   return (
     <section id={id} className={cn("settings-section scroll-mt-6", className)}>
       <div className="flex items-start justify-between gap-4">
@@ -131,6 +135,7 @@ export function SettingRow({
   className?: string;
   children?: ReactNode;
 }) {
+  useUiTranslation();
   const id = useId();
   const labelId = `${id}-label`;
   const descriptionId = description ? `${id}-description` : undefined;
@@ -170,7 +175,7 @@ export function SettingRow({
 export function SettingsSearch({
   value,
   onChange,
-  placeholder = "Search settings",
+  placeholder = uiI18n.t('app.search_settings_9a6f37a7'),
   className,
   autoFocus,
 }: {
@@ -180,6 +185,7 @@ export function SettingsSearch({
   className?: string;
   autoFocus?: boolean;
 }) {
+  useUiTranslation();
   return (
     <div className={cn("relative", className)}>
       <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -198,7 +204,7 @@ export function SettingsSearch({
         <button
           type="button"
           onClick={() => onChange("")}
-          aria-label="Clear search"
+          aria-label={uiI18n.t('app.clear_search_67300d0f')}
           className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:text-foreground"
         >
           <X className="h-3.5 w-3.5" />
@@ -218,6 +224,7 @@ export function SettingsEmptyState({
   title: string;
   description?: string;
 }) {
+  useUiTranslation();
   return (
     <div className="flex flex-col items-center gap-2 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-10 text-center">
       <div className="mb-1 flex h-12 w-12 items-center justify-center rounded-2xl bg-muted/50">

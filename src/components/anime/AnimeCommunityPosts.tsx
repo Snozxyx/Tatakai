@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { MessagesSquare, PenSquare, ChevronRight } from 'lucide-react';
 import { GlassPanel } from '@/components/ui/GlassPanel';
@@ -55,6 +56,7 @@ export function AnimeCommunityPosts({
   animeName: string;
   animePoster?: string | null;
 }) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { data: posts = [], isLoading, refetch } = useForumPosts({ animeId, sortBy: 'new', limit: 12 });
   const [composerOpen, setComposerOpen] = useState(false);
@@ -73,7 +75,7 @@ export function AnimeCommunityPosts({
       <div className="mb-6 flex items-center justify-between gap-4">
         <h2 className="font-display text-2xl font-semibold flex items-center gap-2">
           <MessagesSquare className="w-5 h-5 text-primary" />
-          Community posts
+          {t('animeDetail.communityPosts')}
         </h2>
         {user && (
           <Button
@@ -83,7 +85,7 @@ export function AnimeCommunityPosts({
             className="gap-1.5 rounded-full"
           >
             <PenSquare className="h-4 w-4" />
-            {composerOpen ? 'Close' : 'New post about this'}
+            {composerOpen ? t('common.close') : t('animeDetail.newPostAbout')}
           </Button>
         )}
       </div>
@@ -109,12 +111,12 @@ export function AnimeCommunityPosts({
       ) : visible.length === 0 ? (
         <GlassPanel className="flex flex-col items-center justify-center gap-2 py-10 text-center border-white/[0.06]">
           <MessagesSquare className="h-8 w-8 text-muted-foreground/50" />
-          <p className="text-sm font-medium text-muted-foreground">No posts about {animeName} yet.</p>
+          <p className="text-sm font-medium text-muted-foreground">{t('animeDetail.noPostsAbout', { animeName })}</p>
           {user ? (
-            <p className="text-xs text-muted-foreground/70">Be the first to start the conversation.</p>
+            <p className="text-xs text-muted-foreground/70">{t('animeDetail.beFirstToPost')}</p>
           ) : (
             <p className="text-xs text-muted-foreground/70">
-              <Link to="/auth" className="text-primary hover:underline">Sign in</Link> to post about this anime.
+              <Link to="/auth" className="text-primary hover:underline">{t('nav.signIn')}</Link> {t('animeDetail.signInToPost')}
             </p>
           )}
         </GlassPanel>
@@ -128,7 +130,7 @@ export function AnimeCommunityPosts({
               to={`/community?anime=${encodeURIComponent(animeId)}`}
               className="flex items-center justify-center gap-1 text-sm font-semibold text-primary hover:underline"
             >
-              View all {posts.length} posts
+              {t('animeDetail.viewAllPosts', { count: posts.length })}
               <ChevronRight className="h-4 w-4" />
             </Link>
           )}

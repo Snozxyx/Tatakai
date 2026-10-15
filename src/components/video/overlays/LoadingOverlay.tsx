@@ -1,4 +1,5 @@
 import { Play } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 interface LoadingOverlayProps {
   isVisible: boolean;
@@ -6,6 +7,7 @@ interface LoadingOverlayProps {
 }
 
 export function LoadingOverlay({ isVisible, serverName }: LoadingOverlayProps) {
+  const { t } = useTranslation();
   if (!isVisible) return null;
 
   return (
@@ -18,7 +20,7 @@ export function LoadingOverlay({ isVisible, serverName }: LoadingOverlayProps) {
           </div>
         </div>
         <span className="text-sm md:text-base text-white/80 font-medium">
-          {serverName ? `Loading ${serverName}...` : "Loading..."}
+          {serverName ? t('player.loadingServer', { server: serverName }) : t('common.loading')}
         </span>
       </div>
     </div>

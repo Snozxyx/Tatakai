@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, useSortable, rectSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -142,6 +143,7 @@ function TierRow({
 }
 
 export function TierListEditor({ initialData, onSave, onClose }: TierListEditorProps) {
+  const { t } = useTranslation();
   const [name, setName] = useState(initialData?.name || '');
   const [description, setDescription] = useState(initialData?.description || '');
   const [isPublic, setIsPublic] = useState(initialData?.is_public ?? true);
@@ -299,7 +301,7 @@ export function TierListEditor({ initialData, onSave, onClose }: TierListEditorP
             return mediaId
               ? {
                   id: `manga:${mediaId}`,
-                  title: row.canonicalTitle || 'Untitled',
+                  title: row.canonicalTitle || t('tierlist.untitled'),
                   image: row.poster || '',
                   type: 'manga' as const,
                 }
@@ -327,7 +329,7 @@ export function TierListEditor({ initialData, onSave, onClose }: TierListEditorP
             return mediaId
               ? {
                   id: `novel:${mediaId}`,
-                  title: row.canonicalTitle || 'Untitled',
+                  title: row.canonicalTitle || t('tierlist.untitled'),
                   image: row.poster || '',
                   type: 'novel' as const,
                 }
@@ -383,13 +385,13 @@ export function TierListEditor({ initialData, onSave, onClose }: TierListEditorP
       if (requestId !== latestSearchRequestRef.current) return;
       console.error('Search failed:', error);
       if (pageNum === 1) setSearchResults([]);
-      toast.error('Failed to search. Please try again.');
+      toast.error(t('tierlist.searchFailed'));
     } finally {
       if (requestId === latestSearchRequestRef.current) {
         setIsSearching(false);
       }
     }
-  }, []);
+  }, [t]);
 
   // Proper debouncing with cleanup
   const handleSearchChange = (value: string) => {
@@ -447,7 +449,7 @@ export function TierListEditor({ initialData, onSave, onClose }: TierListEditorP
   const addItemToTier = (item: SearchResult, tier: string) => {
     // Check if already added
     if (items.some(i => i.anime_id === item.id)) {
-      toast.error('This item is already in your tier list');
+      toast.error(t('tierlist.alreadyAdded'));
       return;
     }
 
@@ -460,7 +462,7 @@ export function TierListEditor({ initialData, onSave, onClose }: TierListEditorP
     };
 
     setItems([...items, newItem]);
-    toast.success(`Added ${item.title} to tier ${tier}`);
+    toast.success(t('tierlist.addedToTier', { title: item.title, tier }));
   };
 
   const removeItem = (animeId: string) => {
@@ -494,7 +496,7 @@ export function TierListEditor({ initialData, onSave, onClose }: TierListEditorP
 
   const handleSave = useCallback(async () => {
     if (!name.trim()) {
-      toast.error('Please enter a name for your tier list');
+      toast.error(t('tierlist.nameRequired'));
       return;
     }
 
@@ -507,7 +509,7 @@ export function TierListEditor({ initialData, onSave, onClose }: TierListEditorP
           items,
           is_public: isPublic,
         });
-        toast.success('Tier list updated!');
+        toast.success(t('tierlist.updated'));
       } else {
         await createTierList.mutateAsync({
           name,
@@ -515,13 +517,13 @@ export function TierListEditor({ initialData, onSave, onClose }: TierListEditorP
           items,
           is_public: isPublic,
         });
-        toast.success('Tier list created!');
+        toast.success(t('tierlist.created'));
       }
       clearSavedDraft();
       onSave?.({ name, description, items, is_public: isPublic });
       onClose?.();
     } catch (error: any) {
-      const message = error?.message || error?.details || 'Failed to save tier list';
+      const message = error?.message || error?.details || t('migration.tierSaveFailed');
       toast.error(message);
     }
   }, [
@@ -534,6 +536,7 @@ export function TierListEditor({ initialData, onSave, onClose }: TierListEditorP
     name,
     onClose,
     onSave,
+    t,
     updateTierList,
   ]);
 
@@ -545,13 +548,13 @@ export function TierListEditor({ initialData, onSave, onClose }: TierListEditorP
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="flex-1 space-y-4">
           <Input
-            placeholder="Tier List Name"
+            placeholder={t('tierlist.namePlaceholder')}
             value={name}
             onChange={(e) => setName(e.target.value)}
             className="text-lg font-semibold"
           />
           <Textarea
-            placeholder="Description (optional)"
+            placeholder={t('tierlist.descriptionPlaceholder')}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={2}
@@ -560,7 +563,7 @@ export function TierListEditor({ initialData, onSave, onClose }: TierListEditorP
         <div className="flex items-start gap-4">
           <div className="flex items-center gap-2">
             {isPublic ? <Globe className="w-4 h-4 text-green-500" /> : <Lock className="w-4 h-4" />}
-            <Label>Public</Label>
+            <Label>{t('privacy.public')}</Label>
             <Switch checked={isPublic} onCheckedChange={setIsPublic} />
           </div>
         </div>
@@ -572,19 +575,19 @@ export function TierListEditor({ initialData, onSave, onClose }: TierListEditorP
           <TabsList className="grid grid-cols-4 w-96 max-w-full">
             <TabsTrigger value="anime" className="flex items-center gap-2">
               <Film className="w-4 h-4" />
-              Anime
+              {t('tierlist.anime')}
             </TabsTrigger>
             <TabsTrigger value="manga" className="flex items-center gap-2">
               <BookOpen className="w-4 h-4" />
-              Manga
+              {t('tierlist.manga')}
             </TabsTrigger>
             <TabsTrigger value="novel" className="flex items-center gap-2">
               <ScrollText className="w-4 h-4" />
-              Novels
+              {t('nav.novels')}
             </TabsTrigger>
             <TabsTrigger value="character" className="flex items-center gap-2">
               <Users className="w-4 h-4" />
-              Characters
+              {t('anime.characters')}
             </TabsTrigger>
           </TabsList>
         </Tabs>
@@ -594,12 +597,12 @@ export function TierListEditor({ initialData, onSave, onClose }: TierListEditorP
           <Input
             placeholder={
               searchType === 'anime'
-                ? 'Search anime (min 3 chars)...'
+                ? t('tierlist.searchAnime')
                 : searchType === 'manga'
-                  ? 'Search manga, manhwa, manhua, comics (min 3 chars)...'
+                  ? t('tierlist.searchManga')
                   : searchType === 'novel'
-                    ? 'Search light novels (min 3 chars)...'
-                    : 'Search characters (min 3 chars)...'
+                    ? t('migration.searchNovels')
+                    : t('tierlist.searchCharacters')
             }
             value={searchQuery}
             onChange={(e) => handleSearchChange(e.target.value)}
@@ -608,7 +611,7 @@ export function TierListEditor({ initialData, onSave, onClose }: TierListEditorP
         </div>
 
         {isSearching && (
-          <div className="text-center py-4 text-muted-foreground">Searching...</div>
+          <div className="text-center py-4 text-muted-foreground">{t('tierlist.searching')}</div>
         )}
 
         {searchResults.length > 0 && (
@@ -643,7 +646,7 @@ export function TierListEditor({ initialData, onSave, onClose }: TierListEditorP
             {hasNextPage && (
               <div className="flex justify-center pt-2">
                 <Button variant="secondary" size="sm" onClick={handleLoadMore}>
-                  Load More Results
+                  {t('tierlist.loadMore')}
                 </Button>
               </div>
             )}
@@ -686,7 +689,7 @@ export function TierListEditor({ initialData, onSave, onClose }: TierListEditorP
       <div className="flex justify-end gap-4">
         {onClose && (
           <Button variant="outline" onClick={onClose}>
-            Cancel
+            {t('common.cancel')}
           </Button>
         )}
         <Button
@@ -695,7 +698,7 @@ export function TierListEditor({ initialData, onSave, onClose }: TierListEditorP
           className="gap-2"
         >
           <Save className="w-4 h-4" />
-          {initialData?.id ? 'Update' : 'Save'} Tier List
+          {initialData?.id ? t('tierlist.updateTierList') : t('tierlist.saveTierList')}
         </Button>
       </div>
     </div>

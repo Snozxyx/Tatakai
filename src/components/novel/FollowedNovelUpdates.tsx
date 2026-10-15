@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { memo, useRef } from "react";
 import { Link } from "react-router-dom";
 import { BellRing, ChevronLeft, ChevronRight } from "lucide-react";
@@ -15,6 +17,7 @@ const FollowedNovelCard = memo(function FollowedNovelCard({
 }: {
   update: ReturnType<typeof useFollowedNovelUpdates>["updates"][number];
 }) {
+  useUiTranslation();
   const href = `/novel/${encodeURIComponent(update.novelId)}`;
   // Exact new chapter in the reader (`item.href` wins over the default
   // detail route inside UnifiedMediaCard), falling back to the detail page
@@ -54,14 +57,14 @@ const FollowedNovelCard = memo(function FollowedNovelCard({
           <div className="pointer-events-none absolute inset-x-2 top-2 z-40 flex items-start justify-between gap-1.5">
             {update.latestChapterNumber != null ? (
               <span className="shrink-0 rounded-md bg-black/70 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-white backdrop-blur-sm">
-                Ch. {update.latestChapterNumber}
+                {uiI18n.t('app.ch_d8dbf726')} {update.latestChapterNumber}
               </span>
             ) : (
               <span />
             )}
             {update.hasNew && (
               <span className="shrink-0 rounded-full bg-primary px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-primary-foreground shadow-lg">
-                {update.newChaptersCount} new
+                {update.newChaptersCount} {uiI18n.t('app.new_c2a6b03f')}
               </span>
             )}
           </div>
@@ -72,6 +75,7 @@ const FollowedNovelCard = memo(function FollowedNovelCard({
 });
 
 export const FollowedNovelUpdates = memo(function FollowedNovelUpdates() {
+  useUiTranslation();
   const { user } = useAuth();
   const { updates, isLoading, hasFollowed } = useFollowedNovelUpdates(10);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -91,25 +95,25 @@ export const FollowedNovelUpdates = memo(function FollowedNovelUpdates() {
     <section className="mb-10 space-y-4 md:mb-12 md:space-y-5" aria-labelledby="followed-novel-heading">
       <HomeSectionHeading
         icon={<BellRing className="h-5 w-5 text-primary" />}
-        title={<span id="followed-novel-heading">New Chapters from Followed Novels</span>}
+        title={<span id="followed-novel-heading">{uiI18n.t('app.new_chapters_from_followed_novels_cbaaa55a')}</span>}
         subtitle={
           updates.some((u) => u.hasNew)
-            ? `${updates.filter((u) => u.hasNew).length} titles with unread chapters`
-            : "Latest chapters from your novel library"
+            ? uiI18n.t('app.i18n_value_0_titles_with_unread_chapters_e064d2f1', { value0: updates.filter((u) => u.hasNew).length })
+            : uiI18n.t('app.latest_chapters_from_your_novel_library_94790443')
         }
         action={
           <div className="flex items-center gap-2">
             <div className="hidden items-center gap-2 md:flex">
               <button
                 onClick={() => scroll("left")}
-                aria-label="Scroll left"
+                aria-label={uiI18n.t('app.scroll_left_2c9e5a60')}
                 className="flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.02] text-white/60 transition-colors hover:bg-white/[0.08] hover:text-white"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
               <button
                 onClick={() => scroll("right")}
-                aria-label="Scroll right"
+                aria-label={uiI18n.t('app.scroll_right_2994b49c')}
                 className="flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.02] text-white/60 transition-colors hover:bg-white/[0.08] hover:text-white"
               >
                 <ChevronRight className="h-4 w-4" />
@@ -119,7 +123,7 @@ export const FollowedNovelUpdates = memo(function FollowedNovelUpdates() {
               to="/profile?tab=novel-readlist"
               className="shrink-0 text-sm text-muted-foreground transition-colors hover:text-foreground"
             >
-              View All
+              {uiI18n.t('app.view_all_efd83559')}
             </Link>
           </div>
         }

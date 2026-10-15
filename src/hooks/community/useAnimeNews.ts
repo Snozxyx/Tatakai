@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useQuery } from '@tanstack/react-query';
 
 export interface AnimeNewsItem {
@@ -16,13 +18,14 @@ export interface AnimeNewsItem {
  * alongside News-flaired community posts.
  */
 export function useAnimeNews() {
+  useUiTranslation();
   return useQuery({
     queryKey: ['anime-news-seasonal'],
     staleTime: 30 * 60 * 1000,
     retry: 1,
     queryFn: async (): Promise<AnimeNewsItem[]> => {
       const res = await fetch('https://api.jikan.moe/v4/seasons/now?limit=16&sfw=true');
-      if (!res.ok) throw new Error('Failed to load anime news');
+      if (!res.ok) throw new Error(uiI18n.t('app.failed_to_load_anime_news_fe4a7d21'));
       const json = await res.json();
       const data = Array.isArray(json?.data) ? json.data : [];
       return data.map((a: any) => ({

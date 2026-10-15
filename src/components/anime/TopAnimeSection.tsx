@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { memo, useState } from "react";
 import { Trophy } from "lucide-react";
 import { TopAnime, getHighQualityPoster } from "@/lib/api";
@@ -15,13 +17,14 @@ interface TopAnimeSectionProps {
 type Period = "today" | "week" | "month";
 
 export const TopAnimeSection = memo(function TopAnimeSection({ today, week, month }: TopAnimeSectionProps) {
+  useUiTranslation();
   const navigate = useNavigate();
   const [activePeriod, setActivePeriod] = useState<Period>("today");
 
   const periods: { key: Period; label: string }[] = [
-    { key: "today", label: "Today" },
-    { key: "week", label: "This Week" },
-    { key: "month", label: "This Month" },
+    { key: "today", get label() { return uiI18n.t('app.today_24345a14'); } },
+    { key: "week", get label() { return uiI18n.t('app.this_week_4e68dca8'); } },
+    { key: "month", get label() { return uiI18n.t('app.this_month_0f6cc3a8'); } },
   ];
 
   const getAnimes = () => {
@@ -47,7 +50,7 @@ export const TopAnimeSection = memo(function TopAnimeSection({ today, week, mont
           <div className="p-1.5 rounded-xl bg-amber/10 text-amber border border-amber/20">
             <Trophy className="w-5 h-5" />
           </div>
-          <span>Top <span className="text-amber">10</span> Anime</span>
+          <span>{uiI18n.t('app.top_cae0435c')} <span className="text-amber">10</span> {uiI18n.t('app.anime_f1b32a19')}</span>
         </h3>
 
         <div className="flex w-full sm:w-auto gap-1 p-1 rounded-full bg-white/5 border border-white/10 max-w-full overflow-x-auto no-scrollbar scrollbar-hide [-webkit-overflow-scrolling:touch] [touch-action:pan-x_pan-y] overscroll-x-contain">
@@ -103,7 +106,7 @@ export const TopAnimeSection = memo(function TopAnimeSection({ today, week, mont
                 </h4>
                 <div className="mt-1.5 md:mt-2 flex items-center gap-2">
                   <span className="inline-flex items-center bg-black/50 border border-white/10 px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold uppercase tracking-wider text-white/80">
-                    EP {anime.episodes.sub}
+                    {uiI18n.t('app.ep_00c1bff9')} {anime.episodes.sub}
                   </span>
                 </div>
               </div>

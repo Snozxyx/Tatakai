@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
  * ExtensionDebugWindow
  *
@@ -149,12 +151,13 @@ async function runTokoTest(method: 'debugSingle' | 'debugBatch' | 'debugMangaCha
     console.log(`[DebugWindow] runtime.invoke result for ${method}:`, res);
     return res;
   }
-  throw new Error('No extension runtime available');
+  throw new Error(uiI18n.t('app.no_extension_runtime_available_4a369628'));
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function ExtensionDebugWindow({ anilistId = 21, titles = ['One Piece'], episode = 1, mangaTitle, onClose }: ExtensionDebugWindowProps) {
+  useUiTranslation();
   const [results, setResults] = useState<ProviderResult[]>([]);
   const [running, setRunning] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -211,9 +214,9 @@ export function ExtensionDebugWindow({ anilistId = 21, titles = ['One Piece'], e
 
     // Test Toko IPC methods
     const methods: Array<{ label: string; method: 'debugSingle' | 'debugBatch' | 'debugMangaChapters'; category: 'stream' | 'torrent' | 'manga' }> = [
-      { label: 'Stream (single)', method: 'debugSingle', category: 'stream' },
-      { label: 'Torrent+Stream (batch)', method: 'debugBatch', category: 'torrent' },
-      { label: 'Manga chapters', method: 'debugMangaChapters', category: 'manga' },
+      { get label() { return uiI18n.t('app.stream_single_fbb559c7'); }, method: 'debugSingle', category: 'stream' },
+      { get label() { return uiI18n.t('app.torrent_stream_batch_20eb617f'); }, method: 'debugBatch', category: 'torrent' },
+      { get label() { return uiI18n.t('app.manga_chapters_dd0e4557'); }, method: 'debugMangaChapters', category: 'manga' },
     ];
 
     for (const { label, method, category } of methods) {
@@ -226,7 +229,7 @@ export function ExtensionDebugWindow({ anilistId = 21, titles = ['One Piece'], e
       try {
         const res = await Promise.race([
           runTokoTest(method, config),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 20_000)),
+          new Promise((_, reject) => setTimeout(() => reject(new Error(uiI18n.t('app.timeout_d4c45de0'))), 20_000)),
         ]) as any;
 
         const elapsedMs = Date.now() - t0;
@@ -304,9 +307,9 @@ export function ExtensionDebugWindow({ anilistId = 21, titles = ['One Piece'], e
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-black/20 flex-shrink-0">
           <div>
             <h2 className="text-lg font-black text-foreground flex items-center gap-2">
-              <span className="text-violet-400">🔧</span> Toko Extension Debug
+              <span className="text-violet-400">🔧</span> {uiI18n.t('app.toko_extension_debug_8fd5b0bc')}
             </h2>
-            <p className="text-xs text-muted-foreground mt-0.5">Developer Mode — tests each provider in real-time</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{uiI18n.t('app.developer_mode_tests_each_provider_in_real_time_248709b7')}</p>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-xl transition-colors">
             <X className="w-5 h-5" />
@@ -316,7 +319,7 @@ export function ExtensionDebugWindow({ anilistId = 21, titles = ['One Piece'], e
         {/* Config bar */}
         <div className="px-6 py-3 border-b border-white/5 bg-black/10 flex gap-4 items-center text-xs flex-shrink-0 flex-wrap">
           <label className="flex items-center gap-2">
-            <span className="text-muted-foreground">AniList ID:</span>
+            <span className="text-muted-foreground">{uiI18n.t('app.anilist_id_bdd7ddb9')}</span>
             <input
               type="number"
               value={config.anilistId}
@@ -325,7 +328,7 @@ export function ExtensionDebugWindow({ anilistId = 21, titles = ['One Piece'], e
             />
           </label>
           <label className="flex items-center gap-2">
-            <span className="text-muted-foreground">Episode:</span>
+            <span className="text-muted-foreground">{uiI18n.t('app.episode_8bffcf5b')}</span>
             <input
               type="number"
               value={config.episode}
@@ -334,7 +337,7 @@ export function ExtensionDebugWindow({ anilistId = 21, titles = ['One Piece'], e
             />
           </label>
           <label className="flex items-center gap-2 flex-1">
-            <span className="text-muted-foreground">Title:</span>
+            <span className="text-muted-foreground">{uiI18n.t('app.title_7698df7c')}</span>
             <input
               value={config.titles[0] ?? ''}
               onChange={e => setConfig(c => ({ ...c, titles: [e.target.value] }))}
@@ -348,7 +351,7 @@ export function ExtensionDebugWindow({ anilistId = 21, titles = ['One Piece'], e
               running ? 'bg-destructive/20 text-destructive border border-destructive/20' : 'bg-violet-500/20 text-violet-400 border border-violet-500/30 hover:bg-violet-500/30'
             )}
           >
-            {running ? <><RefreshCw className="w-4 h-4 animate-spin" /> Stop</> : <><Play className="w-4 h-4" /> Run Tests</>}
+            {running ? <><RefreshCw className="w-4 h-4 animate-spin" /> {uiI18n.t('app.stop_9e253470')}</> : <><Play className="w-4 h-4" /> {uiI18n.t('app.run_tests_40e0369d')}</>}
           </button>
         </div>
 
@@ -358,17 +361,17 @@ export function ExtensionDebugWindow({ anilistId = 21, titles = ['One Piece'], e
           {/* Bundle Status Panel (Req 2.8.5) */}
           {bundleStatus && (
             <section>
-              <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">Bundle Status</h3>
+              <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">{uiI18n.t('app.bundle_status_d5b7ba61')}</h3>
               <div className="rounded-xl border border-white/5 bg-white/[0.02] px-4 py-3 flex items-start gap-3 flex-wrap">
                 {bundleStatus.loaded
                   ? <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
                   : <XCircle className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5" />}
                 <span className={cn('text-xs font-bold', bundleStatus.loaded ? 'text-emerald-400' : 'text-destructive')}>
                   {bundleStatus.loaded
-                    ? '✅ loaded'
+                    ? uiI18n.t('app.loaded_9dac5c4c')
                     : bundleStatus.error
-                      ? `❌ error: ${bundleStatus.error}`
-                      : '❌ not loaded'}
+                      ? uiI18n.t('app.error_i18n_value_0_290d9e41', { value0: bundleStatus.error })
+                      : uiI18n.t('app.not_loaded_7e334b10')}
                 </span>
                 {bundleStatus.bundlePath && (
                   <span className="text-xs font-mono text-muted-foreground break-all">
@@ -382,7 +385,7 @@ export function ExtensionDebugWindow({ anilistId = 21, titles = ['One Piece'], e
           {/* IPC method results */}
           {results.length > 0 && (
             <section>
-              <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">Extension IPC Results</h3>
+              <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">{uiI18n.t('app.extension_ipc_results_0b56d682')}</h3>
               <div className="space-y-2">
                 {results.map(r => (
                   <div key={r.provider} className="rounded-xl border border-white/5 bg-white/[0.02] overflow-hidden">
@@ -400,11 +403,11 @@ export function ExtensionDebugWindow({ anilistId = 21, titles = ['One Piece'], e
                       <span className={cn('text-xs px-2 py-0.5 rounded font-bold',
                         r.sourceCount > 0 ? 'bg-emerald-500/20 text-emerald-400' : r.status === 'error' ? 'bg-destructive/20 text-destructive' : 'bg-white/5 text-muted-foreground'
                       )}>
-                        {r.status === 'running' ? 'testing…' : r.status === 'error' ? 'ERROR' : `${r.sourceCount} results`}
+                        {r.status === 'running' ? uiI18n.t('app.testing_8de26828') : r.status === 'error' ? uiI18n.t('app.error_0b99cebe') : uiI18n.t('app.i18n_value_0_results_847ea0c7', { value0: r.sourceCount })}
                       </span>
                       {/* Timing display (Req 2.8.7) */}
                       {r.latencyMs != null && (
-                        <span className="text-xs text-muted-foreground ml-2">Total: {r.latencyMs}ms</span>
+                        <span className="text-xs text-muted-foreground ml-2">{uiI18n.t('app.total_d8e7170f')} {r.latencyMs}{uiI18n.t('app.ms_26cc3217')}</span>
                       )}
                       {expanded.has(r.provider) ? <ChevronDown className="w-4 h-4 text-muted-foreground ml-1" /> : <ChevronRight className="w-4 h-4 text-muted-foreground ml-1" />}
                     </button>
@@ -423,15 +426,15 @@ export function ExtensionDebugWindow({ anilistId = 21, titles = ['One Piece'], e
                               {expandedBreakdown.has(r.provider)
                                 ? <ChevronDown className="w-3 h-3" />
                                 : <ChevronRight className="w-3 h-3" />}
-                              <span className="font-semibold">Provider Breakdown ({r.breakdown.length})</span>
+                              <span className="font-semibold">{uiI18n.t('app.provider_breakdown_e5b76a20')}{r.breakdown.length})</span>
                             </button>
                             {expandedBreakdown.has(r.provider) && (
                               <div className="rounded-lg border border-white/5 bg-black/20 overflow-hidden">
                                 {r.breakdown.map((row, i) => (
                                   <div key={i} className="flex items-center gap-3 px-3 py-1.5 border-b border-white/5 last:border-b-0" title={row.error}>
                                     <span className="text-xs font-mono text-foreground flex-1">{row.provider}</span>
-                                    <span className="text-xs text-muted-foreground">{row.count} src{row.count !== 1 ? 's' : ''}</span>
-                                    {row.latencyMs != null && <span className="text-[10px] text-muted-foreground">{row.latencyMs}ms</span>}
+                                    <span className="text-xs text-muted-foreground">{row.count} {uiI18n.t('app.src_f27fede2')}{row.count !== 1 ? 's' : ''}</span>
+                                    {row.latencyMs != null && <span className="text-[10px] text-muted-foreground">{row.latencyMs}{uiI18n.t('app.ms_26cc3217')}</span>}
                                     <span className={cn('text-[10px] px-1.5 py-0.5 rounded font-bold',
                                       row.status === 'ok' ? 'bg-emerald-500/20 text-emerald-400'
                                         : row.status === 'empty' ? 'bg-amber-500/20 text-amber-400'
@@ -466,7 +469,7 @@ export function ExtensionDebugWindow({ anilistId = 21, titles = ['One Piece'], e
                           </ul>
                         )}
                         {r.sourceCount === 0 && r.status !== 'error' && (
-                          <p className="text-xs text-muted-foreground mt-2">No results returned by this method.</p>
+                          <p className="text-xs text-muted-foreground mt-2">{uiI18n.t('app.no_results_returned_by_this_method_49685299')}</p>
                         )}
                       </div>
                     )}
@@ -479,7 +482,7 @@ export function ExtensionDebugWindow({ anilistId = 21, titles = ['One Piece'], e
           {/* API endpoint results */}
           {apiResults.length > 0 && (
             <section className="mt-4">
-              <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">API Endpoint Results</h3>
+              <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">{uiI18n.t('app.api_endpoint_results_d4e81549')}</h3>
               <div className="space-y-2">
                 {apiResults.map(r => (
                   <div key={r.name} className="rounded-xl border border-white/5 bg-white/[0.02] overflow-hidden">
@@ -490,7 +493,7 @@ export function ExtensionDebugWindow({ anilistId = 21, titles = ['One Piece'], e
                       {r.ok ? <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
                         : <XCircle className="w-4 h-4 text-destructive flex-shrink-0" />}
                       <span className="font-mono text-xs flex-1 text-muted-foreground">{r.name}</span>
-                      <span className="text-xs text-muted-foreground">{r.latencyMs}ms</span>
+                      <span className="text-xs text-muted-foreground">{r.latencyMs}{uiI18n.t('app.ms_26cc3217')}</span>
                       {expanded.has('api:' + r.name) ? <ChevronDown className="w-4 h-4 text-muted-foreground ml-1" /> : <ChevronRight className="w-4 h-4 text-muted-foreground ml-1" />}
                     </button>
                     {expanded.has('api:' + r.name) && (
@@ -515,8 +518,8 @@ export function ExtensionDebugWindow({ anilistId = 21, titles = ['One Piece'], e
               <div className="w-16 h-16 rounded-2xl bg-violet-500/10 flex items-center justify-center mb-4">
                 <Play className="w-8 h-8 text-violet-400" />
               </div>
-              <h3 className="font-bold text-lg mb-1">Ready to test</h3>
-              <p className="text-sm text-muted-foreground">Configure the fixture above and click Run Tests to probe every Toko provider.</p>
+              <h3 className="font-bold text-lg mb-1">{uiI18n.t('app.ready_to_test_d0dfa235')}</h3>
+              <p className="text-sm text-muted-foreground">{uiI18n.t('app.configure_the_fixture_above_and_click_run_tests__b8438485')}</p>
             </div>
           )}
         </div>
@@ -525,14 +528,14 @@ export function ExtensionDebugWindow({ anilistId = 21, titles = ['One Piece'], e
         {(results.length > 0 || apiResults.length > 0) && (
           <div className="px-6 py-3 border-t border-white/10 bg-black/20 flex items-center gap-6 text-xs flex-shrink-0 flex-wrap">
             <span className="font-bold">
-              Total sources: <span className={totalSources > 0 ? 'text-emerald-400' : 'text-muted-foreground'}>{totalSources}</span>
+              {uiI18n.t('app.total_sources_ca6d3a8f')} <span className={totalSources > 0 ? 'text-emerald-400' : 'text-muted-foreground'}>{totalSources}</span>
             </span>
-            <span>Stream: <span className="text-primary">{results.find(r => r.provider.includes('single'))?.sourceCount ?? 0}</span></span>
-            <span>Torrent: <span className="text-primary">{results.find(r => r.provider.includes('batch'))?.sourceCount ?? 0}</span></span>
-            <span>Manga: <span className="text-primary">{results.find(r => r.provider.includes('chapter'))?.sourceCount ?? 0}</span></span>
-            {hasErrors && <span className="text-destructive font-bold">⚠ Some providers failed</span>}
+            <span>{uiI18n.t('app.stream_e2b52394')} <span className="text-primary">{results.find(r => r.provider.includes('single'))?.sourceCount ?? 0}</span></span>
+            <span>{uiI18n.t('app.torrent_140b097b')} <span className="text-primary">{results.find(r => r.provider.includes('batch'))?.sourceCount ?? 0}</span></span>
+            <span>{uiI18n.t('app.manga_6eaed896')} <span className="text-primary">{results.find(r => r.provider.includes('chapter'))?.sourceCount ?? 0}</span></span>
+            {hasErrors && <span className="text-destructive font-bold">{uiI18n.t('app.some_providers_failed_8267f6ac')}</span>}
             <span className="text-muted-foreground">
-              API: {apiResults.filter(r => r.ok).length}/{apiResults.length} OK
+              {uiI18n.t('app.api_1fa34c70')} {apiResults.filter(r => r.ok).length}/{apiResults.length} {uiI18n.t('app.ok_9ce3bd42')}
             </span>
             {/* Copy Report button (Req 2.8.6) */}
             <button
@@ -545,7 +548,7 @@ export function ExtensionDebugWindow({ anilistId = 21, titles = ['One Piece'], e
               )}
             >
               <Copy className="w-3 h-3" />
-              {copySuccess ? 'Copied!' : 'Copy Report'}
+              {copySuccess ? uiI18n.t('app.copied_b7c3ca0e') : uiI18n.t('app.copy_report_a9d06490')}
             </button>
           </div>
         )}

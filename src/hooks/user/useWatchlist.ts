@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -19,6 +21,7 @@ export interface WatchlistItem {
 }
 
 export function useWatchlist() {
+  useUiTranslation();
   const { user } = useAuth();
 
   return useQuery({
@@ -38,6 +41,7 @@ export function useWatchlist() {
 }
 
 export function useWatchlistItem(animeId: string | undefined) {
+  useUiTranslation();
   const { user } = useAuth();
 
   return useQuery({
@@ -58,6 +62,7 @@ export function useWatchlistItem(animeId: string | undefined) {
 }
 
 export function useAddToWatchlist() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user, profile } = useAuth();
 
@@ -110,7 +115,7 @@ export function useAddToWatchlist() {
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['watchlist'] });
       queryClient.invalidateQueries({ queryKey: ['external-ids', variables.animeId] }); // Refresh external IDs cache
-      toast.success('Updated watchlist');
+      toast.success(uiI18n.t('app.updated_watchlist_2ff09b08'));
 
       console.log('[Watchlist Sync] ===== SYNC DEBUG START =====');
       console.log('[Watchlist Sync] Anime:', variables.animeName);
@@ -133,11 +138,11 @@ export function useAddToWatchlist() {
           updateMalAnimeStatus(targetMalId, variables.status || 'plan_to_watch')
             .then(() => {
               console.log('[Watchlist Sync] ✓ MAL sync SUCCESSFUL for MAL ID:', targetMalId);
-              toast.success('Synced to MyAnimeList');
+              toast.success(uiI18n.t('app.synced_to_myanimelist_759c85b4'));
             })
             .catch(err => {
               console.error('[Watchlist Sync] ✗ MAL sync FAILED:', err);
-              toast.error('Failed to sync to MyAnimeList');
+              toast.error(uiI18n.t('app.failed_to_sync_to_myanimelist_fb84f91e'));
             });
         } else {
           console.warn('[Watchlist Sync] ✗ Skipping MAL sync: No MAL ID available, falling back to animeId');
@@ -163,11 +168,11 @@ export function useAddToWatchlist() {
           updateAniListAnimeStatus(profile.anilist_access_token, Number(targetAnilistId), aniStatus)
             .then(() => {
               console.log('[Watchlist Sync] ✓ AniList sync SUCCESSFUL for AniList ID:', targetAnilistId);
-              toast.success('Synced to AniList');
+              toast.success(uiI18n.t('app.synced_to_anilist_9d547dac'));
             })
             .catch(err => {
               console.error('[Watchlist Sync] ✗ AniList sync FAILED:', err);
-              toast.error('Failed to sync to AniList');
+              toast.error(uiI18n.t('app.failed_to_sync_to_anilist_4b2bad3b'));
             });
         } else {
           console.warn('[Watchlist Sync] ✗ Skipping AniList sync: No AniList ID available');
@@ -180,12 +185,13 @@ export function useAddToWatchlist() {
     },
     onError: (error: any) => {
       console.error('[useWatchlist] Mutation failed:', error);
-      toast.error(`Failed to update watchlist: ${error?.message || 'Unknown error'}`);
+      toast.error(uiI18n.t('app.failed_to_update_watchlist_i18n_value_0_44302deb', { value0: error?.message || 'Unknown error' }));
     },
   });
 }
 
 export function useRemoveFromWatchlist() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user, profile } = useAuth();
 
@@ -212,16 +218,17 @@ export function useRemoveFromWatchlist() {
         });
       }
 
-      toast.success('Removed from watchlist');
+      toast.success(uiI18n.t('app.removed_from_watchlist_91f4d440'));
     },
     onError: () => {
-      toast.error('Failed to remove from watchlist');
+      toast.error(uiI18n.t('app.failed_to_remove_from_watchlist_f6073067'));
     },
   });
 }
 
 // Bulk remove multiple anime ids from watchlist (used for multi-select delete)
 export function useBulkRemoveFromWatchlist() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { profile } = useAuth();
 
@@ -246,10 +253,10 @@ export function useBulkRemoveFromWatchlist() {
         });
       }
 
-      toast.success('Removed items from watchlist');
+      toast.success(uiI18n.t('app.removed_items_from_watchlist_e41e80dd'));
     },
     onError: (error: any) => {
-      toast.error(`Failed to remove: ${error?.message || String(error)}`);
+      toast.error(uiI18n.t('app.failed_to_remove_i18n_value_0_54db62eb', { value0: error?.message || String(error) }));
     },
   });
 }

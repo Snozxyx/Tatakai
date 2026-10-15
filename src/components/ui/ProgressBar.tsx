@@ -1,9 +1,12 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 interface ProgressBarProps {
   progress: number;
   className?: string;
 }
 
 export function ProgressBar({ progress, className = "" }: ProgressBarProps) {
+  useUiTranslation();
   return (
     <div className={`h-1 w-full bg-muted rounded-full overflow-hidden ${className}`}>
       <div

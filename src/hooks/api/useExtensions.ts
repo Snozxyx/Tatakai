@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { migrateExtensionStorage } from "@/core/extensions/ecosystems";
 migrateExtensionStorage();
 import { useEffect } from 'react';
@@ -65,6 +67,7 @@ export function mapLegacyExtensionRow(row: Tables<'extensions'>): ExtensionManif
 }
 
 export function useExtensions() {
+  useUiTranslation();
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -160,7 +163,7 @@ export function useExtensions() {
   const submitExtension = useMutation({
     mutationFn: async (extension: Partial<ExtensionManifest>) => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Must be logged in to submit an extension");
+      if (!user) throw new Error(uiI18n.t('app.must_be_logged_in_to_submit_an_extension_aa4b69da'));
 
       const { data, error } = await supabase
         .from('extension_manifests')
@@ -185,10 +188,10 @@ export function useExtensions() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['extensions'] });
-      toast.success("Extension submitted for review!");
+      toast.success(uiI18n.t('app.extension_submitted_for_review_556a990f'));
     },
     onError: (error: any) => {
-      toast.error(error.message || "Failed to submit extension");
+      toast.error(error.message || uiI18n.t('app.failed_to_submit_extension_38d94d1a'));
     }
   });
 

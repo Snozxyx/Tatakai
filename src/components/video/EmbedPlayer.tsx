@@ -1,5 +1,8 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useDesktopPlayerFullscreen } from "./hooks/useDesktopPlayerFullscreen";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Loader2, AlertCircle, RefreshCw, Maximize, Minimize } from "lucide-react";
 import { probeUrlReachable } from "@/hooks/media/useExtensionSourceStream";
 import { isMobileNative } from "@/lib/platform/platform";
@@ -93,6 +96,8 @@ const EMBED_ALLOW = [
 const LOAD_TIMEOUT_MS = 15000;
 
 export function EmbedPlayer({ url, poster, language, referer, onError }: EmbedPlayerProps) {
+  useUiTranslation();
+  const { t } = useTranslation();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<{ reason: string; statusCode?: number } | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
@@ -329,10 +334,10 @@ export function EmbedPlayer({ url, poster, language, referer, onError }: EmbedPl
 
   if (error) {
     const detail = error.statusCode
-      ? `The embed host returned HTTP ${error.statusCode}.`
+      ? t('player.embedHostHttp', { status: error.statusCode })
       : error.reason === "embed-load-timeout"
-        ? "The embed host stopped responding."
-        : "The embed host could not be reached.";
+        ? t('player.embedTimeout')
+        : t('player.embedUnreachable');
     return (
       <div
         className="w-full aspect-video bg-black flex flex-col items-center justify-center text-white"
@@ -340,14 +345,14 @@ export function EmbedPlayer({ url, poster, language, referer, onError }: EmbedPl
       >
         <div className="bg-black/80 p-6 rounded-xl flex flex-col items-center gap-3 max-w-md text-center">
           <AlertCircle className="w-12 h-12 text-red-500" />
-          <p className="text-lg">Embed player unavailable</p>
-          <p className="text-sm text-white/60">{detail} Try another server from the list below.</p>
+          <p className="text-lg">{t('player.embedUnavailable')}</p>
+          <p className="text-sm text-white/60">{detail} {t('player.embedTryAnother')}</p>
           <button
             onClick={handleRetry}
             className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/80 rounded-lg transition-colors"
           >
             <RefreshCw className="w-4 h-4" />
-            Retry
+            {t('common.retry')}
           </button>
         </div>
       </div>
@@ -364,7 +369,7 @@ export function EmbedPlayer({ url, poster, language, referer, onError }: EmbedPl
           <div className="flex flex-col items-center gap-3">
             <Loader2 className="w-12 h-12 animate-spin text-primary" />
             <p className="text-white/70 text-sm">
-              Loading {language ? `${language} ` : ''}player...
+              {language ? t('player.embedLoadingLanguage', { language }) : t('player.embedLoadingGeneric')}
             </p>
           </div>
         </div>
@@ -377,7 +382,7 @@ export function EmbedPlayer({ url, poster, language, referer, onError }: EmbedPl
         allow={EMBED_ALLOW}
         onLoad={handleLoad}
         onError={handleIframeError}
-        title={`Video player - ${language || "Embed"}`}
+        title={t('player.embedFrameTitle', { language: language || "Embed" })}
         referrerPolicy="no-referrer-when-downgrade"
       />
 
@@ -385,8 +390,8 @@ export function EmbedPlayer({ url, poster, language, referer, onError }: EmbedPl
       <button
         type="button"
         onClick={toggleFullscreen}
-        title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
-        aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+        title={isFullscreen ? t('player.exitFullscreen') : t('player.fullscreen')}
+        aria-label={isFullscreen ? t('player.exitFullscreen') : t('player.fullscreen')}
         className={`absolute bottom-3 right-3 z-20 rounded-md bg-black/60 p-2 text-white transition-opacity hover:bg-black/80 focus:opacity-100 focus-visible:outline focus-visible:outline-2 group-hover:opacity-100 [div:hover>&]:opacity-100 ${isMobile ? "opacity-100" : "opacity-0"}`}
       >
         {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}

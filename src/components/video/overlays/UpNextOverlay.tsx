@@ -1,4 +1,5 @@
 import { Play, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 /**
  * Up-Next countdown overlay shown when an episode ends and Auto Next Episode is
@@ -32,6 +33,7 @@ export function UpNextOverlay({
   onPlayNow,
   onCancel,
 }: UpNextOverlayProps) {
+  const { t } = useTranslation();
   const clampedTotal = Math.max(1, total);
   const progress = Math.min(1, Math.max(0, secondsLeft / clampedTotal));
   const dashOffset = RING_CIRCUMFERENCE * (1 - progress);
@@ -84,10 +86,10 @@ export function UpNextOverlay({
 
           <div className="flex min-w-0 flex-1 flex-col justify-center">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">
-              Up Next{thumbnail ? ` · ${secondsLeft}s` : ""}
+              {thumbnail ? t('player.upNextCountdown', { seconds: secondsLeft }) : t('player.upNext')}
             </p>
             <p className="truncate text-sm font-semibold text-white">
-              {typeof episodeNumber === "number" ? `Episode ${episodeNumber}` : "Next Episode"}
+              {typeof episodeNumber === "number" ? t('header.episode', { number: episodeNumber }) : t('player.nextEpisode')}
             </p>
             {title && (
               <p className="truncate text-xs text-white/60">{title}</p>
@@ -102,7 +104,7 @@ export function UpNextOverlay({
             className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
           >
             <Play className="h-4 w-4" fill="currentColor" />
-            Play now
+            {t('player.playNow')}
           </button>
           <button
             type="button"
@@ -110,7 +112,7 @@ export function UpNextOverlay({
             className="flex items-center justify-center gap-1.5 rounded-lg bg-white/10 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-white/20"
           >
             <X className="h-4 w-4" />
-            Cancel
+            {t('common.cancel')}
           </button>
         </div>
       </div>

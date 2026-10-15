@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode, TouchEvent as ReactTouchEvent } from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
@@ -11,6 +13,7 @@ const DISMISS_DY = 110;
 export function PeekSheet({ open, onClose, label, children }: {
   open: boolean; onClose: () => void; label: string; children: ReactNode;
 }) {
+  useUiTranslation();
   const reduced = useMotionPreference();
   const [render, setRender] = useState(false);
   const [leaving, setLeaving] = useState(false);
@@ -87,7 +90,7 @@ export function PeekSheet({ open, onClose, label, children }: {
             <DialogPrimitive.Title className="sr-only">{label}</DialogPrimitive.Title>
             <div className="relative flex h-12 shrink-0 items-start justify-center pt-3">
               <span className="h-1 w-10 rounded-full bg-muted-foreground/40" aria-hidden />
-              <DialogPrimitive.Close aria-label="Close quick peek" className="absolute right-2 top-1 flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+              <DialogPrimitive.Close aria-label={uiI18n.t('app.close_quick_peek_2800ccbb')} className="absolute right-2 top-1 flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
                 <X className="h-4 w-4" aria-hidden />
               </DialogPrimitive.Close>
             </div>

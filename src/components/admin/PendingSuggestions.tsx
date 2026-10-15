@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState } from 'react';
 import { useAllSuggestions, useReviewSuggestion, useDeleteSuggestion } from '@/hooks/api/useSuggestions';
 import { useAuth } from '@/contexts/AuthContext';
@@ -6,10 +8,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Loader2, CheckCircle, XCircle, Trash2, Image as ImageIcon } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from '@/lib/localeFormat';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 
 export function PendingSuggestions() {
+  useUiTranslation();
   const { isAdmin } = useAuth();
   const { data: suggestions, isLoading } = useAllSuggestions();
   const reviewSuggestion = useReviewSuggestion();
@@ -31,7 +34,7 @@ export function PendingSuggestions() {
   };
 
   const handleDelete = async (id: string) => {
-    if (await confirm({ title: 'Are you sure you want to delete this suggestion?', destructive: true })) {
+    if (await confirm({ get title() { return uiI18n.t('app.are_you_sure_you_want_to_delete_this_suggestion_65492d73'); }, destructive: true })) {
       await deleteSuggestion.mutateAsync(id);
     }
   };
@@ -48,7 +51,7 @@ export function PendingSuggestions() {
     return (
       <div className="text-center py-12">
         <CheckCircle className="w-12 h-12 mx-auto text-muted-foreground mb-4 opacity-50" />
-        <p className="text-muted-foreground">No pending suggestions</p>
+        <p className="text-muted-foreground">{uiI18n.t('app.no_pending_suggestions_6f26fcb1')}</p>
       </div>
     );
   }
@@ -67,7 +70,7 @@ export function PendingSuggestions() {
                   <Badge
                     variant={suggestion.priority === 'urgent' ? 'destructive' : suggestion.priority === 'normal' ? 'default' : 'secondary'}
                   >
-                    {suggestion.priority} priority
+                    {suggestion.priority} {uiI18n.t('app.priority_3345867e')}
                   </Badge>
                   <span className="text-xs text-muted-foreground">
                     {formatDistanceToNow(new Date(suggestion.created_at), { addSuffix: true })}
@@ -95,7 +98,7 @@ export function PendingSuggestions() {
               <div className="relative rounded-lg overflow-hidden border border-muted">
                 <img
                   src={suggestion.image_url}
-                  alt="Suggestion attachment"
+                  alt={uiI18n.t('app.suggestion_attachment_b1363cf8')}
                   className="w-full max-h-64 object-contain bg-muted/20"
                 />
               </div>
@@ -104,7 +107,7 @@ export function PendingSuggestions() {
             {/* Admin Response */}
             {selectedSuggestion === suggestion.id ? (
               <div className="space-y-3 p-4 rounded-lg bg-primary/5 border border-primary/20">
-                <label className="text-sm font-medium">Admin Response</label>
+                <label className="text-sm font-medium">{uiI18n.t('app.admin_response_3c08fa0b')}</label>
                 <div className="flex flex-wrap gap-2 mb-2">
                   {[
                     "Thanks for the suggestion! We'll look into it.",
@@ -126,7 +129,7 @@ export function PendingSuggestions() {
                 <Textarea
                   value={adminNotes[suggestion.id] || ''}
                   onChange={(e) => setAdminNotes(prev => ({ ...prev, [suggestion.id]: e.target.value }))}
-                  placeholder="Add your response or notes..."
+                  placeholder={uiI18n.t('app.add_your_response_or_notes_4320cbdb')}
                   className="min-h-[100px]"
                 />
                 <div className="flex gap-2">
@@ -137,7 +140,7 @@ export function PendingSuggestions() {
                     className="gap-2"
                   >
                     <CheckCircle className="w-4 h-4" />
-                    Approve
+                    {uiI18n.t('app.approve_7b2c7f14')}
                   </Button>
                   <Button
                     size="sm"
@@ -147,14 +150,14 @@ export function PendingSuggestions() {
                     className="gap-2"
                   >
                     <XCircle className="w-4 h-4" />
-                    Reject
+                    {uiI18n.t('app.reject_2b03b592')}
                   </Button>
                   <Button
                     size="sm"
                     variant="ghost"
                     onClick={() => setSelectedSuggestion(null)}
                   >
-                    Cancel
+                    {uiI18n.t('app.cancel_77dfd213')}
                   </Button>
                 </div>
               </div>
@@ -165,7 +168,7 @@ export function PendingSuggestions() {
                 onClick={() => setSelectedSuggestion(suggestion.id)}
                 className="gap-2"
               >
-                Review Suggestion
+                {uiI18n.t('app.review_suggestion_3b4b6dac')}
               </Button>
             )}
           </div>

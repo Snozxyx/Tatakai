@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, Radar, Tooltip } from 'recharts';
@@ -11,12 +13,13 @@ export interface OverviewGenreAnalyticsProps {
 }
 
 const GlassTooltip = ({ active, payload }: any) => {
+  useUiTranslation();
   if (active && payload && payload.length) {
     return (
       <div className="rounded-xl border border-white/[0.08] bg-background/80 p-3 shadow-2xl backdrop-blur-2xl">
         <p className="text-xs font-semibold text-foreground/90">{payload[0].payload.genre}</p>
         <p className="text-xs text-muted-foreground/70">
-          Affinity <span className="font-mono font-semibold text-foreground">{payload[0].value}%</span>
+          {uiI18n.t('app.affinity_2d3ad175')} <span className="font-mono font-semibold text-foreground">{payload[0].value}%</span>
         </p>
       </div>
     );
@@ -25,6 +28,7 @@ const GlassTooltip = ({ active, payload }: any) => {
 };
 
 function EmptyState({ message }: { message: string }) {
+  useUiTranslation();
   return (
     <div className="flex flex-col items-center justify-center h-[220px] text-center">
       <Sparkles className="w-10 h-10 text-muted-foreground/30 mb-3" />
@@ -33,13 +37,14 @@ function EmptyState({ message }: { message: string }) {
         to="/recommendations"
         className="mt-3 text-xs font-medium text-primary hover:underline"
       >
-        Build your taste profile →
+        {uiI18n.t('app.build_your_taste_profile_64b625f3')}
       </Link>
     </div>
   );
 }
 
 export function OverviewGenreAnalytics({ profile, isLoading = false }: OverviewGenreAnalyticsProps) {
+  useUiTranslation();
   const radarData = useMemo(
     () =>
       (profile?.topGenres || []).slice(0, 6).map((g) => ({
@@ -67,17 +72,17 @@ export function OverviewGenreAnalytics({ profile, isLoading = false }: OverviewG
         <div className="flex items-center gap-2 mb-1">
           <Sparkles className="w-4 h-4 text-primary/80" />
           <h3 className="font-display font-bold text-base sm:text-lg text-foreground tracking-tight">
-            Genre Analytics
+            {uiI18n.t('app.genre_analytics_4caae86a')}
           </h3>
         </div>
-        <p className="text-xs text-muted-foreground/70">Your genre affinity across watched titles</p>
+        <p className="text-xs text-muted-foreground/70">{uiI18n.t('app.your_genre_affinity_across_watched_titles_7b059962')}</p>
       </div>
 
       <div className="relative z-10">
         {isLoading ? (
           <div className="h-[220px] w-full animate-pulse rounded-xl bg-white/[0.02]" />
         ) : !profile || radarData.length === 0 ? (
-          <EmptyState message="No taste profile yet. Visit Recommendations to generate one from your lists." />
+          <EmptyState message={uiI18n.t('app.no_taste_profile_yet_visit_recommendations_to_ge_081b5994')} />
         ) : radarData.length >= 3 ? (
           <div className="h-[240px] w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -115,7 +120,7 @@ export function OverviewGenreAnalytics({ profile, isLoading = false }: OverviewG
         {profile && topTags.length > 0 && (
           <div className="mt-4 pt-4 border-t border-white/[0.04]">
             <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">
-              Top Tags
+              {uiI18n.t('app.top_tags_0fb32d3b')}
             </span>
             <div className="mt-2.5 flex flex-wrap gap-2">
               {topTags.map((tag) => (

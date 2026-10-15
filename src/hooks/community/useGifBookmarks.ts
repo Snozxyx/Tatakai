@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -17,6 +19,7 @@ export interface GifBookmark {
 
 /** A user's saved GIFs, newest first (the picker's "Saved" tab). */
 export function useGifBookmarks() {
+  useUiTranslation();
   const { user } = useAuth();
 
   return useQuery<GifBookmark[]>({
@@ -37,12 +40,13 @@ export function useGifBookmarks() {
 
 /** Add or remove a GIF from the caller's bookmarks (keyed by url). */
 export function useToggleGifBookmark() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
   return useMutation({
     mutationFn: async ({ gif, bookmarked }: { gif: GiphyGif; bookmarked: boolean }) => {
-      if (!user) throw new Error('Sign in to bookmark GIFs');
+      if (!user) throw new Error(uiI18n.t('app.sign_in_to_bookmark_gifs_224e4c57'));
       if (bookmarked) {
         const { error } = await (supabase
           .from('gif_bookmarks' as any)
@@ -66,7 +70,7 @@ export function useToggleGifBookmark() {
       queryClient.invalidateQueries({ queryKey: ['gif-bookmarks'] });
     },
     onError: (error: Error) => {
-      toast.error(error.message || 'Failed to update bookmark');
+      toast.error(error.message || uiI18n.t('app.failed_to_update_bookmark_8da7706f'));
     },
   });
 }

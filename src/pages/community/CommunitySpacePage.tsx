@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -34,6 +36,7 @@ import { LeaderboardSheet } from '@/components/community/LeaderboardSheet';
 const ROLE_ICON: Record<string, any> = { owner: Crown, mod: Shield };
 
 export default function CommunitySpacePage() {
+  useUiTranslation();
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const isDesktopApp = useIsDesktopApp();
@@ -72,8 +75,8 @@ export default function CommunitySpacePage() {
         <CommunitySidebar />
         <main className={cn('relative z-10 w-full', isDesktopApp ? 'pl-24 lg:pl-28' : 'pl-0 md:pl-24 lg:pl-28')}>
           <div className="mx-auto max-w-2xl px-4 py-16 text-center">
-            <h1 className="font-display text-2xl font-bold">Community not found</h1>
-            <Button className="mt-4 rounded-full" onClick={() => navigate('/community')}>Back to Community</Button>
+            <h1 className="font-display text-2xl font-bold">{uiI18n.t('app.community_not_found_7f77fcb2')}</h1>
+            <Button className="mt-4 rounded-full" onClick={() => navigate('/community')}>{uiI18n.t('app.back_to_community_58498a50')}</Button>
           </div>
         </main>
         <MobileNav />
@@ -107,7 +110,7 @@ export default function CommunitySpacePage() {
           {community.banner_url ? (
             <img
               src={getProxiedImageUrl(community.banner_url)}
-              alt={`${community.name} banner`}
+              alt={uiI18n.t('app.i18n_value_0_banner_4eb507b5', { value0: community.name })}
               className="absolute inset-0 h-full w-full object-cover object-center"
             />
           ) : (
@@ -122,7 +125,7 @@ export default function CommunitySpacePage() {
               className="group/back flex items-center gap-2 rounded-full border border-white/20 bg-black/40 px-4 py-2 text-xs font-bold text-white/90 shadow-xl backdrop-blur-xl transition-colors hover:bg-black/60 hover:text-white"
             >
               <ArrowLeft className="h-4 w-4 transition-transform group-hover/back:-translate-x-1" />
-              <span>Community</span>
+              <span>{uiI18n.t('app.community_bfd58ee3')}</span>
             </button>
           </div>
         </div>
@@ -154,7 +157,7 @@ export default function CommunitySpacePage() {
                   onClick={() => navigate(`/community/c/${community.slug}/information`)}
                   className="gap-1.5 rounded-full border border-white/10 bg-white/[0.06] text-white backdrop-blur-md hover:bg-white/[0.12]"
                 >
-                  <Info className="h-4 w-4" /> <span className="hidden sm:inline">Info</span>
+                  <Info className="h-4 w-4" /> <span className="hidden sm:inline">{uiI18n.t('app.info_4b631f69')}</span>
                 </Button>
                 {canManage && (
                   <>
@@ -164,7 +167,7 @@ export default function CommunitySpacePage() {
                       onClick={() => navigate(`/community/c/${community.slug}/settings`)}
                       className="gap-1.5 rounded-full border border-white/10 bg-white/10 text-white backdrop-blur-md hover:bg-white/20"
                     >
-                      <Settings className="h-4 w-4" /> Settings
+                      <Settings className="h-4 w-4" /> {uiI18n.t('app.settings_c7f73bb5')}
                     </Button>
                     <Button
                       variant="secondary"
@@ -172,7 +175,7 @@ export default function CommunitySpacePage() {
                       onClick={() => setShowSettings((v) => !v)}
                       className="gap-1.5 rounded-full border border-white/10 bg-white/10 text-white backdrop-blur-md hover:bg-white/20"
                     >
-                      <Crown className="h-4 w-4" /> Manage
+                      <Crown className="h-4 w-4" /> {uiI18n.t('app.manage_bf58d17e')}
                     </Button>
                   </>
                 )}
@@ -186,7 +189,7 @@ export default function CommunitySpacePage() {
                           className="gap-1.5 rounded-full bg-white/10 font-bold text-foreground hover:bg-white/15"
                         >
                           {toggle.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-                          Joined
+                          {uiI18n.t('app.joined_43a1c626')}
                           <ChevronDown className="h-3.5 w-3.5 opacity-70" />
                         </Button>
                       </DropdownMenuTrigger>
@@ -196,7 +199,7 @@ export default function CommunitySpacePage() {
                           onClick={() => toggle.mutate({ communityId: community.id, isMember: true })}
                           disabled={toggle.isPending}
                         >
-                          <LogOut className="mr-2 h-4 w-4" /> Leave community
+                          <LogOut className="mr-2 h-4 w-4" /> {uiI18n.t('app.leave_community_271bf4be')}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -207,7 +210,7 @@ export default function CommunitySpacePage() {
                       onClick={() => toggle.mutate({ communityId: community.id, isMember: false })}
                       className="gap-1.5 rounded-full font-bold"
                     >
-                      {toggle.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Join
+                      {toggle.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} {uiI18n.t('app.join_e0d73143')}
                     </Button>
                   )
                 )}
@@ -217,14 +220,14 @@ export default function CommunitySpacePage() {
             <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
               <div>
                 <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-primary/85">
-                  <Sparkles className="h-3.5 w-3.5" /> Community space
+                  <Sparkles className="h-3.5 w-3.5" /> {uiI18n.t('app.community_space_75188c4f')}
                 </div>
             <h1 className="flex items-center gap-2 font-display text-3xl font-black tracking-tight drop-shadow-xl md:text-4xl">
               <span className="bg-gradient-to-br from-white via-white to-white/60 bg-clip-text text-transparent">
                 {community.name}
               </span>
               {community.is_verified && (
-                <BadgeCheck className="h-6 w-6 shrink-0 text-sky-400 md:h-7 md:w-7" aria-label="Verified community" />
+                <BadgeCheck className="h-6 w-6 shrink-0 text-sky-400 md:h-7 md:w-7" aria-label={uiI18n.t('app.verified_community_8777dd86')} />
               )}
             </h1>
             {community.description && <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-muted-foreground">{community.description}</p>}
@@ -232,7 +235,7 @@ export default function CommunitySpacePage() {
             <div className="inline-flex w-fit items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3.5 py-1.5 backdrop-blur-md">
               <Users className="h-3.5 w-3.5 text-primary" />
               <span className="text-sm font-bold tabular-nums text-white">{community.member_count}</span>
-              <span className="text-xs text-muted-foreground">{community.member_count === 1 ? 'member' : 'members'}</span>
+              <span className="text-xs text-muted-foreground">{community.member_count === 1 ? uiI18n.t('app.member_6467baa3') : uiI18n.t('app.members_f13eb585')}</span>
             </div>
             </div>
             </div>
@@ -241,7 +244,7 @@ export default function CommunitySpacePage() {
           {/* Owner settings: member roles */}
           {canManage && showSettings && (
             <GlassPanel className="mb-5 p-5">
-              <h3 className="mb-3 font-display font-bold tracking-tight">Members &amp; ranks</h3>
+              <h3 className="mb-3 font-display font-bold tracking-tight">{uiI18n.t('app.members_amp_ranks_e109da08')}</h3>
               <div className="space-y-2">
                 {members.map((m) => {
                   const RoleIcon = ROLE_ICON[m.role];
@@ -251,7 +254,7 @@ export default function CommunitySpacePage() {
                         <AvatarImage src={m.avatar_url || undefined} />
                         <AvatarFallback>{(m.display_name || m.username || 'U')[0]?.toUpperCase()}</AvatarFallback>
                       </Avatar>
-                      <span className="min-w-0 flex-1 truncate text-sm font-medium">{m.display_name || m.username || 'Anonymous'}</span>
+                      <span className="min-w-0 flex-1 truncate text-sm font-medium">{m.display_name || m.username || uiI18n.t('app.anonymous_9bed5104')}</span>
                       {RoleIcon && <RoleIcon className="h-3.5 w-3.5 text-amber" />}
                       <Select
                         value={m.role}
@@ -260,15 +263,15 @@ export default function CommunitySpacePage() {
                       >
                         <SelectTrigger className="h-8 w-28 rounded-lg text-xs"><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="member">Member</SelectItem>
-                          <SelectItem value="mod">Mod</SelectItem>
-                          <SelectItem value="owner">Owner</SelectItem>
+                          <SelectItem value="member">{uiI18n.t('app.member_6853c98a')}</SelectItem>
+                          <SelectItem value="mod">{uiI18n.t('app.mod_f388dbfb')}</SelectItem>
+                          <SelectItem value="owner">{uiI18n.t('app.owner_89ff3122')}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                   );
                 })}
-                {members.length === 0 && <p className="text-sm text-muted-foreground">No members yet.</p>}
+                {members.length === 0 && <p className="text-sm text-muted-foreground">{uiI18n.t('app.no_members_yet_ea27c45b')}</p>}
               </div>
             </GlassPanel>
           )}

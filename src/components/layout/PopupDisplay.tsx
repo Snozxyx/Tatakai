@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -35,6 +36,7 @@ interface Popup {
 }
 
 export function PopupDisplay() {
+  const { t } = useTranslation();
   const { user, profile } = useAuth();
   const location = useLocation();
   const isDesktop = useIsDesktopApp();
@@ -213,7 +215,7 @@ export function PopupDisplay() {
             )}
           >
             <DialogTitle className="sr-only">{modal.title}</DialogTitle>
-            <DialogDescription className="sr-only">Popup Announcement Modal</DialogDescription>
+            <DialogDescription className="sr-only">{t('layout.popupAnnouncement')}</DialogDescription>
             
             {modal.image_url && (
               <img src={modal.image_url} alt="" className="w-full rounded-lg mb-4" />

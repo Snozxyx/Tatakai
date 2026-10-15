@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useEffect, useRef } from 'react';
 import { X, Trash2, Copy, Terminal } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -11,6 +13,7 @@ interface LogEntry {
 }
 
 export function DevConsole() {
+  useUiTranslation();
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [filter, setFilter] = useState<'all' | 'log' | 'warn' | 'error' | 'info'>('all');
@@ -111,7 +114,7 @@ export function DevConsole() {
 
   const copyLogs = () => {
     const text = filteredLogs.map(log => 
-      `[${log.timestamp.toLocaleTimeString()}] [${log.level.toUpperCase()}] ${log.message}`
+      `[${log.timestamp.toLocaleTimeString(uiI18n.language)}] [${log.level.toUpperCase()}] ${log.message}`
     ).join('\n');
     navigator.clipboard.writeText(text);
   };
@@ -142,8 +145,8 @@ export function DevConsole() {
           <div className="flex items-center justify-between p-4 border-b border-white/10">
             <div className="flex items-center gap-2">
               <Terminal className="w-5 h-5 text-purple-400" />
-              <h3 className="text-white font-semibold">Dev Console</h3>
-              <span className="text-xs text-white/50">({filteredLogs.length} logs)</span>
+              <h3 className="text-white font-semibold">{uiI18n.t('app.dev_console_1425373e')}</h3>
+              <span className="text-xs text-white/50">({filteredLogs.length} {uiI18n.t('app.logs_7d3a6765')}</span>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -191,12 +194,12 @@ export function DevConsole() {
             className="flex-1 overflow-y-auto p-4 space-y-2 font-mono text-sm"
           >
             {filteredLogs.length === 0 ? (
-              <p className="text-white/50 text-center py-8">No logs yet</p>
+              <p className="text-white/50 text-center py-8">{uiI18n.t('app.no_logs_yet_c7462a9d')}</p>
             ) : (
               filteredLogs.map((log, index) => (
                 <div key={index} className="flex gap-2 items-start">
                   <span className="text-white/40 text-xs shrink-0">
-                    {log.timestamp.toLocaleTimeString()}
+                    {log.timestamp.toLocaleTimeString(uiI18n.language)}
                   </span>
                   <span className={cn("text-xs shrink-0", getLevelColor(log.level))}>
                     [{log.level.toUpperCase()}]

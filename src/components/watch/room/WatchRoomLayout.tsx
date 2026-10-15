@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { Background } from '@/components/layout/Background';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { MobileNav } from '@/components/layout/MobileNav';
@@ -20,6 +22,7 @@ import { PollComposerDialog } from './dialogs/PollComposerDialog';
 
 /** Theater composition: ambient wash + top bar + (stage · info + drawer) + host sheet + dialogs. */
 export function WatchRoomLayout() {
+  useUiTranslation();
     const {
         loadingRoom, room, navigate, isModerator, isHost, isAdmin, isDesktopApp,
         prefersReducedMotion, showAnimeSearch, handleCloseAnimeSearch, handleAnimeSearchSelect,
@@ -36,7 +39,7 @@ export function WatchRoomLayout() {
                     <Loader2 className="relative h-8 w-8 text-[hsl(var(--isshoni-accent))] animate-spin" />
                 </div>
                 <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground/60 animate-pulse">
-                    Joining Room...
+                    {uiI18n.t('app.joining_room_7e49386c')}
                 </p>
             </div>
         );
@@ -53,15 +56,15 @@ export function WatchRoomLayout() {
                     <div className="mx-auto mb-6 grid h-20 w-20 place-items-center rounded-full bg-white/5 border border-white/10 shadow-inner">
                         <MonitorOff className="w-8 h-8 text-muted-foreground/60" />
                     </div>
-                    <h2 className="text-2xl font-bold mb-3 tracking-tight text-foreground/90">Room Not Found</h2>
+                    <h2 className="text-2xl font-bold mb-3 tracking-tight text-foreground/90">{uiI18n.t('app.room_not_found_a8977514')}</h2>
                     <p className="text-sm font-medium text-muted-foreground/70 mb-8 leading-relaxed">
-                        This watch party may have ended, or the link is invalid. Let's find you another room to join.
+                        {uiI18n.t('app.this_watch_party_may_have_ended_or_the_link_is_i_b7da0e82')}
                     </p>
                     <Button 
                         onClick={() => navigate('/isshoni')} 
                         className="w-full rounded-full bg-white/10 hover:bg-white/20 text-white border border-white/10 transition-all active:scale-95 h-12 font-semibold shadow-lg"
                     >
-                        Browse Public Rooms
+                        {uiI18n.t('app.browse_public_rooms_273927ac')}
                     </Button>
                 </div>
             </div>
@@ -102,9 +105,9 @@ export function WatchRoomLayout() {
                             <div className="mx-auto mb-6 grid h-20 w-20 place-items-center rounded-full bg-red-500/10 border border-red-500/20 shadow-inner">
                                 <Lock className="w-8 h-8 text-red-400/80" />
                             </div>
-                            <h2 className="text-xl font-bold mb-3 tracking-tight text-foreground/90">Restricted Access</h2>
+                            <h2 className="text-xl font-bold mb-3 tracking-tight text-foreground/90">{uiI18n.t('app.restricted_access_c5e7fda2')}</h2>
                             <p className="text-sm font-medium text-muted-foreground/70 mb-8 leading-relaxed">
-                                Moderators have restricted access to watch rooms. You cannot view the broadcast, participants, or chat.
+                                {uiI18n.t('app.moderators_have_restricted_access_to_watch_rooms_ba9d9b34')}
                             </p>
                             <Button 
                                 onClick={() => navigate('/isshoni')} 
@@ -112,7 +115,7 @@ export function WatchRoomLayout() {
                                 className="w-full h-11 gap-2 rounded-full bg-white/5 border-white/10 hover:bg-white/10 text-foreground transition-all active:scale-95"
                             >
                                 <ArrowLeft className="w-4 h-4" />
-                                Back to Watch Rooms
+                                {uiI18n.t('app.back_to_watch_rooms_92a265a9')}
                             </Button>
                         </div>
                     </div>

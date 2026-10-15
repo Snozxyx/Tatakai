@@ -9,6 +9,7 @@
  * pill row, a collection filter) as `children` and renders it in the same slot.
  */
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Play } from 'lucide-react';
@@ -42,7 +43,7 @@ export function BoardHero({
   description,
   leader,
   leaderPrefix = '#1',
-  ctaLabel = 'Watch now',
+  ctaLabel,
   stats = [],
   backdrop,
   items,
@@ -50,6 +51,8 @@ export function BoardHero({
   children,
   className,
 }: BoardHeroProps) {
+  const { t } = useTranslation();
+  const resolvedCtaLabel = ctaLabel ?? t('discover.watchNow');
   const art = backdrop || leader?.poster;
 
   return (
@@ -133,7 +136,7 @@ export function BoardHero({
                   className="group mt-7 inline-flex items-center gap-2 rounded-full bg-gradient-to-b from-primary to-secondary px-6 py-3 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:from-primary/90 hover:to-secondary/90 hover:shadow-primary/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                 >
                   <Play className="h-4 w-4 fill-primary-foreground transition-transform group-hover:scale-110" />
-                  {ctaLabel}
+                  {resolvedCtaLabel}
                 </Link>
               )}
             </motion.div>

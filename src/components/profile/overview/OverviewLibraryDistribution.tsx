@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
@@ -12,6 +14,7 @@ export interface OverviewLibraryDistributionProps {
 }
 
 const GlassTooltip = ({ active, payload }: any) => {
+  useUiTranslation();
   if (active && payload && payload.length) {
     const p = payload[0];
     return (
@@ -31,6 +34,7 @@ export function OverviewLibraryDistribution({
   watchlist = [],
   mangaReadlist = [],
 }: OverviewLibraryDistributionProps) {
+  useUiTranslation();
   const dist = useMemo(
     () => computeLibraryDistribution(watchlist, mangaReadlist),
     [watchlist, mangaReadlist],
@@ -52,10 +56,10 @@ export function OverviewLibraryDistribution({
           <div className="flex items-center gap-2 mb-1">
             <Library className="w-4 h-4 text-primary/80" />
             <h3 className="font-display font-bold text-base sm:text-lg text-foreground tracking-tight">
-              Library Distribution
+              {uiI18n.t('app.library_distribution_33d31583')}
             </h3>
           </div>
-          <p className="text-xs text-muted-foreground/70">How your titles break down by status</p>
+          <p className="text-xs text-muted-foreground/70">{uiI18n.t('app.how_your_titles_break_down_by_status_b983f600')}</p>
         </div>
 
         <div className="flex items-center gap-1 bg-black/20 p-1 rounded-xl border border-white/[0.03] self-start sm:self-auto">
@@ -70,7 +74,7 @@ export function OverviewLibraryDistribution({
                   : 'text-muted-foreground/60 hover:text-foreground/90 hover:bg-white/[0.02]',
               )}
             >
-              {key}
+              {uiI18n.t(({"anime":"app.anime_11a3e059","manga":"app.manga_1c404c69"})[key])}
             </button>
           ))}
         </div>
@@ -89,7 +93,7 @@ export function OverviewLibraryDistribution({
               <div className="flex flex-col items-center justify-center h-[220px] text-center">
                 <Library className="w-10 h-10 text-muted-foreground/30 mb-3" />
                 <p className="text-sm text-muted-foreground/60">
-                  No {tab} titles tracked yet.
+                  {uiI18n.t('app.no_816c52fd')} {tab} {uiI18n.t('app.titles_tracked_yet_3b6beaa6')}
                 </p>
               </div>
             ) : (
@@ -120,7 +124,7 @@ export function OverviewLibraryDistribution({
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                     <span className="font-display font-bold text-2xl text-foreground">{total}</span>
                     <span className="text-[10px] text-muted-foreground/50 font-medium uppercase tracking-widest">
-                      Titles
+                      {uiI18n.t('app.titles_a116f725')}
                     </span>
                   </div>
                 </div>

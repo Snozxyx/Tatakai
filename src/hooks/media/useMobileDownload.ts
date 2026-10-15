@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMemo } from 'react';
 import { toast } from 'sonner';
 import { isMobileNative } from '@/lib/platform/platform';
@@ -41,6 +43,7 @@ const isActiveStatus = (s: MobileDownloadQueueItem['status']) =>
  * page / floating panel never showed anything even while downloads ran.
  */
 export function useMobileDownload() {
+  useUiTranslation();
   const animeStates = useDownloadStates();
   const mangaStates = useMangaDownloadStates();
 
@@ -104,8 +107,8 @@ export function useMobileDownload() {
     // manga page holds — the offline hub renders an "Open manga" button for
     // those rows instead of retrying here.
     if (!item || item.kind === 'manga') {
-      toast.info('Re-download from the manga page', {
-        description: 'Open the manga and pick the chapter again.',
+      toast.info(uiI18n.t('app.re_download_from_the_manga_page_42bf3435'), {
+        get description() { return uiI18n.t('app.open_the_manga_and_pick_the_chapter_again_c4806b72'); },
       });
       return;
     }
@@ -114,21 +117,21 @@ export function useMobileDownload() {
         const { retryMobileDownload } = await import('@/core/download/mobile/mobileDownloader');
         const res = await retryMobileDownload(id);
         if (res.ok) {
-          toast.success('Download restarted');
+          toast.success(uiI18n.t('app.download_restarted_54bef814'));
           return;
         }
         const reason = 'reason' in res && typeof res.reason === 'string' ? res.reason : 'unknown';
         if (reason === 'missing_stream_url') {
-          toast.info('Re-download from the series page', {
-            description: 'The original stream link expired. Open the anime and pick the episode again.',
+          toast.info(uiI18n.t('app.re_download_from_the_series_page_6fb02b8d'), {
+            get description() { return uiI18n.t('app.the_original_stream_link_expired_open_the_anime__c8bb671d'); },
           });
         } else if (reason === 'already_downloading') {
-          toast.info('Already downloading');
+          toast.info(uiI18n.t('app.already_downloading_7a98b1fa'));
         } else {
-          toast.error('Could not restart the download', { description: String(reason || '') });
+          toast.error(uiI18n.t('app.could_not_restart_the_download_86256d4a'), { description: String(reason || '') });
         }
       } catch (error) {
-        toast.error('Could not restart the download', {
+        toast.error(uiI18n.t('app.could_not_restart_the_download_86256d4a'), {
           description: error instanceof Error ? error.message : String(error),
         });
       }
@@ -158,6 +161,7 @@ export type OfflineEpisode = {
 };
 
 export function useOfflineLibrary() {
+  useUiTranslation();
   const { jobs, error, available, ready } = useNativeDownloadJobs();
   const episodes: OfflineEpisode[] = jobs.filter((job) => job.status === 'completed').map((job) => ({
     animeId: job.animeId || job.episodeId,

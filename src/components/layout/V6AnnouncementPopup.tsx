@@ -1,4 +1,7 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -21,6 +24,8 @@ const POPUP_ACTIVE_CLASS = 'v6-popup-active';
 const REDUCE_MOTION_DELAY_MS = 60 * 1000;
 
 export function V6AnnouncementPopup() {
+  useUiTranslation();
+    const { t } = useTranslation();
     const [isOpen, setIsOpen] = useState(false);
     const isMobile = useIsMobile();
     const { openSettings } = useSettingsModal();
@@ -78,33 +83,33 @@ export function V6AnnouncementPopup() {
     const features = [
         {
             icon: <Blocks className="w-5 h-5 text-violet-400" />,
-            title: "Extension Ecosystem",
-            description: "Add sources, themes, custom read/watch verticals, and full UI — as modular extensions that run side by side."
+            title: t('layout.v6FeatureExtensionsTitle'),
+            description: t('layout.v6FeatureExtensionsDesc')
         },
         {
             icon: <BookOpen className="w-5 h-5 text-rose-400" />,
-            title: "Manga, Rebuilt",
-            description: "A comick-style reader with per-device settings, saved progress, and download-whole-series offline reading."
+            title: t('layout.v6FeatureMangaTitle'),
+            description: t('layout.v6FeatureMangaDesc')
         },
         {
             icon: <PlayCircle className="w-5 h-5 text-emerald-400" />,
-            title: "Continue Watching",
-            description: "Netflix-style cross-device resume, auto-downloads, richer anime info, and a release calendar."
+            title: t('layout.v6FeatureContinueTitle'),
+            description: t('layout.v6FeatureContinueDesc')
         },
         {
             icon: <Users className="w-5 h-5 text-cyan-400" />,
-            title: "Watch2Together",
-            description: "Host-streamed rooms with password protection and a redesigned ambient theater."
+            title: t('layout.v6FeatureWatch2Title'),
+            description: t('layout.v6FeatureWatch2Desc')
         },
         {
             icon: <MessageSquare className="w-5 h-5 text-sky-400" />,
-            title: "Community Feed",
-            description: "A feed-first community with posts, polls, and rich embeds."
+            title: t('layout.v6FeatureFeedTitle'),
+            description: t('layout.v6FeatureFeedDesc')
         },
         {
             icon: <Award className="w-5 h-5 text-amber-400" />,
-            title: "Ranks & Badges",
-            description: "Unified Mitsu ranks with animated name effects, plus collectible Chikra badges with rarity tiers."
+            title: t('layout.v6FeatureRanksTitle'),
+            description: t('layout.v6FeatureRanksDesc')
         }
     ];
 
@@ -116,7 +121,7 @@ export function V6AnnouncementPopup() {
             >
 
                 <div className="relative h-32 w-full overflow-hidden sm:h-52">
-                    <img src={`${import.meta.env.BASE_URL}assets/logo/tatakaibanner.png`} alt="Tatakai V6" className="absolute inset-0 w-full h-full object-cover" />
+                    <img src={`${import.meta.env.BASE_URL}assets/logo/tatakaibanner.png`} alt={uiI18n.t('app.tatakai_v6_42b962e7')} className="absolute inset-0 w-full h-full object-cover" />
                     <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/40 to-transparent" />
                     <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-4 sm:p-6">
                         
@@ -144,7 +149,7 @@ export function V6AnnouncementPopup() {
                             size="lg"
                             className="min-h-12 flex-1 rounded-2xl font-black uppercase tracking-widest text-xs gap-2 group hover:scale-[1.02] transition-transform shadow-lg shadow-primary/20 px-4 sm:px-6"
                         >
-                            <Sparkles className="w-4 h-4 group-hover:animate-spin" /> Continue
+                            <Sparkles className="w-4 h-4 group-hover:animate-spin" /> {t('layout.v6Continue')}
                         </Button>
                         <Button
                             onClick={handleGoToSettings}
@@ -152,12 +157,12 @@ export function V6AnnouncementPopup() {
                             size="lg"
                             className="min-h-12 flex-1 rounded-2xl bg-white/5 border-white/10 font-bold uppercase tracking-widest text-[10px] gap-2 hover:bg-white/10 transition-all px-4 sm:px-6"
                         >
-                            <Settings className="w-4 h-4" /> View Changelog
+                            <Settings className="w-4 h-4" /> {t('layout.v6ViewChangelog')}
                         </Button>
                     </div>
 
                     <p className="text-center text-[9px] text-muted-foreground/40 font-medium uppercase tracking-[0.3em]">
-                        Developed with ❤️ by Snozxyx
+                        {t('layout.v6Credit')}
                     </p>
                 </div>
             </DialogContent>

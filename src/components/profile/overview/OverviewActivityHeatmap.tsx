@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { CalendarDays, Flame, Info, Trophy } from 'lucide-react';
@@ -17,10 +19,10 @@ export interface OverviewActivityHeatmapProps {
 type ActivitySource = 'all' | 'anime' | 'manga' | 'forum';
 
 const SOURCE_TABS: { key: ActivitySource; label: string }[] = [
-  { key: 'all', label: 'All' },
-  { key: 'anime', label: 'Anime' },
-  { key: 'manga', label: 'Manga' },
-  { key: 'forum', label: 'Forum' },
+  { key: 'all', get label() { return uiI18n.t('app.all_6a720856'); } },
+  { key: 'anime', get label() { return uiI18n.t('app.anime_f1b32a19'); } },
+  { key: 'manga', get label() { return uiI18n.t('app.manga_87db0f99'); } },
+  { key: 'forum', get label() { return uiI18n.t('app.forum_cf1d2c97'); } },
 ];
 
 const WEEKS = 26;
@@ -45,6 +47,7 @@ export function OverviewActivityHeatmap({
   currentStreak = 0,
   longestStreak = 0,
 }: OverviewActivityHeatmapProps) {
+  useUiTranslation();
   const [source, setSource] = useState<ActivitySource>('all');
 
   const since = useMemo(() => {
@@ -111,14 +114,14 @@ export function OverviewActivityHeatmap({
           <div className="flex items-center gap-2 mb-1">
             <CalendarDays className="w-4 h-4 text-primary/80" />
             <h3 className="font-display font-bold text-base sm:text-lg text-foreground tracking-tight">
-              Activity & Watch 
+              {uiI18n.t('app.activity_watch_f798ca65')}
             </h3>
             <span className="text-[10px] font-semibold text-muted-foreground/80 px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.05] uppercase tracking-wider">
-              26 Weeks
+              {uiI18n.t('app.26_weeks_582231ea')}
             </span>
           </div>
           <p className="text-xs text-muted-foreground/70">
-            Track your daily watch velocity, consistency, and active streaks
+            {uiI18n.t('app.track_your_daily_watch_velocity_consistency_and__49a1be19')}
           </p>
         </div>
 
@@ -143,20 +146,20 @@ export function OverviewActivityHeatmap({
 
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-black/20 border border-white/[0.03]">
             <Flame className="w-3.5 h-3.5 text-orange-400" />
-            <span className="text-muted-foreground/70 text-[11px]">Current:</span>
+            <span className="text-muted-foreground/70 text-[11px]">{uiI18n.t('app.current_19889c90')}</span>
             <span className="font-bold text-foreground font-display tabular-nums">{currentStreak}d</span>
           </div>
 
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-black/20 border border-white/[0.03]">
             <Trophy className="w-3.5 h-3.5 text-amber-400" />
-            <span className="text-muted-foreground/70 text-[11px]">Record:</span>
+            <span className="text-muted-foreground/70 text-[11px]">{uiI18n.t('app.record_9b5e24d4')}</span>
             <span className="font-bold text-foreground font-display tabular-nums">{longestStreak}d</span>
           </div>
 
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary/10 border border-primary/20 text-primary">
             <span className="font-bold font-display tabular-nums">{totalInPeriod}</span>
             <span className="text-[10px] uppercase font-semibold tracking-wide">
-              {source === 'forum' ? 'comments' : source === 'manga' ? 'updates' : 'events'}
+              {source === 'forum' ? uiI18n.t('app.comments_5b17a6c6') : source === 'manga' ? uiI18n.t('app.updates_f0f97766') : uiI18n.t('app.events_82d50d90')}
             </span>
           </div>
         </div>
@@ -195,7 +198,7 @@ export function OverviewActivityHeatmap({
                         className="text-xs bg-background/90 backdrop-blur-xl border border-white/10 p-2.5 shadow-2xl rounded-xl"
                       >
                         <p className="font-bold text-foreground mb-0.5">
-                          {cell.date.toLocaleDateString('en-US', {
+                          {cell.date.toLocaleDateString(uiI18n.language, {
                             weekday: 'short',
                             month: 'short',
                             day: 'numeric',
@@ -204,7 +207,7 @@ export function OverviewActivityHeatmap({
                         </p>
                         <p className="text-xs text-muted-foreground/80">
                           <span className="font-bold text-primary font-mono">{cell.count}</span>{' '}
-                          {cell.count === 1 ? 'episode/activity' : 'episodes/activities'} tracked
+                          {cell.count === 1 ? 'episode/activity' : 'episodes/activities'} {uiI18n.t('app.tracked_4c54cc4d')}
                         </p>
                       </TooltipContent>
                     </Tooltip>
@@ -220,11 +223,11 @@ export function OverviewActivityHeatmap({
       <div className="relative z-10 flex items-center justify-between pt-4 border-t border-white/[0.04] mt-2 text-[11px] text-muted-foreground/60">
         <span className="flex items-center gap-1.5">
           <Info className="w-3.5 h-3.5 text-muted-foreground/50" />
-          Interactive daily watch & read activity
+          {uiI18n.t('app.interactive_daily_watch_read_activity_84c16b88')}
         </span>
 
         <div className="flex items-center gap-2">
-          <span>Less</span>
+          <span>{uiI18n.t('app.less_526cb742')}</span>
           <div className="flex gap-1 items-center">
             <div className="h-2.5 w-2.5 rounded-[3px] bg-white/[0.02] border border-white/[0.04]" />
             <div className="h-2.5 w-2.5 rounded-[3px] bg-primary/20 border border-primary/20" />
@@ -232,7 +235,7 @@ export function OverviewActivityHeatmap({
             <div className="h-2.5 w-2.5 rounded-[3px] bg-primary/70 border border-primary/40" />
             <div className="h-2.5 w-2.5 rounded-[3px] bg-primary border border-primary/50" />
           </div>
-          <span>More</span>
+          <span>{uiI18n.t('app.more_4bab2d8f')}</span>
         </div>
       </div>
     </GlassPanel>

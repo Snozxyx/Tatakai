@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useCallback } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import {
@@ -32,6 +34,7 @@ import { CommunityRightRail } from '@/components/community/feed/CommunityRightRa
 import { useCommunityPresence } from '@/hooks/community/useCommunityPresence';
 
 export default function CommunityFeedPage() {
+  useUiTranslation();
   const isDesktopApp = useIsDesktopApp();
   const { isAdmin } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -85,7 +88,7 @@ export default function CommunityFeedPage() {
               <div className="space-y-2.5">
                 <div className="flex items-center gap-3">
                   <h1 className="font-display text-3xl font-bold tracking-tight sm:text-4xl text-foreground">
-                    Community
+                    {uiI18n.t('app.community_bfd58ee3')}
                   </h1>
 
                   {/* Live online-count pill (Item 9 presence) */}
@@ -94,12 +97,12 @@ export default function CommunityFeedPage() {
                       <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
                       <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
                     </span>
-                    <span className="tabular-nums">{onlineCount}</span> online
+                    <span className="tabular-nums">{onlineCount}</span> {uiI18n.t('app.online_2dbc2fd2')}
                   </span>
                 </div>
 
                 <p className="text-sm text-muted-foreground max-w-2xl leading-relaxed">
-                  Join discussions, host watchrooms, create tier lists, and explore curated playlists from Tatakai fans worldwide.
+                  {uiI18n.t('app.join_discussions_host_watchrooms_create_tier_lis_d545d561')}
                 </p>
               </div>
 {/* Header Actions */}
@@ -173,28 +176,28 @@ export default function CommunityFeedPage() {
                     onClick={() => setLeaderboardOpen(true)}
                     className="flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm font-bold text-foreground backdrop-blur-md shrink-0 transition-[color,background-color,border-color,opacity,transform] hover:bg-amber-500/20 duration-150 active:scale-[0.98]"
                   >
-                    <Trophy className="h-4 w-4 text-foreground" /> Leaderboard
+                    <Trophy className="h-4 w-4 text-foreground" /> {uiI18n.t('app.leaderboard_0381247a')}
                   </button>
 
                   <Link
                     to="/isshoni"
                     className="flex items-center gap-2 rounded-full border border-rose-500/30 bg-rose-500/10 px-4 py-2 text-sm font-bold text-foreground backdrop-blur-md shrink-0 transition-[color,background-color,border-color,opacity,transform] hover:bg-rose-500/20 duration-150 active:scale-[0.98]"
                   >
-                    <Radio className="h-4 w-4 text-foreground" /> Watch Together
+                    <Radio className="h-4 w-4 text-foreground" /> {uiI18n.t('app.watch_together_195732a6')}
                   </Link>
 
                   <Link
                     to="/tierlists"
                     className="flex items-center gap-2 rounded-full border border-border bg-muted/40 px-4 py-2 text-sm font-bold text-foreground backdrop-blur-md shrink-0 transition-[color,background-color,border-color,opacity,transform] hover:border-amber-500/40 hover:bg-muted/60 active:scale-95 hover:text-foreground"
                   >
-                    <Layers className="h-4 w-4" /> Tier Lists
+                    <Layers className="h-4 w-4" /> {uiI18n.t('app.tier_lists_86752701')}
                   </Link>
 
                   <Link
                     to="/playlists"
                     className="flex items-center gap-2 rounded-full border border-border bg-muted/40 px-4 py-2 text-sm font-bold text-foreground backdrop-blur-md shrink-0 transition-[color,background-color,border-color,opacity,transform] hover:border-violet-500/40 hover:bg-muted/60 active:scale-95 hover:text-foreground"
                   >
-                    <Music2 className="h-4 w-4" /> Playlists
+                    <Music2 className="h-4 w-4" /> {uiI18n.t('app.playlists_77b69f32')}
                   </Link>
                 </div>
 
@@ -221,7 +224,7 @@ export default function CommunityFeedPage() {
                       <Hash className="h-4 w-4 text-primary" />
                     </div>
                     <span className="text-sm font-bold text-foreground">
-                      Filtering by <span className="text-primary">#{tag}</span>
+                      {uiI18n.t('app.filtering_by_3abae343')} <span className="text-primary">#{tag}</span>
                     </span>
                   </div>
 
@@ -230,7 +233,7 @@ export default function CommunityFeedPage() {
                     onClick={clearFilters}
                     className="flex items-center gap-1.5 rounded-full bg-white/5 px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-[color,background-color,border-color,opacity,transform] hover:bg-white/10 hover:text-foreground"
                   >
-                    Clear <X className="h-3.5 w-3.5" />
+                    {uiI18n.t('app.clear_719ea396')} <X className="h-3.5 w-3.5" />
                   </button>
                 </div>
               )}
@@ -239,10 +242,10 @@ export default function CommunityFeedPage() {
               {(tab === 'foryou' || tab === 'following') && (
                 <div className="mb-4 flex flex-wrap items-center gap-2">
                   {([
-                    { value: undefined, label: 'All', icon: Sparkles },
-                    { value: 'playlist' as const, label: 'Playlists', icon: Music2 },
-                    { value: 'tierlist' as const, label: 'Tier Lists', icon: Layers },
-                    { value: 'watchroom' as const, label: 'Watchrooms', icon: Radio },
+                    { value: undefined, get label() { return uiI18n.t('app.all_6a720856'); }, icon: Sparkles },
+                    { value: 'playlist' as const, get label() { return uiI18n.t('app.playlists_77b69f32'); }, icon: Music2 },
+                    { value: 'tierlist' as const, get label() { return uiI18n.t('app.tier_lists_86752701'); }, icon: Layers },
+                    { value: 'watchroom' as const, get label() { return uiI18n.t('app.watchrooms_8b19ed3b'); }, icon: Radio },
                   ]).map(({ value, label, icon: Icon }) => {
                     const active = postType === value;
                     return (

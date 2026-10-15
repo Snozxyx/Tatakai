@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { cn } from '@/lib/utils';
 
 /**
@@ -12,6 +14,7 @@ export function OnlineDot({
   className?: string;
   size?: 'sm' | 'md';
 }) {
+  useUiTranslation();
   return (
     <span
       className={cn(
@@ -19,7 +22,7 @@ export function OnlineDot({
         size === 'sm' ? 'h-2.5 w-2.5' : 'h-3 w-3',
         className,
       )}
-      aria-label="Online"
+      aria-label={uiI18n.t('app.online_c3e839df')}
     >
       <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400 opacity-60" />
     </span>

@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { resolveColors, useTheme, type ThemeId } from '@/hooks/ui/useTheme';
 import { SettingsSection } from '@/components/settings/SettingsPrimitives';
 import { Check, Palette, Sparkles } from 'lucide-react';
@@ -21,6 +23,7 @@ function swatchGradient(t: ThemeId): string {
 }
 
 export function ThemeSelector() {
+  useUiTranslation();
   const { theme, setTheme, themes, themeInfo } = useTheme();
 
   const darkThemes = themes.filter(t => themeInfo[t]?.category === 'dark');
@@ -42,11 +45,9 @@ export function ThemeSelector() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: (startIndex + index) * 0.05 }}
             onClick={() => setTheme(t)}
-            className={`relative p-3 rounded-2xl border-2 transition-all duration-300 text-left group overflow-hidden ${
-              isActive
+            className={`relative p-3 rounded-2xl border-2 transition-all duration-300 text-left group overflow-hidden ${isActive
                 ? 'border-primary bg-primary/10 ring-2 ring-primary/30'
-                : 'border-border/50 hover:border-primary/50 bg-muted/30 hover:bg-muted/50'
-            }`}
+                : 'border-border/50 hover:border-primary/50 bg-muted/30 hover:bg-muted/50'}`}
           >
             {/* Animated background on hover */}
             <div
@@ -92,12 +93,12 @@ export function ThemeSelector() {
   return (
     <SettingsSection
       icon={Palette}
-      title="Appearance"
-      description={`Choose your visual theme — ${themes.length} available`}
+      title={uiI18n.t('app.appearance_41def7a0')}
+      description={uiI18n.t('app.choose_your_visual_theme_i18n_value_0_available_0caa637c', { value0: themes.length })}
     >
       <div className="mb-8">
         <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4 flex items-center gap-2">
-          <span className="text-lg">🌙</span> Dark Themes
+          <span className="text-lg">🌙</span> {uiI18n.t('app.dark_themes_388c5f0e')}
         </h3>
         {renderThemeGrid(darkThemes, 0)}
       </div>
@@ -105,7 +106,7 @@ export function ThemeSelector() {
       {lightThemes.length > 0 && (
         <div>
           <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4 flex items-center gap-2">
-            <span className="text-lg">☀️</span> Light Themes
+            <span className="text-lg">☀️</span> {uiI18n.t('app.light_themes_8ebfbbc8')}
           </h3>
           {renderThemeGrid(lightThemes, darkThemes.length)}
         </div>

@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -28,6 +30,7 @@ export function CommunityWidgetCard({
   side = 'bottom',
   className,
 }: CommunityWidgetCardProps) {
+  useUiTranslation();
   const navigate = useNavigate();
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
@@ -99,7 +102,7 @@ export function CommunityWidgetCard({
                   {toggle.isPending || isLoading ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   ) : isMember ? (
-                    <span className="flex items-center gap-1.5"><Check className="h-3.5 w-3.5" /> Joined</span>
+                    <span className="flex items-center gap-1.5"><Check className="h-3.5 w-3.5" /> {uiI18n.t('app.joined_43a1c626')}</span>
                   ) : (
                     'Join'
                   )}
@@ -115,7 +118,7 @@ export function CommunityWidgetCard({
                 {displayName}
               </span>
               {community?.is_verified && (
-                <BadgeCheck className="h-4.5 w-4.5 shrink-0 text-sky-400" aria-label="Verified community" />
+                <BadgeCheck className="h-4.5 w-4.5 shrink-0 text-sky-400" aria-label={uiI18n.t('app.verified_community_8777dd86')} />
               )}
             </button>
             <span className="text-sm text-zinc-400">c/{slug}</span>
@@ -142,8 +145,8 @@ export function CommunityWidgetCard({
           ) : memberCount !== null ? (
             <div className="mt-4 flex items-center gap-4 text-sm">
               <div className="flex items-center gap-1 text-zinc-400">
-                <span className="font-bold text-white tabular-nums">{memberCount.toLocaleString()}</span> 
-                {memberCount === 1 ? 'member' : 'members'}
+                <span className="font-bold text-white tabular-nums">{memberCount.toLocaleString(uiI18n.language)}</span>
+                {memberCount === 1 ? uiI18n.t('app.member_6467baa3') : uiI18n.t('app.members_f13eb585')}
               </div>
             </div>
           ) : null}
@@ -157,7 +160,7 @@ export function CommunityWidgetCard({
             onClick={go} 
             className="group w-full justify-between text-zinc-300 hover:text-white hover:bg-white/5"
           >
-            View Community
+            {uiI18n.t('app.view_community_5e329551')}
             <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
           </Button>
         </div>

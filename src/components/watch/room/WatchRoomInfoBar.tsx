@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { Button } from '@/components/ui/button';
 import { Check, Zap, Film } from 'lucide-react';
 import { useWatchRoomContext } from './WatchRoomContext';
@@ -5,6 +7,7 @@ import { IconSwap } from './IconSwap';
 
 /** Slim info strip beneath the stage: poster · title · episode + participant "Mark ready". */
 export function WatchRoomInfoBar() {
+  useUiTranslation();
     const { room, isHost, isParticipantReady, handleToggleReady } = useWatchRoomContext();
 
     return (
@@ -18,7 +21,7 @@ export function WatchRoomInfoBar() {
                         <img 
                             src={room.anime_poster} 
                             className="h-full w-full object-cover" 
-                            alt={room.anime_title || "Poster"} 
+                            alt={room.anime_title || uiI18n.t('app.poster_a33539ca')}
                         />
                     ) : (
                         <div className="flex h-full w-full items-center justify-center bg-white/5">
@@ -30,14 +33,14 @@ export function WatchRoomInfoBar() {
                 {/* Text Data */}
                 <div className="flex min-w-0 flex-col justify-center">
                     <p className="mb-0.5 text-[10px] font-bold uppercase tracking-widest text-[hsl(var(--isshoni-accent))] drop-shadow-md">
-                        Now watching
+                        {uiI18n.t('app.now_watching_45b3c8db')}
                     </p>
                     <h2 className="max-w-[200px] sm:max-w-[350px] md:max-w-[500px] truncate text-sm sm:text-base font-bold text-foreground/95 leading-tight">
-                        {room.anime_title || 'Waiting for host to select anime...'}
+                        {room.anime_title || uiI18n.t('app.waiting_for_host_to_select_anime_25912833')}
                     </h2>
                     {(room.episode_number || room.episode_title) && (
                         <p className="mt-0.5 text-[11px] font-medium text-muted-foreground/70 truncate max-w-[200px] sm:max-w-none">
-                            {room.episode_number ? `Episode ${room.episode_number}` : ''}
+                            {room.episode_number ? uiI18n.t('app.episode_i18n_value_0_f05acda8', { value0: room.episode_number }) : ''}
                             {room.episode_number && room.episode_title ? <span className="mx-1.5 text-white/20">•</span> : ''}
                             {room.episode_title && <span className="truncate">{room.episode_title}</span>}
                         </p>
@@ -52,11 +55,9 @@ export function WatchRoomInfoBar() {
                         variant="ghost" 
                         size="sm" 
                         onClick={handleToggleReady} 
-                        className={`h-10 gap-2 rounded-full px-5 transition-all duration-300 active:scale-95 ${
-                            isParticipantReady 
+                        className={`h-10 gap-2 rounded-full px-5 transition-all duration-300 active:scale-95 ${isParticipantReady
                             ? 'border border-emerald-500/30 bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 shadow-[0_0_20px_rgba(16,185,129,0.15)]' 
-                            : 'border border-white/5 bg-white/5 text-foreground/80 hover:bg-white/10 hover:text-foreground'
-                        }`}
+                            : 'border border-white/5 bg-white/5 text-foreground/80 hover:bg-white/10 hover:text-foreground'}`}
                     >
                         <IconSwap swapKey={isParticipantReady ? 'ready' : 'not'}>
                             {isParticipantReady ? (
@@ -66,7 +67,7 @@ export function WatchRoomInfoBar() {
                             )}
                         </IconSwap>
                         <span className="text-[11px] font-bold uppercase tracking-wider">
-                            {isParticipantReady ? "Ready" : "Mark ready"}
+                            {isParticipantReady ? uiI18n.t('app.ready_20c7c552') : uiI18n.t('app.mark_ready_e6c9229a')}
                         </span>
                     </Button>
                 </div>

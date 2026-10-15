@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import { Activity, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -11,6 +12,7 @@ const ANNOUNCEMENT_SEEN_KEY = 'tatakai_v6_announced';
 const ANNOUNCEMENT_DELAY_MS = 60 * 1000;
 
 export function ReduceMotionPrompt() {
+  const { t } = useTranslation();
   const isMobile = useIsMobile();
   const [isOpen, setIsOpen] = useState(false);
 
@@ -77,7 +79,7 @@ export function ReduceMotionPrompt() {
           <button
             onClick={() => handleClose(false)}
             className="absolute top-2 right-2 p-1 rounded-lg hover:bg-muted/50 transition-colors"
-            aria-label="Close"
+            aria-label={t('common.close')}
           >
             <X className="w-4 h-4 text-muted-foreground" />
           </button>
@@ -87,9 +89,9 @@ export function ReduceMotionPrompt() {
               <Activity className="w-5 h-5 text-primary" />
             </div>
             <div className="flex-1 pt-0.5">
-              <h3 className="font-semibold text-sm mb-1">Reduce motion effects?</h3>
+              <h3 className="font-semibold text-sm mb-1">{t('layout.reduceMotionTitle')}</h3>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                If animations feel too intense, we can tone them down.
+                {t('layout.reduceMotionDesc')}
               </p>
             </div>
           </div>
@@ -100,14 +102,14 @@ export function ReduceMotionPrompt() {
               className="flex-1 h-9 text-xs"
               variant="secondary"
             >
-              Reduce Motion
+              {t('layout.reduceMotionEnable')}
             </Button>
             <Button
               onClick={() => handleClose(false)}
               className="flex-1 h-9 text-xs"
               variant="ghost"
             >
-              Keep Motion
+              {t('layout.reduceMotionKeep')}
             </Button>
           </div>
         </div>

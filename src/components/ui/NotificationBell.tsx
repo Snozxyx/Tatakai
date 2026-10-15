@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Bell } from 'lucide-react';
 import { useAdminMessages } from '@/hooks/admin/useAdminMessages';
 import { useNotifications } from '@/hooks/community/useNotifications';
@@ -6,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { NotificationSheet } from '@/components/community/NotificationSheet';
 
 export function NotificationBell() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { unreadCount: adminUnreadCount } = useAdminMessages();
   const { unreadCount: notificationUnreadCount } = useNotifications();
@@ -24,7 +26,7 @@ export function NotificationBell() {
       <button
         onClick={() => setIsOpen(true)}
         className="relative flex h-10 w-10 items-center justify-center rounded-full hover:bg-muted/50 transition-colors"
-        aria-label="Notifications"
+        aria-label={t('nav.notifications')}
       >
         <Bell className="h-5 w-5 shrink-0 text-muted-foreground hover:text-foreground transition-colors" />
         {totalUnreadCount > 0 && (

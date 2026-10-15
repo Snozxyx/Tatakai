@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Home, Bookmark, Radio, Layers, Music2, Users, LogIn } from 'lucide-react';
 import { NavIcon } from '@/components/ui/NavIcon';
@@ -17,6 +19,7 @@ import { cn } from '@/lib/utils';
  * on each {@link NavIcon}).
  */
 export function CommunitySidebar() {
+  useUiTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const { user, profile } = useAuth();
@@ -53,8 +56,8 @@ export function CommunitySidebar() {
       {/* Back Button */}
       <button
         onClick={() => navigate(-1)}
-        aria-label="Back"
-        title={expanded ? undefined : 'Back'}
+        aria-label={uiI18n.t('app.back_b52b36b7')}
+        title={expanded ? undefined : uiI18n.t('app.back_b52b36b7')}
         className={cn(
           'group flex items-center justify-center transition-all duration-200 active:scale-95',
           expanded
@@ -63,7 +66,7 @@ export function CommunitySidebar() {
         )}
       >
         <ArrowLeft className="h-[22px] w-[22px] shrink-0 transition-transform group-hover:-translate-x-0.5" />
-        {expanded && <span className="truncate text-sm font-semibold">Back</span>}
+        {expanded && <span className="truncate text-sm font-semibold">{uiI18n.t('app.back_b52b36b7')}</span>}
       </button>
 
       {/* Top Separator */}
@@ -71,18 +74,18 @@ export function CommunitySidebar() {
 
       {/* Main Nav Links */}
       <div className={cn('flex flex-col', expanded ? 'gap-1.5 w-full' : 'items-center gap-2.5')}>
-        <NavIcon icon={Home} active={isActive('/')} onClick={() => navigate('/')} label="Home" expanded={expanded} />
-        <NavIcon icon={Users} active={isActive('/community')} onClick={() => navigate('/community')} label="Community" expanded={expanded} />
+        <NavIcon icon={Home} active={isActive('/')} onClick={() => navigate('/')} label={uiI18n.t('app.home_70f8bb9a')} expanded={expanded} />
+        <NavIcon icon={Users} active={isActive('/community')} onClick={() => navigate('/community')} label={uiI18n.t('app.community_bfd58ee3')} expanded={expanded} />
         <NavIcon
           icon={Bookmark}
           active={isActive('/community/bookmarks')}
           onClick={() => navigate('/community/bookmarks')}
-          label="Bookmarks"
+          label={uiI18n.t('app.bookmarks_ca3cddd2')}
           expanded={expanded}
         />
-        <NavIcon icon={Radio} active={isActive('/isshoni')} onClick={() => navigate('/isshoni')} label="Watch Together" expanded={expanded} />
-        <NavIcon icon={Layers} active={isActive('/tierlists')} onClick={() => navigate('/tierlists')} label="Tier Lists" expanded={expanded} />
-        <NavIcon icon={Music2} active={isActive('/playlists')} onClick={() => navigate('/playlists')} label="Playlists" expanded={expanded} />
+        <NavIcon icon={Radio} active={isActive('/isshoni')} onClick={() => navigate('/isshoni')} label={uiI18n.t('app.watch_together_195732a6')} expanded={expanded} />
+        <NavIcon icon={Layers} active={isActive('/tierlists')} onClick={() => navigate('/tierlists')} label={uiI18n.t('app.tier_lists_86752701')} expanded={expanded} />
+        <NavIcon icon={Music2} active={isActive('/playlists')} onClick={() => navigate('/playlists')} label={uiI18n.t('app.playlists_77b69f32')} expanded={expanded} />
       </div>
 
       <div className={cn('mt-auto flex flex-col', expanded ? 'w-full' : 'items-center')}>
@@ -92,7 +95,7 @@ export function CommunitySidebar() {
         {user ? (
           <button
             onClick={() => navigate(profileHref)}
-            aria-label="Profile"
+            aria-label={uiI18n.t('app.profile_ff4fc027')}
             className={cn(
               'group relative flex items-center transition-all duration-200 active:scale-95',
               expanded 
@@ -107,7 +110,7 @@ export function CommunitySidebar() {
             {expanded && (
               <div className="min-w-0 text-left">
                 <p className="truncate text-sm font-semibold text-white">
-                  {profile?.display_name || profile?.username || 'You'}
+                  {profile?.display_name || profile?.username || uiI18n.t('app.you_905cb326')}
                 </p>
                 {profile?.username && <p className="truncate text-xs text-muted-foreground">@{profile.username}</p>}
               </div>
@@ -115,7 +118,7 @@ export function CommunitySidebar() {
           </button>
         ) : (
           <div className={expanded ? 'mt-4' : ''}>
-            <NavIcon icon={LogIn} active={isActive('/auth')} onClick={() => navigate('/auth')} label="Sign In" expanded={expanded} />
+            <NavIcon icon={LogIn} active={isActive('/auth')} onClick={() => navigate('/auth')} label={uiI18n.t('app.sign_in_f8492cc1')} expanded={expanded} />
           </div>
         )}
       </div>

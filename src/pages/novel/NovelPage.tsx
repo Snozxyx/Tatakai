@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { SourceDebug } from '@/components/extensions/SourceDebug';
 /**
  * NovelPage.tsx
@@ -60,6 +62,7 @@ import { useMangaBakaSeries } from "@/hooks/api/useMangaData";
 
 // --- Helper Component: Relation Tree ---
 function RelationTree({ relations }: { relations: MediaRelation[] }) {
+  useUiTranslation();
   const navigate = useNavigate();
   void navigate;
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -75,7 +78,7 @@ function RelationTree({ relations }: { relations: MediaRelation[] }) {
       <button
         type="button"
         onClick={() => scroll('left')}
-        aria-label="Scroll series tree left"
+        aria-label={uiI18n.t('app.scroll_series_tree_left_b8db9779')}
         className="absolute -left-3 top-[38%] -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/80 hover:bg-black text-white border border-white/10 hidden md:flex items-center justify-center opacity-0 group-hover/rail:opacity-100 transition-all shadow-xl backdrop-blur-md"
       >
         <ChevronLeft className="w-5 h-5" />
@@ -108,7 +111,7 @@ function RelationTree({ relations }: { relations: MediaRelation[] }) {
       <button
         type="button"
         onClick={() => scroll('right')}
-        aria-label="Scroll series tree right"
+        aria-label={uiI18n.t('app.scroll_series_tree_right_37e703d6')}
         className="absolute -right-3 top-[38%] -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/80 hover:bg-black text-white border border-white/10 hidden md:flex items-center justify-center opacity-0 group-hover/rail:opacity-100 transition-all shadow-xl backdrop-blur-md"
       >
         <ChevronRight className="w-5 h-5" />
@@ -187,6 +190,7 @@ type ChapterSortMode = "newest" | "oldest";
 const CHAPTERS_PER_GROUP = 25;
 
 export default function NovelPage() {
+  useUiTranslation();
   const { novelId } = useParams<{ novelId: string }>();
   const navigate = useNavigate();
   const isNative = useIsNativeApp();
@@ -581,7 +585,7 @@ export default function NovelPage() {
         const minChapter = numericChapterValues.length > 0 ? Math.min(...numericChapterValues) : null;
         const maxChapter = numericChapterValues.length > 0 ? Math.max(...numericChapterValues) : null;
 
-        let rangeLabel = "Unknown range";
+        let rangeLabel = uiI18n.t('app.unknown_range_a8ec0c19');
         if (minChapter != null && maxChapter != null) {
           rangeLabel = minChapter === maxChapter ? `${minChapter}` : `${minChapter} - ${maxChapter}`;
         }
@@ -652,7 +656,7 @@ export default function NovelPage() {
     info?.title?.english ||
     info?.title?.romaji ||
     info?.title?.native ||
-    "Unknown Title";
+    uiI18n.t('app.unknown_title_58dfae3c');
 
   const recommendationTerms = useMemo(() => {
     if (!info) return [];
@@ -826,10 +830,10 @@ export default function NovelPage() {
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center p-6">
           <BookOpen className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-          <h1 className="text-2xl font-bold mb-2">Novel details not available</h1>
-          <p className="text-muted-foreground mb-4">We couldn't retrieve the information for this novel ID.</p>
+          <h1 className="text-2xl font-bold mb-2">{uiI18n.t('app.novel_details_not_available_f0918058')}</h1>
+          <p className="text-muted-foreground mb-4">{uiI18n.t('app.we_couldn_t_retrieve_the_information_for_this_no_bd8b587e')}</p>
           <button onClick={() => navigate("/novel")} className="px-6 py-2 bg-primary text-primary-foreground rounded-full hover:brightness-110 font-bold transition-all">
-            Back to novels
+            {uiI18n.t('app.back_to_novels_dd3a5da4')}
           </button>
         </div>
       </div>
@@ -852,7 +856,7 @@ export default function NovelPage() {
           isDesktopApp ? "px-4" : "pl-6 md:pl-32 pr-6"
         )}>
           <AdultWarningGate
-            title={info.canonicalTitle || info.title?.english || info.title?.romaji || 'Unknown'}
+            title={info.canonicalTitle || info.title?.english || info.title?.romaji || uiI18n.t('app.unknown_bc7819b3')}
             mediaLabel="novel"
             onBack={() => navigate(-1)}
             onContinue={() => setAllowAdultForSession(true)}
@@ -958,11 +962,11 @@ export default function NovelPage() {
   };
 
   const READLIST_STATUS_OPTIONS: { value: NovelReadlistStatus; label: string }[] = [
-    { value: "plan_to_read", label: "Plan to Read" },
-    { value: "reading", label: "Reading" },
-    { value: "completed", label: "Completed" },
-    { value: "on_hold", label: "On Hold" },
-    { value: "dropped", label: "Dropped" },
+    { value: "plan_to_read", get label() { return uiI18n.t('app.plan_to_read_1f74de73'); } },
+    { value: "reading", get label() { return uiI18n.t('app.reading_cffa2af0'); } },
+    { value: "completed", get label() { return uiI18n.t('app.completed_1798b3ba'); } },
+    { value: "on_hold", get label() { return uiI18n.t('app.on_hold_73fd29ee'); } },
+    { value: "dropped", get label() { return uiI18n.t('app.dropped_8cf622d3'); } },
   ];
   const currentReadlistStatus = readlistEntry?.status as NovelReadlistStatus | undefined;
   const currentReadlistLabel = READLIST_STATUS_OPTIONS.find((o) => o.value === currentReadlistStatus)?.label;
@@ -975,7 +979,7 @@ export default function NovelPage() {
   return (
     <>
       <Helmet>
-        <title>{displayTitle} — Novel on Tatakai</title>
+        <title>{displayTitle} {uiI18n.t('app.novel_on_tatakai_ddbaaaa3')}</title>
         <meta name="description" content={info.synopsis?.slice(0, 160) || `Track ${displayTitle}, rate it, and add it to your lists on Tatakai.`} />
         <meta property="og:title" content={`${displayTitle} — Novel on Tatakai`} />
         <meta property="og:description" content={info.synopsis?.slice(0, 160) || `Track and discuss ${displayTitle} on Tatakai — the otaku community.`} />
@@ -1014,7 +1018,7 @@ export default function NovelPage() {
             <div className="absolute top-0 left-0 w-full h-[50vh] xl:h-[60vh] -z-10 overflow-hidden opacity-30 md:opacity-40">
               <img
                 src={bannerUrl}
-                alt="Banner"
+                alt={uiI18n.t('app.banner_c8af83fb')}
                 className="w-full h-full object-cover blur-[12px] brightness-[0.6] transform scale-105"
               />
               <div className="absolute inset-0 bg-gradient-to-b from-background/10 via-background/60 to-background" />
@@ -1027,7 +1031,7 @@ export default function NovelPage() {
             className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6 group w-fit"
           >
             <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-            <span className="font-medium text-sm">Back</span>
+            <span className="font-medium text-sm">{uiI18n.t('app.back_b52b36b7')}</span>
           </button>
 
           {/* Hero Section — AnimePage-aligned GlassPanel layout */}
@@ -1059,12 +1063,12 @@ export default function NovelPage() {
                   {info.inDb ? (
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-400 text-xs font-medium">
                       <CheckCircle2 className="w-3.5 h-3.5" />
-                      In Tatakai DB
+                      {uiI18n.t('app.in_tatakai_db_41c5d242')}
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted text-muted-foreground text-xs font-medium">
                       <Database className="w-3.5 h-3.5" />
-                      Not in DB yet
+                      {uiI18n.t('app.not_in_db_yet_f43185d4')}
                     </span>
                   )}
                   {isAdmin && (
@@ -1075,7 +1079,7 @@ export default function NovelPage() {
                       onClick={() => setEditOpen(true)}
                     >
                       <Pencil className="w-3.5 h-3.5" />
-                      Edit content
+                      {uiI18n.t('app.edit_content_0eea86f9')}
                     </Button>
                   )}
                 </div>
@@ -1135,7 +1139,7 @@ export default function NovelPage() {
                   )}
                   <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted">
                     <BookOpen className="w-4 h-4" />
-                    <span className="capitalize">Novel</span>
+                    <span className="capitalize">{uiI18n.t('app.novel_1a9fdb91')}</span>
                   </div>
                   {info.status && (
                     <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary/20 text-primary">
@@ -1147,13 +1151,13 @@ export default function NovelPage() {
                   {typeof info.totalChapters === "number" && info.totalChapters > 0 && (
                     <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted">
                       <Layers className="w-4 h-4" />
-                      <span>{info.totalChapters} Chapters</span>
+                      <span>{info.totalChapters} {uiI18n.t('app.chapters_034e2733')}</span>
                     </div>
                   )}
                   {typeof info.totalVolumes === "number" && info.totalVolumes > 0 && (
                     <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted">
                       <BookOpen className="w-4 h-4" />
-                      <span>{info.totalVolumes} Volumes</span>
+                      <span>{info.totalVolumes} {uiI18n.t('app.volumes_39c0ee03')}</span>
                     </div>
                   )}
                 </div>
@@ -1161,7 +1165,7 @@ export default function NovelPage() {
                 {info.authors && info.authors.length > 0 && (
                   <p className="text-muted-foreground text-sm md:text-base font-medium flex flex-wrap items-center gap-2 mb-4">
                     <Users className="w-4 h-4 shrink-0" />
-                    By{" "}
+                    {uiI18n.t('app.by_cfadbd7a')}{" "}
                     {info.authors.map((author: string, idx: number) => (
                       <button
                         key={author}
@@ -1194,7 +1198,7 @@ export default function NovelPage() {
                   <div className="flex flex-wrap items-center gap-1.5 mb-4">
                     <span className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mr-1 flex items-center gap-1">
                       <Tag className="w-3 h-3 text-primary" />
-                      Tags:
+                      {uiI18n.t('app.tags_b5ddd4e8')}
                     </span>
                     {combinedNovelTags.slice(0, 14).map((tag: any) => (
                       <button
@@ -1202,7 +1206,7 @@ export default function NovelPage() {
                         type="button"
                         onClick={() => navigate(`/search?novelTag=${encodeURIComponent(tag.name)}&novelTagSource=${tag.source}&type=novel`)}
                         className="px-2.5 py-0.5 rounded-full bg-white/5 hover:bg-primary/20 border border-white/10 hover:border-primary/40 text-xs text-muted-foreground hover:text-primary transition-all flex items-center gap-1 group"
-                        title={tag.rank ? `${tag.name} (${tag.rank}%) • Click to search` : `${tag.name} • Click to search`}
+                        title={tag.rank ? uiI18n.t('app.i18n_value_0_i18n_value_1_click_to_search_b5c1c535', { value0: tag.name, value1: tag.rank }) : uiI18n.t('app.i18n_value_0_click_to_search_befc3ac0', { value0: tag.name })}
                       >
                         <span>{tag.name}</span>
                         {typeof tag.rank === 'number' && (
@@ -1223,7 +1227,7 @@ export default function NovelPage() {
                   className="flex items-center justify-center gap-2 bg-primary text-primary-foreground px-8 py-3.5 rounded-xl font-bold hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-primary/25 disabled:opacity-50 disabled:cursor-not-allowed group"
                 >
                   <BookOpen className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                  {hasSavedProgress ? "Continue Reading" : "Read From Chapter 1"}
+                  {hasSavedProgress ? uiI18n.t('app.continue_reading_54800d4f') : uiI18n.t('app.read_from_chapter_1_8933469a')}
                 </button>
                 <AddToPlaylistButton
                   animeId={`novel:${String(info.anilistId || info.malId || novelId || "")}`}
@@ -1237,10 +1241,10 @@ export default function NovelPage() {
                   onClick={() => setShowNovelDownload(true)}
                   disabled={sortedChapters.length === 0}
                   className="flex items-center justify-center gap-2 border border-white/15 bg-white/5 text-foreground px-6 py-3.5 rounded-xl font-bold hover:bg-white/10 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Download chapters for offline reading"
+                  title={uiI18n.t('app.download_chapters_for_offline_reading_a3dc5b8e')}
                 >
                   <Download className="w-5 h-5" />
-                  Download
+                  {uiI18n.t('app.download_a479c9c3')}
                 </button>
                 {!user ? (
                   <button
@@ -1248,7 +1252,7 @@ export default function NovelPage() {
                     className="flex items-center justify-center gap-2 border border-white/15 bg-white/5 text-foreground px-6 py-3.5 rounded-xl font-bold hover:bg-white/10 active:scale-95 transition-all"
                   >
                     <BookmarkPlus className="w-5 h-5" />
-                    Sign In for Library
+                    {uiI18n.t('app.sign_in_for_library_e0c3c048')}
                   </button>
                 ) : (
                   <DropdownMenu>
@@ -1258,7 +1262,7 @@ export default function NovelPage() {
                         className="flex items-center justify-center gap-2 border border-white/15 bg-white/5 text-foreground px-6 py-3.5 rounded-xl font-bold hover:bg-white/10 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {currentReadlistStatus ? <BookmarkCheck className="w-5 h-5 text-primary" /> : <BookmarkPlus className="w-5 h-5" />}
-                        {currentReadlistLabel ?? "Add to Library"}
+                        {currentReadlistLabel ?? uiI18n.t('app.add_to_library_84540e9d')}
                         <ChevronDown className="w-4 h-4 opacity-60" />
                       </button>
                     </DropdownMenuTrigger>
@@ -1279,7 +1283,7 @@ export default function NovelPage() {
                             onClick={handleRemoveReadlist}
                             className="text-destructive focus:text-destructive"
                           >
-                            Remove from Library
+                            {uiI18n.t('app.remove_from_library_a3c22664')}
                           </DropdownMenuItem>
                         </>
                       )}
@@ -1297,7 +1301,7 @@ export default function NovelPage() {
                 <section>
                   <h3 className="font-display text-xl md:text-2xl font-bold mb-4 flex items-center gap-2">
                     <Sparkles className="w-5 h-5 text-primary" />
-                    Synopsis
+                    {uiI18n.t('app.synopsis_36c0630a')}
                   </h3>
                   <GlassPanel className="p-6 md:p-8 relative overflow-hidden group">
                     <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap relative z-10 text-sm md:text-base">
@@ -1311,7 +1315,7 @@ export default function NovelPage() {
                 <section>
                   <h3 className="font-display text-xl md:text-2xl font-bold mb-4 flex items-center gap-2">
                     <Palette className="w-5 h-5 text-primary" />
-                    Tags
+                    {uiI18n.t('app.tags_848eed0f')}
                   </h3>
                   <GlassPanel className="p-5">
                     <div className="flex flex-wrap gap-1.5">
@@ -1320,14 +1324,12 @@ export default function NovelPage() {
                           key={`tag-${tag.id ?? tag.name}`}
                           type="button"
                           onClick={() => navigate(`/search?novelTag=${encodeURIComponent(tag.name)}&novelTagSource=${tag.source}&type=novel`)}
-                          className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-colors hover:border-primary/40 hover:text-primary flex items-center gap-1 ${
-                            tag.weight === 'defining'
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-colors hover:border-primary/40 hover:text-primary flex items-center gap-1 ${tag.weight === 'defining'
                               ? 'bg-primary/10 border-primary/20 text-primary/80'
                               : tag.weight === 'core'
                               ? 'bg-white/5 border-white/10 text-foreground/70'
-                              : 'bg-white/[0.03] border-white/5 text-muted-foreground'
-                          }`}
-                          title={tag.rank ? `${tag.name} (${tag.rank}%) • Click to search` : `${tag.name} • Click to search`}
+                              : 'bg-white/[0.03] border-white/5 text-muted-foreground'}`}
+                          title={tag.rank ? uiI18n.t('app.i18n_value_0_i18n_value_1_click_to_search_b5c1c535', { value0: tag.name, value1: tag.rank }) : uiI18n.t('app.i18n_value_0_click_to_search_befc3ac0', { value0: tag.name })}
                         >
                           <span>{tag.name}</span>
                           {typeof tag.rank === 'number' && (
@@ -1345,7 +1347,7 @@ export default function NovelPage() {
                 <section className="mb-8">
                   <h3 className="font-display text-xl md:text-2xl font-bold mb-4 flex items-center gap-2">
                     <GitGraph className="w-5 h-5 text-primary" />
-                    Series Tree
+                    {uiI18n.t('app.series_tree_31ecaced')}
                   </h3>
                   <RelationTree relations={info.relations} />
                 </section>
@@ -1356,7 +1358,7 @@ export default function NovelPage() {
                 <section className="mb-10">
                   <h3 className="font-display text-xl md:text-2xl font-bold mb-6 flex items-center gap-2">
                     <Users className="w-5 h-5 text-primary" />
-                    Characters
+                    {uiI18n.t('app.characters_b6f59f08')}
                   </h3>
                   <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3">
                     {info.characters.slice(0, 12).map((char: any, index: number) => (
@@ -1378,7 +1380,7 @@ export default function NovelPage() {
                         <div className="p-2">
                           <p className="font-bold text-xs truncate group-hover:text-primary transition-colors">{char.name}</p>
                           <p className="text-[9px] text-muted-foreground uppercase tracking-wider truncate">
-                            {char.role || "Character"}
+                            {char.role || uiI18n.t('app.character_ee9946c8')}
                           </p>
                         </div>
                       </GlassPanel>
@@ -1393,13 +1395,13 @@ export default function NovelPage() {
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <h3 className="font-display text-xl md:text-2xl font-bold flex items-center gap-2">
                       <Layers className="w-5 h-5 text-primary" />
-                      Chapters
+                      {uiI18n.t('app.chapters_034e2733')}
                     </h3>
                     <div className="flex items-center gap-2">
                       <Button size="sm" variant="outline" disabled={checkingChapters}
                         onClick={() => fullScanForNovel === novelId ? void recheckChapters() : setFullScanForNovel(novelId || null)}
                         className="h-8 text-xs">
-                        {checkingChapters ? 'Checking sources...' : 'Check all sources'}
+                        {checkingChapters ? uiI18n.t('app.checking_sources_17451181') : uiI18n.t('app.check_all_sources_7b5bc3b0')}
                       </Button>
                       <Button
                         size="sm"
@@ -1408,25 +1410,25 @@ export default function NovelPage() {
                         className="h-8 gap-1.5 rounded-lg glow-primary text-xs font-bold"
                       >
                         <Download className="w-3.5 h-3.5" />
-                        Download all
+                        {uiI18n.t('app.download_all_d69edf7c')}
                       </Button>
                       <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                        Sort by
+                        {uiI18n.t('app.sort_by_a2a5bdec')}
                       </label>
                       <select
                         value={chapterSortMode}
                         onChange={(event) => setChapterSortMode(event.target.value as ChapterSortMode)}
                         className="rounded-lg border border-white/10 bg-background/70 px-2.5 py-1.5 text-xs font-semibold"
                       >
-                        <option value="oldest">Oldest first</option>
-                        <option value="newest">Newest first</option>
+                        <option value="oldest">{uiI18n.t('app.oldest_first_6a99c65c')}</option>
+                        <option value="newest">{uiI18n.t('app.newest_first_f5ec7772')}</option>
                       </select>
                       <span className="text-sm font-bold text-muted-foreground bg-muted px-3 py-1 rounded-full">
                         {isChapterListLoading
                           ? "Loading..."
                           : hasChapterFilters
-                            ? `${filteredDisplayChapters.length} of ${displayChapters.length} matches`
-                            : `${displayChapters.length} available`}
+                            ? uiI18n.t('app.i18n_value_0_of_i18n_value_1_matches_af8631d0', { value0: filteredDisplayChapters.length, value1: displayChapters.length })
+                            : uiI18n.t('app.i18n_value_0_available_af551792', { value0: displayChapters.length })}
                       </span>
                     </div>
                   </div>
@@ -1437,7 +1439,7 @@ export default function NovelPage() {
                       <input
                         value={chapterSearchTerm}
                         onChange={(event) => setChapterSearchTerm(event.target.value)}
-                        placeholder="Search chapter number/title/translator"
+                        placeholder={uiI18n.t('app.search_chapter_number_title_translator_f6dd9d48')}
                         className="w-full rounded-xl border border-white/10 bg-background/70 pl-9 pr-3 py-2 text-sm font-medium text-foreground focus:border-primary/50 focus:outline-none"
                       />
                     </div>
@@ -1445,7 +1447,7 @@ export default function NovelPage() {
                     {volumeSections.length > 0 && (
                       <div className="flex items-center gap-2">
                         <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                          Volume
+                          {uiI18n.t('app.book_volume')}
                         </label>
                         <select
                           value={selectedVolumeFilter == null ? "all" : String(selectedVolumeFilter)}
@@ -1461,10 +1463,10 @@ export default function NovelPage() {
                           }}
                           className="rounded-lg border border-white/10 bg-background/70 px-2.5 py-1.5 text-xs font-semibold"
                         >
-                          <option value="all">All volumes</option>
+                          <option value="all">{uiI18n.t('app.all_volumes_d12fdd83')}</option>
                           {volumeSections.map((volumeItem) => (
                             <option key={`volume-filter-${volumeItem.volume}`} value={volumeItem.volume}>
-                              Volume {volumeItem.volume}
+                              {uiI18n.t('app.book_volume')} {volumeItem.volume}
                             </option>
                           ))}
                         </select>
@@ -1479,7 +1481,7 @@ export default function NovelPage() {
                         }}
                         className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider hover:bg-white/10 transition-colors"
                       >
-                        Clear
+                        {uiI18n.t('app.clear_719ea396')}
                       </button>
                     )}
                   </div>
@@ -1500,7 +1502,7 @@ export default function NovelPage() {
                                 ? "bg-primary text-primary-foreground border-primary"
                                 : "bg-white/5 text-muted-foreground border-white/10 hover:bg-white/10 hover:text-foreground",
                             )}
-                            title={`${group.length} chapters`}
+                            title={uiI18n.t('app.i18n_value_0_chapters_6744ce28', { value0: group.length })}
                           >
                             {range.start}-{range.end}
                           </button>
@@ -1524,7 +1526,7 @@ export default function NovelPage() {
                   <GlassPanel className="p-8">
                     <div className="flex items-center justify-center gap-2 text-muted-foreground">
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Loading chapters...</span>
+                      <span>{uiI18n.t('app.loading_chapters_6e009b7e')}</span>
                     </div>
                   </GlassPanel>
                 ) : filteredDisplayChapters.length > 0 ? (
@@ -1565,10 +1567,10 @@ export default function NovelPage() {
                   <GlassPanel className="p-8 text-center">
                     <p className="text-muted-foreground">
                       {sortedChapters.length === 0
-                        ? "No chapters available yet."
+                        ? uiI18n.t('app.no_chapters_available_yet_89eae277')
                         : hasChapterFilters
-                          ? "No chapters match your current filters or search."
-                          : "No chapters match the selected translator filter. Try Auto."}
+                          ? uiI18n.t('app.no_chapters_match_your_current_filters_or_search_5adc1f8d')
+                          : uiI18n.t('app.no_chapters_match_the_selected_translator_filter_b3dd5c5d')}
                     </p>
                     {sortedChapters.length === 0 && (
                       <div className="mt-4 text-left">
@@ -1583,26 +1585,26 @@ export default function NovelPage() {
                 <section>
                   <h3 className="font-display text-xl md:text-2xl font-bold mb-4 flex items-center gap-2">
                     <Layers className="w-5 h-5 text-primary" />
-                    Volumes
+                    {uiI18n.t('app.volumes_39c0ee03')}
                   </h3>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     {volumeSections.map((volumeItem) => (
                       <GlassPanel key={`volume-${volumeItem.volume}`} className="p-4 border border-white/10">
                         <div className="flex items-center justify-between gap-2">
-                          <p className="text-base font-bold">Volume {volumeItem.volume}</p>
+                          <p className="text-base font-bold">{uiI18n.t('app.book_volume')} {volumeItem.volume}</p>
                           <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                            {volumeItem.readableCount}/{volumeItem.chapterCount} readable
+                            {volumeItem.readableCount}/{volumeItem.chapterCount} {uiI18n.t('app.readable_1d28e511')}
                           </span>
                         </div>
 
                         <p className="mt-2 text-xs uppercase tracking-wider text-muted-foreground">
-                          Chapters {volumeItem.rangeLabel}
+                          {uiI18n.t('app.chapters_034e2733')} {volumeItem.rangeLabel}
                         </p>
 
                         {volumeItem.firstChapterTitle && (
                           <p className="mt-1 text-xs text-foreground/80 line-clamp-1">
-                            Starts: {volumeItem.firstChapterTitle}
+                            {uiI18n.t('app.starts_83eef1d6')} {volumeItem.firstChapterTitle}
                           </p>
                         )}
 
@@ -1612,7 +1614,7 @@ export default function NovelPage() {
                             disabled={!volumeItem.firstChapterKey}
                             className="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                           >
-                            Read Volume
+                            {uiI18n.t('app.read_volume_0e0ca02c')}
                           </button>
 
                           <button
@@ -1620,7 +1622,7 @@ export default function NovelPage() {
                             disabled={!volumeItem.latestChapterKey}
                             className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-bold hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                           >
-                            Latest in Volume
+                            {uiI18n.t('app.latest_in_volume_3eb30bf5')}
                           </button>
 
                           <button
@@ -1634,7 +1636,7 @@ export default function NovelPage() {
                             }}
                             className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary/20 transition-colors"
                           >
-                            View Chapters
+                            {uiI18n.t('app.view_chapters_f90f45bd')}
                           </button>
                         </div>
 
@@ -1646,12 +1648,12 @@ export default function NovelPage() {
                                 onClick={() => goToReader(chapterItem.chapter, chapterItem.source, 0)}
                                 className="rounded-md border border-white/15 bg-white/5 px-2 py-1 text-[10px] font-bold uppercase tracking-wider hover:bg-white/10 transition-colors"
                               >
-                                {chapterItem.chapterNumber != null ? `Ch ${chapterItem.chapterNumber}` : "Open chapter"}
+                                {chapterItem.chapterNumber != null ? uiI18n.t('app.ch_i18n_value_0_4ed07eb4', { value0: chapterItem.chapterNumber }) : uiI18n.t('app.open_chapter_5e1d2940')}
                               </button>
                             ))}
                             {volumeItem.readableChapters.length > 6 && (
                               <span className="rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-wider text-muted-foreground">
-                                +{volumeItem.readableChapters.length - 6} more
+                                +{volumeItem.readableChapters.length - 6} {uiI18n.t('app.more_e7c95b4c')}
                               </span>
                             )}
                           </div>
@@ -1665,7 +1667,7 @@ export default function NovelPage() {
               <section>
                 <h3 className="font-display text-xl md:text-2xl font-bold mb-4 flex items-center gap-2">
                   <Sparkles className="w-5 h-5 text-primary" />
-                  Recommendations
+                  {uiI18n.t('app.recommendations_4faa65b5')}
                 </h3>
 
                 {loadingRecommendations && mergedRecommendations.length === 0 ? (
@@ -1685,7 +1687,7 @@ export default function NovelPage() {
                 ) : (
                   <GlassPanel className="p-5">
                     <p className="text-sm text-muted-foreground">
-                      Recommendations are warming up. Check back in a moment.
+                      {uiI18n.t('app.recommendations_are_warming_up_check_back_in_a_m_bd89f750')}
                     </p>
                   </GlassPanel>
                 )}
@@ -1701,17 +1703,17 @@ export default function NovelPage() {
             </div>
             <div className="space-y-4">
               <GlassPanel className="p-5">
-                <h4 className="font-display font-bold mb-3">Metadata</h4>
+                <h4 className="font-display font-bold mb-3">{uiI18n.t('app.metadata_251edc0e')}</h4>
                 <div className="mb-4">
                   <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                    Preferred translator
+                    {uiI18n.t('app.preferred_translator_1225eea2')}
                   </label>
                   <select
                     value={preferredProvider}
                     onChange={(event) => setPreferredProvider(event.target.value)}
                     className="w-full rounded-xl border border-white/10 bg-background/70 px-3 py-2 text-sm font-medium text-foreground focus:border-primary/50 focus:outline-none"
                   >
-                    <option value="auto">Auto (Best source per chapter)</option>
+                    <option value="auto">{uiI18n.t('app.auto_best_source_per_chapter_922dc680')}</option>
                     {providerOptions.map((provider) => (
                       <option key={provider} value={provider}>
                         {chapters.flatMap(ch => ch.sources || []).find(s => s.provider === provider)?.providerName || provider}
@@ -1721,27 +1723,27 @@ export default function NovelPage() {
                 </div>
                 <SourceDebug kind="manga" sources={chapters.flatMap(ch => ch.sources || [])} />
                 <div className="space-y-2 text-sm text-muted-foreground">
-                  <p>Status: <span className="text-foreground">{info.status || "unknown"}</span></p>
-                  <p>Format: <span className="text-foreground">Novel</span></p>
-                  <p>Total chapters: <span className="text-foreground">{info.totalChapters ?? anilistMetadata?.chapters ?? "?"}</span></p>
-                  <p>Total volumes: <span className="text-foreground">{info.totalVolumes ?? anilistMetadata?.volumes ?? "?"}</span></p>
+                  <p>{uiI18n.t('app.status_11dc9e19')} <span className="text-foreground">{info.status || uiI18n.t('app.unknown_50d8b4a9')}</span></p>
+                  <p>{uiI18n.t('app.format_d6400d55')} <span className="text-foreground">{uiI18n.t('app.novel_1a9fdb91')}</span></p>
+                  <p>{uiI18n.t('app.total_chapters_d933396b')} <span className="text-foreground">{info.totalChapters ?? anilistMetadata?.chapters ?? "?"}</span></p>
+                  <p>{uiI18n.t('app.total_volumes_ac878036')} <span className="text-foreground">{info.totalVolumes ?? anilistMetadata?.volumes ?? "?"}</span></p>
 
                   {info.publishers && info.publishers.length > 0 && (
-                    <p>Publishers: <span className="text-foreground">{info.publishers.join(", ")}</span></p>
+                    <p>{uiI18n.t('app.publishers_0a4eac14')} <span className="text-foreground">{info.publishers.join(", ")}</span></p>
                   )}
 
                   {jikanData?.serializations && jikanData.serializations.length > 0 && (
-                    <p>Serialization: <span className="text-foreground">{jikanData.serializations.map((s: any) => s.name).join(", ")}</span></p>
+                    <p>{uiI18n.t('app.serialization_9ef6c82b')} <span className="text-foreground">{jikanData.serializations.map((s: any) => s.name).join(", ")}</span></p>
                   )}
 
                   {info.yearStart && (
-                    <p>Aired: <span className="text-foreground">{info.yearStart}{info.yearEnd ? ` to ${info.yearEnd}` : " (Ongoing)"}</span></p>
+                    <p>{uiI18n.t('app.aired_5ea003a8')} <span className="text-foreground">{info.yearStart}{info.yearEnd ? uiI18n.t('app.to_i18n_value_0_3c4b31a7', { value0: info.yearEnd }) : uiI18n.t('app.ongoing_7e2971b2')}</span></p>
                   )}
                 </div>
 
                 <div className="mt-4">
                   <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                    Genres
+                    {uiI18n.t('app.genres_96817ade')}
                   </p>
                   {info.genres && info.genres.length > 0 ? (
                     <div className="flex flex-wrap gap-1.5">
@@ -1757,21 +1759,21 @@ export default function NovelPage() {
                       ))}
                     </div>
                   ) : (
-                    <p className="text-sm text-muted-foreground">No genres available.</p>
+                    <p className="text-sm text-muted-foreground">{uiI18n.t('app.no_genres_available_c7b06b77')}</p>
                   )}
                 </div>
 
                 {Array.isArray(anilistNovelMeta?.tags) && anilistNovelMeta.tags.length > 0 && (
                   <div className="mt-4">
                     <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                      AniList Tags
+                      {uiI18n.t('app.anilist_tags_dae15328')}
                     </p>
                     <div className="flex flex-wrap gap-1.5">
                       {anilistNovelMeta.tags.filter((tag: any) => tag?.name).map((tag: any) => (
                         <button
                           key={tag.name}
                           type="button"
-                          title={tag.isAdult ? "Adult AniList tag" : "Search this AniList tag"}
+                          title={tag.isAdult ? uiI18n.t('app.adult_anilist_tag_09278eca') : uiI18n.t('app.search_this_anilist_tag_c14512b4')}
                           onClick={() => navigate(`/search?novelTag=${encodeURIComponent(tag.name)}&novelTagSource=anilist&type=novel`)}
                           className="rounded-md border border-primary/20 bg-primary/5 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary/80 transition-colors hover:border-primary/40 hover:bg-primary/15"
                         >
@@ -1786,14 +1788,14 @@ export default function NovelPage() {
                 {(mangaBakaData as any) && Object.keys((mangaBakaData as any).sources || {}).length > 0 && (
                   <div className="mt-4 pt-4 border-t border-white/5">
                     <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                      Cross-site Ratings
+                      {uiI18n.t('app.cross_site_ratings_39a0e8db')}
                     </p>
                     <div className="space-y-1.5">
                       {Object.entries((mangaBakaData as any).sources)
                         .filter(([, src]: any) => src.ratingNormalized !== null)
                         .sort(([, a]: any, [, b]: any) => (b.ratingNormalized ?? 0) - (a.ratingNormalized ?? 0))
                         .map(([key, src]: any) => {
-                          const label = key === 'anilist' ? 'AniList' : key === 'my_anime_list' ? 'MAL' : key === 'kitsu' ? 'Kitsu' : key === 'manga_updates' ? 'MU' : key === 'anime_planet' ? 'AP' : key === 'shikimori' ? 'Shikimori' : key === 'anime_news_network' ? 'ANN' : key.replace(/_/g, ' ');
+                          const label = key === 'anilist' ? uiI18n.t('app.anilist_c03a6787') : key === 'my_anime_list' ? uiI18n.t('app.mal_308b46c0') : key === 'kitsu' ? uiI18n.t('app.kitsu_0477259d') : key === 'manga_updates' ? uiI18n.t('app.mu_fc242aea') : key === 'anime_planet' ? uiI18n.t('app.ap_bc5af774') : key === 'shikimori' ? uiI18n.t('app.shikimori_59fa6858') : key === 'anime_news_network' ? uiI18n.t('app.ann_30ffbd17') : key.replace(/_/g, ' ');
                           const pct = Math.round(src.ratingNormalized ?? 0);
                           return (
                             <div key={key} className="flex items-center gap-2">
@@ -1813,7 +1815,7 @@ export default function NovelPage() {
                 {(mangaBakaData as any) && (mangaBakaData as any).publishers?.length > 0 && (
                   <div className="mt-4 pt-4 border-t border-white/5">
                     <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                      Publishers
+                      {uiI18n.t('app.publishers_107e7fab')}
                     </p>
                     <div className="space-y-1">
                       {(mangaBakaData as any).publishers.map((pub: any, i: number) => (
@@ -1821,7 +1823,7 @@ export default function NovelPage() {
                           <span className="text-foreground/80">{pub.name}</span>
                           {pub.type && (
                             <span className="text-[10px] text-muted-foreground px-1.5 py-0.5 rounded bg-white/5">
-                              {pub.type}{pub.note ? ` · ${pub.note}` : ''}
+                              {pub.type}{pub.note ? uiI18n.t('app.i18n_value_0_92e4cd32', { value0: pub.note }) : ''}
                             </span>
                           )}
                         </div>
@@ -1834,11 +1836,11 @@ export default function NovelPage() {
                 {(mangaBakaData as any)?.animeCoverage && (mangaBakaData as any).hasAnime && (
                   <div className="mt-4 pt-4 border-t border-white/5">
                     <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                      Anime Coverage
+                      {uiI18n.t('app.anime_coverage_0d07955c')}
                     </p>
                     <p className="text-xs text-foreground/80">
-                      {(mangaBakaData as any).animeCoverage.start && `From: ${(mangaBakaData as any).animeCoverage.start}`}
-                      {(mangaBakaData as any).animeCoverage.end && ` → ${(mangaBakaData as any).animeCoverage.end}`}
+                      {(mangaBakaData as any).animeCoverage.start && uiI18n.t('app.from_i18n_value_0_a86522e4', { value0: (mangaBakaData as any).animeCoverage.start })}
+                      {(mangaBakaData as any).animeCoverage.end && uiI18n.t('app.i18n_value_0_4585ffcf', { value0: (mangaBakaData as any).animeCoverage.end })}
                     </p>
                   </div>
                 )}
@@ -1847,7 +1849,7 @@ export default function NovelPage() {
                 {(mangaBakaData as any) && (mangaBakaData as any).links?.length > 0 && (
                   <div className="mt-4 pt-4 border-t border-white/5">
                     <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                      External Links
+                      {uiI18n.t('app.external_links_4d57eab2')}
                     </p>
                     <div className="flex flex-wrap gap-1.5">
                       {(mangaBakaData as any).links.slice(0, 6).map((link: any, i: number) => (

@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Capacitor } from '@capacitor/core';
 import { launchExternalPlayer } from '@/core/player/external-player';
 import type { PlaybackSubtitle } from '@/core/player/player-core';
+import { useTranslation } from "react-i18next";
 
 interface ExternalPlayerButtonProps {
   videoRef: React.RefObject<HTMLVideoElement | null>;
@@ -32,6 +33,7 @@ export function ExternalPlayerButton({
   subtitles,
   autoLaunch = false,
 }: ExternalPlayerButtonProps) {
+  const { t } = useTranslation();
   const [launching, setLaunching] = useState(false);
   const [externalSource, setExternalSource] = useState<string | null>(null);
   const autoLaunchedSource = useRef<string | null>(null);
@@ -49,14 +51,14 @@ export function ExternalPlayerButton({
       }, () => onSaveProgress?.());
 
       if (res.success) {
-        toast.success(`Launched ${res.player || "external player"}`);
+        toast.success(t('player.externalLaunched', { player: res.player || t('player.externalPlayerFallback') }));
         videoRef.current?.pause();
         if (automatic) setExternalSource(currentSourceUrl);
       } else {
-        toast.error(res.error || "Failed to launch external player");
+        toast.error(res.error || t('player.externalLaunchFailed'));
       }
     } catch (err: any) {
-      toast.error(err.message || "Error launching external player");
+      toast.error(err.message || t('player.externalLaunchError'));
     } finally {
       setLaunching(false);
     }
@@ -87,8 +89,8 @@ export function ExternalPlayerButton({
       onClick={() => void handleLaunchExternal()}
       disabled={launching}
       className="min-h-11 min-w-11 inline-flex items-center justify-center rounded-lg hover:bg-white/10 transition-colors text-white/80 hover:text-white disabled:opacity-50 disabled:cursor-wait focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-      title="Play in External Player"
-      aria-label={launching ? 'Opening external player' : 'Play in external player'}
+      title={t('player.externalPlayerTitle')}
+      aria-label={launching ? t('migration.externalOpening') : t('migration.externalPlay')}
     >
       {launching ? <Loader2 className="h-4 w-4 animate-spin" /> : <MonitorPlay className="w-4 h-4 md:w-5 md:h-5" />}
     </button>

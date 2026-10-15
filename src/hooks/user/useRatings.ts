@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -27,6 +29,7 @@ interface AnimeRatingStats {
 }
 
 export function useAnimeRatings(animeId: string | undefined) {
+  useUiTranslation();
   return useQuery({
     queryKey: ['ratings', animeId],
     queryFn: async () => {
@@ -58,6 +61,7 @@ export function useAnimeRatings(animeId: string | undefined) {
 }
 
 export function useAnimeRatingStats(animeId: string | undefined) {
+  useUiTranslation();
   const { data: ratings } = useAnimeRatings(animeId);
   
   return useQuery({
@@ -86,6 +90,7 @@ export function useAnimeRatingStats(animeId: string | undefined) {
 }
 
 export function useUserRating(animeId: string | undefined) {
+  useUiTranslation();
   const { user } = useAuth();
   
   return useQuery({
@@ -106,6 +111,7 @@ export function useUserRating(animeId: string | undefined) {
 }
 
 export function useRateAnime() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   
@@ -137,15 +143,16 @@ export function useRateAnime() {
       queryClient.invalidateQueries({ queryKey: ['ratings', variables.animeId] });
       queryClient.invalidateQueries({ queryKey: ['rating_stats', variables.animeId] });
       queryClient.invalidateQueries({ queryKey: ['user_rating'] });
-      toast.success('Rating saved');
+      toast.success(uiI18n.t('app.rating_saved_cbdec4f6'));
     },
     onError: () => {
-      toast.error('Failed to save rating');
+      toast.error(uiI18n.t('app.failed_to_save_rating_2f166978'));
     },
   });
 }
 
 export function useDeleteRating() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   
   return useMutation({
@@ -161,10 +168,10 @@ export function useDeleteRating() {
       queryClient.invalidateQueries({ queryKey: ['ratings', animeId] });
       queryClient.invalidateQueries({ queryKey: ['rating_stats', animeId] });
       queryClient.invalidateQueries({ queryKey: ['user_rating'] });
-      toast.success('Rating removed');
+      toast.success(uiI18n.t('app.rating_removed_1fa6a37b'));
     },
     onError: () => {
-      toast.error('Failed to remove rating');
+      toast.error(uiI18n.t('app.failed_to_remove_rating_decb6f02'));
     },
   });
 }

@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useRemoteExtensionSources } from "./useRemoteExtensionSources";
 import { useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -309,13 +311,14 @@ export function useCombinedSources(
   knownMalId?: number | string | null,
   options?: { enabled?: boolean }
 ) {
+  useUiTranslation();
   return useQuery<CombinedResult, Error>({
     queryKey: ["combined-sources", episodeId, animeName, episodeNumber, server, category, currentUserId, knownAnilistId, knownMalId],
     queryFn: async () => {
       const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
         let timeoutId: ReturnType<typeof setTimeout> | null = null;
         const timeoutPromise = new Promise<never>((_, reject) => {
-          timeoutId = setTimeout(() => reject(new Error(`combined sources timeout (${timeoutMs}ms)`)), timeoutMs);
+          timeoutId = setTimeout(() => reject(new Error(uiI18n.t('app.combined_sources_timeout_i18n_value_0ms_7e82abd3', { value0: timeoutMs }))), timeoutMs);
         });
         try {
           return await Promise.race([promise, timeoutPromise]);
@@ -431,6 +434,7 @@ export function useCombinedSourcesWithRefetch(
   knownAnilistId?: number | string | null,
   knownMalId?: number | string | null
 ) {
+  useUiTranslation();
   const anilistIdNum = Number(knownAnilistId);
   const hasAnilist = Number.isFinite(anilistIdNum) && anilistIdNum > 0;
   const streamEnabled =

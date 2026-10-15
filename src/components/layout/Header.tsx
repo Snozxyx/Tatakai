@@ -1,6 +1,9 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { Search, User, LogOut, Shield, Download, Camera, Loader2, X, Film, Play, ChevronRight, BookOpen, ScrollText } from "lucide-react";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, Link, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIsDesktopApp, useIsMacOS, useIsNativeApp } from "@/hooks/ui/useIsNativeApp";
 import { useTitlebarHidden } from "@/hooks/ui/useTitlebarHidden";
@@ -32,9 +35,9 @@ import { triggerHaptic } from "@/lib/haptics";
 
 async function runImageSearch(file: File): Promise<any[]> {
   const formData = new FormData();
-  formData.append("image", file);
+  formData.append('image', file);
   const res = await fetch("https://api.trace.moe/search", { method: "POST", body: formData });
-  if (!res.ok) throw new Error("trace.moe search failed");
+  if (!res.ok) throw new Error(uiI18n.t('app.trace_moe_search_failed_685a0f8e'));
   const data = await res.json();
   const rawResults: any[] = data.result || [];
 
@@ -87,6 +90,8 @@ function formatTs(secs: number) {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function Header() {
+  useUiTranslation();
+  const { t } = useTranslation();
   const refreshed = useMobileAppearance();
   const [searchQuery, setSearchQuery] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -306,8 +311,8 @@ export function Header() {
             <button
               type="button"
               onClick={() => navigate('/')}
-              aria-label="Go home"
-              title="Home"
+              aria-label={t('migration.goHome')}
+              title={t('nav.home')}
               className="relative z-10 flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] shadow-sm transition-[transform,background-color,border-color,color,box-shadow,filter] duration-150 hover:border-primary/40 hover:bg-white/[0.1] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
             >
               <img
@@ -329,21 +334,21 @@ export function Header() {
             onPointerCancel={clearLongPressTimer}
             onContextMenu={(e) => e.preventDefault()}
             className="absolute left-1/2 top-1/2 z-10 inline-flex h-9 -translate-x-1/2 -translate-y-1/2 touch-manipulation select-none items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3.5 text-xs font-bold tracking-wide text-foreground shadow-sm transition-[transform,background-color,border-color,color,box-shadow,filter] duration-150 [-webkit-touch-callout:none] hover:border-primary/40 hover:bg-white/[0.1] active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
-            aria-label={catalog === 'anime' ? 'Switch to Manga' : catalog === 'manga' ? 'Switch to Novels' : 'Switch to Anime'}
-            title="Tap to switch catalog · hold for all catalogs"
+            aria-label={catalog === 'anime' ? t('migration.switchManga') : catalog === 'manga' ? t('migration.switchNovels') : t('migration.switchAnime')}
+            title={t('migration.catalogHint')}
             aria-haspopup="menu"
             aria-expanded={catalogMenuOpen}
           >
             <span key={catalog} className="inline-flex motion-safe:animate-catalog-switch">
               {catalog === 'anime' ? <Play className="h-3.5 w-3.5 fill-primary text-primary" /> : catalog === 'manga' ? <BookOpen className="h-3.5 w-3.5 text-primary" /> : <ScrollText className="h-3.5 w-3.5 text-primary" />}
             </span>
-            {catalog === 'anime' ? 'Anime' : catalog === 'manga' ? 'Manga' : 'Novels'}
+            {catalog === 'anime' ? uiI18n.t('app.anime_f1b32a19') : catalog === 'manga' ? uiI18n.t('app.manga_87db0f99') : t('nav.novels')}
           </button>
           {catalogMenuOpen && (
             <div
               ref={catalogMenuRef}
               role="menu"
-              aria-label="Jump to catalog"
+              aria-label={t('migration.jumpCatalog')}
               className="absolute left-1/2 top-[calc(100%+8px)] z-30 w-48 -translate-x-1/2 rounded-2xl border border-white/10 bg-card/95 p-1.5 shadow-2xl backdrop-blur-xl data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=open]:duration-150"
             >
               {(['anime', 'manga', 'novel'] as const)
@@ -361,7 +366,7 @@ export function Header() {
                       : c === 'manga'
                         ? <BookOpen className="mr-1 h-4 w-4 text-primary" />
                         : <ScrollText className="mr-1 h-4 w-4 text-primary" />}
-                    {c === 'anime' ? 'Anime' : c === 'manga' ? 'Manga' : 'Novels'}
+                    {c === 'anime' ? uiI18n.t('app.anime_f1b32a19') : c === 'manga' ? uiI18n.t('app.manga_87db0f99') : t('nav.novels')}
                   </button>
                 ))}
             </div>
@@ -372,22 +377,22 @@ export function Header() {
             ) : user && !isBanned ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button aria-label="Open profile menu" className="flex h-11 w-11 items-center justify-center rounded-full outline-none transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-primary/60">
+                  <button aria-label={t('migration.profileMenu')} className="flex h-11 w-11 items-center justify-center rounded-full outline-none transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-primary/60">
                     <Avatar className="h-9 w-9 ring-1 ring-white/20 transition-shadow hover:ring-primary/40">
-                      <AvatarImage src={profile?.avatar_url || undefined} alt={profile?.display_name || 'User'} />
+                      <AvatarImage src={profile?.avatar_url || undefined} alt={profile?.display_name || t('settings.groups.User')} />
                       <AvatarFallback className="bg-gradient-to-br from-primary to-secondary text-xs font-bold text-primary-foreground">{profile?.display_name?.[0]?.toUpperCase() || user.email?.[0]?.toUpperCase() || 'U'}</AvatarFallback>
                     </Avatar>
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-52 rounded-2xl border-white/10 bg-background/90 p-1.5 shadow-2xl backdrop-blur-xl data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=open]:duration-150">
-                  <DropdownMenuItem onClick={() => navigate(profile?.username ? `/@${profile.username}` : '/profile')} className="gap-2 rounded-xl px-3 py-2.5 font-medium"><User className="mr-1 h-4 w-4 text-muted-foreground" />Profile</DropdownMenuItem>
-                  {(isAdmin || isModerator) && <DropdownMenuItem onClick={() => navigate('/admin')} className="gap-2 rounded-xl px-3 py-2.5 font-medium"><Shield className="mr-1 h-4 w-4 text-muted-foreground" />Admin navigation</DropdownMenuItem>}
+                  <DropdownMenuItem onClick={() => navigate(profile?.username ? `/@${profile.username}` : '/profile')} className="gap-2 rounded-xl px-3 py-2.5 font-medium"><User className="mr-1 h-4 w-4 text-muted-foreground" />{t('header.profile')}</DropdownMenuItem>
+                  {(isAdmin || isModerator) && <DropdownMenuItem onClick={() => navigate('/admin')} className="gap-2 rounded-xl px-3 py-2.5 font-medium"><Shield className="mr-1 h-4 w-4 text-muted-foreground" />{t('migration.adminNav')}</DropdownMenuItem>}
                   <DropdownMenuSeparator className="bg-white/[0.06]" />
-                  <DropdownMenuItem onClick={handleSignOut} className="gap-2 rounded-xl px-3 py-2.5 font-medium text-destructive focus:text-destructive"><LogOut className="mr-1 h-4 w-4" />Sign out</DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleSignOut} className="gap-2 rounded-xl px-3 py-2.5 font-medium text-destructive focus:text-destructive"><LogOut className="mr-1 h-4 w-4" />{t('migration.signOut')}</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <Link to="/auth" className="inline-flex h-9 items-center rounded-full bg-primary px-4 text-xs font-bold text-primary-foreground shadow-lg shadow-primary/25 transition-[transform,background-color,border-color,color,box-shadow,filter] duration-150 hover:brightness-110 active:scale-95">Sign in</Link>
+              <Link to="/auth" className="inline-flex h-9 items-center rounded-full bg-primary px-4 text-xs font-bold text-primary-foreground shadow-lg shadow-primary/25 transition-[transform,background-color,border-color,color,box-shadow,filter] duration-150 hover:brightness-110 active:scale-95">{t('migration.signIn')}</Link>
             )}
           </div>
         </div>
@@ -399,18 +404,18 @@ export function Header() {
         {/* Left: welcome + status */}
         <div className="flex items-center gap-3">
           <h2 className="text-muted-foreground text-sm font-medium tracking-wider uppercase">
-            Welcome back, <span className="text-foreground">{profile?.display_name || "Traveler"}</span>
+            {t("header.welcomeBack")} <span className="text-foreground">{profile?.display_name || t("header.traveler")}</span>
           </h2>
           {isBanned && (
-            <span className="px-2 py-0.5 rounded-full bg-destructive/20 text-destructive text-xs font-medium animate-pulse">BANNED</span>
+            <span className="px-2 py-0.5 rounded-full bg-destructive/20 text-destructive text-xs font-medium animate-pulse">{t("header.banned")}</span>
           )}
           <Link
             to="/status"
             className="flex items-center gap-2 px-3 py-1 rounded-full bg-muted/30 hover:bg-muted/50 transition-[transform,background-color,border-color,color,box-shadow,filter] duration-150 group"
-            title={systemStatus === "operational" ? "All systems operational" : "Some services degraded"}
+            title={systemStatus === "operational" ? t("header.allOperational") : t("header.someDegraded")}
           >
             <span className={cn("w-2 h-2 rounded-full", statusColor, systemStatus === "operational" && "animate-pulse")} />
-            <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors">Status</span>
+            <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors">{t("header.status")}</span>
           </Link>
         </div>
 
@@ -435,9 +440,9 @@ export function Header() {
                 onKeyDown={(e) => {
                   if (e.key === "Escape") setShowSuggestions(false);
                 }}
-                placeholder="Search anime..."
+                placeholder={t("header.searchPlaceholder")}
                 className="bg-transparent text-sm text-muted-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus:text-foreground w-24 sm:w-32 lg:w-48"
-                aria-label="Search anime"
+                aria-label={t("header.searchAria")}
                 autoComplete="off"
               />
               {searchQuery && (
@@ -445,7 +450,7 @@ export function Header() {
                   type="button"
                   onClick={() => { setSearchQuery(""); setShowSuggestions(false); }}
                   className="p-0.5 hover:bg-muted/50 rounded-full"
-                  aria-label="Clear search"
+                  aria-label={t('discover.clearSearch')}
                 >
                   <X className="w-3.5 h-3.5 text-muted-foreground" />
                 </button>
@@ -454,7 +459,7 @@ export function Header() {
                 type="button"
                 onClick={(e) => { e.preventDefault(); setShowImageSearch(true); }}
                 className="p-1 hover:bg-muted/50 rounded-lg transition-colors"
-                title="Search by image"
+                title={t("header.searchByImage")}
               >
                 <Camera className="w-4 h-4 text-muted-foreground hover:text-foreground transition-colors" />
               </button>
@@ -483,7 +488,7 @@ export function Header() {
               <DropdownMenuTrigger asChild>
                 <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus:ring-offset-2 focus:ring-offset-background rounded-full active:scale-95 transition-transform">
                   <Avatar className="w-10 h-10 cursor-pointer hover:ring-2 hover:ring-primary/50 transition-[transform,background-color,border-color,color,box-shadow,filter] duration-150">
-                    <AvatarImage src={profile?.avatar_url || undefined} alt={profile?.display_name || "User"} />
+                    <AvatarImage src={profile?.avatar_url || undefined} alt={profile?.display_name || t('settings.groups.User')} />
                     <AvatarFallback className="bg-gradient-to-br from-primary to-secondary text-primary-foreground font-bold">
                       {profile?.display_name?.[0]?.toUpperCase() || user.email?.[0]?.toUpperCase() || "U"}
                     </AvatarFallback>
@@ -492,16 +497,16 @@ export function Header() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
                 <DropdownMenuItem onClick={() => navigate(profile?.username ? `/@${profile.username}` : "/profile")}>
-                  <User className="w-4 h-4 mr-2" /> Profile
+                  <User className="w-4 h-4 mr-2" /> {t("header.profile")}
                 </DropdownMenuItem>
                 {(isAdmin || isModerator) && (
                   <DropdownMenuItem onClick={() => navigate("/admin")}>
-                    <Shield className="w-4 h-4 mr-2" /> Admin Panel
+                    <Shield className="w-4 h-4 mr-2" /> {t("header.adminPanel")}
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleSignOut} className="text-destructive focus:text-destructive">
-                  <LogOut className="w-4 h-4 mr-2" /> Sign Out
+                  <LogOut className="w-4 h-4 mr-2" /> {t("header.signOut")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -511,7 +516,7 @@ export function Header() {
               className="h-10 px-4 rounded-full bg-primary text-primary-foreground font-medium text-sm hover:bg-primary/90 transition-colors flex items-center gap-2"
             >
               <User className="w-4 h-4" />
-              <span className="hidden sm:inline">Sign In</span>
+              <span className="hidden sm:inline">{t("header.signIn")}</span>
             </Link>
           )}
         </div>
@@ -526,10 +531,10 @@ export function Header() {
           <DialogHeader className="shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <Camera className="w-5 h-5 text-primary" />
-              Scene <span className="text-primary italic ml-1">Identification</span>
+              {t("header.imageSearchTitleA")} <span className="text-primary italic ml-1">{t("header.imageSearchTitleB")}</span>
             </DialogTitle>
             <DialogDescription>
-              Upload an anime screenshot to identify it via trace.moe
+              {t("header.imageSearchDescription")}
             </DialogDescription>
           </DialogHeader>
 
@@ -540,7 +545,7 @@ export function Header() {
                 <div className="flex items-center gap-2 px-4 h-12 rounded-xl bg-muted/50 border-2 border-dashed border-white/10 group-hover:border-primary/50 transition-colors">
                   <Camera className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
                   <span className="text-sm text-muted-foreground group-hover:text-foreground truncate transition-colors">
-                    {selectedFile ? selectedFile.name : "Choose anime screenshot…"}
+                    {selectedFile ? selectedFile.name : t("header.chooseScreenshot")}
                   </span>
                   <input
                     ref={fileInputRef}
@@ -557,15 +562,15 @@ export function Header() {
                 className="px-6 h-12 rounded-xl bg-primary text-primary-foreground font-semibold hover:brightness-110 active:scale-95 transition-[transform,background-color,border-color,color,box-shadow,filter] duration-150 shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center min-w-[110px] gap-2"
               >
                 {isSearchingImage ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" /> Scanning…</>
-                ) : "Identify"}
+                  <><Loader2 className="w-4 h-4 animate-spin" /> {t("header.scanning")}</>
+                ) : t("header.identify")}
               </button>
             </div>
 
             {/* Preview */}
             {previewUrl && (
               <div className="relative rounded-xl overflow-hidden border border-white/10 bg-black/20 max-h-[180px]">
-                <img src={previewUrl} alt="Preview" className="w-full h-full object-contain" />
+                <img src={previewUrl} alt={t('migration.preview')} className="w-full h-full object-contain" />
                 <button
                   onClick={() => handleFileChange(null)}
                   className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/60 hover:bg-black/80 transition-colors"
@@ -579,21 +584,21 @@ export function Header() {
             {imageResults && imageResults.length === 0 && (
               <div className="text-center py-8 text-muted-foreground">
                 <Film className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                <p className="text-sm">No matches found. Try a different screenshot.</p>
+                <p className="text-sm">{t("header.noMatches")}</p>
               </div>
             )}
 
             {imageResults && imageResults.length > 0 && (
               <div className="space-y-3">
                 <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground px-0.5">
-                  {imageResults.length} match{imageResults.length !== 1 ? "es" : ""} found
+                  {t(imageResults.length === 1 ? "header.matchesFound" : "header.matchesFound_plural", { count: imageResults.length })}
                 </p>
 
                 {imageResults.slice(0, 5).map((result, idx) => {
                   const title = result._animeTitle ||
                     result.filename?.split("] ")?.[1]?.split(" - ")?.[0]?.trim() ||
                     result.filename ||
-                    "Unknown Anime";
+                    uiI18n.t('app.unknown_anime_5cf9523d');
                   const pct = (result.similarity * 100).toFixed(1);
                   const simColor =
                     result.similarity >= 0.95 ? "text-emerald-400" :
@@ -640,7 +645,7 @@ export function Header() {
                         </div>
                         {result.episode != null && (
                           <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-black/70 text-xs font-bold text-white backdrop-blur-sm">
-                            EP {result.episode}
+                            {t('migration.episodeShort')} {result.episode}
                           </div>
                         )}
                         {result.at != null && (
@@ -662,9 +667,9 @@ export function Header() {
                         <div className="flex-1 min-w-0">
                           <p className="font-bold text-sm line-clamp-1">{title}</p>
                           <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground mt-0.5">
-                            {result.episode != null && <span className="font-semibold text-foreground/70">Episode {result.episode}</span>}
-                            {result.at != null && <span>at {formatTs(result.at)}</span>}
-                            <span className={cn("font-black", simColor)}>{pct}% match</span>
+                            {result.episode != null && <span className="font-semibold text-foreground/70">{t("header.episode", { number: result.episode })}</span>}
+                            {result.at != null && <span>{t("header.atTime", { time: formatTs(result.at) })}</span>}
+                            <span className={cn("font-black", simColor)}>{t("header.matchPercent", { pct })}</span>
                           </div>
                           <div className="flex gap-2 mt-2.5">
                             <button
@@ -674,7 +679,7 @@ export function Header() {
                               }}
                               className="flex-1 py-1.5 rounded-lg bg-primary/15 hover:bg-primary/30 text-[11px] font-bold text-primary transition-[transform,background-color,border-color,color,box-shadow,filter] duration-150 border border-primary/20 hover:border-primary/40"
                             >
-                              View Anime
+                              {t("header.viewAnime")}
                             </button>
                             <button
                               onClick={() => {
@@ -683,7 +688,7 @@ export function Header() {
                               }}
                               className="flex-1 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-[11px] font-bold text-muted-foreground hover:text-foreground transition-[transform,background-color,border-color,color,box-shadow,filter] duration-150 border border-white/5"
                             >
-                              Search
+                              {t("header.search")}
                             </button>
                           </div>
                         </div>

@@ -1,6 +1,9 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { uploadSubtitle, fetchSubtitle, decodeSubtitle } from '@/core/player/subtitle-service';
 import { useCallback, useEffect, useRef, useMemo } from "react";
 import { toast } from "sonner";
+import i18n from "@/lib/i18n";
 import { fetchViaChain } from "@/core/network/proxyChain";
 import {
   buildSubtitleFetchCandidates,
@@ -87,7 +90,7 @@ export function formatMediaTrackLabel(track: { language?: string; title?: string
     return langName;
   }
 
-  return `${langName} (${rawTitle})`;
+  return uiI18n.t('app.i18n_value_0_i18n_value_1_8568f691', { value0: langName, value1: rawTitle });
 }
 
 export function toTrackLanguageCode(lang?: string): string {
@@ -192,6 +195,7 @@ export function useSubtitleManager({
   setCustomSubtitles,
   setSubtitleBlobs,
 }: UseSubtitleManagerParams) {
+  useUiTranslation();
   const uploadedSubtitleUrls = useRef<string[]>([]);
   useEffect(() => () => { uploadedSubtitleUrls.current.forEach(url => URL.revokeObjectURL(url)); }, []);
   const subtitleApplyStateRef = useRef<{ lang: string; selectedIndex: number; trackCount: number } | null>(null);
@@ -359,7 +363,7 @@ export function useSubtitleManager({
       if (!file) return;
 
       let prepared;
-      try { prepared = await uploadSubtitle(file); } catch (error) { toast.error(error instanceof Error ? error.message : 'Could not read subtitle'); return; }
+      try { prepared = await uploadSubtitle(file); } catch (error) { toast.error(error instanceof Error ? error.message : uiI18n.t('app.could_not_read_subtitle_e6558cb0')); return; }
       const url = prepared.url;
       uploadedSubtitleUrls.current.push(url);
       const newSub: CustomSubtitle = {
@@ -377,7 +381,7 @@ export function useSubtitleManager({
       // Also add to blobs map immediately so it renders
       setSubtitleBlobs((prev) => ({ ...prev, [url]: url }));
 
-      toast.success(`Loaded subtitle: ${file.name}`);
+      toast.success(i18n.t('player.subtitleLoadedFile', { name: file.name }));
     },
     [subtitles.length, setCustomSubtitles, setCurrentSubtitle, setSubtitleBlobs],
   );

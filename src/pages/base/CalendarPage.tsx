@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
  * Tatakai Calendar (docs/Plans.md §6) — a Google-Calendar-style week view of the
  * anime airing schedule, powered by AniList (`useAiringSchedule`) and rendered in
@@ -56,7 +58,7 @@ function startOfWeek(base: Date): Date {
 }
 
 function formatTime(unix: number) {
-  return new Date(unix * 1000).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  return new Date(unix * 1000).toLocaleTimeString(uiI18n.language, { hour: '2-digit', minute: '2-digit' });
 }
 
 /* ------------------------------------------------------------------ */
@@ -80,6 +82,7 @@ function EntryCard({
   onToggle: (entry: AiringEntry, tracked: boolean) => void;
   onOpen: (entry: AiringEntry) => void;
 }) {
+  useUiTranslation();
   const time = formatTime(entry.airingAt);
 
   const card = (
@@ -138,7 +141,7 @@ function EntryCard({
             </span>
             {isNext && (
               <span className="rounded-md bg-primary px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-primary-foreground">
-                Next
+                {uiI18n.t('app.next_bc981983')}
               </span>
             )}
             {tracked && <Star className="ml-auto h-3 w-3 shrink-0 fill-primary text-primary" />}
@@ -147,7 +150,7 @@ function EntryCard({
             {entry.title}
           </p>
           <p className="mt-1 text-[10px] font-medium text-muted-foreground">
-            Episode <span className="text-foreground/80">{entry.episode}</span>
+            {uiI18n.t('app.episode_8669aa56')} <span className="text-foreground/80">{entry.episode}</span>
             {entry.totalEpisodes ? (
               <span className="text-muted-foreground/60"> / {entry.totalEpisodes}</span>
             ) : null}
@@ -159,7 +162,7 @@ function EntryCard({
       {canTrack && (
         <button
           type="button"
-          title={tracked ? 'Remove from calendar' : 'Add to calendar'}
+          title={tracked ? uiI18n.t('app.remove_from_calendar_b9650b4e') : uiI18n.t('app.add_to_calendar_4f05cd64')}
           onClick={(e) => {
             e.stopPropagation();
             onToggle(entry, tracked);
@@ -186,18 +189,18 @@ function EntryCard({
       <ContextMenuContent className="w-52">
         <ContextMenuItem onSelect={() => onOpen(entry)}>
           <Play className="mr-2 h-4 w-4" />
-          Watch now
+          {uiI18n.t('app.watch_now_db351956')}
         </ContextMenuItem>
         <ContextMenuItem onSelect={() => onToggle(entry, tracked)}>
           {tracked ? (
             <>
               <CalendarX className="mr-2 h-4 w-4" />
-              Remove from calendar
+              {uiI18n.t('app.remove_from_calendar_b9650b4e')}
             </>
           ) : (
             <>
               <CalendarPlus className="mr-2 h-4 w-4" />
-              Add to calendar
+              {uiI18n.t('app.add_to_calendar_4f05cd64')}
             </>
           )}
         </ContextMenuItem>
@@ -211,6 +214,7 @@ function EntryCard({
 /* ------------------------------------------------------------------ */
 
 function DaySkeleton({ rows }: { rows: number }) {
+  useUiTranslation();
   return (
     <div className="flex flex-col gap-2">
       <div className="h-14 animate-pulse rounded-xl bg-white/[0.04]" />
@@ -230,6 +234,7 @@ function DaySkeleton({ rows }: { rows: number }) {
 /* ------------------------------------------------------------------ */
 
 export default function CalendarPage() {
+  useUiTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
   const isDesktopApp = useIsDesktopApp();
@@ -324,8 +329,8 @@ export default function CalendarPage() {
   const weekEnd = new Date(weekStart.getTime() + 6 * DAY_MS);
   const sameMonth = weekStart.getMonth() === weekEnd.getMonth();
   const rangeLabel = sameMonth
-    ? `${weekStart.toLocaleDateString(undefined, { month: 'long', day: 'numeric' })} – ${weekEnd.getDate()}, ${weekEnd.getFullYear()}`
-    : `${weekStart.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} – ${weekEnd.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`;
+    ? uiI18n.t('app.i18n_value_0_i18n_value_1_i18n_value_2_8646c380', { value0: weekStart.toLocaleDateString(uiI18n.language, { month: 'long', day: 'numeric' }), value1: weekEnd.getDate(), value2: weekEnd.getFullYear() })
+    : uiI18n.t('app.i18n_value_0_i18n_value_1_adcb5fa4', { value0: weekStart.toLocaleDateString(uiI18n.language, { month: 'short', day: 'numeric' }), value1: weekEnd.toLocaleDateString(uiI18n.language, { month: 'short', day: 'numeric', year: 'numeric' }) });
 
   const isCurrentWeek = todayIdx !== -1;
   const shiftWeek = (dir: number) => setWeekStart((w) => new Date(w.getTime() + dir * 7 * DAY_MS));
@@ -374,14 +379,14 @@ export default function CalendarPage() {
                   {date.getDate()}
                 </span>
                 <span className="text-[10px] font-medium text-muted-foreground">
-                  {date.toLocaleDateString(undefined, { month: 'short' })}
+                  {date.toLocaleDateString(uiI18n.language, { month: 'short' })}
                 </span>
               </div>
             </div>
             <div className="flex flex-col items-end gap-1">
               {isToday && (
                 <span className="rounded-full bg-primary px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-primary-foreground">
-                  Today
+                  {uiI18n.t('app.today_24345a14')}
                 </span>
               )}
               {dayEntries.length > 0 && (
@@ -391,7 +396,7 @@ export default function CalendarPage() {
                     isToday ? 'bg-primary/20 text-primary' : 'bg-white/[0.06] text-muted-foreground',
                   )}
                 >
-                  {dayEntries.length} ep{dayEntries.length === 1 ? '' : 's'}
+                  {dayEntries.length} {uiI18n.t('app.ep_881baaed')}{dayEntries.length === 1 ? '' : 's'}
                 </span>
               )}
             </div>
@@ -408,7 +413,7 @@ export default function CalendarPage() {
           {dayEntries.length === 0 ? (
             <div className="flex h-28 flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-white/[0.06] text-muted-foreground/40">
               <Tv className="h-4 w-4" />
-              <span className="text-[10px] font-medium">Nothing airing</span>
+              <span className="text-[10px] font-medium">{uiI18n.t('app.nothing_airing_f2a424a3')}</span>
             </div>
           ) : (
             dayEntries.map((entry) => (
@@ -450,12 +455,12 @@ export default function CalendarPage() {
               <div>
                 <div className="flex items-center gap-2">
                   <h1 className="font-display text-2xl font-black tracking-tight md:text-3xl">
-                    Tatakai Calendar
+                    {uiI18n.t('app.tatakai_calendar_36e4bd5e')}
                   </h1>
                   {isCurrentWeek && (
                     <span className="hidden items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary sm:inline-flex">
                       <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
-                      This week
+                      {uiI18n.t('app.this_week_7b72883e')}
                     </span>
                   )}
                 </div>
@@ -471,7 +476,7 @@ export default function CalendarPage() {
             <div className="hidden items-center gap-2 lg:flex">
               <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-2">
                 <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                  Episodes
+                  {uiI18n.t('app.episodes_49d641ba')}
                 </div>
                 <div className="font-display text-xl font-black leading-none tabular-nums">
                   {isLoading ? '—' : totalThisWeek}
@@ -481,7 +486,7 @@ export default function CalendarPage() {
                 <div className="rounded-xl border border-primary/20 bg-primary/10 px-3 py-2">
                   <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-primary">
                     <Star className="h-2.5 w-2.5 fill-primary" />
-                    Yours
+                    {uiI18n.t('app.yours_755844bc')}
                   </div>
                   <div className="font-display text-xl font-black leading-none tabular-nums text-primary">
                     {isLoading ? '—' : trackedThisWeek}
@@ -500,7 +505,7 @@ export default function CalendarPage() {
                   onClick={() => setMineOnly((v) => !v)}
                 >
                   <Filter className="h-3.5 w-3.5" />
-                  My shows
+                  {uiI18n.t('app.my_shows_739eef73')}
                   {mineOnly && trackedThisWeek > 0 && (
                     <span className="ml-0.5 rounded-full bg-primary-foreground/20 px-1.5 text-[10px] tabular-nums">
                       {trackedThisWeek}
@@ -513,8 +518,8 @@ export default function CalendarPage() {
                 <PopoverTrigger asChild>
                   <Button variant="outline" size="sm" className="gap-1.5 rounded-lg">
                     <CalendarSearch className="h-3.5 w-3.5" />
-                    <span className="hidden sm:inline">Jump to date</span>
-                    <span className="sm:hidden">Date</span>
+                    <span className="hidden sm:inline">{uiI18n.t('app.jump_to_date_288a6887')}</span>
+                    <span className="sm:hidden">{uiI18n.t('app.date_eb9a4bc1')}</span>
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="end">
@@ -537,7 +542,7 @@ export default function CalendarPage() {
                   size="icon"
                   className="h-8 w-8 rounded-md hover:bg-white/10"
                   onClick={() => shiftWeek(-1)}
-                  aria-label="Previous week"
+                  aria-label={uiI18n.t('app.previous_week_c4970e09')}
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
@@ -550,14 +555,14 @@ export default function CalendarPage() {
                   )}
                   onClick={goToday}
                 >
-                  Today
+                  {uiI18n.t('app.today_24345a14')}
                 </Button>
                 <Button
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8 rounded-md hover:bg-white/10"
                   onClick={() => shiftWeek(1)}
-                  aria-label="Next week"
+                  aria-label={uiI18n.t('app.next_week_5a20763a')}
                 >
                   <ChevronRight className="h-4 w-4" />
                 </Button>
@@ -587,7 +592,7 @@ export default function CalendarPage() {
                     : 'border-white/[0.06] bg-white/[0.03] text-muted-foreground hover:bg-white/[0.06]',
                 )}
               >
-                <span className="text-[9px] font-bold uppercase tracking-wider">{wd}</span>
+                <span className="text-[9px] font-bold uppercase tracking-wider">{uiI18n.t(({"Sun":"app.sun_48c98cab","Mon":"app.mon_24b2a099","Tue":"app.tue_529541bb","Wed":"app.wed_23408b19","Thu":"app.thu_3593ccd9","Fri":"app.fri_bbd6e32e","Sat":"app.sat_6b782d41"})[wd])}</span>
                 <span
                   className={cn(
                     'text-base font-black leading-tight',
@@ -636,16 +641,16 @@ export default function CalendarPage() {
               )}
             </span>
             <h2 className="font-display text-lg font-bold">
-              {mineOnly ? 'None of your shows air this week' : 'Nothing on the schedule'}
+              {mineOnly ? uiI18n.t('app.none_of_your_shows_air_this_week_5fe3bd92') : uiI18n.t('app.nothing_on_the_schedule_5b1d92a5')}
             </h2>
             <p className="mt-1 max-w-sm text-sm text-muted-foreground">
               {mineOnly
-                ? 'Pin more shows from their anime page, or turn off the filter to see everything airing.'
-                : 'AniList has no airing data for this week yet. Try a different week.'}
+                ? uiI18n.t('app.pin_more_shows_from_their_anime_page_or_turn_off_50d99c50')
+                : uiI18n.t('app.anilist_has_no_airing_data_for_this_week_yet_try_a6874e98')}
             </p>
             {mineOnly && (
               <Button variant="outline" size="sm" className="mt-4" onClick={() => setMineOnly(false)}>
-                Show all
+                {uiI18n.t('app.show_all_50a279de')}
               </Button>
             )}
           </div>
@@ -661,10 +666,10 @@ export default function CalendarPage() {
               <div className="mb-2 flex items-center justify-between px-1">
                 <h2 className="font-display text-base font-bold">
                   {WEEKDAYS_LONG[mobileDay]}
-                  {mobileDay === todayIdx && <span className="ml-2 text-xs text-primary">Today</span>}
+                  {mobileDay === todayIdx && <span className="ml-2 text-xs text-primary">{uiI18n.t('app.today_24345a14')}</span>}
                 </h2>
                 <span className="text-xs text-muted-foreground tabular-nums">
-                  {days[mobileDay].length} episode{days[mobileDay].length === 1 ? '' : 's'}
+                  {days[mobileDay].length} {uiI18n.t('app.episode_39ae6b3c')}{days[mobileDay].length === 1 ? '' : 's'}
                 </span>
               </div>
               {renderDay(mobileDay)}
@@ -678,9 +683,9 @@ export default function CalendarPage() {
             <Star className="h-4 w-4 shrink-0 text-primary" />
             <p>
               <button className="font-semibold text-primary hover:underline" onClick={() => navigate('/auth')}>
-                Sign in
+                {uiI18n.t('app.sign_in_ada2e9e9')}
               </button>{' '}
-              and pin shows from their anime page to highlight them here.
+              {uiI18n.t('app.and_pin_shows_from_their_anime_page_to_highlight_d6f7f7e8')}
             </p>
           </div>
         )}

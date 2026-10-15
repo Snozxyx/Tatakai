@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
  * The admin dashboard's section rail — one component for the desktop column and
  * the mobile sheet, so the two lists (and their badge counts) cannot drift apart
@@ -31,6 +33,7 @@ interface AdminNavProps {
 }
 
 export function AdminNav({ groups, badgeCounts, onSelect, className }: AdminNavProps) {
+  useUiTranslation();
   const [query, setQuery] = useState('');
   const visible = useMemo(() => filterAdminNav(groups, query), [groups, query]);
   const total = useMemo(
@@ -47,8 +50,8 @@ export function AdminNav({ groups, badgeCounts, onSelect, className }: AdminNavP
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder={`Filter ${total} sections`}
-            aria-label="Filter dashboard sections"
+            placeholder={uiI18n.t('app.filter_i18n_value_0_sections_61fb098f', { value0: total })}
+            aria-label={uiI18n.t('app.filter_dashboard_sections_2550b3df')}
             className="h-10 w-full rounded-xl border border-white/[0.07] bg-white/[0.03] pl-9 pr-3 text-sm font-medium text-foreground transition-colors placeholder:text-muted-foreground focus-visible:border-primary/40 focus-visible:outline-none"
           />
         </div>
@@ -85,7 +88,7 @@ export function AdminNav({ groups, badgeCounts, onSelect, className }: AdminNavP
 
       {visible.length === 0 && (
         <p className="px-3 py-6 text-center text-sm text-muted-foreground">
-          No section matches “{query.trim()}”.
+          {uiI18n.t('app.no_section_matches_35608bb9')}{query.trim()}”.
         </p>
       )}
     </div>

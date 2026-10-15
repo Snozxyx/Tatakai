@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { memo } from "react";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -29,7 +31,7 @@ export const TagGroupCloud = memo(function TagGroupCloud({
   selected,
   onToggle,
   maxHeightClass = "max-h-48",
-  emptyText = "No tags match that search.",
+  emptyText = uiI18n.t('app.no_tags_match_that_search_b5b4f8be'),
   compact = false,
 }: {
   groups: TagCloudGroup[];
@@ -39,6 +41,7 @@ export const TagGroupCloud = memo(function TagGroupCloud({
   emptyText?: string;
   compact?: boolean;
 }) {
+  useUiTranslation();
   const selectedSet = new Set(selected);
   const totalSelected = selected.length;
 
@@ -67,7 +70,7 @@ export const TagGroupCloud = memo(function TagGroupCloud({
               </span>
               {picked > 0 && (
                 <span className="rounded-full bg-primary/15 px-1.5 py-px text-[9px] font-black text-primary">
-                  {picked} picked
+                  {picked} {uiI18n.t('app.picked_17a53b0a')}
                 </span>
               )}
               <span className="h-px flex-1 bg-gradient-to-r from-white/10 to-transparent" aria-hidden />
@@ -92,12 +95,12 @@ export const TagGroupCloud = memo(function TagGroupCloud({
                     {active && <Check className="h-3 w-3 shrink-0" />}
                     {tag.name}
                     {tag.isGeneralSpoiler ? (
-                      <span className="text-amber-400" title="Spoiler tag">
+                      <span className="text-amber-400" title={uiI18n.t('app.spoiler_tag_3398991a')}>
                         !
                       </span>
                     ) : null}
                     {tag.isAdult ? (
-                      <span className="text-[9px] font-black uppercase text-rose-400" title="Adult tag">
+                      <span className="text-[9px] font-black uppercase text-rose-400" title={uiI18n.t('app.adult_tag_54ad227a')}>
                         18+
                       </span>
                     ) : null}
@@ -109,7 +112,7 @@ export const TagGroupCloud = memo(function TagGroupCloud({
         );
       })}
       {totalSelected > 0 && (
-        <p className="sr-only">{totalSelected} tags selected</p>
+        <p className="sr-only">{totalSelected} {uiI18n.t('app.tags_selected_226e2987')}</p>
       )}
     </div>
   );

@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { TATAKAI_API_URL, withClientHeaders, unwrapApiData } from '@/lib/api/api-client';
@@ -39,7 +41,7 @@ export interface NewsRefreshResult {
 async function adminNewsFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   const { data: sessionData } = await supabase.auth.getSession();
   const token = sessionData.session?.access_token;
-  if (!token) throw new Error('You must be signed in as an admin.');
+  if (!token) throw new Error(uiI18n.t('app.you_must_be_signed_in_as_an_admin_c5c6a7a0'));
 
   const res = await fetch(`${TATAKAI_API_URL}/admin/news${path}`, {
     ...init,
@@ -57,6 +59,7 @@ async function adminNewsFetch<T>(path: string, init: RequestInit = {}): Promise<
 
 /** Recent bot-authored News posts (pinned first, then newest). */
 export function useNewsPosts(page = 1, limit = 30) {
+  useUiTranslation();
   return useQuery({
     queryKey: ['admin-news', page, limit],
     queryFn: () => adminNewsFetch<AdminNewsPost[]>(`?page=${page}&limit=${limit}`),
@@ -65,6 +68,7 @@ export function useNewsPosts(page = 1, limit = 30) {
 
 /** Run one ingestion pass now (pull upstream sources → insert new stories). */
 export function useRefreshNews() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: () => adminNewsFetch<NewsRefreshResult>('/refresh', { method: 'POST' }),
@@ -77,6 +81,7 @@ export function useRefreshNews() {
 
 /** Pin / unpin a News post. */
 export function useSetNewsPinned() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (args: { id: string; is_pinned: boolean }) =>
@@ -93,6 +98,7 @@ export function useSetNewsPinned() {
 
 /** Delete a News post. */
 export function useDeleteNews() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => adminNewsFetch<{ id: string }>(`/${id}`, { method: 'DELETE' }),

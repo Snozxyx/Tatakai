@@ -1,5 +1,7 @@
+import uiI18n from '@/lib/uiI18n';
 import { Camera } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 
 interface ScreenshotButtonProps {
   videoRef: React.RefObject<HTMLVideoElement | null>;
@@ -8,6 +10,7 @@ interface ScreenshotButtonProps {
 }
 
 export function ScreenshotButton({ videoRef, animeName, episodeNumber }: ScreenshotButtonProps) {
+  const { t } = useTranslation();
   const handleScreenshot = () => {
     if (!videoRef.current) return;
 
@@ -25,7 +28,7 @@ export function ScreenshotButton({ videoRef, animeName, episodeNumber }: Screens
         if (!blob) return;
 
         const timestamp = new Date()
-          .toLocaleString("en-US", {
+          .toLocaleString(uiI18n.language, {
             year: "numeric",
             month: "2-digit",
             day: "2-digit",
@@ -45,11 +48,11 @@ export function ScreenshotButton({ videoRef, animeName, episodeNumber }: Screens
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
 
-        toast.success(`Screenshot saved: ${filename}`);
+        toast.success(t('player.screenshotSaved', { filename }));
       }, "image/png");
     } catch (err) {
       console.error("Screenshot failed:", err);
-      toast.error("Failed to create screenshot");
+      toast.error(t('player.screenshotFailed'));
     }
   };
 
@@ -57,7 +60,7 @@ export function ScreenshotButton({ videoRef, animeName, episodeNumber }: Screens
     <button
       onClick={handleScreenshot}
       className="p-2 rounded-lg hover:bg-white/10 transition-colors"
-      title="Take Screenshot"
+      title={t('player.takeScreenshot')}
     >
       <Camera className="w-4 h-4 md:w-5 md:h-5" />
     </button>

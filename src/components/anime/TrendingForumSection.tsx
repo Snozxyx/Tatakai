@@ -1,8 +1,10 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from '@/lib/localeFormat';
 import { Flame, ChevronRight, Heart, MessageCircle, Eye, EyeOff, ImagePlus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { GlassPanel } from '@/components/ui/GlassPanel';
@@ -69,6 +71,7 @@ function guard<T>(promise: Promise<{ data: T[] | null }>): Promise<T[]> {
  * bento always shows imagery, not text-only threads.
  */
 function useTrendingTiles(target = TILE_COUNT) {
+  useUiTranslation();
   const { data: posts = [], isLoading } = useForumPosts({ sortBy: 'hot', limit: 30 });
   const ids = useMemo(() => posts.map((p) => p.id), [posts]);
   const idKey = ids.join(',');
@@ -191,6 +194,7 @@ function compactCount(value: number): string {
 }
 
 function StatChip({ icon: Icon, value, className }: { icon: any; value: number; className?: string }) {
+  useUiTranslation();
   if (!value) return null;
   return (
     <span className={cn('flex items-center gap-1 text-[11px] font-semibold tabular-nums', className)}>
@@ -200,6 +204,7 @@ function StatChip({ icon: Icon, value, className }: { icon: any; value: number; 
 }
 
 function RankBadge({ index, large = false }: { index: number; large?: boolean }) {
+  useUiTranslation();
   if (index > 2) return null;
   return (
     <span
@@ -218,6 +223,7 @@ function RankBadge({ index, large = false }: { index: number; large?: boolean })
 
 /** Author row shared by every tile: avatar, name (rank-tinted), time, community chip. */
 function TileHeader({ tile, shape }: { tile: TrendingTile; shape: 'hero' | 'side' | 'square' | 'band' }) {
+  useUiTranslation();
   const { post } = tile;
   const author = post.profiles;
   const authorName = author?.display_name || author?.username || 'Anonymous';
@@ -265,7 +271,7 @@ function TileHeader({ tile, shape }: { tile: TrendingTile; shape: 'hero' | 'side
             </button>
           </ProfileWidgetCard>
           {tile.author_is_official && (
-            <span className="shrink-0 rounded-[3px] border border-sky-400/40 bg-sky-400/20 px-1 text-[8px] font-bold uppercase text-sky-300">Official</span>
+            <span className="shrink-0 rounded-[3px] border border-sky-400/40 bg-sky-400/20 px-1 text-[8px] font-bold uppercase text-sky-300">{uiI18n.t('app.official_ac60fda7')}</span>
           )}
           <UserBadges badges={tile.badges} size={14} max={2} />
         </div>
@@ -296,7 +302,8 @@ function TileHeader({ tile, shape }: { tile: TrendingTile; shape: 'hero' | 'side
 
 /** Flair pill: the post's own flair, or its hottest hashtag as a fallback. */
 function TileFlair({ tile, shape }: { tile: TrendingTile; shape: 'hero' | 'side' | 'square' | 'band' }) {
-  const label = tile.post.flair || (tile.tags.length ? `#${tile.tags[0]}` : null);
+  useUiTranslation();
+  const label = tile.post.flair || (tile.tags.length ? uiI18n.t('app.i18n_value_0_84e19ea0', { value0: tile.tags[0] }) : null);
   if (!label) return null;
   const size = shape === 'hero' ? 'text-xs' : 'text-[10px]';
   const isTag = label.startsWith('#');
@@ -312,6 +319,7 @@ function TileFlair({ tile, shape }: { tile: TrendingTile; shape: 'hero' | 'side'
 }
 
 function TileFooter({ tile, shape }: { tile: TrendingTile; shape: 'hero' | 'side' | 'square' | 'band' }) {
+  useUiTranslation();
   const { post } = tile;
   const dim = shape === 'hero' ? 'text-white/60' : 'text-white/50';
   return (
@@ -321,7 +329,7 @@ function TileFooter({ tile, shape }: { tile: TrendingTile; shape: 'hero' | 'side
       <StatChip icon={Eye} value={post.views_count} className={dim} />
       {shape === 'hero' && (
         <span className="ml-auto flex items-center gap-1 text-[11px] font-semibold text-primary">
-          Read discussion <ChevronRight className="h-3.5 w-3.5" />
+          {uiI18n.t('app.read_discussion_f5bb7d31')} <ChevronRight className="h-3.5 w-3.5" />
         </span>
       )}
     </div>
@@ -329,11 +337,12 @@ function TileFooter({ tile, shape }: { tile: TrendingTile; shape: 'hero' | 'side
 }
 
 function FlairLine({ tile, shape }: { tile: TrendingTile; shape: 'hero' | 'side' | 'square' | 'band' }) {
+  useUiTranslation();
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       <TileFlair tile={tile} shape={shape} />
       {tile.post.is_spoiler && (
-        <span className="rounded-md border border-orange-500/25 bg-orange-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-orange-400">Spoiler</span>
+        <span className="rounded-md border border-orange-500/25 bg-orange-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-orange-400">{uiI18n.t('app.spoiler_875786ee')}</span>
       )}
     </div>
   );
@@ -341,6 +350,7 @@ function FlairLine({ tile, shape }: { tile: TrendingTile; shape: 'hero' | 'side'
 
 /** Interactive community embeds (poll / playlist / tierlist) rendered in place. */
 function TileWidget({ tile }: { tile: TrendingTile }) {
+  useUiTranslation();
   if (tile.visual === 'poll' && tile.poll) return <PostPollCard poll={tile.poll} />;
   if (tile.visual === 'playlist' && tile.post.playlist_id) return <PostPlaylistEmbed playlistId={tile.post.playlist_id} />;
   if (tile.visual === 'tierlist' && tile.post.tierlist_id) return <PostTierlistEmbed tierlistId={tile.post.tierlist_id} />;
@@ -348,6 +358,7 @@ function TileWidget({ tile }: { tile: TrendingTile }) {
 }
 
 function CoverImage({ tile, rounded = 'rounded-none' }: { tile: TrendingTile; rounded?: string }) {
+  useUiTranslation();
   const src = tile.gif_url || tile.images[0];
   const extra = tile.images.length + (tile.gif_url ? 1 : 0) - 1;
   return (
@@ -370,7 +381,8 @@ function CoverImage({ tile, rounded = 'rounded-none' }: { tile: TrendingTile; ro
   );
 }
 
-function SpoilerVeil({ label = 'Spoiler · tap to view', onClick }: { label?: string; onClick?: () => void }) {
+function SpoilerVeil({ label = uiI18n.t('app.spoiler_tap_to_view_0932d1f5'), onClick }: { label?: string; onClick?: () => void }) {
+  useUiTranslation();
   return (
     <button
       type="button"
@@ -388,6 +400,7 @@ function SpoilerVeil({ label = 'Spoiler · tap to view', onClick }: { label?: st
 
 /** Full-bleed media tile: imagery carries the discussion. */
 function CoverTile({ tile, shape, onOpen }: { tile: TrendingTile; shape: 'hero' | 'side' | 'square'; onOpen: () => void }) {
+  useUiTranslation();
   const { post } = tile;
   const [revealed, setRevealed] = useState(!post.is_spoiler);
   const hero = shape === 'hero';
@@ -404,7 +417,7 @@ function CoverTile({ tile, shape, onOpen }: { tile: TrendingTile; shape: 'hero' 
         <div className={cn('space-y-2.5', hero && 'max-w-[30rem]')}>
           <FlairLine tile={tile} shape={shape} />
           <h3 className={cn('font-display font-bold leading-tight tracking-tight text-white', hero ? 'text-2xl md:text-3xl line-clamp-3' : 'text-base sm:text-lg line-clamp-2')}>
-            {post.title || (tile.tags.length ? `#${tile.tags[0]}` : 'Discussion')}
+            {post.title || (tile.tags.length ? uiI18n.t('app.i18n_value_0_84e19ea0', { value0: tile.tags[0] }) : uiI18n.t('app.discussion_8fb937b6'))}
           </h3>
           {post.content && (
             <RichContent
@@ -421,6 +434,7 @@ function CoverTile({ tile, shape, onOpen }: { tile: TrendingTile; shape: 'hero' 
 
 /** Split tile: text left, poster strip right — for shared anime/manga titles. */
 function PosterTile({ tile, shape, onOpen }: { tile: TrendingTile; shape: 'hero' | 'side' | 'square' | 'band'; onOpen: () => void }) {
+  useUiTranslation();
   const { post } = tile;
   const hero = shape === 'hero';
   const [revealed, setRevealed] = useState(!post.is_spoiler);
@@ -434,7 +448,7 @@ function PosterTile({ tile, shape, onOpen }: { tile: TrendingTile; shape: 'hero'
         <div className="space-y-2.5">
           <FlairLine tile={tile} shape={shape} />
           <h3 className={cn('font-display font-bold leading-tight tracking-tight', hero ? 'text-2xl line-clamp-3' : 'text-base sm:text-lg line-clamp-2')}>
-            {post.title || 'Discussion'}
+            {post.title || uiI18n.t('app.discussion_8fb937b6')}
           </h3>
           {post.content && (
             <RichContent
@@ -453,7 +467,7 @@ function PosterTile({ tile, shape, onOpen }: { tile: TrendingTile; shape: 'hero'
           className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
         />
         <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/10 to-transparent" />
-        {!revealed && <SpoilerVeil label="Spoiler" />}
+        {!revealed && <SpoilerVeil label={uiI18n.t('app.spoiler_875786ee')} />}
       </div>
     </div>
   );
@@ -461,6 +475,7 @@ function PosterTile({ tile, shape, onOpen }: { tile: TrendingTile; shape: 'hero'
 
 /** Stacked tile for polls, playlists, tierlists and text-only posts. */
 function StackedTile({ tile, shape, onOpen }: { tile: TrendingTile; shape: 'hero' | 'side' | 'square' | 'band'; onOpen: () => void }) {
+  useUiTranslation();
   const { post } = tile;
   const hero = shape === 'hero';
   const band = shape === 'band';
@@ -477,7 +492,7 @@ function StackedTile({ tile, shape, onOpen }: { tile: TrendingTile; shape: 'hero
         <div className={cn('min-w-0 flex-1 space-y-2.5', band && 'max-w-2xl')}>
           <FlairLine tile={tile} shape={shape} />
           <h3 className={cn('font-display font-bold leading-tight tracking-tight', hero ? 'text-2xl line-clamp-3' : band ? 'text-xl line-clamp-2' : 'text-base line-clamp-2')}>
-            {post.title || 'Discussion'}
+            {post.title || uiI18n.t('app.discussion_8fb937b6')}
           </h3>
           {!tile.poll && post.content && (
             <RichContent
@@ -486,7 +501,7 @@ function StackedTile({ tile, shape, onOpen }: { tile: TrendingTile; shape: 'hero
             />
           )}
           {tile.visual === 'text' && !post.title && !post.content && (
-            <p className="text-[13px] text-white/50">No content yet — start the conversation.</p>
+            <p className="text-[13px] text-white/50">{uiI18n.t('app.no_content_yet_start_the_conversation_ff2a31b0')}</p>
           )}
         </div>
 
@@ -514,6 +529,7 @@ function StackedTile({ tile, shape, onOpen }: { tile: TrendingTile; shape: 'hero
 }
 
 function BentoTile({ tile, index, onOpen }: { tile: TrendingTile; index: number; onOpen: () => void }) {
+  useUiTranslation();
   const layout = TILE_LAYOUTS[index];
   const body =
     tile.visual === 'cover' ? (
@@ -534,7 +550,7 @@ function BentoTile({ tile, index, onOpen }: { tile: TrendingTile; index: number;
       <GlassPanel
         role="button"
         tabIndex={0}
-        aria-label={tile.post.title || 'Trending post'}
+        aria-label={tile.post.title || uiI18n.t('app.trending_post_676beaff')}
         onClick={onOpen}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
@@ -551,6 +567,7 @@ function BentoTile({ tile, index, onOpen }: { tile: TrendingTile; index: number;
 }
 
 function TileSkeleton({ className }: { className?: string }) {
+  useUiTranslation();
   return (
     <GlassPanel className={cn('border-white/[0.06] p-4', className)}>
       <div className="flex items-center gap-2">
@@ -571,6 +588,7 @@ function TileSkeleton({ className }: { className?: string }) {
 }
 
 function TrendingPostSkeleton() {
+  useUiTranslation();
   return (
     <div className="grid grid-cols-2 lg:grid-cols-12 gap-3 sm:gap-4">
       {TILE_LAYOUTS.map((layout, i) => (
@@ -581,6 +599,7 @@ function TrendingPostSkeleton() {
 }
 
 function TrendingPostHeader() {
+  useUiTranslation();
   const navigate = useNavigate();
   const { data: tags = [] } = useTrendingTags(5);
   const topTags = tags.slice(0, 3);
@@ -592,11 +611,11 @@ function TrendingPostHeader() {
           <Flame className="h-5 w-5 text-primary" />
         </div>
         <div className="min-w-0">
-          <h2 className="font-display text-xl font-bold tracking-tight sm:text-2xl">Trending Post</h2>
+          <h2 className="font-display text-xl font-bold tracking-tight sm:text-2xl">{uiI18n.t('app.trending_post_2d0c3bc6')}</h2>
           <p className="truncate text-[13px] text-muted-foreground">
             {topTags.length
-              ? <>Hottest right now · {topTags.map((t) => `#${t.tag}`).join('  ')}</>
-              : 'What the community is buzzing about'}
+              ? <>{uiI18n.t('app.hottest_right_now_e360cc71')} {topTags.map((t) => `#${t.tag}`).join('  ')}</>
+              : uiI18n.t('app.what_the_community_is_buzzing_about_9a9d6ec3')}
           </p>
         </div>
       </div>
@@ -606,7 +625,7 @@ function TrendingPostHeader() {
         onClick={() => navigate('/community')}
         className="flex-shrink-0 gap-1 rounded-full text-muted-foreground hover:text-foreground"
       >
-        View All
+        {uiI18n.t('app.view_all_efd83559')}
         <ChevronRight className="h-4 w-4" />
       </Button>
     </div>
@@ -614,6 +633,7 @@ function TrendingPostHeader() {
 }
 
 export function TrendingForumSection() {
+  useUiTranslation();
   const navigate = useNavigate();
   const { tiles, isLoading, isEmpty } = useTrendingTiles(TILE_COUNT);
 

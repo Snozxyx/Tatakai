@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -14,7 +16,7 @@ import {
   ChevronRight,
   Search,
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format } from '@/lib/localeFormat';
 import { filterAuditLog, exportAuditLogCsv } from '@/utils/banUtils';
 import type { BanAuditRecord } from '@/types/admin-dashboard';
 import { useAuth } from '@/contexts/AuthContext';
@@ -29,6 +31,7 @@ const QUERY_KEY = ['admin_ban_audit_log'] as const;
 // Component
 // ---------------------------------------------------------------------------
 export function BanAuditLogPanel() {
+  useUiTranslation();
   const { isAdmin, isModerator } = useAuth();
   const [page, setPage] = useState(0);
   const [searchText, setSearchText] = useState('');
@@ -42,7 +45,7 @@ export function BanAuditLogPanel() {
       <GlassPanel className="p-12 text-center border-destructive/20 bg-destructive/5">
         <XCircle className="w-10 h-10 text-destructive/50 mx-auto mb-4" />
         <p className="text-sm font-medium text-destructive">
-          Access denied — admin or moderator role required
+          {uiI18n.t('app.access_denied_admin_or_moderator_role_required_7e6ee4dd')}
         </p>
       </GlassPanel>
     );
@@ -62,7 +65,7 @@ export function BanAuditLogPanel() {
         .limit(1000) as any);
 
       if (error) {
-        toast.error('Failed to load ban audit log');
+        toast.error(uiI18n.t('app.failed_to_load_ban_audit_log_eb4fe42d'));
         throw error;
       }
 
@@ -156,7 +159,7 @@ export function BanAuditLogPanel() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h2 className="text-xl font-bold flex items-center gap-2">
           <History className="w-6 h-6 text-primary" />
-          Ban Audit Log
+          {uiI18n.t('app.ban_audit_log_ca860feb')}
         </h2>
         <div className="flex items-center gap-2">
           <Button
@@ -167,7 +170,7 @@ export function BanAuditLogPanel() {
             className="gap-1.5 text-xs"
           >
             <Download className="w-3.5 h-3.5" />
-            Export CSV
+            {uiI18n.t('app.export_csv_5755f9ac')}
           </Button>
           <Button
             variant="ghost"
@@ -177,7 +180,7 @@ export function BanAuditLogPanel() {
             className="gap-2 text-muted-foreground hover:text-foreground"
           >
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-            Refresh
+            {uiI18n.t('app.refresh_56e3badc')}
           </Button>
         </div>
       </div>
@@ -190,7 +193,7 @@ export function BanAuditLogPanel() {
             type="text"
             value={searchText}
             onChange={(e) => handleSearchChange(e.target.value)}
-            placeholder="Search by name or username…"
+            placeholder={uiI18n.t('app.search_by_name_or_username_dd5c001e')}
             className="w-full bg-white/5 border border-white/10 rounded pl-9 pr-3 py-1.5 text-sm text-white placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </div>
@@ -199,9 +202,9 @@ export function BanAuditLogPanel() {
           onChange={(e) => handleActionFilterChange(e.target.value as any)}
           className="bg-white/5 border border-white/10 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary"
         >
-          <option value="all">All Actions</option>
-          <option value="banned">Banned</option>
-          <option value="unbanned">Unbanned</option>
+          <option value="all">{uiI18n.t('app.all_actions_902f1999')}</option>
+          <option value="banned">{uiI18n.t('app.banned_c8cd83f6')}</option>
+          <option value="unbanned">{uiI18n.t('app.unbanned_6d81a499')}</option>
         </select>
       </div>
 
@@ -213,7 +216,7 @@ export function BanAuditLogPanel() {
       ) : isError ? (
         <GlassPanel className="p-10 text-center border-destructive/20 bg-destructive/5">
           <XCircle className="w-8 h-8 text-destructive/50 mx-auto mb-3" />
-          <p className="text-sm font-medium text-destructive mb-4">Failed to load audit log</p>
+          <p className="text-sm font-medium text-destructive mb-4">{uiI18n.t('app.failed_to_load_audit_log_1bbd9efb')}</p>
           <Button
             variant="outline"
             size="sm"
@@ -221,13 +224,13 @@ export function BanAuditLogPanel() {
             className="gap-2 border-destructive/30 hover:bg-destructive/10 text-destructive"
           >
             <RefreshCw className="w-4 h-4" />
-            Retry
+            {uiI18n.t('app.retry_9f5cd8a2')}
           </Button>
         </GlassPanel>
       ) : paginatedRecords.length === 0 ? (
         <GlassPanel className="p-12 text-center border-dashed border-white/5">
           <History className="w-10 h-10 text-muted-foreground/25 mx-auto mb-3" />
-          <p className="text-sm text-muted-foreground">No matching records found</p>
+          <p className="text-sm text-muted-foreground">{uiI18n.t('app.no_matching_records_found_8fe09462')}</p>
         </GlassPanel>
       ) : (
         <>
@@ -236,12 +239,12 @@ export function BanAuditLogPanel() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-white/10">
-                    <th className="text-left py-3 px-4 text-xs text-muted-foreground font-medium uppercase tracking-wide">User</th>
-                    <th className="text-left py-3 px-4 text-xs text-muted-foreground font-medium uppercase tracking-wide">Action</th>
-                    <th className="text-left py-3 px-4 text-xs text-muted-foreground font-medium uppercase tracking-wide">Reason</th>
-                    <th className="text-left py-3 px-4 text-xs text-muted-foreground font-medium uppercase tracking-wide">Duration</th>
-                    <th className="text-left py-3 px-4 text-xs text-muted-foreground font-medium uppercase tracking-wide">By</th>
-                    <th className="text-left py-3 px-4 text-xs text-muted-foreground font-medium uppercase tracking-wide">Timestamp</th>
+                    <th className="text-left py-3 px-4 text-xs text-muted-foreground font-medium uppercase tracking-wide">{uiI18n.t('app.user_9f8a2389')}</th>
+                    <th className="text-left py-3 px-4 text-xs text-muted-foreground font-medium uppercase tracking-wide">{uiI18n.t('app.action_97c89a4d')}</th>
+                    <th className="text-left py-3 px-4 text-xs text-muted-foreground font-medium uppercase tracking-wide">{uiI18n.t('app.reason_f219cc06')}</th>
+                    <th className="text-left py-3 px-4 text-xs text-muted-foreground font-medium uppercase tracking-wide">{uiI18n.t('app.duration_1370004d')}</th>
+                    <th className="text-left py-3 px-4 text-xs text-muted-foreground font-medium uppercase tracking-wide">{uiI18n.t('app.by_cfadbd7a')}</th>
+                    <th className="text-left py-3 px-4 text-xs text-muted-foreground font-medium uppercase tracking-wide">{uiI18n.t('app.timestamp_19eabc96')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -254,11 +257,9 @@ export function BanAuditLogPanel() {
                         </div>
                       </td>
                       <td className="py-3 px-4">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold border ${
-                          record.action === 'banned'
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold border ${record.action === 'banned'
                             ? 'bg-destructive/15 text-destructive border-destructive/30'
-                            : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
-                        }`}>
+                            : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'}`}>
                           {record.action}
                         </span>
                       </td>
@@ -289,7 +290,7 @@ export function BanAuditLogPanel() {
           {pageCount > 1 && (
             <div className="flex items-center justify-between text-sm">
               <span className="text-xs text-muted-foreground">
-                {filteredRecords.length} records · Page {page + 1} of {pageCount}
+                {filteredRecords.length} {uiI18n.t('app.records_page_742f3431')} {page + 1} {uiI18n.t('app.of_de04fa0e')} {pageCount}
               </span>
               <div className="flex gap-2">
                 <Button
@@ -300,7 +301,7 @@ export function BanAuditLogPanel() {
                   className="gap-1 text-xs"
                 >
                   <ChevronLeft className="w-3.5 h-3.5" />
-                  Prev
+                  {uiI18n.t('app.prev_e96fea52')}
                 </Button>
                 <Button
                   variant="outline"
@@ -309,7 +310,7 @@ export function BanAuditLogPanel() {
                   disabled={page >= pageCount - 1}
                   className="gap-1 text-xs"
                 >
-                  Next
+                  {uiI18n.t('app.next_bc981983')}
                   <ChevronRight className="w-3.5 h-3.5" />
                 </Button>
               </div>

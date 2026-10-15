@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { RemoteExtensionsPanel } from "@/components/extensions/RemoteExtensionsPanel";
 import { migrateExtensionStorage } from "@/core/extensions/ecosystems";
 migrateExtensionStorage();
@@ -39,6 +41,7 @@ function readInstalled(): ExtensionManifest[] {
 
 /** Extensions: installed list on this device + entry point into the full hub. */
 export function ExtensionsPanel() {
+  useUiTranslation();
   const navigate = useNavigate();
   const { closeSettings } = useSettingsModal();
 
@@ -89,31 +92,31 @@ export function ExtensionsPanel() {
       <SettingsSection
         icon={Puzzle}
         eyebrow="Extensions"
-        title="Extension Hub"
-        description="Extensions add new sources, features, and customization options to Tatakai."
+        title={uiI18n.t('app.extension_hub_e58f54b8')}
+        description={uiI18n.t('app.extensions_add_new_sources_features_and_customiz_c01962e6')}
         action={
           <Button onClick={openHub} className="whitespace-nowrap">
-            Open Extension Hub
+            {uiI18n.t('app.open_extension_hub_68bb8d7f')}
           </Button>
         }
       >
         <div className="flex items-start gap-2 rounded-xl border border-white/10 bg-white/[0.02] p-4 text-xs text-muted-foreground">
           <Shield className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-          <span>Choose source extensions from the marketplace or add a package or manifest URL.</span>
+          <span>{uiI18n.t('app.choose_source_extensions_from_the_marketplace_or_e18d995d')}</span>
         </div>
       </SettingsSection>
  <RemoteExtensionsPanel />
       <SettingsSection
         icon={PackageOpen}
         eyebrow="Installed"
-        title="Installed extensions"
-        description="Extensions loaded on this device. Manage or add more from the Extension Hub."
+        title={uiI18n.t('app.installed_extensions_749ba7d5')}
+        description={uiI18n.t('app.extensions_loaded_on_this_device_manage_or_add_m_c397011a')}
       >
         {visibleInstalled.length === 0 ? (
           <SettingsEmptyState
             icon={PackageOpen}
-            title="No extensions installed"
-            description="Open the Extension Hub to browse and install sources."
+            title={uiI18n.t('app.no_extensions_installed_255fc1b6')}
+            description={uiI18n.t('app.open_the_extension_hub_to_browse_and_install_sou_8f1799c7')}
           />
         ) : (
           <div className="divide-y divide-white/5">
@@ -132,9 +135,9 @@ export function ExtensionsPanel() {
                       )}
                       {showLoadState &&
                         (isLoaded ? (
-                          <SettingsBadge tone="success">Loaded</SettingsBadge>
+                          <SettingsBadge tone="success">{uiI18n.t('app.loaded_6db90a0a')}</SettingsBadge>
                         ) : (
-                          <SettingsBadge tone="warning">Not loaded</SettingsBadge>
+                          <SettingsBadge tone="warning">{uiI18n.t('app.not_loaded_45096619')}</SettingsBadge>
                         ))}
                     </span>
                   }

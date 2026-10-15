@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { fetchAvatarGallery } from '@/lib/avatarGallery';
 import { fetchWatchHistory } from '@/lib/watchHistoryQuery';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -118,7 +120,7 @@ export async function searchAniListCharacters(query: string, page = 1): Promise<
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify({ query: gql, variables: { query, page } }),
   });
-  if (!res.ok) throw new Error('AniList character search failed');
+  if (!res.ok) throw new Error(uiI18n.t('app.anilist_character_search_failed_4c8198ee'));
   const json = await res.json();
   const rows = Array.isArray(json?.data?.Page?.characters) ? json.data.Page.characters : [];
   return rows.map(normalizeAniListCharacter).filter((char) => char.id > 0);
@@ -249,7 +251,7 @@ export async function searchAniListMedia(
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify({ query: gql, variables: { query, type } }),
   });
-  if (!res.ok) throw new Error('AniList media search failed');
+  if (!res.ok) throw new Error(uiI18n.t('app.anilist_media_search_failed_08420884'));
   const json = await res.json();
   const rows = Array.isArray(json?.data?.Page?.media) ? json.data.Page.media : [];
   return rows
@@ -377,6 +379,7 @@ function probeImageSize(url: string, timeoutMs = 4000): Promise<{ w: number; h: 
 
 // Hook to fetch random animated GIF avatars
 export function useRandomAvatarGifs(limit = 12) {
+  useUiTranslation();
   return useQuery({
     queryKey: ['anime_avatar_gifs', limit],
     queryFn: () => fetchNekosBestGifs(undefined, limit),
@@ -386,6 +389,7 @@ export function useRandomAvatarGifs(limit = 12) {
 
 // Hook to search AniList media banners for the banner picker
 export function useAniListMediaSearch(query: string, type: 'ANIME' | 'MANGA' = 'ANIME', enabled = true) {
+  useUiTranslation();
   return useQuery({
     queryKey: ['anilist_media_banner', type, query],
     queryFn: () => searchAniListMedia(query, type),
@@ -396,6 +400,7 @@ export function useAniListMediaSearch(query: string, type: 'ANIME' | 'MANGA' = '
 
 // Hook to fetch landscape waifu.im banners
 export function useWaifuLandscapeBanners(limit = 8) {
+  useUiTranslation();
   return useQuery({
     queryKey: ['waifu_landscape', limit],
     queryFn: () => fetchWaifuLandscape(limit),
@@ -405,6 +410,7 @@ export function useWaifuLandscapeBanners(limit = 8) {
 
 // Hook to fetch random profile images with gender filter
 export function useRandomProfileImages(limit = 6, gender: 'male' | 'female' | 'any' = 'any') {
+  useUiTranslation();
   return useQuery({
     queryKey: ['anime_profile_images', limit, gender],
     queryFn: () => fetchAvatarGallery(ANILIST_GRAPHQL_ENDPOINT, gender, limit),
@@ -414,6 +420,7 @@ export function useRandomProfileImages(limit = 6, gender: 'male' | 'female' | 'a
 
 // Hook to fetch random banner images
 export function useRandomBannerImages(limit = 4) {
+  useUiTranslation();
   return useQuery({
     queryKey: ['anime_banner_images', limit],
     queryFn: () => fetchRandomAnimeImage({ limit, type: 'banner' }),
@@ -423,6 +430,7 @@ export function useRandomBannerImages(limit = 4) {
 
 // Hook to search AniList characters for avatar/banner selection
 export function useAniListCharacterSearch(query: string, enabled = true) {
+  useUiTranslation();
   return useQuery({
     queryKey: ['anilist_char_search', query],
     queryFn: () => searchAniListCharacters(query),
@@ -434,12 +442,13 @@ export function useAniListCharacterSearch(query: string, enabled = true) {
 
 // Update profile avatar with NekosAPI image
 export function useUpdateProfileAvatar() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user, refreshProfile } = useAuth();
 
   return useMutation({
     mutationFn: async (imageUrl: string) => {
-      if (!user) throw new Error('Not logged in');
+      if (!user) throw new Error(uiI18n.t('app.not_logged_in_53802e67'));
 
       const { error } = await supabase
         .from('profiles')
@@ -457,12 +466,13 @@ export function useUpdateProfileAvatar() {
 
 // Update profile banner with NekosAPI image
 export function useUpdateProfileBanner() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user, refreshProfile } = useAuth();
 
   return useMutation({
     mutationFn: async (imageUrl: string) => {
-      if (!user) throw new Error('Not logged in');
+      if (!user) throw new Error(uiI18n.t('app.not_logged_in_53802e67'));
 
       const { error } = await supabase
         .from('profiles')
@@ -483,12 +493,13 @@ export function useUpdateProfileBanner() {
 // preserved. Batch ambientColor + backgroundEffect into ONE call per save to avoid
 // a read-modify-write race.
 export function useUpdateProfileSettings() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user, profile, refreshProfile } = useAuth();
 
   return useMutation({
     mutationFn: async (patch: NonNullable<ProfileAppSettings['profile']>) => {
-      if (!user) throw new Error('Not logged in');
+      if (!user) throw new Error(uiI18n.t('app.not_logged_in_53802e67'));
 
       const premiumSelection = (patch.backgroundEffect && PREMIUM_BACKGROUND_EFFECTS.includes(patch.backgroundEffect))
         || (patch.avatarDecoration && patch.avatarDecoration !== 'none')
@@ -499,9 +510,9 @@ export function useUpdateProfileSettings() {
           supabase.from('profiles').select('is_admin, role').eq('user_id', user.id).maybeSingle(),
           supabase.from('user_badges' as any).select('badge_key').eq('user_id', user.id),
         ]);
-        if (roleResult.error || badgeResult.error) throw new Error('Could not verify premium access. Try again.');
+        if (roleResult.error || badgeResult.error) throw new Error(uiI18n.t('app.could_not_verify_premium_access_try_again_fec8a88a'));
         if (!hasPremiumCosmetics(roleResult.data, ((badgeResult.data ?? []) as unknown as { badge_key: string }[]).map(badge => ({ key: badge.badge_key })))) {
-          throw new Error('These cosmetics require a Premium Go, Pro, or Ultra badge, or admin access.');
+          throw new Error(uiI18n.t('app.these_cosmetics_require_a_premium_go_pro_or_ultr_85540758'));
         }
       }
 
@@ -523,7 +534,7 @@ export function useUpdateProfileSettings() {
         const msg = `${error.message} ${(error as any).details ?? ''}`.toLowerCase();
         if ((error as any).code === '42703' || (error as any).code === 'PGRST204' || msg.includes('app_settings')) {
           throw new Error(
-            'Profile customization needs the profiles.app_settings column, which is missing from the database. Apply migration 20260902000003_profiles_column_level_update.sql (or add the column) and reload the schema cache.',
+            uiI18n.t('app.profile_customization_needs_the_profiles_app_set_9f4e58bd'),
           );
         }
         throw error;
@@ -540,6 +551,7 @@ export function useUpdateProfileSettings() {
 
 // Fetch public profile by username
 export function usePublicProfile(username: string) {
+  useUiTranslation();
   return useQuery({
     queryKey: ['public_profile', username],
     queryFn: async () => {
@@ -553,7 +565,7 @@ export function usePublicProfile(username: string) {
       
       // Check if profile is public
       if (!data.is_public) {
-        throw new Error('Profile is private');
+        throw new Error(uiI18n.t('app.profile_is_private_237c770f'));
       }
 
       return data;
@@ -564,6 +576,7 @@ export function usePublicProfile(username: string) {
 
 // Fetch public profile's watchlist
 export function usePublicWatchlist(userId: string, isPublic: boolean, showWatchlist: boolean = true) {
+  useUiTranslation();
   return useQuery({
     queryKey: ['public_watchlist', userId],
     queryFn: async () => {
@@ -582,6 +595,7 @@ export function usePublicWatchlist(userId: string, isPublic: boolean, showWatchl
 
 // Fetch public profile's watch history
 export function usePublicWatchHistory(userId: string, isPublic: boolean, showHistory: boolean = true) {
+  useUiTranslation();
   return useQuery({
     queryKey: ['public_history', userId],
     queryFn: ({ signal }) => fetchWatchHistory(supabase, userId, undefined, signal),
@@ -591,12 +605,13 @@ export function usePublicWatchHistory(userId: string, isPublic: boolean, showHis
 
 // Update profile privacy
 export function useUpdateProfilePrivacy() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user, refreshProfile } = useAuth();
 
   return useMutation({
     mutationFn: async (isPublic: boolean) => {
-      if (!user) throw new Error('Not logged in');
+      if (!user) throw new Error(uiI18n.t('app.not_logged_in_53802e67'));
 
       const { error } = await supabase
         .from('profiles')
@@ -614,12 +629,13 @@ export function useUpdateProfilePrivacy() {
 
 // Update showcase anime
 export function useUpdateShowcaseAnime() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user, refreshProfile } = useAuth();
 
   return useMutation({
     mutationFn: async (animeList: Array<{ id: string; title: string; image: string }>) => {
-      if (!user) throw new Error('Not logged in');
+      if (!user) throw new Error(uiI18n.t('app.not_logged_in_53802e67'));
 
       const { error } = await supabase
         .from('profiles')
@@ -637,6 +653,7 @@ export function useUpdateShowcaseAnime() {
 
 // Check if current user follows a profile
 export function useIsFollowing(userId?: string) {
+  useUiTranslation();
   const { user } = useAuth();
 
   return useQuery({
@@ -660,6 +677,7 @@ export function useIsFollowing(userId?: string) {
 
 // Get follower/following counts
 export function useFollowCounts(userId?: string) {
+  useUiTranslation();
   return useQuery({
     queryKey: ['follow_counts', userId],
     queryFn: async () => {
@@ -687,13 +705,14 @@ export function useFollowCounts(userId?: string) {
 
 // Follow a user
 export function useFollowUser() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
   return useMutation({
     mutationFn: async (followingId: string) => {
-      if (!user) throw new Error('Must be logged in');
-      if (user.id === followingId) throw new Error('Cannot follow yourself');
+      if (!user) throw new Error(uiI18n.t('app.must_be_logged_in_9cf435d8'));
+      if (user.id === followingId) throw new Error(uiI18n.t('app.cannot_follow_yourself_3cc88213'));
 
       const { error } = await supabase
         .from('user_follows')
@@ -711,12 +730,13 @@ export function useFollowUser() {
 
 // Unfollow a user
 export function useUnfollowUser() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
   return useMutation({
     mutationFn: async (followingId: string) => {
-      if (!user) throw new Error('Must be logged in');
+      if (!user) throw new Error(uiI18n.t('app.must_be_logged_in_9cf435d8'));
 
       const { error } = await supabase
         .from('user_follows')

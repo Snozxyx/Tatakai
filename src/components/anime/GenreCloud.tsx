@@ -1,4 +1,7 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Hash, ArrowUpRight } from "lucide-react";
 import { useAniListGenres } from "@/hooks/api/useAniListGenres";
 
@@ -8,14 +11,14 @@ interface GenreCloudProps {
 
 // Curated palette — cycles through so each genre gets a consistent, distinct accent
 const ACCENT_COLORS = [
-  { text: "text-rose-400", glow: "bg-rose-500" },
-  { text: "text-amber-400", glow: "bg-amber-500" },
-  { text: "text-emerald-400", glow: "bg-emerald-500" },
-  { text: "text-sky-400", glow: "bg-sky-500" },
-  { text: "text-violet-400", glow: "bg-violet-500" },
-  { text: "text-orange-400", glow: "bg-orange-500" },
-  { text: "text-pink-400", glow: "bg-pink-500" },
-  { text: "text-teal-400", glow: "bg-teal-500" },
+  { get text() { return uiI18n.t('app.text_rose_400_35f30274'); }, glow: "bg-rose-500" },
+  { get text() { return uiI18n.t('app.text_amber_400_29a9a15f'); }, glow: "bg-amber-500" },
+  { get text() { return uiI18n.t('app.text_emerald_400_edbfd1c5'); }, glow: "bg-emerald-500" },
+  { get text() { return uiI18n.t('app.text_sky_400_0f2dc4ff'); }, glow: "bg-sky-500" },
+  { get text() { return uiI18n.t('app.text_violet_400_19790c31'); }, glow: "bg-violet-500" },
+  { get text() { return uiI18n.t('app.text_orange_400_bf45afb9'); }, glow: "bg-orange-500" },
+  { get text() { return uiI18n.t('app.text_pink_400_c1d4fc96'); }, glow: "bg-pink-500" },
+  { get text() { return uiI18n.t('app.text_teal_400_2ae3078b'); }, glow: "bg-teal-500" },
 ];
 
 function getAccent(genre: string) {
@@ -28,6 +31,8 @@ function getAccent(genre: string) {
 }
 
 export function GenreCloud({ genres }: GenreCloudProps) {
+  useUiTranslation();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   // AniList's live vocabulary; `genres` (from the home bundle) is merged in so a
   // genre AniList has retired before the API cache expires still renders.
@@ -45,7 +50,7 @@ export function GenreCloud({ genres }: GenreCloudProps) {
           <Hash className="w-5 h-5" />
         </div>
         <h3 className="font-display text-2xl font-semibold tracking-tight">
-          Explore Genres
+          {t('discover.exploreGenres')}
         </h3>
       </div>
 

@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useWatchHistory } from '@/hooks/user/useWatchHistory';
 import { useEnhancedRecommendations } from '@/hooks/api/useEnhancedRecommendations';
@@ -12,6 +13,7 @@ interface BecauseYouWatchedProps {
 }
 
 export function BecauseYouWatched({ className }: BecauseYouWatchedProps) {
+  const { t } = useTranslation();
   const { data: history = [] } = useWatchHistory(20);
   const { data: recommendations, isLoading } = useEnhancedRecommendations();
   const navigate = useNavigate();
@@ -54,7 +56,7 @@ export function BecauseYouWatched({ className }: BecauseYouWatchedProps) {
           <div className="flex flex-col justify-center gap-1">
             <div className="flex items-center gap-1.5 text-sm font-medium text-primary">
               <Sparkles className="w-4 h-4" />
-              <span>Because you watched</span>
+              <span>{t('discover.becauseYouWatched')}</span>
             </div>
             <button
               onClick={() => navigate(`/anime/${seedAnime.id}`)}
@@ -71,7 +73,7 @@ export function BecauseYouWatched({ className }: BecauseYouWatchedProps) {
           onClick={() => navigate('/recommendations')}
           className="group hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-muted-foreground rounded-full hover:bg-primary/10 hover:text-primary transition-all duration-200 ease-out shrink-0"
         >
-          See all
+          {t('common.seeAll')}
           <ChevronRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-0.5" />
         </button>
         
@@ -80,7 +82,7 @@ export function BecauseYouWatched({ className }: BecauseYouWatchedProps) {
           onClick={() => navigate('/recommendations')}
           className="sm:hidden group flex items-center text-sm font-medium text-muted-foreground hover:text-primary transition-colors pb-1"
         >
-          See all
+          {t('common.seeAll')}
           <ChevronRight className="w-4 h-4" />
         </button>
       </div>

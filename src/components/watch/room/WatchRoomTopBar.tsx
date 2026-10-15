@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { Button } from '@/components/ui/button';
 import {
     ArrowLeft, Radio, Copy, Check, BarChart3, DownloadCloud,
@@ -8,6 +10,7 @@ import { IconSwap } from './IconSwap';
 
 /** Slim frosted floating top bar: back · room name/status · actions + drawer toggle. */
 export function WatchRoomTopBar() {
+  useUiTranslation();
     const {
         navigate, room, selectedCategory, broadcastChip, isReconnecting,
         copied, handleCopyLink, isHost, setShowPollDialog, handleExportChat,
@@ -23,7 +26,7 @@ export function WatchRoomTopBar() {
                 <button 
                     type="button" 
                     onClick={() => navigate('/isshoni')} 
-                    aria-label="Back to watch rooms" 
+                    aria-label={uiI18n.t('app.back_to_watch_rooms_03be175a')}
                     className="group shrink-0 rounded-full border border-white/[0.08] bg-white/[0.03] p-2.5 text-muted-foreground transition-all duration-300 hover:bg-white/[0.1] hover:text-foreground hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 active:scale-95"
                 >
                     <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" />
@@ -37,7 +40,7 @@ export function WatchRoomTopBar() {
                         {room.is_playing && (
                             <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-red-500/20 bg-red-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-red-400 shadow-[0_0_10px_rgba(239,68,68,0.1)]">
                                 <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse shadow-[0_0_5px_rgba(239,68,68,0.8)]" />
-                                Live
+                                {uiI18n.t('app.live_65c821a5')}
                             </span>
                         )}
                     </div>
@@ -46,15 +49,13 @@ export function WatchRoomTopBar() {
                         <p className="truncate">
                             {room.anime_title} 
                             {room.episode_number && <span className="text-white/30 mx-1.5">•</span>}
-                            {room.episode_number && `Ep ${room.episode_number}`}
+                            {room.episode_number && uiI18n.t('app.ep_i18n_value_0_1a0eea94', { value0: room.episode_number })}
                             {room.episode_title && <span className="text-white/30 mx-1.5">•</span>}
                             {room.episode_title && <span className="truncate">{room.episode_title}</span>}
                         </p>
-                        <span className={`shrink-0 rounded-md border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
-                            selectedCategory === 'sub' 
+                        <span className={`shrink-0 rounded-md border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${selectedCategory === 'sub'
                             ? 'border-primary/20 bg-primary/10 text-primary' 
-                            : 'border-orange-500/20 bg-orange-500/10 text-orange-400'
-                        }`}>
+                            : 'border-orange-500/20 bg-orange-500/10 text-orange-400'}`}>
                             {selectedCategory}
                         </span>
                     </div>
@@ -66,43 +67,43 @@ export function WatchRoomTopBar() {
                 
                 {/* Status Indicators */}
                 <div className="hidden md:flex items-center gap-2 mr-1">
-                    <div className="flex items-center gap-1.5 rounded-full border border-[hsl(var(--isshoni-accent)/0.2)] bg-[hsl(var(--isshoni-accent)/0.05)] px-3 py-1.5 shadow-[0_0_15px_hsl(var(--isshoni-accent)/0.05)]" title="Watch party broadcast status">
+                    <div className="flex items-center gap-1.5 rounded-full border border-[hsl(var(--isshoni-accent)/0.2)] bg-[hsl(var(--isshoni-accent)/0.05)] px-3 py-1.5 shadow-[0_0_15px_hsl(var(--isshoni-accent)/0.05)]" title={uiI18n.t('app.watch_party_broadcast_status_e6e7d1a3')}>
                         <Radio className={`w-3.5 h-3.5 text-[hsl(var(--isshoni-accent))] ${broadcastChip.live ? 'animate-pulse' : ''}`} />
                         <span className="text-[11px] font-semibold tracking-wide text-[hsl(var(--isshoni-accent))]">{broadcastChip.label}</span>
                     </div>
                     {isReconnecting && (
                         <div className="flex items-center gap-1.5 rounded-full border border-amber-500/20 bg-amber-500/10 px-3 py-1.5">
                             <Loader2 className="w-3 h-3 text-amber-400 animate-spin" />
-                            <span className="text-[11px] font-semibold tracking-wide text-amber-400">Reconnecting…</span>
+                            <span className="text-[11px] font-semibold tracking-wide text-amber-400">{uiI18n.t('app.reconnecting_8a8b9561')}</span>
                         </div>
                     )}
                 </div>
 
                 {/* Core Buttons */}
-                <Button variant="ghost" size="sm" onClick={handleCopyLink} aria-label="Copy room link" className="h-8 gap-1.5 rounded-full border border-white/5 bg-white/5 px-3 text-xs font-medium text-foreground/80 transition-all hover:bg-white/10 hover:text-foreground active:scale-95">
+                <Button variant="ghost" size="sm" onClick={handleCopyLink} aria-label={uiI18n.t('app.copy_room_link_b263a7bf')} className="h-8 gap-1.5 rounded-full border border-white/5 bg-white/5 px-3 text-xs font-medium text-foreground/80 transition-all hover:bg-white/10 hover:text-foreground active:scale-95">
                     <IconSwap swapKey={copied ? 'check' : 'copy'}>
                         {copied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
                     </IconSwap>
-                    <span className="hidden sm:inline">{copied ? 'Copied' : 'Share'}</span>
+                    <span className="hidden sm:inline">{copied ? uiI18n.t('app.copied_8e3df45a') : uiI18n.t('app.share_09ca55ca')}</span>
                 </Button>
 
                 {isHost && (
                     <>
-                        <Button variant="ghost" size="sm" onClick={() => setShowPollDialog(true)} aria-label="Create a poll" className="h-8 gap-1.5 rounded-full border border-white/5 bg-white/5 px-3 text-xs font-medium text-foreground/80 transition-all hover:bg-white/10 hover:text-foreground active:scale-95">
+                        <Button variant="ghost" size="sm" onClick={() => setShowPollDialog(true)} aria-label={uiI18n.t('app.create_a_poll_1cd8e960')} className="h-8 gap-1.5 rounded-full border border-white/5 bg-white/5 px-3 text-xs font-medium text-foreground/80 transition-all hover:bg-white/10 hover:text-foreground active:scale-95">
                             <BarChart3 className="w-3.5 h-3.5" />
-                            <span className="hidden lg:inline">Poll</span>
+                            <span className="hidden lg:inline">{uiI18n.t('app.poll_dafe1d3d')}</span>
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={handleExportChat} aria-label="Export chat" className="h-8 gap-1.5 rounded-full border border-white/5 bg-white/5 px-3 text-xs font-medium text-foreground/80 transition-all hover:bg-white/10 hover:text-foreground active:scale-95">
+                        <Button variant="ghost" size="sm" onClick={handleExportChat} aria-label={uiI18n.t('app.export_chat_ba575ee1')} className="h-8 gap-1.5 rounded-full border border-white/5 bg-white/5 px-3 text-xs font-medium text-foreground/80 transition-all hover:bg-white/10 hover:text-foreground active:scale-95">
                             <DownloadCloud className="w-3.5 h-3.5" />
-                            <span className="hidden lg:inline">Export</span>
+                            <span className="hidden lg:inline">{uiI18n.t('app.export_f3e4fadb')}</span>
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => setShowSettings(!showSettings)} aria-label="Toggle room settings" className={`h-8 gap-1.5 rounded-full border px-3 text-xs font-medium transition-all active:scale-95 ${showSettings ? 'border-white/10 bg-white/15 text-foreground shadow-inner' : 'border-white/5 bg-white/5 text-foreground/80 hover:bg-white/10 hover:text-foreground'}`}>
+                        <Button variant="ghost" size="sm" onClick={() => setShowSettings(!showSettings)} aria-label={uiI18n.t('app.toggle_room_settings_92073066')} className={`h-8 gap-1.5 rounded-full border px-3 text-xs font-medium transition-all active:scale-95 ${showSettings ? 'border-white/10 bg-white/15 text-foreground shadow-inner' : 'border-white/5 bg-white/5 text-foreground/80 hover:bg-white/10 hover:text-foreground'}`}>
                             <Settings className={`w-3.5 h-3.5 transition-transform duration-500 ${showSettings ? 'rotate-90' : ''}`} />
-                            <span className="hidden sm:inline">Settings</span>
+                            <span className="hidden sm:inline">{uiI18n.t('app.settings_c7f73bb5')}</span>
                         </Button>
                         <Button variant="ghost" size="sm" onClick={handleClose} className="h-8 gap-1.5 rounded-full border border-red-500/20 bg-red-500/10 px-3 text-xs font-medium text-red-400 transition-all hover:bg-red-500/20 hover:text-red-300 active:scale-95">
                             <X className="w-3.5 h-3.5" />
-                            <span className="hidden sm:inline">Close</span>
+                            <span className="hidden sm:inline">{uiI18n.t('app.close_bbfa773e')}</span>
                         </Button>
                     </>
                 )}
@@ -110,14 +111,14 @@ export function WatchRoomTopBar() {
                 {isParticipant && !isHost && (
                     <Button variant="ghost" size="sm" onClick={handleLeave} className="h-8 gap-1.5 rounded-full border border-red-500/20 bg-red-500/5 px-3 text-xs font-medium text-red-400 transition-all hover:bg-red-500/15 hover:text-red-300 active:scale-95">
                         <LogOut className="w-3.5 h-3.5" />
-                        <span className="hidden sm:inline">Leave</span>
+                        <span className="hidden sm:inline">{uiI18n.t('app.leave_7e3520a9')}</span>
                     </Button>
                 )}
 
                 {isAdmin && !isHost && (
-                    <Button variant="ghost" size="sm" onClick={handleAdminDelete} disabled={adminDeleteRoom.isPending} className="h-8 gap-1.5 rounded-full border border-red-500/20 bg-red-500/10 px-3 text-xs font-medium text-red-400 transition-all hover:bg-red-500/20 hover:text-red-300 active:scale-95" title="Admin: force-delete room">
+                    <Button variant="ghost" size="sm" onClick={handleAdminDelete} disabled={adminDeleteRoom.isPending} className="h-8 gap-1.5 rounded-full border border-red-500/20 bg-red-500/10 px-3 text-xs font-medium text-red-400 transition-all hover:bg-red-500/20 hover:text-red-300 active:scale-95" title={uiI18n.t('app.admin_force_delete_room_e6419c2f')}>
                         {adminDeleteRoom.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                        <span className="hidden sm:inline">Delete</span>
+                        <span className="hidden sm:inline">{uiI18n.t('app.delete_f6fdbe48')}</span>
                     </Button>
                 )}
 
@@ -126,15 +127,13 @@ export function WatchRoomTopBar() {
                     variant="ghost" 
                     size="sm" 
                     onClick={() => setShowDrawer(!showDrawer)} 
-                    aria-label="Toggle chat and room panels" 
-                    className={`h-8 gap-1.5 rounded-full border px-4 text-xs font-bold transition-all duration-300 active:scale-95 ${
-                        showDrawer 
+                    aria-label={uiI18n.t('app.toggle_chat_and_room_panels_4a0fb37f')}
+                    className={`h-8 gap-1.5 rounded-full border px-4 text-xs font-bold transition-all duration-300 active:scale-95 ${showDrawer
                         ? 'border-[hsl(var(--isshoni-accent)/0.3)] bg-[hsl(var(--isshoni-accent)/0.15)] text-[hsl(var(--isshoni-accent))] shadow-[0_0_15px_hsl(var(--isshoni-accent)/0.15)]' 
-                        : 'border-white/5 bg-white/5 text-foreground/80 hover:bg-white/10 hover:text-foreground'
-                    }`}
+                        : 'border-white/5 bg-white/5 text-foreground/80 hover:bg-white/10 hover:text-foreground'}`}
                 >
                     <MessageSquare className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Chat</span>
+                    <span className="hidden sm:inline">{uiI18n.t('app.chat_2ced57f1')}</span>
                 </Button>
             </div>
         </header>

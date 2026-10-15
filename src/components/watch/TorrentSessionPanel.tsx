@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
  * TorrentSessionPanel — the live state of the running torrent session.
  *
@@ -38,6 +40,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 
 interface TorrentSessionPanelProps {
   sessionId: string;
@@ -103,6 +106,7 @@ function SpeedGraph({
   series: number[];
   className?: string;
 }) {
+  useUiTranslation();
   const width = 132;
   const height = 30;
 
@@ -153,7 +157,9 @@ export function TorrentSessionPanel({
   onRepair,
   onStop,
 }: TorrentSessionPanelProps) {
+  useUiTranslation();
   const [expanded, setExpanded] = useState(false);
+  const { t } = useTranslation();
   const [repairing, setRepairing] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
   const [downSeries, setDownSeries] = useState<number[]>([]);
@@ -229,10 +235,10 @@ export function TorrentSessionPanel({
   // `progress` is the authoritative figure; the byte pair is only shown when the
   // metadata actually gave a file length, which some magnets do not.
   const byteLabel = totalLength > 0
-    ? `${formatBytes(downloaded)} of ${formatBytes(totalLength)}`
+    ? uiI18n.t('app.i18n_value_0_of_i18n_value_1_fc894332', { value0: formatBytes(downloaded), value1: formatBytes(totalLength) })
     : formatBytes(downloaded);
 
-  const peerLabel = numPeers == null ? "n/a" : String(numPeers);
+  const peerLabel = numPeers == null ? t('torrent.status.notAvailable') : String(numPeers);
   const infoHash = String(stats?.infoHash || "");
 
   return (
@@ -252,38 +258,38 @@ export function TorrentSessionPanel({
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-emerald-400">
               <Radio className={cn("h-3 w-3", !done && "animate-pulse")} />
-              Torrent session
+              {t('torrent.session.title')}
             </span>
 
             {done && verified && (
               <span className="flex items-center gap-1 rounded-full bg-emerald-400/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-300">
-                <ShieldCheck className="h-2.5 w-2.5" /> Verified
+                <ShieldCheck className="h-2.5 w-2.5" /> {t('torrent.session.verified')}
               </span>
             )}
             {!verified && (
               <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-300">
-                Seeking locked
+                {t('torrent.session.seekingLocked')}
               </span>
             )}
             {showRepairBadge && (
               <span className="flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-300">
-                <RefreshCw className="h-2.5 w-2.5 animate-spin" /> Repairing
+                <RefreshCw className="h-2.5 w-2.5 animate-spin" /> {t('torrent.session.repairing')}
               </span>
             )}
             {isStalled && (
               <span className="flex items-center gap-1 rounded-full bg-orange-500/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-orange-300">
-                <AlertTriangle className="h-2.5 w-2.5" /> Stalled {Math.round(stalledForMs / 1000)}s
+                <AlertTriangle className="h-2.5 w-2.5" /> {t('torrent.session.stalledSeconds', { seconds: Math.round(stalledForMs / 1000) })}
               </span>
             )}
             {isUnavailable && (
               <span className="flex items-center gap-1 rounded-full bg-red-500/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-red-300">
-                <AlertTriangle className="h-2.5 w-2.5" /> No peers
+                <AlertTriangle className="h-2.5 w-2.5" /> {t('torrent.status.noPeers')}
               </span>
             )}
           </div>
 
           <p className="mt-1 truncate font-mono text-xs text-foreground" title={stats?.name || sessionId}>
-            {stats?.name || (loading ? "Resolving release..." : sessionId)}
+            {stats?.name || (loading ? t('torrent.session.resolvingRelease') : sessionId)}
           </p>
         </div>
 
@@ -293,7 +299,7 @@ export function TorrentSessionPanel({
           className="flex h-7 shrink-0 items-center gap-1 rounded-lg bg-white/5 px-2 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
           aria-expanded={expanded}
         >
-          {expanded ? "Less" : "Details"}
+          {expanded ? t('torrent.session.less') : t('torrent.session.details')}
           <ChevronDown className={cn("h-3 w-3 transition-transform", expanded && "rotate-180")} />
         </button>
       </div>
@@ -318,7 +324,7 @@ export function TorrentSessionPanel({
               {formatEta(stats?.eta)}
             </span>
           )}
-          {done && <span className="text-emerald-400">Download complete</span>}
+          {done && <span className="text-emerald-400">{t('torrent.session.downloadComplete')}</span>}
         </div>
       </div>
 
@@ -327,7 +333,7 @@ export function TorrentSessionPanel({
         <div className="flex items-center justify-between gap-2 rounded-xl bg-white/[0.03] px-2.5 py-2 text-emerald-400">
           <div className="min-w-0">
             <div className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
-              <Download className="h-2.5 w-2.5" /> Down
+              <Download className="h-2.5 w-2.5" /> {t('torrent.status.down')}
             </div>
             <div className="truncate text-xs font-bold text-foreground">{formatRate(stats?.downloadSpeed)}</div>
           </div>
@@ -337,7 +343,7 @@ export function TorrentSessionPanel({
         <div className="flex items-center justify-between gap-2 rounded-xl bg-white/[0.03] px-2.5 py-2 text-sky-400">
           <div className="min-w-0">
             <div className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
-              <Upload className="h-2.5 w-2.5" /> Up
+              <Upload className="h-2.5 w-2.5" /> {t('torrent.status.up')}
             </div>
             <div className="truncate text-xs font-bold text-foreground">{formatRate(stats?.uploadSpeed)}</div>
           </div>
@@ -346,14 +352,17 @@ export function TorrentSessionPanel({
 
         <div className="col-span-2 rounded-xl bg-white/[0.03] px-2.5 py-2 sm:col-span-1">
           <div className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
-            <Users className="h-2.5 w-2.5" /> Peers
+            <Users className="h-2.5 w-2.5" /> {t('torrent.status.peers')}
           </div>
           <div className="text-xs font-bold text-foreground">
             {peerLabel}
             <span className="ml-1.5 text-[10px] font-normal text-muted-foreground">
               {/* Split out because the total hides the case that matters: many
                   leechers and no seeders never finishes. */}
-              {seeders == null ? "n/a" : seeders} seed · {leechers == null ? "n/a" : leechers} leech
+              {t('torrent.session.seedLeech', {
+                seeders: seeders == null ? t('torrent.status.notAvailable') : seeders,
+                leechers: leechers == null ? t('torrent.status.notAvailable') : leechers,
+              })}
             </span>
           </div>
         </div>
@@ -363,7 +372,7 @@ export function TorrentSessionPanel({
       {(isUnavailable || error) && (
         <p className={cn("text-[10px]", isUnavailable ? "text-red-300" : "text-amber-300")}>
           {isUnavailable
-            ? stats?.availabilityMessage || "This release has no visible swarm right now — try another one."
+            ? stats?.availabilityMessage || t('torrent.session.noSwarmTryAnother')
             : error}
         </p>
       )}
@@ -372,47 +381,47 @@ export function TorrentSessionPanel({
       {expanded && (
         <div className="grid grid-cols-2 gap-x-4 gap-y-2 border-t border-white/5 pt-3 text-[10px] sm:grid-cols-3">
           <div>
-            <div className="text-muted-foreground">Uploaded</div>
+            <div className="text-muted-foreground">{t('torrent.session.uploaded')}</div>
             <div className="font-medium text-foreground">
               {formatBytes(uploaded)}
-              {ratio > 0 && <span className="ml-1 text-muted-foreground">· {ratio.toFixed(2)} ratio</span>}
+              {ratio > 0 && <span className="ml-1 text-muted-foreground">{t('torrent.session.ratio', { ratio: ratio.toFixed(2) })}</span>}
             </div>
           </div>
 
           <div>
-            <div className="text-muted-foreground">Files in release</div>
+            <div className="text-muted-foreground">{t('torrent.session.filesInRelease')}</div>
             <div className="font-medium text-foreground">{numFiles > 0 ? numFiles : "—"}</div>
           </div>
 
           <div>
-            <div className="text-muted-foreground">Started</div>
+            <div className="text-muted-foreground">{t('torrent.session.started')}</div>
             <div className="font-medium text-foreground">
-              {stats?.startedAt ? new Date(stats.startedAt).toLocaleTimeString() : "—"}
+              {stats?.startedAt ? new Date(stats.startedAt).toLocaleTimeString(uiI18n.language) : "—"}
             </div>
           </div>
 
           <div className="col-span-2 sm:col-span-1">
             <div className="flex items-center gap-1 text-muted-foreground">
-              <HardDrive className="h-2.5 w-2.5" /> Cache on disk
+              <HardDrive className="h-2.5 w-2.5" /> {t('torrent.session.cacheOnDisk')}
             </div>
             <div className="font-medium text-foreground">
               {Number.isFinite(cacheBytes) ? formatBytes(cacheBytes) : "—"}
               {Number.isFinite(cacheMaxBytes) && cacheMaxBytes > 0 && (
                 // Cache-wide, not this torrent — the engine reports one budget
                 // for every session it has ever cached.
-                <span className="ml-1 text-muted-foreground">of {formatBytes(cacheMaxBytes)} total</span>
+                <span className="ml-1 text-muted-foreground">{t('torrent.session.ofTotal', { size: formatBytes(cacheMaxBytes) })}</span>
               )}
             </div>
           </div>
 
           <div className="col-span-2">
-            <div className="text-muted-foreground">Info hash</div>
+            <div className="text-muted-foreground">{t('torrent.session.infoHash')}</div>
             <button
               type="button"
               onClick={() => copy("hash", infoHash)}
               disabled={!infoHash}
               className="flex max-w-full items-center gap-1 font-mono text-[10px] text-foreground transition-colors hover:text-emerald-400 disabled:opacity-50"
-              title="Copy info hash"
+              title={t('torrent.session.copyInfoHash')}
             >
               <span className="truncate">{infoHash || "—"}</span>
               {copied === "hash" ? (
@@ -425,7 +434,7 @@ export function TorrentSessionPanel({
 
           {(downloadPath || stats?.storage?.root) && (
             <div className="col-span-2 sm:col-span-3">
-              <div className="text-muted-foreground">Saved to</div>
+              <div className="text-muted-foreground">{t('torrent.session.savedTo')}</div>
               <div className="flex items-center gap-2">
                 <span className="truncate font-mono text-[10px] text-foreground">
                   {downloadPath || stats?.storage?.root}
@@ -434,7 +443,7 @@ export function TorrentSessionPanel({
                   type="button"
                   onClick={() => copy("path", String(downloadPath || stats?.storage?.root || ""))}
                   className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
-                  title="Copy path"
+                  title={t('torrent.session.copyPath')}
                 >
                   {copied === "path" ? <Check className="h-2.5 w-2.5 text-emerald-400" /> : <Copy className="h-2.5 w-2.5" />}
                 </button>
@@ -444,7 +453,7 @@ export function TorrentSessionPanel({
 
           {optimizeStorage && !done && (
             <p className="col-span-2 text-[10px] text-amber-400/80 sm:col-span-3">
-              Storage optimization is on — stopping before this finishes deletes the partial file.
+              {t('torrent.session.optimizeStorageNote')}
             </p>
           )}
         </div>
@@ -458,10 +467,10 @@ export function TorrentSessionPanel({
           onClick={handleRepair}
           disabled={repairing}
           className="h-7 gap-1.5 rounded-lg border-white/10 px-2.5 text-[11px]"
-          title="Re-announce to the trackers and DHT to find more peers"
+          title={t('torrent.session.repairHint')}
         >
           {repairing ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
-          {isUnavailable ? "Find peers" : "Repair"}
+          {isUnavailable ? t('torrent.session.findPeers') : t('torrent.status.repair')}
         </Button>
 
         <Button
@@ -469,10 +478,10 @@ export function TorrentSessionPanel({
           variant="ghost"
           onClick={onStop}
           className="h-7 gap-1.5 rounded-lg px-2.5 text-[11px] text-red-300 hover:bg-red-500/10 hover:text-red-200"
-          title="Stop the session and go back to the hosted streams"
+          title={t('torrent.session.stopHint')}
         >
           <Square className="h-3 w-3" />
-          Stop &amp; return to streams
+          {t('torrent.session.stopReturn')}
         </Button>
 
         {(downloadPath || stats?.storage?.root) && (
@@ -481,16 +490,16 @@ export function TorrentSessionPanel({
             variant="ghost"
             onClick={openFolder}
             className="h-7 gap-1.5 rounded-lg px-2.5 text-[11px] text-muted-foreground hover:text-foreground"
-            title="Open the download folder"
+            title={t('torrent.session.openFolderHint')}
           >
             <FolderOpen className="h-3 w-3" />
-            Open folder
+            {t('torrent.status.openFolder')}
           </Button>
         )}
 
         {loading && (
           <span className="ml-auto flex items-center gap-1.5 text-[10px] text-muted-foreground">
-            <Loader2 className="h-3 w-3 animate-spin" /> Starting...
+            <Loader2 className="h-3 w-3 animate-spin" /> {t('torrent.session.starting')}
           </span>
         )}
       </div>

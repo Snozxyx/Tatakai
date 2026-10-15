@@ -1,4 +1,7 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { motion } from "framer-motion";
+import { useTranslation } from "react-i18next";
 import { Ban, ShieldX, Mail, AlertTriangle, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -6,6 +9,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { StatusVideoBackground } from "@/components/layout/StatusVideoBackground";
 
 const BannedPage = () => {
+  useUiTranslation();
+  const { t } = useTranslation();
   const { banReason, signOut, user, profile } = useAuth();
 
   return (
@@ -89,7 +94,7 @@ const BannedPage = () => {
               >
                 禁止
               </motion.p>
-              <p className="text-[10px] text-muted-foreground tracking-[0.15em] uppercase">Kinshi - Prohibited</p>
+              <p className="text-[10px] text-muted-foreground tracking-[0.15em] uppercase">{uiI18n.t('app.kinshi_prohibited_04a25423')}</p>
             </motion.div>
 
             {/* Header */}
@@ -99,10 +104,10 @@ const BannedPage = () => {
               transition={{ delay: 0.3 }}
             >
               <h1 className="text-2xl md:text-3xl font-display font-bold text-destructive mb-2">
-                Account Suspended
+                {t('errors.accountSuspended')}
               </h1>
               <p className="text-muted-foreground">
-                Your access to this platform has been restricted.
+                {t('errors.accessRestricted')}
               </p>
             </motion.div>
 
@@ -119,7 +124,7 @@ const BannedPage = () => {
                     <User className="w-5 h-5 text-red-400" />
                   </div>
                   <div className="text-left">
-                    <p className="font-medium text-foreground">{profile?.display_name || 'User'}</p>
+                    <p className="font-medium text-foreground">{profile?.display_name || uiI18n.t('app.user_9f8a2389')}</p>
                     <p className="text-xs text-muted-foreground">{user?.email}</p>
                   </div>
                   <div className="ml-auto">
@@ -143,10 +148,10 @@ const BannedPage = () => {
                 <div>
                   <p className="text-sm font-medium text-foreground mb-1 flex items-center gap-2">
                     <span className="text-red-400/60 text-xs">理由:</span>
-                    Reason for suspension
+                    {t('errors.suspensionReason')}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    {banReason || 'Violation of our Terms of Service. This action was taken after careful review.'}
+                    {banReason || t('errors.defaultBanReason')}
                   </p>
                 </div>
               </div>
@@ -161,11 +166,11 @@ const BannedPage = () => {
             >
               <div className="bg-red-500/5 border border-red-500/10 rounded-lg p-3">
                 <p className="text-muted-foreground text-xs mb-1">ステータス</p>
-                <p className="font-semibold text-red-400">Permanent</p>
+                <p className="font-semibold text-red-400">{t('errors.permanent')}</p>
               </div>
               <div className="bg-muted/50 border border-border/50 rounded-lg p-3">
                 <p className="text-muted-foreground text-xs mb-1">日付</p>
-                <p className="font-semibold text-foreground">{new Date().toLocaleDateString()}</p>
+                <p className="font-semibold text-foreground">{new Date().toLocaleDateString(uiI18n.language)}</p>
               </div>
             </motion.div>
 
@@ -178,7 +183,7 @@ const BannedPage = () => {
             >
               <p className="text-sm text-muted-foreground">
                 <span className="text-red-400/60 mr-1">異議申し立て:</span>
-                If you believe this is a mistake, you can submit an appeal.
+                {uiI18n.t('app.if_you_believe_this_is_a_mistake_you_can_submit__a60feaaa')}
               </p>
               <div className="flex flex-col gap-2">
                 <Button
@@ -188,7 +193,7 @@ const BannedPage = () => {
                   onClick={() => window.open('mailto:appeals@example.com?subject=Ban Appeal')}
                 >
                   <Mail className="w-5 h-5" />
-                  Submit Appeal
+                  {uiI18n.t('app.submit_appeal_ab84630e')}
                 </Button>
                 <Button
                   variant="ghost"
@@ -196,7 +201,7 @@ const BannedPage = () => {
                   className="w-full text-muted-foreground hover:text-foreground"
                   onClick={() => signOut()}
                 >
-                  Sign Out
+                  {uiI18n.t('app.sign_out_61fd08ff')}
                 </Button>
               </div>
             </motion.div>

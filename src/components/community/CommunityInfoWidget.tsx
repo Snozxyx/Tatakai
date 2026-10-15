@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { Info, ScrollText, BookText, Pencil } from 'lucide-react';
@@ -29,6 +31,7 @@ export function CommunityInfoWidget({
   canManage: boolean;
   className?: string;
 }) {
+  useUiTranslation();
   const updateCommunity = useUpdateCommunity();
   const [editing, setEditing] = useState<Field | null>(null);
 
@@ -36,10 +39,10 @@ export function CommunityInfoWidget({
     const value = serializeCommunityDoc({ content: payload.content, embeds: payload.embeds });
     try {
       await updateCommunity.mutateAsync({ id: community.id, [field]: value });
-      toast.success('Saved');
+      toast.success(uiI18n.t('app.saved_c0ae8f6e'));
       setEditing(null);
     } catch (err) {
-      toast.error('Failed to save', { description: err instanceof Error ? err.message : undefined });
+      toast.error(uiI18n.t('app.failed_to_save_23778b5f'), { description: err instanceof Error ? err.message : undefined });
       return false;
     }
   };
@@ -71,7 +74,7 @@ export function CommunityInfoWidget({
               onClick={() => setEditing(field)}
               className="flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold text-white/60 transition-colors hover:bg-white/5 hover:text-white"
             >
-              <Pencil className="h-3 w-3" /> Edit
+              <Pencil className="h-3 w-3" /> {uiI18n.t('app.edit_5301648d')}
             </button>
           )}
         </div>
@@ -109,7 +112,7 @@ export function CommunityInfoWidget({
         <div className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/[0.04]">
           <Info className="h-3.5 w-3.5 text-white/80" />
         </div>
-        <span className="text-[11px] font-bold uppercase tracking-widest text-white/70">Information</span>
+        <span className="text-[11px] font-bold uppercase tracking-widest text-white/70">{uiI18n.t('app.information_0eb5ed50')}</span>
       </div>
       <div className="relative z-10 space-y-4 px-4 pb-4">
         {renderSection('about', BookText, 'About', 'Tell members what this community is about…')}

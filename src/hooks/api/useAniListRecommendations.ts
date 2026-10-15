@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
  * useAniListRecommendations — per-media "Recommended" picks curated on AniList.
  *
@@ -85,7 +87,7 @@ async function fetchAniListRecommendations(
     body: JSON.stringify({ query: RECOMMENDATIONS_QUERY, variables: { id: anilistId } }),
     signal,
   });
-  if (!res.ok) throw new Error(`AniList ${res.status}`);
+  if (!res.ok) throw new Error(uiI18n.t('app.anilist_i18n_value_0_ebc40c5f', { value0: res.status }));
 
   const json = await res.json();
   if (json.errors?.length) throw new Error(json.errors[0]?.message || 'AniList GraphQL error');
@@ -132,6 +134,7 @@ export function useAniListRecommendations(
   anilistId: number | null | undefined,
   opts: UseAniListRecommendationsOptions = {},
 ) {
+  useUiTranslation();
   const { mediaType, includeAdult = false, limit = 24 } = opts;
 
   const query = useQuery({

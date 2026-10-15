@@ -1,4 +1,7 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { AlertCircle, RefreshCw, RotateCcw } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 interface ErrorOverlayProps {
   videoError: string;
@@ -21,6 +24,8 @@ export function ErrorOverlay({
   onRefresh,
   onServerSwitch,
 }: ErrorOverlayProps) {
+  useUiTranslation();
+  const { t } = useTranslation();
   if (!videoError) return null;
 
   return (
@@ -33,18 +38,18 @@ export function ErrorOverlay({
 
         {isOffline && (
           <div className="text-xs text-white/50 bg-black/50 p-2 rounded mt-2 font-mono break-all max-w-[300px]">
-            Debug: {videoSrc || "No Source"} <br />
-            Error: {videoErrorObj?.message || videoErrorObj?.code || "Unknown"}
+            {uiI18n.t('app.debug_4a0881a6')} {videoSrc || uiI18n.t('app.no_source_b97bf114')} <br />
+            {uiI18n.t('app.error_787aa161')} {videoErrorObj?.message || videoErrorObj?.code || uiI18n.t('app.unknown_bc7819b3')}
           </div>
         )}
 
         <p className="text-sm text-white/60">
           {videoError.toLowerCase().includes("auto-switching") ||
           videoError.toLowerCase().includes("switching server")
-            ? "Auto-switching to the next server in 3 seconds..."
+            ? t('player.autoSwitching')
             : videoError.toLowerCase().includes("retrying")
-              ? "Retrying automatically..."
-              : "Automatic server failover is enabled."}
+              ? t('player.retryingAuto')
+              : t('player.failoverEnabled')}
         </p>
 
         <div className="flex flex-col sm:flex-row gap-3 mt-2">
@@ -54,7 +59,7 @@ export function ErrorOverlay({
             disabled={isBuffering}
           >
             <RefreshCw className="w-4 h-4" />
-            Retry Current Server
+            {t('player.retryCurrentServer')}
           </button>
 
           <button
@@ -62,7 +67,7 @@ export function ErrorOverlay({
             className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 backdrop-blur-sm flex items-center justify-center gap-2 transition-all font-medium video-controls-btn"
           >
             <RotateCcw className="w-4 h-4" />
-            Refresh Player
+            {t('player.refreshPlayer')}
           </button>
 
           {onServerSwitch && (
@@ -70,7 +75,7 @@ export function ErrorOverlay({
               onClick={onServerSwitch}
               className="px-5 py-2.5 rounded-xl bg-primary hover:bg-primary/80 text-primary-foreground flex items-center justify-center gap-2 transition-all font-medium shadow-lg shadow-primary/30"
             >
-              Switch Server
+              {t('player.switchServer')}
             </button>
           )}
         </div>

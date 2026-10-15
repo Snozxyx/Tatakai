@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { Loader2, Share2 } from 'lucide-react';
@@ -60,6 +62,7 @@ function getPlaylistItemHref(mediaRef: string): string {
 }
 
 export default function PublicPlaylistPage() {
+  useUiTranslation();
   const { shareSlug } = useParams<{ shareSlug: string }>();
   const [searchParams] = useSearchParams();
   const [playlist, setPlaylist] = useState<any | null>(null);
@@ -127,7 +130,7 @@ export default function PublicPlaylistPage() {
   }, [shareSlug]);
 
   if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
-  if (!playlist) return <div className="min-h-screen flex items-center justify-center">Playlist not found</div>;
+  if (!playlist) return <div className="min-h-screen flex items-center justify-center">{uiI18n.t('app.playlist_not_found_38ca712b')}</div>;
 
   const { name, share_description, playlist_items = [] } = playlist;
 
@@ -138,8 +141,8 @@ export default function PublicPlaylistPage() {
     <div className={embed ? 'bg-transparent p-4' : 'min-h-screen bg-background text-foreground p-6'}>
       {!embed && (
         <Seo
-          title={name || 'Playlist'}
-          description={share_description || `A playlist with ${playlist_items.length} titles on Tatakai.`}
+          title={name || uiI18n.t('app.playlist_cd95b41f')}
+          description={share_description || uiI18n.t('app.a_playlist_with_i18n_value_0_titles_on_tatakai_d1560bb7', { value0: playlist_items.length })}
           image={playlist_items[0]?.anime_poster || undefined}
           canonicalPath={`/p/${shareSlug}`}
           kind="website"
@@ -150,18 +153,18 @@ export default function PublicPlaylistPage() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-2xl font-bold">{name}</h1>
-            <p className="text-sm text-muted-foreground">By {ownerName}</p>
+            <p className="text-sm text-muted-foreground">{uiI18n.t('app.by_cfadbd7a')} {ownerName}</p>
             {share_description && <p className="mt-2 text-sm text-muted-foreground">{share_description}</p>}
-            <p className="mt-1 text-xs text-muted-foreground">{playlist_items.length} item(s)</p>
+            <p className="mt-1 text-xs text-muted-foreground">{playlist_items.length} {uiI18n.t('app.item_s_c0e2ec82')}</p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => { navigator.clipboard.writeText(shareUrl); toast.success('Link copied'); }} className="gap-2">
+            <Button variant="outline" onClick={() => { navigator.clipboard.writeText(shareUrl); toast.success(uiI18n.t('app.link_copied_c2e98476')); }} className="gap-2">
               <Share2 className="w-4 h-4" />
-              Copy Link
+              {uiI18n.t('app.copy_link_672d82d0')}
             </Button>
             {!embed && playlist.embed_allowed && (
-              <Button variant="outline" onClick={() => { navigator.clipboard.writeText(embedCode); toast.success('Embed code copied'); }} className="gap-2">
-                Copy Embed
+              <Button variant="outline" onClick={() => { navigator.clipboard.writeText(embedCode); toast.success(uiI18n.t('app.embed_code_copied_4eeede71')); }} className="gap-2">
+                {uiI18n.t('app.copy_embed_979abded')}
               </Button>
             )}
           </div>
@@ -177,17 +180,17 @@ export default function PublicPlaylistPage() {
                   </div>
                   <div className="min-w-0">
                     <div className="font-semibold line-clamp-1">{item.anime_name}</div>
-                    <div className="text-sm text-muted-foreground">{parsePlaylistMediaRef(item.anime_id).kind === 'manga' ? 'Manga' : 'Anime'} • Added {new Date(item.added_at).toLocaleDateString()}</div>
+                    <div className="text-sm text-muted-foreground">{parsePlaylistMediaRef(item.anime_id).kind === 'manga' ? uiI18n.t('app.manga_87db0f99') : uiI18n.t('app.anime_f1b32a19')} {uiI18n.t('app.added_837d593c')} {new Date(item.added_at).toLocaleDateString(uiI18n.language)}</div>
                   </div>
                 </Link>
                 <Link to={getPlaylistItemHref(item.anime_id)} className="text-xs font-bold uppercase tracking-wider text-primary hover:underline">
-                  Open
+                  {uiI18n.t('app.open_cf9b7706')}
                 </Link>
               </div>
             ))}
           </div>
         ) : (
-          <div className="text-center py-12 text-muted-foreground">This playlist is empty</div>
+          <div className="text-center py-12 text-muted-foreground">{uiI18n.t('app.this_playlist_is_empty_9edd94fc')}</div>
         )}
       </div>
     </div>

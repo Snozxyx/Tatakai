@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { normalizeUpdateState } from '@/core/update/normalized-update';
 import { ReleaseDetails } from './ReleaseDetails';
 import { useDeveloperMode } from '@/hooks/ui/useDeveloperMode';
@@ -50,6 +52,7 @@ import { useUpdateState, resetUpdateState } from '@/core/update/update-monitor';
 import { installUpdateNow, openManualUpdateDownload } from '@/core/update/useUpdateOrchestrator';
 
 export function DesktopSettings() {
+  useUiTranslation();
     const isNative = useIsNativeApp();
 
     // The update lifecycle is owned by one app-lifetime store (fed by the Dynamic
@@ -98,13 +101,13 @@ export function DesktopSettings() {
             const success = await (window as any).electron.exportLogs();
 
             if (success) {
-                toast.success('Logs exported successfully');
+                toast.success(uiI18n.t('app.logs_exported_successfully_852b1517'));
             } else {
-                toast.error('Export cancelled or failed');
+                toast.error(uiI18n.t('app.export_cancelled_or_failed_e6bea6bc'));
             }
         } catch (error) {
             console.error(error);
-            toast.error('Failed to export logs');
+            toast.error(uiI18n.t('app.failed_to_export_logs_b777f66b'));
         }
     };
 
@@ -172,13 +175,13 @@ export function DesktopSettings() {
 
                         case 'not-available':
                             setIsCheckingUpdate(false);
-                            toast.success('You are using the latest version');
+                            toast.success(uiI18n.t('app.you_are_using_the_latest_version_34866012'));
                             break;
 
                         case 'error':
                             setIsCheckingUpdate(false);
                             toast.error(
-                                `Updater error: ${data.message || 'unknown error'}`
+                                uiI18n.t('app.updater_error_i18n_value_0_a829881d', { value0: data.message || 'unknown error' })
                             );
                             break;
                     }
@@ -254,11 +257,11 @@ export function DesktopSettings() {
                     path
                 );
 
-                toast.success('Download location updated');
+                toast.success(uiI18n.t('app.download_location_updated_5cf4f948'));
             }
         } catch (error) {
             console.error(error);
-            toast.error('Failed to select directory');
+            toast.error(uiI18n.t('app.failed_to_select_directory_02113ec4'));
         }
     };
 
@@ -276,7 +279,7 @@ export function DesktopSettings() {
             if (result?.error) {
                 setIsCheckingUpdate(false);
 
-                toast.error(`Check failed: ${result.error}`);
+                toast.error(uiI18n.t('app.check_failed_i18n_value_0_98d9c30b', { value0: result.error }));
             }
             // Success / availability is reported asynchronously via the
             // `updater-event` broadcast handled above; nothing else to do here.
@@ -285,7 +288,7 @@ export function DesktopSettings() {
 
             setIsCheckingUpdate(false);
 
-            toast.error('Failed to check for updates');
+            toast.error(uiI18n.t('app.failed_to_check_for_updates_4c4052cd'));
         }
     };
 
@@ -302,7 +305,7 @@ export function DesktopSettings() {
         enabled: boolean
     ) => {
         if (!(window as any).electron?.setAutoLaunch) {
-            toast.error('Auto-launch feature not available');
+            toast.error(uiI18n.t('app.auto_launch_feature_not_available_8a3141a9'));
             return;
         }
 
@@ -316,32 +319,32 @@ export function DesktopSettings() {
 
                 toast.success(
                     enabled
-                        ? 'Auto-launch enabled'
-                        : 'Auto-launch disabled'
+                        ? uiI18n.t('app.auto_launch_enabled_9839eb80')
+                        : uiI18n.t('app.auto_launch_disabled_344551d6')
                 );
             } else {
                 toast.error(
-                    'Failed to update auto-launch setting'
+                    uiI18n.t('app.failed_to_update_auto_launch_setting_71b33711')
                 );
             }
         } catch (error) {
             console.error(error);
 
             toast.error(
-                'Failed to update auto-launch setting'
+                uiI18n.t('app.failed_to_update_auto_launch_setting_71b33711')
             );
         }
     };
 
     const handleResetApp = async () => {
         if (!isNative) {
-            toast.error('Reset function not available');
+            toast.error(uiI18n.t('app.reset_function_not_available_8aaf57b9'));
             return;
         }
 
         if (!(window as any).electron?.resetAppData) {
             toast.error(
-                'Reset function not available. Please restart the desktop app.'
+                uiI18n.t('app.reset_function_not_available_please_restart_the__68c5e344')
             );
             return;
         }
@@ -357,7 +360,7 @@ export function DesktopSettings() {
                 localStorage.clear();
 
                 toast.success(
-                    'App data cleared. Restarting app...'
+                    uiI18n.t('app.app_data_cleared_restarting_app_24c6123d')
                 );
 
                 setTimeout(async () => {
@@ -367,13 +370,13 @@ export function DesktopSettings() {
                 }, 1500);
             } else {
                 toast.error(
-                    result.error || 'Failed to reset app'
+                    result.error || uiI18n.t('app.failed_to_reset_app_1c5a992e')
                 );
             }
         } catch (error) {
             console.error(error);
 
-            toast.error('Failed to reset app');
+            toast.error(uiI18n.t('app.failed_to_reset_app_1c5a992e'));
         }
 
         setShowResetDialog(false);
@@ -384,11 +387,11 @@ export function DesktopSettings() {
     return (
         <div className="space-y-8 min-w-0">
             {/* GENERAL */}
-            <SettingsSection title="General" bodyClassName="space-y-1">
+            <SettingsSection title={uiI18n.t('app.general_9239ee2c')} bodyClassName="space-y-1">
                 {(window as any).electron?.setAutoLaunch && (
                     <SettingRow
-                        title="Launch at Startup"
-                        description="Automatically start Tatakai when you log in"
+                        title={uiI18n.t('app.launch_at_startup_88d8812a')}
+                        description={uiI18n.t('app.automatically_start_tatakai_when_you_log_in_0a683edb')}
                         control={
                             <Switch
                                 checked={autoLaunch}
@@ -399,25 +402,25 @@ export function DesktopSettings() {
                 )}
 
                 <SettingRow
-                    title="Download Location"
-                    description="Episodes will be saved to this folder organized by anime title."
+                    title={uiI18n.t('app.download_location_b82af0c9')}
+                    description={uiI18n.t('app.episodes_will_be_saved_to_this_folder_organized__e077d2e6')}
                 >
                     <div className="flex flex-wrap items-center gap-2">
                         <div className="flex-1 basis-full sm:basis-0 min-w-0 px-3 py-2 rounded-md bg-background/50 border border-border text-sm font-mono truncate">
-                            {downloadPath || 'Default'}
+                            {downloadPath || uiI18n.t('app.default_808d7dca')}
                         </div>
                         <Button
                             variant="ghost"
                             size="icon"
                             className="shrink-0"
                             onClick={() => (window as any).electron.openPath(downloadPath)}
-                            title="Open Folder"
+                            title={uiI18n.t('app.open_folder_027760ff')}
                         >
                             <ExternalLink className="w-4 h-4" />
                         </Button>
                         <Button variant="outline" className="shrink-0" onClick={handleSelectDirectory}>
                             <FolderOpen className="w-4 h-4 mr-2" />
-                            Change
+                            {uiI18n.t('app.change_64fbd995')}
                         </Button>
                     </div>
                 </SettingRow>
@@ -436,8 +439,8 @@ export function DesktopSettings() {
             <CountryPolicyPanel />
 
             <SettingsSection
-                title="Discord Rich Presence"
-                description="Show what you are watching in Discord"
+                title={uiI18n.t('app.discord_rich_presence_1ce59a08')}
+                description={uiI18n.t('app.show_what_you_are_watching_in_discord_226eda86')}
                 action={
                     <Switch
                         checked={rpcSettings.enabled}
@@ -448,7 +451,7 @@ export function DesktopSettings() {
                             if (!checked && (window as any).electron?.clearRPC) {
                                 (window as any).electron.clearRPC();
                             }
-                            toast.success(checked ? 'Discord RPC enabled' : 'Discord RPC disabled');
+                            toast.success(checked ? uiI18n.t('app.discord_rpc_enabled_3ce8aa3c') : uiI18n.t('app.discord_rpc_disabled_5826bc7b'));
                         }}
                     />
                 }
@@ -456,12 +459,12 @@ export function DesktopSettings() {
             >
                 {rpcSettings.enabled && (
                     [
-                        { key: 'showAnimeTitle', label: 'Anime title', desc: 'e.g. "Watching Solo Leveling"' },
-                        { key: 'showEpisode',    label: 'Episode number', desc: 'e.g. "Episode 8"' },
-                        { key: 'showSeason',     label: 'Season number', desc: 'e.g. "S2 • Episode 8"' },
-                        { key: 'showLanguage',   label: 'Language / dub info', desc: 'e.g. "English Dub"' },
-                        { key: 'showProgress',   label: 'Playback progress', desc: 'Elapsed / remaining timestamps' },
-                        { key: 'showButtons',    label: '"View on Tatakai" button', desc: 'Adds a clickable link to the presence' },
+                        { key: 'showAnimeTitle', get label() { return uiI18n.t('app.anime_title_87dc4f04'); }, desc: 'e.g. "Watching Solo Leveling"' },
+                        { key: 'showEpisode',    get label() { return uiI18n.t('app.episode_number_f9410419'); }, desc: 'e.g. "Episode 8"' },
+                        { key: 'showSeason',     get label() { return uiI18n.t('app.season_number_712e75c8'); }, desc: 'e.g. "S2 • Episode 8"' },
+                        { key: 'showLanguage',   get label() { return uiI18n.t('app.language_dub_info_83085f80'); }, desc: 'e.g. "English Dub"' },
+                        { key: 'showProgress',   get label() { return uiI18n.t('app.playback_progress_9b734216'); }, desc: 'Elapsed / remaining timestamps' },
+                        { key: 'showButtons',    get label() { return uiI18n.t('app.view_on_tatakai_button_73b73c6d'); }, desc: 'Adds a clickable link to the presence' },
                     ] as Array<{ key: keyof DiscordRpcSettings; label: string; desc: string }>
                 ).map(({ key, label, desc }) => (
                     <SettingRow
@@ -483,19 +486,19 @@ export function DesktopSettings() {
             </SettingsSection>
 
             {/* SYSTEM */}
-            <SettingsSection title="System" bodyClassName="space-y-1">
+            <SettingsSection title={uiI18n.t('app.system_bc0792d8')} bodyClassName="space-y-1">
                 <SettingRow
-                    title={`Current version — v${__APP_VERSION__}`}
-                    description="You are on the stable channel"
+                    title={uiI18n.t('app.current_version_vi18n_value_0_0829162c', { value0: __APP_VERSION__ })}
+                    description={uiI18n.t('app.you_are_on_the_stable_channel_3864857b')}
                     control={
                         <div className="flex gap-2">
                             {updateReady ? (
                                 <Button onClick={handleQuitAndInstall} className="bg-success text-white hover:bg-success/90">
-                                    Restart to Install
+                                    {uiI18n.t('app.restart_to_install_2ca8d8c0')}
                                 </Button>
                             ) : updateAvailable && !isDownloading ? (
                                 <Button onClick={update.manual ? openManualUpdateDownload : handleDownloadUpdate}>
-                                    {update.manual ? 'Download manually' : `Download v${updateAvailable.version}`}
+                                    {update.manual ? uiI18n.t('app.download_manually_c68bf876') : uiI18n.t('app.download_vi18n_value_0_a7f631fe', { value0: updateAvailable.version })}
                                 </Button>
                             ) : (
                                 <Button onClick={handleCheckUpdate} disabled={isCheckingUpdate || isDownloading}>
@@ -515,8 +518,8 @@ export function DesktopSettings() {
                     {updateAvailable && (
                         <p className="text-xs text-success flex items-center gap-1">
                             <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
-                            Update available: v{updateAvailable.version}
-                            {update.manual && ' - install the latest DMG manually on macOS.'}
+                            {uiI18n.t('app.update_available_v_447e665e')}{updateAvailable.version}
+                            {update.manual && uiI18n.t('app.install_the_latest_dmg_manually_on_macos_3076a1a6')}
                         </p>
                     )}
                     {downloadProgress > 0 && isDownloading && (
@@ -527,34 +530,34 @@ export function DesktopSettings() {
                 </SettingRow>
 
                 {systemInfo && (
-                    <SettingRow title="System information">
+                    <SettingRow title={uiI18n.t('app.system_information_b5923ed1')}>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2 min-w-0">
                                 <div className="flex items-center justify-between gap-3 text-sm">
-                                    <span className="text-muted-foreground shrink-0">App Version</span>
+                                    <span className="text-muted-foreground shrink-0">{uiI18n.t('app.app_version_055c4ce8')}</span>
                                     <Badge variant="secondary" className="shrink-0">{systemInfo.version}</Badge>
                                 </div>
                                 <div className="flex items-center justify-between gap-3 text-sm">
-                                    <span className="text-muted-foreground shrink-0">Platform</span>
+                                    <span className="text-muted-foreground shrink-0">{uiI18n.t('app.platform_123a7f2f')}</span>
                                     <span className="font-mono min-w-0 truncate text-right">{systemInfo.platform} ({systemInfo.arch})</span>
                                 </div>
                                 <div className="flex items-center justify-between gap-3 text-sm">
-                                    <span className="text-muted-foreground shrink-0">Electron</span>
+                                    <span className="text-muted-foreground shrink-0">{uiI18n.t('app.electron_32a90561')}</span>
                                     <span className="font-mono min-w-0 truncate text-right">v{systemInfo.electronVersion}</span>
                                 </div>
                             </div>
                             <div className="space-y-2 min-w-0">
                                 <div className="flex items-center justify-between gap-3 text-sm">
-                                    <span className="text-muted-foreground shrink-0">CPU Cores</span>
+                                    <span className="text-muted-foreground shrink-0">{uiI18n.t('app.cpu_cores_8bafdfc7')}</span>
                                     <span className="font-mono min-w-0 truncate text-right">{systemInfo.cpus}</span>
                                 </div>
                                 <div className="flex items-center justify-between gap-3 text-sm">
-                                    <span className="text-muted-foreground shrink-0">Total RAM</span>
-                                    <span className="font-mono min-w-0 truncate text-right">{systemInfo.totalMemory} GB</span>
+                                    <span className="text-muted-foreground shrink-0">{uiI18n.t('app.total_ram_21492c7b')}</span>
+                                    <span className="font-mono min-w-0 truncate text-right">{systemInfo.totalMemory} {uiI18n.t('app.gb_505a44fa')}</span>
                                 </div>
                                 <div className="flex items-center justify-between gap-3 text-sm">
-                                    <span className="text-muted-foreground shrink-0">Free RAM</span>
-                                    <span className="font-mono min-w-0 truncate text-right">{systemInfo.freeMemory} GB</span>
+                                    <span className="text-muted-foreground shrink-0">{uiI18n.t('app.free_ram_41fc6719')}</span>
+                                    <span className="font-mono min-w-0 truncate text-right">{systemInfo.freeMemory} {uiI18n.t('app.gb_505a44fa')}</span>
                                 </div>
                             </div>
                         </div>
@@ -563,45 +566,45 @@ export function DesktopSettings() {
             </SettingsSection>
 
             {/* DEVELOPER */}
-            <SettingsSection title="Developer Tools" bodyClassName="space-y-1">
+            <SettingsSection title={uiI18n.t('app.developer_tools_b0608ab1')} bodyClassName="space-y-1">
                 <SettingRow
-                    title="Developer Mode"
-                    description="Enable advanced debugging features"
+                    title={uiI18n.t('app.developer_mode_324ac722')}
+                    description={uiI18n.t('app.enable_advanced_debugging_features_55f0d95f')}
                     control={<Switch checked={devMode} onCheckedChange={setDevMode} />}
                 />
 
                 {devMode && (
                     <SettingRow
-                        title="Application Logs"
-                        description="Export logs for troubleshooting"
+                        title={uiI18n.t('app.application_logs_cdd2f56a')}
+                        description={uiI18n.t('app.export_logs_for_troubleshooting_8400394a')}
                         control={
                             <Button variant="outline" onClick={handleExportLogs}>
                                 <FileText className="w-4 h-4 mr-2" />
-                                Export Logs
+                                {uiI18n.t('app.export_logs_fa7cce2c')}
                             </Button>
                         }
                     />
                 )}
 
                 <SettingRow
-                    title="Runtime Diagnostics"
-                    description="Local runtime/proxy events"
+                    title={uiI18n.t('app.runtime_diagnostics_1e531b8f')}
+                    description={uiI18n.t('app.local_runtime_proxy_events_93916c3a')}
                     control={
                         <Button variant="ghost" size="sm" onClick={() => setRuntimeEvents([])}>
-                            Clear
+                            {uiI18n.t('app.clear_719ea396')}
                         </Button>
                     }
                 >
                     <div className="max-h-44 overflow-auto rounded-md border border-border/50 bg-background/50">
                         {runtimeEvents.length === 0 ? (
-                            <div className="p-3 text-xs text-muted-foreground">No runtime events yet.</div>
+                            <div className="p-3 text-xs text-muted-foreground">{uiI18n.t('app.no_runtime_events_yet_cd81897e')}</div>
                         ) : (
                             <ul className="divide-y divide-border/40">
                                 {runtimeEvents.map((evt, idx) => (
                                     <li key={`${evt.type}-${idx}`} className="p-2 text-xs">
                                         <div className="font-mono text-primary">{evt.type}</div>
                                         <div className="text-muted-foreground">
-                                            {evt.ts ? new Date(evt.ts).toLocaleTimeString() : 'now'}
+                                            {evt.ts ? new Date(evt.ts).toLocaleTimeString(uiI18n.language) : uiI18n.t('app.now_c9bc849a')}
                                         </div>
                                     </li>
                                 ))}
@@ -611,8 +614,8 @@ export function DesktopSettings() {
                 </SettingRow>
 
                 <SettingRow
-                    title="Extension Audit Log & Sideloading"
-                    description="Sideload custom modules or view load/invoke/error events"
+                    title={uiI18n.t('app.extension_audit_log_sideloading_4ae65134')}
+                    description={uiI18n.t('app.sideload_custom_modules_or_view_load_invoke_erro_338ee45d')}
                     control={
                         <div className="flex items-center gap-2">
                             <Button
@@ -622,7 +625,7 @@ export function DesktopSettings() {
                                 className="h-9 px-4 rounded-xl bg-primary/10 border-primary/30 text-primary hover:bg-primary/20 hover:border-primary/50 text-xs font-bold gap-1.5"
                             >
                                 <Terminal className="w-4 h-4" />
-                                Test Toko Extension
+                                {uiI18n.t('app.test_toko_extension_b427bcef')}
                             </Button>
                             <Button
                                 size="sm"
@@ -631,22 +634,22 @@ export function DesktopSettings() {
                                 className="h-9 px-4 rounded-xl bg-primary/10 border-primary/30 text-primary hover:bg-primary/20 hover:border-primary/50 text-xs font-bold gap-1.5"
                             >
                                 <FolderUp className="w-4 h-4" />
-                                Sideload Extension
+                                {uiI18n.t('app.sideload_extension_9e220d8a')}
                             </Button>
                         </div>
                     }
                 >
                     <div className="max-h-40 overflow-auto rounded-md border border-border/50 bg-background/50">
                         {extensionAudit.length === 0 ? (
-                            <div className="p-3 text-xs text-muted-foreground">No audit entries.</div>
+                            <div className="p-3 text-xs text-muted-foreground">{uiI18n.t('app.no_audit_entries_f0d72cd7')}</div>
                         ) : (
                             <ul className="divide-y divide-border/40">
                                 {extensionAudit.slice(0, 20).map((evt, idx) => (
                                     <li key={`${evt.event}-${idx}`} className="p-2 text-xs">
                                         <div className="font-mono text-primary">{evt.event}</div>
                                         <div className="text-muted-foreground">
-                                            {evt.extensionId ? `ext=${evt.extensionId} · ` : ''}
-                                            {evt.ts ? new Date(evt.ts).toLocaleTimeString() : ''}
+                                            {evt.extensionId ? uiI18n.t('app.ext_i18n_value_0_10ef3e0e', { value0: evt.extensionId }) : ''}
+                                            {evt.ts ? new Date(evt.ts).toLocaleTimeString(uiI18n.language) : ''}
                                         </div>
                                     </li>
                                 ))}
@@ -656,19 +659,19 @@ export function DesktopSettings() {
                 </SettingRow>
 
                 <SettingRow
-                    title="WARP Routing Log"
-                    description="Recent route decisions"
+                    title={uiI18n.t('app.warp_routing_log_8d56dbeb')}
+                    description={uiI18n.t('app.recent_route_decisions_966777ec')}
                 >
                     <div className="max-h-36 overflow-auto rounded-md border border-border/50 bg-background/50">
                         {warpLog.length === 0 ? (
-                            <div className="p-3 text-xs text-muted-foreground">No routing entries.</div>
+                            <div className="p-3 text-xs text-muted-foreground">{uiI18n.t('app.no_routing_entries_0237ee76')}</div>
                         ) : (
                             <ul className="divide-y divide-border/40">
                                 {warpLog.slice(0, 20).map((evt, idx) => (
                                     <li key={`${evt.host}-${idx}`} className="p-2 text-xs">
-                                        <div className="font-mono text-primary">{evt.host || 'unknown-host'}</div>
+                                        <div className="font-mono text-primary">{evt.host || uiI18n.t('app.unknown_host_16b7d43b')}</div>
                                         <div className="text-muted-foreground">
-                                            {evt.routed ? 'routed via warp' : 'direct'} · {evt.mode || 'auto'}
+                                            {evt.routed ? uiI18n.t('app.routed_via_warp_faa22bd7') : uiI18n.t('app.direct_24a1733c')} · {evt.mode || uiI18n.t('app.auto_0d612c12')}
                                         </div>
                                     </li>
                                 ))}
@@ -681,21 +684,21 @@ export function DesktopSettings() {
 
             {/* DANGER ZONE */}
             {(window as any).electron?.resetAppData && (
-                <SettingsSection title="Danger Zone">
+                <SettingsSection title={uiI18n.t('app.danger_zone_8fc83aac')}>
                     <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/20">
                         <div className="flex items-center justify-between gap-4">
                             <div className="flex items-center gap-3">
                                 <AlertTriangle className="w-5 h-5 text-destructive shrink-0" />
                                 <div>
-                                    <p className="font-medium text-destructive">Reset Application</p>
+                                    <p className="font-medium text-destructive">{uiI18n.t('app.reset_application_5d8a5040')}</p>
                                     <p className="text-sm text-muted-foreground">
-                                        Clear all settings, cache, and downloaded content
+                                        {uiI18n.t('app.clear_all_settings_cache_and_downloaded_content_7bb37f3b')}
                                     </p>
                                 </div>
                             </div>
                             <Button variant="destructive" onClick={() => setShowResetDialog(true)}>
                                 <RotateCcw className="w-4 h-4 mr-2" />
-                                Reset App
+                                {uiI18n.t('app.reset_app_c9283e3e')}
                             </Button>
                         </div>
                     </div>
@@ -711,38 +714,33 @@ export function DesktopSettings() {
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2 text-destructive">
                             <AlertTriangle className="w-5 h-5" />
-                            Reset Application
+                            {uiI18n.t('app.reset_application_5d8a5040')}
                         </DialogTitle>
 
                         <DialogDescription className="space-y-3 pt-4">
                             <p>
-                                This action will completely reset
-                                the Tatakai desktop app:
+                                {uiI18n.t('app.this_action_will_completely_reset_the_tatakai_de_e9592390')}
                             </p>
 
                             <ul className="list-disc list-inside space-y-1 text-sm">
                                 <li>
-                                    Clear all app settings and
-                                    preferences
+                                    {uiI18n.t('app.clear_all_app_settings_and_preferences_c48849bd')}
                                 </li>
 
                                 <li>
-                                    Remove download history and
-                                    offline library
+                                    {uiI18n.t('app.remove_download_history_and_offline_library_4f260b9f')}
                                 </li>
 
                                 <li>
-                                    Reset window size and
-                                    position
+                                    {uiI18n.t('app.reset_window_size_and_position_e0d74731')}
                                 </li>
 
                                 <li>
-                                    Clear cache and temporary
-                                    data
+                                    {uiI18n.t('app.clear_cache_and_temporary_data_77c4f7e8')}
                                 </li>
 
                                 <li>
-                                    Require initial setup again
+                                    {uiI18n.t('app.require_initial_setup_again_3cda2b96')}
                                 </li>
                             </ul>
                         </DialogDescription>
@@ -755,7 +753,7 @@ export function DesktopSettings() {
                                 setShowResetDialog(false)
                             }
                         >
-                            Cancel
+                            {uiI18n.t('app.cancel_77dfd213')}
                         </Button>
 
                         <Button
@@ -763,7 +761,7 @@ export function DesktopSettings() {
                             onClick={handleResetApp}
                         >
                             <RotateCcw className="w-4 h-4 mr-2" />
-                            Reset App
+                            {uiI18n.t('app.reset_app_c9283e3e')}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { Users, ListOrdered, Music2, MessageCircle, Radio } from "lucide-react";
 import { HomeSectionHeading } from "./HomeSectionHeading";
 import { Reveal } from "@/components/ui/Reveal";
@@ -27,6 +28,7 @@ const SkeletonGrid = ({ count, className, itemClassName, tall }: { count: number
  * whole section disappears if the community has nothing to show yet.
  */
 export function CommunitySection() {
+  const { t } = useTranslation();
   // Most-liked public tier lists (with author profiles attached).
   const { data: allTierlists = [], isLoading: tlLoading } = usePublicTierLists(4);
   const tierlists = useMemo(() => allTierlists.slice(0, 4), [allTierlists]);
@@ -57,9 +59,9 @@ export function CommunitySection() {
     <section data-mobile-community className="space-y-12">
       <HomeSectionHeading
         icon={<Users className="w-5 h-5 text-primary" />}
-        title="Community"
+        title={t('nav.community')}
         viewAllTo="/community"
-        viewAllLabel="Explore"
+        viewAllLabel={t('nav.explore')}
       />
 
       {/* Top tier lists */}
@@ -69,7 +71,7 @@ export function CommunitySection() {
             as="h3"
             size="sub"
             icon={<ListOrdered className="w-[18px] h-[18px] text-primary" />}
-            title="Top Tier Lists"
+            title={t('home.topTierLists')}
             viewAllTo="/tierlists"
           />
           {tlLoading ? (
@@ -93,7 +95,7 @@ export function CommunitySection() {
             as="h3"
             size="sub"
             icon={<Music2 className="w-[18px] h-[18px] text-primary" />}
-            title="Popular Playlists"
+            title={t('home.popularPlaylists')}
             viewAllTo="/playlists"
           />
           {plLoading ? (
@@ -117,7 +119,7 @@ export function CommunitySection() {
             as="h3"
             size="sub"
             icon={<MessageCircle className="w-[18px] h-[18px] text-primary" />}
-            title="Community Posts"
+            title={t('home.communityPosts')}
             viewAllTo="/community"
           />
           {feedLoading ? (
@@ -139,7 +141,7 @@ export function CommunitySection() {
             as="h3"
             size="sub"
             icon={<Radio className="w-[18px] h-[18px] text-red-500" />}
-            title="Live Watch Rooms"
+            title={t('home.liveWatchRooms')}
             viewAllTo="/isshoni"
           />
           {roomLoading ? (

@@ -1,4 +1,7 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Button } from '@/components/ui/button';
@@ -19,7 +22,7 @@ const MEDIA_LABELS: Record<string, string> = {
 function formatMediaLabel(mediaFormat: string | null | undefined, mediaKind: 'anime' | 'manga' | 'novel'): string {
   const f = String(mediaFormat || '').trim().toLowerCase();
   if (f) return MEDIA_LABELS[f] || f.charAt(0).toUpperCase() + f.slice(1);
-  return mediaKind === 'manga' || mediaKind === 'novel' ? (mediaKind === 'novel' ? 'Novel' : 'Manga') : 'Anime';
+  return mediaKind === 'manga' || mediaKind === 'novel' ? (mediaKind === 'novel' ? uiI18n.t('app.novel_1a9fdb91') : uiI18n.t('app.manga_87db0f99')) : uiI18n.t('app.anime_f1b32a19');
 }
 
 interface SortablePlaylistItemProps {
@@ -43,6 +46,8 @@ export function SortablePlaylistItem({
   onRemove,
   onLaunchWatchRoom,
 }: SortablePlaylistItemProps) {
+  useUiTranslation();
+  const { t } = useTranslation();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id,
     disabled: !canEdit,
@@ -91,7 +96,7 @@ export function SortablePlaylistItem({
           <button
             type="button"
             className="absolute top-2 right-2 h-6 w-6 rounded-md bg-black/50 backdrop-blur text-white/80 hover:text-white flex items-center justify-center cursor-grab active:cursor-grabbing touch-none opacity-0 group-hover:opacity-100 transition-opacity"
-            aria-label="Drag to reorder"
+            aria-label={t('playlist.dragToReorder')}
             {...attributes}
             {...listeners}
           >
@@ -146,7 +151,7 @@ export function SortablePlaylistItem({
         <button
           type="button"
           className="text-muted-foreground/60 hover:text-foreground cursor-grab active:cursor-grabbing touch-none w-6 flex items-center justify-center"
-          aria-label="Drag to reorder"
+          aria-label={uiI18n.t('app.drag_to_reorder_e7541faf')}
           {...attributes}
           {...listeners}
         >
@@ -177,7 +182,7 @@ export function SortablePlaylistItem({
             {item.anime_name}
           </h3>
           <p className="text-sm text-muted-foreground">
-            {typeLabel} • Added {new Date(item.added_at).toLocaleDateString()}
+            {typeLabel} • {t('playlist.addedOn', { date: new Date(item.added_at).toLocaleDateString(uiI18n.language) })}
           </p>
         </div>
       </Link>

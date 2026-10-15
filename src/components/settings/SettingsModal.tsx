@@ -12,9 +12,11 @@ import { ExtensionSlot } from '@/core/extensions/ExtensionSlot';
 import {
   SETTINGS_CATEGORIES,
   SETTINGS_GROUP_ORDER,
+  getCategoryDisplay,
   getSettingsCategory,
   type SettingsCategory,
 } from './settingsCategories';
+import { useTranslation } from 'react-i18next';
 
 /**
  * Discord-style settings popup: a large centered glass modal with a left
@@ -23,6 +25,7 @@ import {
  * swap (rail first, panel with a back arrow).
  */
 export function SettingsModal() {
+  const { t } = useTranslation();
   const { open, category, section, closeSettings, setCategory } = useSettingsModal();
   const { user, profile, signOut } = useAuth();
   const isDesktop = useIsDesktopApp();
@@ -36,33 +39,34 @@ export function SettingsModal() {
     [isDesktop, isMobile],
   );
 
-  // Token-based search over each category's label, description and keywords, so
-  // a query like "discord" or "download location" surfaces the category that
-  // holds that setting even when the words aren't in its label. All tokens must
-  // match somewhere; `hint` names the keyword that surfaced a non-obvious match.
+  // Token-based search over each category's translated label, description and
+  // keywords, so a query like "discord" or "download location" surfaces the
+  // category that holds that setting even when the words aren't in its label.
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return categories.map((category) => ({ category, hint: undefined as string | undefined }));
     const tokens = q.split(/\s+/).filter(Boolean);
     const results: { category: SettingsCategory; hint?: string }[] = [];
     for (const category of categories) {
-      const label = category.label.toLowerCase();
-      const description = category.description.toLowerCase();
+      const { label, description } = getCategoryDisplay(t, category);
+      const labelLower = label.toLowerCase();
+      const descriptionLower = description.toLowerCase();
       const keywords = category.keywords ?? [];
-      const haystack = [label, description, ...keywords].join(' | ');
-      if (!tokens.every((t) => haystack.includes(t))) continue;
-      const inLabelOrDesc = tokens.every((t) => label.includes(t) || description.includes(t));
+      const haystack = [labelLower, descriptionLower, ...keywords].join(' | ');
+      if (!tokens.every((tok) => haystack.includes(tok))) continue;
+      const inLabelOrDesc = tokens.every((tok) => labelLower.includes(tok) || descriptionLower.includes(tok));
       const hint = inLabelOrDesc
         ? undefined
-        : keywords.find((k) => tokens.every((t) => k.toLowerCase().includes(t)))
-          ?? keywords.find((k) => tokens.some((t) => k.toLowerCase().includes(t)));
+        : keywords.find((k) => tokens.every((tok) => k.toLowerCase().includes(tok)))
+          ?? keywords.find((k) => tokens.some((tok) => k.toLowerCase().includes(tok)));
       results.push({ category, hint });
     }
     return results;
-  }, [categories, query]);
+  }, [categories, query, t]);
 
   const active = getSettingsCategory(category);
   const ActiveComponent = active.Component;
+  const activeDisplay = getCategoryDisplay(t, active);
 
   // Reset transient UI whenever the modal opens; jump straight to the panel on
   // mobile for deep-links (a section anchor or a non-default category).
@@ -86,7 +90,7 @@ export function SettingsModal() {
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) closeSettings(); }}>
       <DialogContent overlayClassName="z-[70]" aria-describedby={undefined} className="z-[80] flex flex-col w-[95vw] max-w-6xl h-[88vh] max-h-[88vh] max-md:w-[calc(100vw-1rem)] max-md:h-[94dvh] max-md:max-h-[94dvh] p-0 gap-0 overflow-hidden bg-background/95 backdrop-blur-xl border-border rounded-2xl max-md:rounded-3xl shadow-2xl">
-        <DialogTitle className="sr-only">Settings — {active.label}</DialogTitle>
+        <DialogTitle className="sr-only">{t('settings.title')} — {activeDisplay.label}</DialogTitle>
         <div className="flex flex-1 min-h-0 min-w-0">
           {/* Left rail */}
           <aside
@@ -116,7 +120,7 @@ export function SettingsModal() {
                   contentClassName="z-[100]"
                   trigger={
                     <Button variant="outline" size="sm" className="w-full mt-3">
-                      Edit Profile
+                      {t("settings.editProfile")}
                     </Button>
                   }
                 />
@@ -130,27 +134,28 @@ export function SettingsModal() {
                 <Input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  aria-label="Search settings"
-                  placeholder="Search settings"
+                  aria-label={t('settings.searchPlaceholder')}
+                  placeholder={t("settings.searchPlaceholder")}
                   className="pl-9 h-9 bg-background/50 border-input"
                 />
               </div>
             </div>
 
             {/* Grouped nav */}
-            <nav aria-label="Settings categories" className="flex-1 overflow-y-auto custom-scrollbar px-2 pb-3 space-y-4">
+            <nav aria-label={t('migration.settingsCategories')} className="flex-1 overflow-y-auto custom-scrollbar px-2 pb-3 space-y-4">
               {SETTINGS_GROUP_ORDER.map((group) => {
                 const items = filtered.filter((r) => r.category.group === group);
                 if (items.length === 0) return null;
                 return (
                   <div key={group}>
                     <p className="px-2 mb-1 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
-                      {group}
+                      {t(`settings.groups.${group}`)}
                     </p>
                     <div className="space-y-0.5">
                       {items.map(({ category: c, hint }) => {
                         const Icon = c.icon;
                         const isActive = c.id === category;
+                        const display = getCategoryDisplay(t, c);
                         return (
                           <button
                             key={c.id}
@@ -165,7 +170,7 @@ export function SettingsModal() {
                           >
                             <Icon className="w-4 h-4 shrink-0" />
                             <span className="min-w-0 flex-1">
-                              <span className="block truncate">{c.label}</span>
+                              <span className="block truncate">{display.label}</span>
                               {hint && (
                                 <span className="block truncate text-[11px] capitalize text-muted-foreground">
                                   {hint}
@@ -181,8 +186,8 @@ export function SettingsModal() {
               })}
               {filtered.length === 0 && (
                 <div className="px-2 py-8 text-center">
-                  <p className="text-sm text-muted-foreground">No settings match “{query.trim()}”.</p>
-                  <p className="mt-1 text-xs text-muted-foreground">Try “torrent”, “theme”, “language”, or “discord”.</p>
+                  <p className="text-sm text-muted-foreground">{t('settings.noResults', { query: query.trim() })}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{t('settings.tryTerms')}</p>
                 </div>
               )}
             </nav>
@@ -197,7 +202,7 @@ export function SettingsModal() {
                   className="w-full justify-start gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
                 >
                   <LogOut className="w-4 h-4" />
-                  Log out
+                  {t("settings.logOut")}
                 </Button>
               </div>
             )}
@@ -214,14 +219,14 @@ export function SettingsModal() {
               <button
                 onClick={() => setMobilePanelOpen(false)}
                 className="md:hidden flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-muted"
-                aria-label="Back to categories"
+                aria-label={t("settings.backToCategories")}
               >
                 <ChevronLeft className="w-5 h-5" />
               </button>
               <SettingsIcon className="w-5 h-5 text-muted-foreground hidden md:block" />
               <div className="min-w-0">
-                <h2 className="text-lg font-bold leading-tight truncate">{active.label}</h2>
-                <p className="text-xs text-muted-foreground truncate">{active.description}</p>
+                <h2 className="text-lg font-bold leading-tight truncate">{activeDisplay.label}</h2>
+                <p className="text-xs text-muted-foreground truncate">{activeDisplay.description}</p>
               </div>
             </header>
 

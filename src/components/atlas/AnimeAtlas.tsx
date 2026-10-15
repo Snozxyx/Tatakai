@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { getProxiedImageUrl } from '@/lib/api';
@@ -29,6 +31,7 @@ function makeStars(count: number) {
  * starfield with a soft vignette. Pan, zoom, hover and click are all supported.
  */
 export function AnimeAtlas({ layout, colorBy, controls }: { layout: AtlasLayout; colorBy: ColorBy; controls?: ReactNode }) {
+  useUiTranslation();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<View>({ scale: 1, tx: 0, ty: 0 });
@@ -407,13 +410,13 @@ export function AnimeAtlas({ layout, colorBy, controls }: { layout: AtlasLayout;
 
       {/* Zoom controls (bottom-right) — larger targets on touch. */}
       <div className="absolute bottom-3 right-3 flex flex-col gap-1.5">
-        <button onClick={() => zoomBy(1.3)} aria-label="Zoom in" className="flex h-10 w-10 md:h-8 md:w-8 items-center justify-center rounded-lg border border-white/10 bg-black/55 text-white/80 backdrop-blur-md transition-colors hover:bg-white/10 active:scale-95">
+        <button onClick={() => zoomBy(1.3)} aria-label={uiI18n.t('app.zoom_in_4fc05f27')} className="flex h-10 w-10 md:h-8 md:w-8 items-center justify-center rounded-lg border border-white/10 bg-black/55 text-white/80 backdrop-blur-md transition-colors hover:bg-white/10 active:scale-95">
           <Plus className="h-4 w-4" />
         </button>
-        <button onClick={() => zoomBy(1 / 1.3)} aria-label="Zoom out" className="flex h-10 w-10 md:h-8 md:w-8 items-center justify-center rounded-lg border border-white/10 bg-black/55 text-white/80 backdrop-blur-md transition-colors hover:bg-white/10 active:scale-95">
+        <button onClick={() => zoomBy(1 / 1.3)} aria-label={uiI18n.t('app.zoom_out_a4ae4b24')} className="flex h-10 w-10 md:h-8 md:w-8 items-center justify-center rounded-lg border border-white/10 bg-black/55 text-white/80 backdrop-blur-md transition-colors hover:bg-white/10 active:scale-95">
           <Minus className="h-4 w-4" />
         </button>
-        <button onClick={resetView} aria-label="Reset view" className="flex h-10 w-10 md:h-8 md:w-8 items-center justify-center rounded-lg border border-white/10 bg-black/55 text-white/80 backdrop-blur-md transition-colors hover:bg-white/10 active:scale-95">
+        <button onClick={resetView} aria-label={uiI18n.t('app.reset_view_80d8db7a')} className="flex h-10 w-10 md:h-8 md:w-8 items-center justify-center rounded-lg border border-white/10 bg-black/55 text-white/80 backdrop-blur-md transition-colors hover:bg-white/10 active:scale-95">
           <Maximize2 className="h-4 w-4" />
         </button>
       </div>
@@ -426,9 +429,9 @@ export function AnimeAtlas({ layout, colorBy, controls }: { layout: AtlasLayout;
           <div className="min-w-0">
             <Link to={infoHref} className="block text-sm font-bold text-white hover:text-primary line-clamp-2">{info.title}</Link>
             <p className="mt-1 text-xs text-muted-foreground">
-              {info.mediaType === 'novel' ? 'Novel' : info.mediaType === 'manga' ? 'Manga' : 'Anime'}
-              {info.year ? ` · ${info.year}` : ''}
-              {info.averageScore != null ? ` · ★ ${(info.averageScore / 10).toFixed(1)}` : ''}
+              {info.mediaType === 'novel' ? uiI18n.t('app.novel_1a9fdb91') : info.mediaType === 'manga' ? uiI18n.t('app.manga_87db0f99') : uiI18n.t('app.anime_f1b32a19')}
+              {info.year ? uiI18n.t('app.i18n_value_0_92e4cd32', { value0: info.year }) : ''}
+              {info.averageScore != null ? uiI18n.t('app.i18n_value_0_884721c8', { value0: (info.averageScore / 10).toFixed(1) }) : ''}
             </p>
             {info.genres.length > 0 && (
               <p className="mt-1 text-[10px] text-white/50 line-clamp-2">{info.genres.slice(0, 3).join(' · ')}</p>

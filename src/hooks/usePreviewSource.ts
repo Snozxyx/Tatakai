@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { getProxiedVideoUrl } from '@/lib/api';
 import { resolveApiV3Base } from '@/lib/api/backendOrigin';
@@ -87,6 +89,7 @@ function toProxyStreamUrl(source: PreviewSource | null): PreviewSource | null {
 }
 
 export function usePreviewSource(): UsePreviewSourceReturn {
+  useUiTranslation();
   const [source, setSource] = useState<PreviewSource | null>(null);
   const [loading, setLoading] = useState(false);
   const [unavailable, setUnavailable] = useState(false);
@@ -122,7 +125,7 @@ export function usePreviewSource(): UsePreviewSourceReturn {
       let timer: ReturnType<typeof setTimeout>;
       try {
         return await Promise.race([promise, new Promise<never>((_, reject) => {
-          timer = setTimeout(() => reject(new Error('timeout')), TIMEOUT_MS);
+          timer = setTimeout(() => reject(new Error(uiI18n.t('app.timeout_56d3c949'))), TIMEOUT_MS);
         })]);
       } finally { clearTimeout(timer!); }
     };

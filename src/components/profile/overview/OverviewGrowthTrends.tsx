@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -21,6 +23,7 @@ export interface OverviewGrowthTrendsProps extends GrowthInputs {
 }
 
 const GlassTooltip = ({ active, payload, label }: any) => {
+  useUiTranslation();
   if (active && payload && payload.length) {
     return (
       <div className="rounded-xl border border-white/[0.08] bg-background/80 p-3 shadow-2xl backdrop-blur-2xl">
@@ -42,6 +45,7 @@ const GlassTooltip = ({ active, payload, label }: any) => {
 };
 
 export function OverviewGrowthTrends({ months = 12, ...inputs }: OverviewGrowthTrendsProps) {
+  useUiTranslation();
   const series = useMemo(() => computeMonthlySeries(inputs, months), [inputs, months]);
   const [view, setView] = useState<'growth' | 'completion'>('growth');
 
@@ -54,10 +58,10 @@ export function OverviewGrowthTrends({ months = 12, ...inputs }: OverviewGrowthT
           <div className="flex items-center gap-2 mb-1">
             <TrendingUp className="w-4 h-4 text-primary/80" />
             <h3 className="font-display font-bold text-base sm:text-lg text-foreground tracking-tight">
-              Growth & Trends
+              {uiI18n.t('app.growth_trends_fda6fdd8')}
             </h3>
           </div>
-          <p className="text-xs text-muted-foreground/70">Real monthly activity over the last {months} months</p>
+          <p className="text-xs text-muted-foreground/70">{uiI18n.t('app.real_monthly_activity_over_the_last_dc5132ff')} {months} {uiI18n.t('app.months_f1494311')}</p>
         </div>
 
         <div className="flex items-center gap-1 bg-black/20 p-1 rounded-xl border border-white/[0.03] self-start sm:self-auto">
@@ -71,7 +75,7 @@ export function OverviewGrowthTrends({ months = 12, ...inputs }: OverviewGrowthT
             )}
           >
             <TrendingUp className="w-3.5 h-3.5" />
-            Growth
+            {uiI18n.t('app.growth_f3b21e04')}
           </button>
           <button
             onClick={() => setView('completion')}
@@ -83,7 +87,7 @@ export function OverviewGrowthTrends({ months = 12, ...inputs }: OverviewGrowthT
             )}
           >
             <LineIcon className="w-3.5 h-3.5" />
-            Completion
+            {uiI18n.t('app.completion_2ff25568')}
           </button>
         </div>
       </div>
@@ -92,7 +96,7 @@ export function OverviewGrowthTrends({ months = 12, ...inputs }: OverviewGrowthT
         {!series.hasData ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <TrendingUp className="w-10 h-10 text-muted-foreground/30 mb-3" />
-            <p className="text-sm text-muted-foreground/60">Not enough activity to chart yet.</p>
+            <p className="text-sm text-muted-foreground/60">{uiI18n.t('app.not_enough_activity_to_chart_yet_4c1c7956')}</p>
           </div>
         ) : (
           <AnimatePresence mode="wait">

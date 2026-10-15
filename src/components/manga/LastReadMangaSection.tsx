@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
  * The home page's continue-reading row.
  *
@@ -24,6 +26,7 @@ import { peekFromManga } from '@/components/media/quickPeekStore';
 const LIMIT = 6;
 
 export function LastReadMangaSection() {
+  useUiTranslation();
   const { user } = useAuth();
   const { data: continueRows = [], isLoading } = useMangaContinueReading(LIMIT);
 
@@ -31,20 +34,20 @@ export function LastReadMangaSection() {
     <section className="mb-12 space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <HomeSectionHeading
         icon={<BookMarked className="w-5 h-5 text-primary" />}
-        title="Last Read Manga"
+        title={uiI18n.t('app.last_read_manga_388a4686')}
         subtitle={
           continueRows.length > 0
-            ? `${continueRows.length} ${continueRows.length === 1 ? 'title' : 'titles'} in progress`
+            ? uiI18n.t('app.i18n_value_0_i18n_value_1_in_progress_36edb6ba', { value0: continueRows.length, value1: continueRows.length === 1 ? 'title' : 'titles' })
             : undefined
         }
         action={
           <Link
             to="/profile?tab=manga-readlist"
             className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border/70 bg-card px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:border-foreground/20 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-            aria-label="View full manga reading history"
+            aria-label={uiI18n.t('app.view_full_manga_reading_history_0fbb4991')}
           >
             <History className="h-3.5 w-3.5" aria-hidden="true" />
-            History
+            {uiI18n.t('app.history_90ccd649')}
           </Link>
         }
       />
@@ -60,11 +63,11 @@ export function LastReadMangaSection() {
           {continueRows.map((item) => {
             const chapterLabel =
               item.last_chapter_number != null
-                ? `Chapter ${item.last_chapter_number}`
-                : item.last_chapter_title || 'Last chapter';
+                ? uiI18n.t('app.chapter_i18n_value_0_e0f6e591', { value0: item.last_chapter_number })
+                : item.last_chapter_title || uiI18n.t('app.last_chapter_c965c810');
             const lastPage = Math.max(0, Number(item.last_page_index || 0));
             const totalPages = Number(item.total_pages || 0);
-            const pageLabel = totalPages > 0 ? `${lastPage + 1} / ${totalPages}` : `${lastPage + 1}`;
+            const pageLabel = totalPages > 0 ? uiI18n.t('app.i18n_value_0_i18n_value_1_68ff458e', { value0: lastPage + 1, value1: totalPages }) : uiI18n.t('app.i18n_value_0_f0862f54', { value0: lastPage + 1 });
             const progressPercent =
               totalPages > 0 ? Math.min(100, Math.round(((lastPage + 1) / totalPages) * 100)) : 0;
             const chapterKey = item.last_chapter_key || '';
@@ -104,13 +107,13 @@ export function LastReadMangaSection() {
                 secondaryMeta={
                   <span className="flex items-center gap-1.5 text-white/50">
                     <Layers className="h-3 w-3" />
-                    Page {pageLabel}
+                    {uiI18n.t('app.page_fb06270f')} {pageLabel}
                   </span>
                 }
                 progress={progressPercent}
                 progressNote={
                   totalPages > 0 ? (
-                    <span className="tabular-nums text-white/60">{totalPages} pages</span>
+                    <span className="tabular-nums text-white/60">{totalPages} {uiI18n.t('app.pages_eec6542d')}</span>
                   ) : undefined
                 }
                 fallbackIcon={BookMarked}
@@ -129,12 +132,12 @@ export function LastReadMangaSection() {
           </div>
           
           <h3 className="text-base font-semibold text-foreground">
-            {user ? 'No reading history' : 'Track your reading'}
+            {user ? uiI18n.t('app.no_reading_history_f0999143') : uiI18n.t('app.track_your_reading_8b2bfc61')}
           </h3>
           <p className="mt-2 max-w-sm text-sm text-muted-foreground leading-relaxed">
             {user
-              ? 'Open a manga chapter and your progress will automatically appear here.'
-              : 'Sign in to automatically track and resume your manga, manhwa, and comics from where you left off.'}
+              ? uiI18n.t('app.open_a_manga_chapter_and_your_progress_will_auto_f0bac235')
+              : uiI18n.t('app.sign_in_to_automatically_track_and_resume_your_m_5441fc66')}
           </p>
           
           {!user && (
@@ -142,7 +145,7 @@ export function LastReadMangaSection() {
               to="/auth"
               className="mt-7 inline-flex h-10 items-center justify-center rounded-full bg-primary px-6 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             >
-              Sign in or register
+              {uiI18n.t('app.sign_in_or_register_bdd855e8')}
             </Link>
           )}
         </div>

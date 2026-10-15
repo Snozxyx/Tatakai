@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState } from 'react';
 import { Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -32,6 +34,7 @@ export function ProfileShelf<T>({
   dialogGridClass,
   cap = 5,
 }: ProfileShelfProps<T>) {
+  useUiTranslation();
   const [open, setOpen] = useState(false);
   const accent = STATUS_ACCENT[status] || STATUS_ACCENT.plan_to_watch;
   const visible = items.slice(0, cap);
@@ -54,7 +57,7 @@ export function ProfileShelf<T>({
             className="flex items-center gap-1.5 rounded-full bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] px-3 py-1.5 text-xs font-bold text-foreground/80 hover:text-foreground transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
-            See all ({items.length})
+            {uiI18n.t('app.see_all_f8a6a050')}{items.length})
           </button>
         )}
       </div>

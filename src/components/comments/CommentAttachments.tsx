@@ -1,4 +1,7 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Heart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { CommentAttachment } from '@/lib/commentMedia';
@@ -47,7 +50,9 @@ export function CommentAttachments({
   attachments: CommentAttachment[] | undefined;
   className?: string;
 }) {
+  useUiTranslation();
   const { data: saved = [] } = useGifBookmarks();
+  const { t } = useTranslation();
   const toggle = useToggleGifBookmark();
   const savedUrls = useMemo(() => new Set(saved.map((s) => s.gif_url)), [saved]);
   const { open } = useLightbox();
@@ -86,7 +91,7 @@ export function CommentAttachments({
           >
             <img
               src={a.url}
-              alt={a.title || (a.type === 'gif' ? 'GIF' : 'image')}
+              alt={a.title || (a.type === 'gif' ? uiI18n.t('app.gif_758f6c93') : t('comments.imageAlt'))}
               loading="lazy"
               // object-contain preserves the whole image (no crop); the wrapper's
               // aspect-ratio (from stored width/height) gives it the right shape.
@@ -101,7 +106,7 @@ export function CommentAttachments({
               type="button"
               onClick={(e) => { e.stopPropagation(); toggle.mutate({ gif: toGiphy(a), bookmarked: isSaved }); }}
               disabled={toggle.isPending}
-              title={isSaved ? 'Remove from favorites' : 'Save to favorites'}
+              title={isSaved ? t('comments.removeFromFavorites') : t('comments.saveToFavorites')}
               aria-pressed={isSaved}
               className={cn(
                 'absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 backdrop-blur-sm transition-opacity hover:bg-black/80',
@@ -112,7 +117,7 @@ export function CommentAttachments({
             </button>
             {a.type === 'gif' && (
               <span className="absolute bottom-1.5 left-1.5 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-bold text-white">
-                GIF
+                {uiI18n.t('app.gif_758f6c93')}
               </span>
             )}
           </div>

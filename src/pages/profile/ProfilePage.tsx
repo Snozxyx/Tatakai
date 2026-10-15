@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { CachedProfileImage } from '@/components/ui/cached-profile-image';
 import { useProfileWatchTime } from '@/hooks/user/useProfileWatchTime';
 import { useState, useEffect, useMemo } from 'react';
@@ -58,7 +60,7 @@ import { toast } from 'sonner';
 import { getProxiedImageUrl } from '@/lib/api';
 import { AvatarPickerSheet } from '@/components/profile/AvatarPickerSheet';
 import { SocialLinksEditor, SocialLinksDisplay, SocialLinks } from '@/components/profile/SocialLinksEditor';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from '@/lib/localeFormat';
 import { cn } from '@/lib/utils';
 import {
   User, Settings, List, History, LogOut, Edit2, Save, X,
@@ -73,24 +75,25 @@ import { UserBadges } from '@/components/ui/UserBadges';
 import { useUserBadges } from '@/hooks/community/useUserBadges';
 
 const STATUS_LABELS: Record<string, { label: string; icon: React.ReactNode; color: string; bg: string }> = {
-  watching: { label: 'Watching', icon: <Play className="w-3 h-3" />, color: 'text-blue-400', bg: 'bg-blue-400/10' },
-  completed: { label: 'Completed', icon: <CheckCircle className="w-3 h-3" />, color: 'text-green-400', bg: 'bg-green-400/10' },
-  plan_to_watch: { label: 'Plan to Watch', icon: <Eye className="w-3 h-3" />, color: 'text-amber-400', bg: 'bg-amber-400/10' },
-  on_hold: { label: 'On Hold', icon: <Pause className="w-3 h-3" />, color: 'text-orange-400', bg: 'bg-orange-400/10' },
-  dropped: { label: 'Dropped', icon: <XCircle className="w-3 h-3" />, color: 'text-red-400', bg: 'bg-red-400/10' },
+  watching: { get label() { return uiI18n.t('app.watching_96d9e027'); }, icon: <Play className="w-3 h-3" />, color: 'text-blue-400', bg: 'bg-blue-400/10' },
+  completed: { get label() { return uiI18n.t('app.completed_1798b3ba'); }, icon: <CheckCircle className="w-3 h-3" />, color: 'text-green-400', bg: 'bg-green-400/10' },
+  plan_to_watch: { get label() { return uiI18n.t('app.plan_to_watch_5a9fd746'); }, icon: <Eye className="w-3 h-3" />, color: 'text-amber-400', bg: 'bg-amber-400/10' },
+  on_hold: { get label() { return uiI18n.t('app.on_hold_73fd29ee'); }, icon: <Pause className="w-3 h-3" />, color: 'text-orange-400', bg: 'bg-orange-400/10' },
+  dropped: { get label() { return uiI18n.t('app.dropped_8cf622d3'); }, icon: <XCircle className="w-3 h-3" />, color: 'text-red-400', bg: 'bg-red-400/10' },
 };
 
 const MANGA_STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
-  reading: { label: 'Reading', color: 'text-blue-300', bg: 'bg-blue-500/15' },
-  completed: { label: 'Completed', color: 'text-green-300', bg: 'bg-green-500/15' },
-  plan_to_read: { label: 'Plan to Read', color: 'text-amber-300', bg: 'bg-amber-500/15' },
-  on_hold: { label: 'On Hold', color: 'text-orange-300', bg: 'bg-orange-500/15' },
-  dropped: { label: 'Dropped', color: 'text-red-300', bg: 'bg-red-500/15' },
+  reading: { get label() { return uiI18n.t('app.reading_cffa2af0'); }, color: 'text-blue-300', bg: 'bg-blue-500/15' },
+  completed: { get label() { return uiI18n.t('app.completed_1798b3ba'); }, color: 'text-green-300', bg: 'bg-green-500/15' },
+  plan_to_read: { get label() { return uiI18n.t('app.plan_to_read_1f74de73'); }, color: 'text-amber-300', bg: 'bg-amber-500/15' },
+  on_hold: { get label() { return uiI18n.t('app.on_hold_73fd29ee'); }, color: 'text-orange-300', bg: 'bg-orange-500/15' },
+  dropped: { get label() { return uiI18n.t('app.dropped_8cf622d3'); }, color: 'text-red-300', bg: 'bg-red-500/15' },
 };
 
 const MANGA_READING_ONLY_STATUSES: MangaReadlistStatus[] = ['reading'];
 
 export default function ProfilePage() {
+  useUiTranslation();
   const navigate = useNavigate();
   const { username: usernameParam, atUsername, slug } = useParams<{ username?: string; atUsername?: string; slug?: string }>();
   const { user, profile: ownProfile, signOut, refreshProfile, isAdmin } = useAuth();
@@ -347,13 +350,13 @@ export default function ProfilePage() {
           <div className="max-w-7xl mx-auto px-4 md:px-8 py-20">
             <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-8">
               <ArrowLeft className="w-5 h-5" />
-              <span>Back</span>
+              <span>{uiI18n.t('app.back_b52b36b7')}</span>
             </button>
             <div className="text-center">
               <Lock className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-              <h1 className="text-2xl font-bold mb-2">Profile Not Available</h1>
-              <p className="text-muted-foreground mb-6">This profile is private or doesn't exist.</p>
-              <Button onClick={() => navigate('/')}>Go Home</Button>
+              <h1 className="text-2xl font-bold mb-2">{uiI18n.t('app.profile_not_available_d9c0b785')}</h1>
+              <p className="text-muted-foreground mb-6">{uiI18n.t('app.this_profile_is_private_or_doesn_t_exist_1df87e34')}</p>
+              <Button onClick={() => navigate('/')}>{uiI18n.t('app.go_home_19445d72')}</Button>
             </div>
           </div>
         </main>
@@ -378,11 +381,11 @@ export default function ProfilePage() {
   const handleSignOut = async () => {
     await signOut();
     navigate('/');
-    toast.success('Signed out');
+    toast.success(uiI18n.t('app.signed_out_1b8337c8'));
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+    return new Date(dateString).toLocaleDateString(uiI18n.language, {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
@@ -413,7 +416,7 @@ export default function ProfilePage() {
       {profile?.username && (
         <Seo
           title={profile.display_name || profile.username}
-          description={profile.bio || `${profile.display_name || profile.username}'s anime profile on Tatakai.`}
+          description={profile.bio || uiI18n.t('app.i18n_value_0_s_anime_profile_on_tatakai_3abad251', { value0: profile.display_name || profile.username })}
           image={profile.banner_url || profile.avatar_url || undefined}
           canonicalPath={`/user/${profile.username}`}
           kind="profile"
@@ -456,7 +459,7 @@ export default function ProfilePage() {
             {profile?.banner_url ? (
               <CachedProfileImage
                 src={profile.banner_url}
-                alt="Profile banner"
+                alt={uiI18n.t('app.profile_banner_7ed6014d')}
                 className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-[2s] ease-out group-hover:scale-[1.02]"
               />
             ) : (
@@ -476,7 +479,7 @@ export default function ProfilePage() {
               trigger={
                 <button className="absolute top-6 right-6 px-4 py-2 rounded-full bg-black/40 hover:bg-black/60 text-white/90 text-xs font-bold flex items-center gap-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-all duration-300 backdrop-blur-xl border border-white/20 shadow-2xl hover:scale-105 z-10">
                   <Camera className="w-3.5 h-3.5" />
-                  Change Cover
+                  {uiI18n.t('app.change_cover_50131aa6')}
                 </button>
               }
             />
@@ -489,7 +492,7 @@ export default function ProfilePage() {
                 className="group flex items-center gap-2 text-xs font-bold text-white/90 hover:text-white transition-all backdrop-blur-xl px-4 py-2 rounded-full bg-black/40 border border-white/20 shadow-xl hover:bg-black/60"
               >
                 <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
-                <span>Back</span>
+                <span>{uiI18n.t('app.back_b52b36b7')}</span>
               </button>
             </div>
           )}
@@ -523,7 +526,7 @@ export default function ProfilePage() {
                     type="avatar"
                     currentImage={profile?.avatar_url || undefined}
                     trigger={
-                      <button aria-label="Change profile picture" className="absolute bottom-2 right-2 w-11 h-11 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground flex items-center justify-center shadow-2xl transition-all duration-300 hover:scale-110 border-2 border-background z-20">
+                      <button aria-label={uiI18n.t('app.change_profile_picture_dfad18d2')} className="absolute bottom-2 right-2 w-11 h-11 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground flex items-center justify-center shadow-2xl transition-all duration-300 hover:scale-110 border-2 border-background z-20">
                         <Sparkles className="w-4 h-4" />
                       </button>
                     }
@@ -542,7 +545,7 @@ export default function ProfilePage() {
                       <h1 className="text-3xl md:text-5xl font-black tracking-tight drop-shadow-xl font-display">
                         <ProfileNameplate nameplate={nameplate}>
                           <span className={rankStyle.className} style={rankStyle.style}>
-                            {profile?.display_name || (profile?.username && profile?.username !== 'null' ? profile?.username : 'User')}
+                            {profile?.display_name || (profile?.username && profile?.username !== 'null' ? profile?.username : uiI18n.t('app.user_9f8a2389'))}
                           </span>
                         </ProfileNameplate>
                       </h1>
@@ -566,7 +569,7 @@ export default function ProfilePage() {
                 {/* Username & Rank Row */}
                 <div className="flex items-center justify-center md:justify-start gap-3 mb-5 flex-wrap">
                   <span className="text-sm font-medium text-muted-foreground/80 hover:text-muted-foreground transition-colors">
-                    @{profile?.username && profile?.username !== 'null' ? profile.username : 'anonymous'}
+                    @{profile?.username && profile?.username !== 'null' ? profile.username : uiI18n.t('app.anonymous_0a92fab3')}
                   </span>
                   <div className="w-1 h-1 rounded-full bg-white/20" />
                   {/* One unified rank across anime + manga/manhwa/comic. */}
@@ -588,7 +591,7 @@ export default function ProfilePage() {
                               : "bg-primary hover:bg-primary/90 text-primary-foreground hover:scale-105"
                           )}
                         >
-                          {isFollowing ? 'Following' : 'Follow'}
+                          {isFollowing ? uiI18n.t('app.following_90eeb100') : uiI18n.t('app.follow_66587a7a')}
                         </Button>
                       )}
                       <Button
@@ -596,11 +599,11 @@ export default function ProfilePage() {
                         onClick={() => {
                           const shareUrl = window.location.href;
                           navigator.clipboard.writeText(shareUrl);
-                          toast.success('Profile link copied!');
+                          toast.success(uiI18n.t('app.profile_link_copied_1db056f0'));
                         }}
                         className="rounded-full h-9 px-5 bg-white/5 hover:bg-white/15 border border-white/10 text-white text-xs font-bold transition-all backdrop-blur-md"
                       >
-                        <Share2 className="w-3.5 h-3.5 mr-2" /> Share
+                        <Share2 className="w-3.5 h-3.5 mr-2" /> {uiI18n.t('app.share_09ca55ca')}
                       </Button>
                     </>
                   ) : (
@@ -611,7 +614,7 @@ export default function ProfilePage() {
                             variant="secondary"
                             className="rounded-full h-9 px-5 bg-white/10 hover:bg-white/20 border border-white/10 text-white text-xs font-bold transition-all backdrop-blur-md hover:scale-105 shadow-xl"
                           >
-                            <Settings className="w-3.5 h-3.5 mr-2" /> Profile Settings
+                            <Settings className="w-3.5 h-3.5 mr-2" /> {uiI18n.t('app.profile_settings_df4b0814')}
                           </Button>
                         }
                       />
@@ -622,7 +625,7 @@ export default function ProfilePage() {
                         showHistory={(ownProfile as any)?.show_history ?? true}
                         trigger={
                           <Button variant="secondary" className="rounded-full h-9 px-5 bg-white/5 hover:bg-white/15 border border-white/10 text-white/90 text-xs font-bold transition-all backdrop-blur-md shadow-xl">
-                            <Share2 className="w-3.5 h-3.5 mr-2" /> Social Links
+                            <Share2 className="w-3.5 h-3.5 mr-2" /> {uiI18n.t('app.social_links_339c1ea9')}
                           </Button>
                         }
                       />
@@ -632,7 +635,7 @@ export default function ProfilePage() {
                           onClick={() => navigate('/admin')}
                           className="rounded-full h-9 px-5 bg-primary/15 hover:bg-primary/25 border border-primary/20 text-primary text-xs font-bold transition-all backdrop-blur-md shadow-xl"
                         >
-                          <Shield className="w-3.5 h-3.5 mr-2" /> Dashboard
+                          <Shield className="w-3.5 h-3.5 mr-2" /> {uiI18n.t('app.dashboard_d87f47b4')}
                         </Button>
                       )}
                     </>
@@ -645,22 +648,22 @@ export default function ProfilePage() {
             <div className="hidden xl:flex items-center gap-6 bg-white/[0.03] backdrop-blur-2xl border border-white/10 rounded-[2rem] p-5 shadow-[0_8px_32px_rgba(0,0,0,0.3)] min-w-[380px] justify-between">
               <div className="flex flex-col items-center px-2 flex-1">
                 <span className="text-2xl font-black text-white drop-shadow-md">{stats.completed}</span>
-                <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold mt-1">Anime</span>
+                <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold mt-1">{uiI18n.t('app.anime_f1b32a19')}</span>
               </div>
               <div className="w-px h-10 bg-white/10" />
               <div className="flex flex-col items-center px-2 flex-1">
                 <span className="text-2xl font-black text-white drop-shadow-md">{mangaCounts.totalChapters}</span>
-                <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold mt-1">Chapters</span>
+                <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold mt-1">{uiI18n.t('app.chapters_034e2733')}</span>
               </div>
               <div className="w-px h-10 bg-white/10" />
               <div className="flex flex-col items-center px-2 flex-1">
                 <span className="text-2xl font-black text-white drop-shadow-md">{followStats?.followers || 0}</span>
-                <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold mt-1">Friends</span>
+                <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold mt-1">{uiI18n.t('app.friends_c11d5e1d')}</span>
               </div>
               <div className="w-px h-10 bg-white/10" />
               <div className="flex flex-col items-center px-2 flex-1">
                 <span className="text-2xl font-black text-white drop-shadow-md">{formatWatchTime(stats.watchTimeSeconds)}</span>
-                <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold mt-1">Time</span>
+                <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold mt-1">{uiI18n.t('app.time_6c82e6dd')}</span>
               </div>
             </div>
 
@@ -709,40 +712,40 @@ export default function ProfilePage() {
                   className="shrink-0 gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_20px_rgba(var(--primary),0.4)] rounded-full px-4 py-2.5 text-sm font-bold whitespace-nowrap transition-all sm:px-5"
                 >
                   <LayoutGrid className="w-4 h-4" />
-                  Overview
+                  {uiI18n.t('app.overview_0efc2e6b')}
                 </TabsTrigger>
                 {showWatchlistTab && (
                   <TabsTrigger value="watchlist" className="shrink-0 md:flex-none gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_20px_rgba(var(--primary),0.4)] rounded-full px-4 py-2.5 text-sm font-bold transition-all sm:px-6">
                     <List className="w-4 h-4" />
-                    Watchlist
+                    {uiI18n.t('app.watchlist_48a616d9')}
                   </TabsTrigger>
                 )}
                 {showWatchlistTab && (
                   <TabsTrigger value="manga-readlist" className="shrink-0 md:flex-none gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_20px_rgba(var(--primary),0.4)] rounded-full px-4 py-2.5 text-sm font-bold transition-all sm:px-6">
                     <BookOpen className="w-4 h-4" />
-                    Manga Readlist
+                    {uiI18n.t('app.manga_readlist_2bfa7178')}
                   </TabsTrigger>
                 )}
                 {showWatchlistTab && (
                   <TabsTrigger value="novel-readlist" className="shrink-0 md:flex-none gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_20px_rgba(var(--primary),0.4)] rounded-full px-4 py-2.5 text-sm font-bold transition-all sm:px-6">
                     <BookOpen className="w-4 h-4" />
-                    Novels
+                    {uiI18n.t('app.novels_4ae488fd')}
                   </TabsTrigger>
                 )}
                 {showHistoryTab && (
                   <TabsTrigger value="history" className="shrink-0 md:flex-none gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_20px_rgba(var(--primary),0.4)] rounded-full px-4 py-2.5 text-sm font-bold transition-all sm:px-6">
                     <History className="w-4 h-4" />
-                    History
+                    {uiI18n.t('app.history_90ccd649')}
                   </TabsTrigger>
                 )}
                 <TabsTrigger value="vault" className="shrink-0 md:flex-none gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_20px_rgba(var(--primary),0.4)] rounded-full px-4 py-2.5 text-sm font-bold transition-all sm:px-6">
                   <Library className="w-4 h-4" />
-                  Vault
+                  {uiI18n.t('app.vault_fb46e374')}
                 </TabsTrigger>
                 {(!isViewingOther || showHistoryTab) && (
                   <TabsTrigger value="streaks" className="shrink-0 md:flex-none gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_20px_rgba(var(--primary),0.4)] rounded-full px-4 py-2.5 text-sm font-bold transition-all sm:px-6">
                     <Flame className="w-4 h-4" />
-                    Streaks
+                    {uiI18n.t('app.streaks_0de6ad7d')}
                   </TabsTrigger>
                 )}
               </TabsList>
@@ -750,7 +753,7 @@ export default function ProfilePage() {
               {isViewingOther && !showWatchlistTab && !showHistoryTab && (
                 <div className="text-center py-16 border border-white/5 bg-white/[0.02] backdrop-blur-sm rounded-[2rem]">
                   <Lock className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
-                  <p className="text-muted-foreground font-medium">This user has chosen to keep their anime lists private.</p>
+                  <p className="text-muted-foreground font-medium">{uiI18n.t('app.this_user_has_chosen_to_keep_their_anime_lists_p_c261a241')}</p>
                 </div>
               )}
 

@@ -1,7 +1,9 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from '@/lib/localeFormat';
 import { toast } from 'sonner';
 import {
   MessageSquare, FileText, ListChecks, ListMusic, Image as ImageIcon, Award,
@@ -31,18 +33,20 @@ import { usePostPoll } from '@/hooks/community/usePostPolls';
 type UserTab = 'comments' | 'posts' | 'tierlists' | 'playlists' | 'uploads' | 'badges';
 
 const TABS: { id: UserTab; label: string; icon: any }[] = [
-  { id: 'comments', label: 'Comments', icon: MessageSquare },
-  { id: 'posts', label: 'Posts', icon: FileText },
-  { id: 'tierlists', label: 'Tier lists', icon: ListChecks },
-  { id: 'playlists', label: 'Playlists', icon: ListMusic },
-  { id: 'uploads', label: 'Uploads', icon: ImageIcon },
-  { id: 'badges', label: 'Badges', icon: Award },
+  { id: 'comments', get label() { return uiI18n.t('app.comments_fce06e20'); }, icon: MessageSquare },
+  { id: 'posts', get label() { return uiI18n.t('app.posts_a0ca0c31'); }, icon: FileText },
+  { id: 'tierlists', get label() { return uiI18n.t('app.tier_lists_bfe1b707'); }, icon: ListChecks },
+  { id: 'playlists', get label() { return uiI18n.t('app.playlists_77b69f32'); }, icon: ListMusic },
+  { id: 'uploads', get label() { return uiI18n.t('app.uploads_227cc640'); }, icon: ImageIcon },
+  { id: 'badges', get label() { return uiI18n.t('app.badges_2c578dc8'); }, icon: Award },
 ];
 
 function Spin() {
+  useUiTranslation();
   return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary/60" /></div>;
 }
 function Empty({ icon: Icon, text }: { icon: any; text: string }) {
+  useUiTranslation();
   return (
     <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
       <Icon className="mb-3 h-8 w-8 opacity-40" />
@@ -52,9 +56,10 @@ function Empty({ icon: Icon, text }: { icon: any; text: string }) {
 }
 
 function CommentsTab({ userId, userName }: { userId: string; userName: string }) {
+  useUiTranslation();
   const { comments, isLoading } = useUserCommentsDetailed(userId);
   if (isLoading) return <Spin />;
-  if (!comments.length) return <Empty icon={MessageSquare} text="No comments." />;
+  if (!comments.length) return <Empty icon={MessageSquare} text={uiI18n.t('app.no_comments_03fdef78')} />;
   return (
     <div className="space-y-3">
       {comments.map((c) => (
@@ -62,14 +67,14 @@ function CommentsTab({ userId, userName }: { userId: string; userName: string })
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
               {c.is_spoiler && (
-                <span className="mb-1 inline-block rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] text-amber-400">Spoiler</span>
+                <span className="mb-1 inline-block rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] text-amber-400">{uiI18n.t('app.spoiler_875786ee')}</span>
               )}
               <CommentContent content={c.content} clamp className="mb-2" />
               <CommentAttachments attachments={c.attachments} className="mb-2" />
               <CommentEmbeds embeds={c.embeds} poll={c.poll} />
               <p className="mt-2 text-xs text-muted-foreground">
                 <Link to={c.target} className="hover:text-primary">{c.title}</Link>
-                {c.hasEpisode && ' • Episode'} · {formatDistanceToNow(new Date(c.created_at), { addSuffix: true })}
+                {c.hasEpisode && uiI18n.t('app.episode_35a1d209')} · {formatDistanceToNow(new Date(c.created_at), { addSuffix: true })}
               </p>
             </div>
             <ModerationMenu contentType="comment" contentId={c.id} authorUserId={userId} authorName={userName} />
@@ -83,6 +88,7 @@ function CommentsTab({ userId, userName }: { userId: string; userName: string })
 type StaffPost = ForumPost & { is_approved: boolean };
 
 function PostRow({ post, userId, userName }: { post: StaffPost; userId: string; userName: string }) {
+  useUiTranslation();
   const { data: poll } = usePostPoll(post.id);
 
   // Derive media the same way the feed's QuotedPostEmbed does: picked GIF, else
@@ -105,21 +111,21 @@ function PostRow({ post, userId, userName }: { post: StaffPost; userId: string; 
         <div className="min-w-0 flex-1">
           <div className="mb-1 flex flex-wrap items-center gap-1.5">
             {!post.is_approved && (
-              <span className="rounded-full bg-orange-500/20 px-2 py-0.5 text-[10px] text-orange-400">Pending approval</span>
+              <span className="rounded-full bg-orange-500/20 px-2 py-0.5 text-[10px] text-orange-400">{uiI18n.t('app.pending_approval_25d1b4bb')}</span>
             )}
             {post.is_pinned && (
-              <span className="rounded-full bg-primary/20 px-2 py-0.5 text-[10px] text-primary">Pinned</span>
+              <span className="rounded-full bg-primary/20 px-2 py-0.5 text-[10px] text-primary">{uiI18n.t('app.pinned_f9312169')}</span>
             )}
             {post.is_spoiler && (
-              <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] text-amber-400">Spoiler</span>
+              <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] text-amber-400">{uiI18n.t('app.spoiler_875786ee')}</span>
             )}
             {post.is_nsfw && (
-              <span className="rounded-full bg-rose-500/20 px-2 py-0.5 text-[10px] text-rose-400">NSFW</span>
+              <span className="rounded-full bg-rose-500/20 px-2 py-0.5 text-[10px] text-rose-400">{uiI18n.t('app.nsfw_b42a65e8')}</span>
             )}
           </div>
 
           <Link to={`/community/forum/${post.id}`} className="font-medium hover:text-primary">
-            {post.title || 'Untitled post'}
+            {post.title || uiI18n.t('app.untitled_post_983f0706')}
           </Link>
 
           {post.content && (
@@ -167,9 +173,10 @@ function PostRow({ post, userId, userName }: { post: StaffPost; userId: string; 
 }
 
 function PostsTab({ userId, userName }: { userId: string; userName: string }) {
+  useUiTranslation();
   const { data: posts = [], isLoading } = useUserForumPostsStaff(userId);
   if (isLoading) return <Spin />;
-  if (!posts.length) return <Empty icon={FileText} text="No forum posts." />;
+  if (!posts.length) return <Empty icon={FileText} text={uiI18n.t('app.no_forum_posts_5e8745f4')} />;
   return (
     <div className="space-y-3">
       {posts.map((p) => (
@@ -180,9 +187,10 @@ function PostsTab({ userId, userName }: { userId: string; userName: string }) {
 }
 
 function TierlistsTab({ userId, userName }: { userId: string; userName: string }) {
+  useUiTranslation();
   const { data: lists = [], isLoading } = useUserTierLists(userId);
   if (isLoading) return <Spin />;
-  if (!lists.length) return <Empty icon={ListChecks} text="No tier lists." />;
+  if (!lists.length) return <Empty icon={ListChecks} text={uiI18n.t('app.no_tier_lists_d1094540')} />;
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       {lists.map((l) => (
@@ -190,11 +198,11 @@ function TierlistsTab({ userId, userName }: { userId: string; userName: string }
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <p className="truncate font-medium">{l.title || l.name}</p>
-              {!l.is_public && <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-muted-foreground">Private</span>}
+              {!l.is_public && <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-muted-foreground">{uiI18n.t('app.private_237dfa0a')}</span>}
             </div>
             {l.description && <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{l.description}</p>}
             <p className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
-              <span>{l.items?.length ?? 0} items</span>
+              <span>{l.items?.length ?? 0} {uiI18n.t('app.items_7316c8b2')}</span>
               <span className="flex items-center gap-1"><Heart className="h-3 w-3" /> {l.likes_count ?? 0}</span>
               <span className="flex items-center gap-1"><Eye className="h-3 w-3" /> {l.views_count ?? 0}</span>
             </p>
@@ -207,9 +215,10 @@ function TierlistsTab({ userId, userName }: { userId: string; userName: string }
 }
 
 function PlaylistsTab({ userId, userName }: { userId: string; userName: string }) {
+  useUiTranslation();
   const { data: lists = [], isLoading } = useUserPlaylistsStaff(userId);
   if (isLoading) return <Spin />;
-  if (!lists.length) return <Empty icon={ListMusic} text="No playlists." />;
+  if (!lists.length) return <Empty icon={ListMusic} text={uiI18n.t('app.no_playlists_9370efb3')} />;
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       {lists.map((p) => (
@@ -221,12 +230,12 @@ function PlaylistsTab({ userId, userName }: { userId: string; userName: string }
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <p className="truncate font-medium">{p.name}</p>
-                {!p.is_public && <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-muted-foreground">Private</span>}
-                {p.is_flagged && <span className="rounded-full bg-rose-500/20 px-2 py-0.5 text-[10px] text-rose-400">Flagged</span>}
+                {!p.is_public && <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-muted-foreground">{uiI18n.t('app.private_237dfa0a')}</span>}
+                {p.is_flagged && <span className="rounded-full bg-rose-500/20 px-2 py-0.5 text-[10px] text-rose-400">{uiI18n.t('app.flagged_f8db8a17')}</span>}
               </div>
               {p.description && <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{p.description}</p>}
               <p className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
-                <span>{p.items_count ?? 0} items</span>
+                <span>{p.items_count ?? 0} {uiI18n.t('app.items_7316c8b2')}</span>
                 <span className="flex items-center gap-1"><Heart className="h-3 w-3" /> {p.likes_count ?? 0}</span>
               </p>
             </div>
@@ -239,6 +248,7 @@ function PlaylistsTab({ userId, userName }: { userId: string; userName: string }
 }
 
 function UploadsTab({ userId }: { userId: string }) {
+  useUiTranslation();
   const qc = useQueryClient();
   const { data: files = [], isLoading } = useQuery({
     queryKey: ['admin-user-media', userId],
@@ -252,14 +262,14 @@ function UploadsTab({ userId }: { userId: string }) {
       qc.setQueryData<UserMediaFile[]>(['admin-user-media', userId], (prev) =>
         (prev ?? []).filter((x) => !(x.bucket === f.bucket && x.path === f.path)),
       );
-      toast.success('File deleted');
+      toast.success(uiI18n.t('app.file_deleted_80bb638b'));
     } catch (err: any) {
-      toast.error('Failed to delete: ' + (err?.message ?? 'unknown error'));
+      toast.error('Failed to delete: ' + (err?.message ?? uiI18n.t('app.unknown_error_af6321ca')));
     }
   };
 
   if (isLoading) return <Spin />;
-  if (!files.length) return <Empty icon={ImageIcon} text="No uploads." />;
+  if (!files.length) return <Empty icon={ImageIcon} text={uiI18n.t('app.no_uploads_01e89b75')} />;
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
       {files.map((f) => (
@@ -285,6 +295,7 @@ function UploadsTab({ userId }: { userId: string }) {
 }
 
 function BadgesTab({ userId }: { userId: string }) {
+  useUiTranslation();
   const { data: granted = [], isLoading } = useUserAchievements(userId);
   const grant = useGrantAchievement();
   const revoke = useRevokeAchievement();
@@ -294,9 +305,9 @@ function BadgesTab({ userId }: { userId: string }) {
     try {
       if (has) await revoke.mutateAsync({ userId, achievementId: id });
       else await grant.mutateAsync({ userId, achievementId: id });
-      toast.success(has ? 'Badge revoked' : 'Badge granted');
+      toast.success(has ? uiI18n.t('app.badge_revoked_ca4583ac') : uiI18n.t('app.badge_granted_e3b32b02'));
     } catch (err: any) {
-      toast.error('Failed: ' + (err?.message ?? 'unknown error'));
+      toast.error('Failed: ' + (err?.message ?? uiI18n.t('app.unknown_error_af6321ca')));
     }
   };
 
@@ -322,7 +333,7 @@ function BadgesTab({ userId }: { userId: string }) {
               className={has ? 'gap-1.5 text-rose-400 hover:bg-rose-400/10 hover:text-rose-400' : 'gap-1.5'}
               onClick={() => toggle(a.id, has)}
             >
-              {has ? <><Check className="h-3.5 w-3.5" /> Granted</> : <><Plus className="h-3.5 w-3.5" /> Grant</>}
+              {has ? <><Check className="h-3.5 w-3.5" /> {uiI18n.t('app.granted_43b11ec4')}</> : <><Plus className="h-3.5 w-3.5" /> {uiI18n.t('app.grant_c02329c4')}</>}
             </Button>
           </div>
         );
@@ -332,6 +343,7 @@ function BadgesTab({ userId }: { userId: string }) {
 }
 
 export function AdminUserTabs({ userId, userName }: { userId: string; userName: string }) {
+  useUiTranslation();
   const [tab, setTab] = useState<UserTab>('comments');
   return (
     <div>
@@ -340,9 +352,7 @@ export function AdminUserTabs({ userId, userName }: { userId: string; userName: 
           <button
             key={id}
             onClick={() => setTab(id)}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-              tab === id ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:bg-white/[0.04] hover:text-foreground'
-            }`}
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${tab === id ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:bg-white/[0.04] hover:text-foreground'}`}
           >
             <Icon className="h-4 w-4" /> {label}
           </button>

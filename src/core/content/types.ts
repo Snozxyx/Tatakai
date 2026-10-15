@@ -1,3 +1,4 @@
+import { selectMediaTitle } from '@/lib/titleLanguage';
 /**
  * src/core/content/types.ts
  * Canonical types for the Tatakai Content Graph.
@@ -345,7 +346,7 @@ export function toAnimeCard(m: TatakaiMedia): AnimeCard {
         : m.tatakaiId || '';
   return {
     id: primaryId,
-    name: m.titleEnglish ?? m.titleRomaji,
+    name: selectMediaTitle(m),
     jname: m.titleNative ?? m.titleRomaji,
     poster: m.coverImageLarge ?? m.coverImageMedium ?? '',
     type: formatToDisplayType(m.format),
@@ -382,7 +383,7 @@ export function toSpotlightAnime(m: TatakaiMedia, rank: number): SpotlightAnime 
 
   return {
     id: primaryId,
-    name: m.titleEnglish ?? m.titleRomaji,
+    name: selectMediaTitle(m),
     jname: m.titleNative ?? m.titleRomaji,
     poster: m.coverImageLarge ?? m.coverImageMedium ?? m.bannerImage ?? '',
     banner: m.bannerImage,
@@ -408,7 +409,7 @@ export function toTopAnime(m: TatakaiMedia, rank: number): TopAnime {
         : m.tatakaiId || '';
   return {
     id: primaryId,
-    name: m.titleEnglish ?? m.titleRomaji,
+    name: selectMediaTitle(m),
     poster: m.coverImageLarge ?? m.coverImageMedium ?? '',
     rank,
     episodes: {
@@ -430,7 +431,7 @@ export function toTrendingAnime(m: TatakaiMedia, rank: number): TrendingAnime {
         : m.tatakaiId || '';
   return {
     id: primaryId,
-    name: m.titleEnglish ?? m.titleRomaji,
+    name: selectMediaTitle(m),
     poster: m.coverImageLarge ?? m.coverImageMedium ?? '',
     rank,
     isAdult: m.isAdult,

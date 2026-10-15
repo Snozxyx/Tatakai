@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMemo, useRef } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, BookOpen, ChevronLeft, ChevronRight, Flame } from "lucide-react";
@@ -60,6 +62,7 @@ function formatStatus(status?: string) {
 const CARD_WIDTH = "w-36 shrink-0 snap-start sm:w-44 md:w-48";
 
 function MangaShowcaseCard({ item }: { item: MangaCardItem }) {
+  useUiTranslation();
   // No explicit variant: the card follows the appearance setting like every
   // other rail — text inside the artwork ("Cinematic overlay") or below it
   // ("Clean poster"), per Settings → Appearance → Media cards.
@@ -71,6 +74,7 @@ function MangaShowcaseCard({ item }: { item: MangaCardItem }) {
 }
 
 function ShowcaseSkeleton() {
+  useUiTranslation();
   return (
     <CardSkeleton />
   );
@@ -83,6 +87,7 @@ function ShowcaseSkeleton() {
  * is true and the rail costs no request of its own.
  */
 export function IndexMangaShowcase() {
+  useUiTranslation();
   const { settings: contentSafetySettings } = useContentSafetySettings();
   const { data, isLoading } = useMangaHome();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -117,21 +122,21 @@ export function IndexMangaShowcase() {
       <HomeSectionHeading
         className="mb-8"
         icon={<Flame className="w-5 h-5 text-primary" />}
-        title="Trending Manga"
-        subtitle="What readers are opening right now."
+        title={uiI18n.t('app.trending_manga_e410f9e0')}
+        subtitle={uiI18n.t('app.what_readers_are_opening_right_now_3e7ba961')}
         action={
           <div className="flex items-center gap-2 shrink-0">
             <div className="hidden sm:flex gap-1 p-1 rounded-full bg-white/5 border border-white/10">
               <button
                 onClick={() => scroll("left")}
-                aria-label="Scroll left"
+                aria-label={uiI18n.t('app.scroll_left_2c9e5a60')}
                 className="p-2 rounded-full text-muted-foreground hover:text-white hover:bg-white/10 transition-colors duration-300"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
               <button
                 onClick={() => scroll("right")}
-                aria-label="Scroll right"
+                aria-label={uiI18n.t('app.scroll_right_2994b49c')}
                 className="p-2 rounded-full text-muted-foreground hover:text-white hover:bg-white/10 transition-colors duration-300"
               >
                 <ChevronRight className="w-4 h-4" />
@@ -142,7 +147,7 @@ export function IndexMangaShowcase() {
               to="/manga"
               className="group inline-flex items-center gap-1.5 h-10 px-4 rounded-full bg-white/5 border border-white/10 text-xs font-semibold uppercase tracking-wider text-white/80 hover:text-white hover:bg-white/10 transition-colors duration-300"
             >
-              Open Hub
+              {uiI18n.t('app.open_hub_0b925fc2')}
               <ArrowRight className="w-3.5 h-3.5 transition-transform duration-300 group-hover:translate-x-0.5" />
             </Link>
           </div>
@@ -172,12 +177,12 @@ export function IndexMangaShowcase() {
           <div className="mx-auto mb-3 w-10 h-10 rounded-full bg-orange-500/10 text-orange-400 flex items-center justify-center">
             <BookOpen className="w-5 h-5" />
           </div>
-          <p className="text-sm text-muted-foreground">Nothing trending yet — check back shortly.</p>
+          <p className="text-sm text-muted-foreground">{uiI18n.t('app.nothing_trending_yet_check_back_shortly_fa37209b')}</p>
           <Link
             to="/manga"
             className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-orange-400 hover:text-orange-300 transition-colors"
           >
-            Browse the manga hub <ArrowRight className="w-3 h-3" />
+            {uiI18n.t('app.browse_the_manga_hub_cf4d9522')} <ArrowRight className="w-3 h-3" />
           </Link>
         </div>
       )}

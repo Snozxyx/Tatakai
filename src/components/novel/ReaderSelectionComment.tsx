@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useEffect, useState, type RefObject } from 'react';
 import { MessageSquareQuote } from 'lucide-react';
 
@@ -8,6 +10,7 @@ export function ReaderSelectionComment({ rootRef, chapterKey, onQuote }: {
   chapterKey: string;
   onQuote: (text: string, chapterKey: string) => void;
 }) {
+  useUiTranslation();
   const [quote, setQuote] = useState<SelectedQuote | null>(null);
   useEffect(() => {
     const update = () => {
@@ -49,7 +52,7 @@ export function ReaderSelectionComment({ rootRef, chapterKey, onQuote }: {
     };
   }, [chapterKey, rootRef]);
   if (!quote) return null;
-  return <button type="button" aria-label="Comment on selected text" title="Comment on selected text"
+  return <button type="button" aria-label={uiI18n.t('app.comment_on_selected_text_a7f95eba')} title={uiI18n.t('app.comment_on_selected_text_a7f95eba')}
     onPointerDown={event => event.preventDefault()}
     onClick={() => { onQuote(quote.text, quote.chapterKey); window.getSelection()?.removeAllRanges(); setQuote(null); }}
     className="fixed z-50 flex h-11 w-11 -translate-x-1/2 items-center justify-center rounded-lg border border-border bg-background text-foreground shadow-md hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"

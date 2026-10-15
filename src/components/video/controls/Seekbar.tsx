@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import React, { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { formatTime } from '@/core/player/time-utils';
@@ -25,6 +27,7 @@ export function Seekbar({
   onSeek,
   isLive = false
 }: SeekbarProps) {
+  useUiTranslation();
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
   const bufferedPercent = duration > 0 ? (buffered / duration) * 100 : 0;
 
@@ -55,7 +58,7 @@ export function Seekbar({
         />
       );
     });
-  }, [chapters, duration]);
+  }, [chapters, duration, uiI18n.language]);
 
   return (
     <div className="relative w-full group/seekbar select-none">

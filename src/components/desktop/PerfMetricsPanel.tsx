@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AreaChart,
@@ -59,6 +61,7 @@ function mb(val: number | undefined): string {
  * Requirements: 4.9, 8.2
  */
 export function PerfMetricsPanel({ onClose }: PerfMetricsPanelProps) {
+  useUiTranslation();
   const [snapshots, setSnapshots] = useState<PerfSnapshot[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -67,7 +70,7 @@ export function PerfMetricsPanel({ onClose }: PerfMetricsPanelProps) {
   const fetchHistory = useCallback(async () => {
     const electron = (window as any).electron;
     if (!electron?.perfGetHistory) {
-      setError('perfGetHistory IPC not available — is this a desktop build?');
+      setError(uiI18n.t('app.perfgethistory_ipc_not_available_is_this_a_deskt_442eddce'));
       return;
     }
     setLoading(true);
@@ -108,7 +111,7 @@ export function PerfMetricsPanel({ onClose }: PerfMetricsPanelProps) {
   return (
     <div
       role="dialog"
-      aria-label="Performance Metrics"
+      aria-label={uiI18n.t('app.performance_metrics_5224dbfb')}
       style={{
         display: 'flex',
         flexDirection: 'column',
@@ -136,15 +139,15 @@ export function PerfMetricsPanel({ onClose }: PerfMetricsPanelProps) {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <Activity size={15} color="#6366f1" />
-          <span style={{ fontWeight: 600 }}>Performance Metrics</span>
+          <span style={{ fontWeight: 600 }}>{uiI18n.t('app.performance_metrics_5224dbfb')}</span>
           {loading && (
-            <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>refreshing…</span>
+            <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>{uiI18n.t('app.refreshing_10ef5f1b')}</span>
           )}
         </div>
         {onClose && (
           <button
             onClick={onClose}
-            aria-label="Close perf panel"
+            aria-label={uiI18n.t('app.close_perf_panel_64354157')}
             style={{
               background: 'none',
               border: 'none',
@@ -165,7 +168,7 @@ export function PerfMetricsPanel({ onClose }: PerfMetricsPanelProps) {
           <p style={{ color: '#f87171' }}>{error}</p>
         ) : snapshots.length === 0 && !loading ? (
           <p style={{ color: 'rgba(255,255,255,0.4)' }}>
-            No performance data yet. Data is sampled every 30 seconds.
+            {uiI18n.t('app.no_performance_data_yet_data_is_sampled_every_30_62e0f0c6')}
           </p>
         ) : (
           <>
@@ -180,26 +183,26 @@ export function PerfMetricsPanel({ onClose }: PerfMetricsPanelProps) {
                 }}
               >
                 <StatCard
-                  label="Heap Used"
+                  label={uiI18n.t('app.heap_used_77611b76')}
                   value={mb(latest.heapUsedMB)}
                   warn={latest.heapUsedMB > HEAP_WARN_MB}
                 />
                 <StatCard
-                  label="RSS"
+                  label={uiI18n.t('app.rss_fcae0f07')}
                   value={mb(latest.rssMB)}
                   warn={latest.rssMB > RSS_WARN_MB}
                 />
-                <StatCard label="Heap Total" value={mb(latest.heapTotalMB)} />
-                <StatCard label="External" value={mb(latest.externalMB)} />
+                <StatCard label={uiI18n.t('app.heap_total_c7274175')} value={mb(latest.heapTotalMB)} />
+                <StatCard label={uiI18n.t('app.external_8d10c693')} value={mb(latest.externalMB)} />
                 {latest.rendererHeapMB !== undefined && (
-                  <StatCard label="Renderer Heap" value={mb(latest.rendererHeapMB)} />
+                  <StatCard label={uiI18n.t('app.renderer_heap_1e7f7826')} value={mb(latest.rendererHeapMB)} />
                 )}
               </div>
             )}
 
             {/* Heap sparkline */}
             <ChartSection
-              title="Heap Used (MB)"
+              title={uiI18n.t('app.heap_used_mb_e9bccd20')}
               data={chartData}
               dataKey="heap"
               colour="#6366f1"
@@ -208,7 +211,7 @@ export function PerfMetricsPanel({ onClose }: PerfMetricsPanelProps) {
 
             {/* RSS sparkline */}
             <ChartSection
-              title="RSS (MB)"
+              title={uiI18n.t('app.rss_mb_849a5173')}
               data={chartData}
               dataKey="rss"
               colour="#10b981"
@@ -232,6 +235,7 @@ function StatCard({
   value: string;
   warn?: boolean;
 }) {
+  useUiTranslation();
   return (
     <div
       style={{
@@ -271,6 +275,7 @@ function ChartSection({
   colour: string;
   warnThreshold: number;
 }) {
+  useUiTranslation();
   // Check if any sample exceeds the threshold — highlight label in amber
   const hasWarn = data.some((d) => (d[dataKey] as number) > warnThreshold);
 
@@ -298,7 +303,7 @@ function ChartSection({
               padding: '1px 5px',
             }}
           >
-            HIGH
+            {uiI18n.t('app.high_d77d0b27')}
           </span>
         )}
       </div>

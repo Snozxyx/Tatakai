@@ -1,3 +1,5 @@
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
+import uiI18n from '@/lib/uiI18n';
 import { useCallback, useMemo } from 'react';
 import { isEnabled, FeatureFlag } from '@/core/feature-flags/feature-flags';
 import { useIsDesktopApp, useIsMobileApp } from '@/hooks/ui/useIsNativeApp';
@@ -18,6 +20,7 @@ import {
  * `useDownload.ts` (anime) but on the dedicated `window.electron.manga` bridge.
  */
 export function useMangaDownload() {
+  useUiTranslation();
   const isDesktop = useIsDesktopApp();
   const isMobileApp = useIsMobileApp();
   const featureEnabled = isEnabled(FeatureFlag.MANGA_DOWNLOAD);
@@ -38,8 +41,8 @@ export function useMangaDownload() {
     const jobId = mangaJobId(series.anilistId, chapter.chapterKey);
     try { localStorage.setItem(`tatakai:manga:retry:${jobId}`, JSON.stringify({ series, chapter })); }
     catch { /* Retrying is optional when local storage is unavailable. */ }
-    const numLabel = chapter.chapterNumber != null ? `Ch. ${chapter.chapterNumber}` : 'Chapter';
-    const chapterLabel = `${chapter.volume != null ? `Vol ${chapter.volume} · ` : ''}${numLabel}`;
+    const numLabel = chapter.chapterNumber != null ? uiI18n.t('app.ch_i18n_value_0_4d827531', { value0: chapter.chapterNumber }) : uiI18n.t('app.chapter_46b00590');
+    const chapterLabel = uiI18n.t('app.i18n_value_0i18n_value_1_bb0b4be1', { value0: chapter.volume != null ? `Vol ${chapter.volume} · ` : '', value1: numLabel });
     rememberMangaJobMeta(jobId, {
       title: series.title,
       posterUrl: series.posterUrl ?? null,

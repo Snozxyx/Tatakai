@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
  * ImportAnimeModal.tsx
  *
@@ -62,6 +64,7 @@ type Step = 'episodes' | 'search' | 'importing' | 'done';
 // ── Component ───────────────────────────────────────────────────────────────
 
 export function ImportAnimeModal({ open, filePaths, onClose, onSuccess }: ImportAnimeModalProps) {
+  useUiTranslation();
   const [step, setStep] = useState<Step>('episodes');
   const [fileEntries, setFileEntries] = useState<FileEntry[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -117,7 +120,7 @@ export function ImportAnimeModal({ open, filePaths, onClose, onSuccess }: Import
     setImportError(null);
     try {
       const electron = (window as any).electron;
-      if (!electron?.finalizeImport) throw new Error('Import not available');
+      if (!electron?.finalizeImport) throw new Error(uiI18n.t('app.import_not_available_9af3ce8b'));
 
       const posterUrl = anime?.coverImage?.large || null;
 
@@ -142,7 +145,7 @@ export function ImportAnimeModal({ open, filePaths, onClose, onSuccess }: Import
       if (result?.success) {
         setStep('done');
         const posterMsg = posterUrl ? ' (poster downloaded)' : '';
-        toast.success(result.message || `Imported ${fileEntries.length} file(s) to "${animeName}"${posterMsg}`);
+        toast.success(result.message || uiI18n.t('app.imported_i18n_value_0_file_s_to_i18n_value_1_i18_a3ac7590', { value0: fileEntries.length, value1: animeName, value2: posterMsg }));
         setTimeout(() => { onSuccess(); onClose(); }, 1500);
       } else {
         throw new Error(result?.error || 'Import failed');
@@ -167,13 +170,13 @@ export function ImportAnimeModal({ open, filePaths, onClose, onSuccess }: Import
         <DialogHeader>
           <DialogTitle className="text-xl font-bold flex items-center gap-2">
             <FileVideo className="w-5 h-5 text-primary" />
-            Import Videos
+            {uiI18n.t('app.import_videos_83d5af25')}
           </DialogTitle>
           <DialogDescription className="text-muted-foreground">
-            {step === 'episodes' && `${fileEntries.length} file(s) — set episode numbers then choose an anime.`}
-            {step === 'search' && 'Search for the anime to organize your files.'}
-            {step === 'importing' && 'Copying files to your library...'}
-            {step === 'done' && 'Import complete!'}
+            {step === 'episodes' && uiI18n.t('app.i18n_value_0_file_s_set_episode_numbers_then_cho_9f5edcdf', { value0: fileEntries.length })}
+            {step === 'search' && uiI18n.t('app.search_for_the_anime_to_organize_your_files_42cd57f3')}
+            {step === 'importing' && uiI18n.t('app.copying_files_to_your_library_c44ce4cd')}
+            {step === 'done' && uiI18n.t('app.import_complete_97918f2b')}
           </DialogDescription>
         </DialogHeader>
 
@@ -195,23 +198,23 @@ export function ImportAnimeModal({ open, filePaths, onClose, onSuccess }: Import
                       value={entry.episodeNumber}
                       onChange={e => handleEpisodeNumberChange(i, e.target.value)}
                       className="w-16 h-7 text-center text-sm bg-white/10 border-white/20 p-1"
-                      title="Episode number"
+                      title={uiI18n.t('app.episode_number_f9410419')}
                     />
                   </div>
                 </div>
               ))}
             </div>
             <p className="text-xs text-muted-foreground px-1">
-              Set the episode number for each file, then choose an anime or skip.
+              {uiI18n.t('app.set_the_episode_number_for_each_file_then_choose_1f4b69b8')}
             </p>
             <div className="flex flex-col gap-2">
               <Button onClick={() => setStep('search')} className="w-full gap-2 h-11">
                 <Search className="w-4 h-4" />
-                Search for Anime & Download Poster
+                {uiI18n.t('app.search_for_anime_download_poster_b1864171')}
               </Button>
               <Button variant="outline" onClick={handleSkip} className="w-full gap-2 h-11">
                 <SkipForward className="w-4 h-4" />
-                Skip — Import as "Imported Videos"
+                {uiI18n.t('app.skip_import_as_imported_videos_6c8938ee')}
               </Button>
             </div>
           </div>
@@ -229,7 +232,7 @@ export function ImportAnimeModal({ open, filePaths, onClose, onSuccess }: Import
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 autoFocus
-                placeholder="Search anime name..."
+                placeholder={uiI18n.t('app.search_anime_name_610e952d')}
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 className="pl-9 h-11 bg-white/5 border-white/10"
@@ -268,11 +271,11 @@ export function ImportAnimeModal({ open, filePaths, onClose, onSuccess }: Import
 
             <div className="flex gap-2 mt-auto">
               <Button variant="ghost" size="sm" onClick={() => setStep('episodes')} className="gap-1.5">
-                <ArrowLeft className="w-4 h-4" /> Back
+                <ArrowLeft className="w-4 h-4" /> {uiI18n.t('app.back_b52b36b7')}
               </Button>
               <Button variant="outline" onClick={handleSkip} className="flex-1 gap-2 h-10">
                 <SkipForward className="w-4 h-4" />
-                Skip — Import as "Imported Videos"
+                {uiI18n.t('app.skip_import_as_imported_videos_6c8938ee')}
               </Button>
             </div>
           </div>
@@ -282,7 +285,7 @@ export function ImportAnimeModal({ open, filePaths, onClose, onSuccess }: Import
         {step === 'importing' && (
           <div className="flex flex-col items-center gap-4 py-8">
             <Loader2 className="w-10 h-10 animate-spin text-primary" />
-            <p className="text-muted-foreground">Copying {fileEntries.length} file(s) and downloading poster...</p>
+            <p className="text-muted-foreground">{uiI18n.t('app.copying_43b7de98')} {fileEntries.length} {uiI18n.t('app.file_s_and_downloading_poster_7b1916f9')}</p>
           </div>
         )}
 
@@ -290,7 +293,7 @@ export function ImportAnimeModal({ open, filePaths, onClose, onSuccess }: Import
         {step === 'done' && (
           <div className="flex flex-col items-center gap-4 py-8">
             <CheckCircle2 className="w-10 h-10 text-green-400" />
-            <p className="font-medium">Import complete!</p>
+            <p className="font-medium">{uiI18n.t('app.import_complete_97918f2b')}</p>
           </div>
         )}
       </DialogContent>

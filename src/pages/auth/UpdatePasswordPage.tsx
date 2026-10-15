@@ -1,4 +1,7 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { Background } from '@/components/layout/Background';
 import { GlassPanel } from '@/components/ui/GlassPanel';
@@ -13,6 +16,8 @@ import { z } from 'zod';
 const passwordSchema = z.string().min(6, 'Password must be at least 6 characters');
 
 export default function UpdatePasswordPage() {
+  useUiTranslation();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -41,14 +46,14 @@ export default function UpdatePasswordPage() {
       passwordSchema.parse(password);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        toast.error(error.errors[0].message);
+        toast.error(t('auth.passwordMin'));
         return;
       }
     }
 
     // Check if passwords match
     if (password !== confirmPassword) {
-      toast.error('Passwords do not match');
+      toast.error(t('auth.passwordsNoMatch'));
       return;
     }
 
@@ -61,7 +66,7 @@ export default function UpdatePasswordPage() {
       if (error) throw error;
 
       setPasswordUpdated(true);
-      toast.success('Password updated successfully!');
+      toast.success(t('auth.passwordUpdatedSuccess'));
       
       // Redirect to home after 2 seconds
       setTimeout(() => {
@@ -69,7 +74,7 @@ export default function UpdatePasswordPage() {
       }, 2000);
     } catch (error: any) {
       console.error('Update password error:', error);
-      toast.error(error.message || 'Failed to update password');
+      toast.error(error.message || t('auth.passwordUpdateFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -88,15 +93,15 @@ export default function UpdatePasswordPage() {
             className="gap-2"
           >
             <ArrowLeft className="w-4 h-4" />
-            Back to Login
+            {t('auth.backToLogin')}
           </Button>
 
           {/* Logo */}
           <div className="text-center">
             <h1 className="text-4xl md:text-5xl font-display font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent mb-2">
-              Tatakai
+              {uiI18n.t('app.tatakai_28bda6bd')}
             </h1>
-            <p className="text-muted-foreground">Create a new password</p>
+            <p className="text-muted-foreground">{t('auth.createNewPassword')}</p>
           </div>
 
           {/* Update Password Form */}
@@ -104,14 +109,14 @@ export default function UpdatePasswordPage() {
             {!passwordUpdated ? (
               <form onSubmit={handleUpdatePassword} className="space-y-4">
                 <div className="space-y-2">
-                  <h2 className="text-2xl font-display font-semibold">Set New Password</h2>
+                  <h2 className="text-2xl font-display font-semibold">{t('auth.setNewPasswordTitle')}</h2>
                   <p className="text-sm text-muted-foreground">
-                    Enter your new password below.
+                    {t('auth.enterNewPasswordBelow')}
                   </p>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="password">New Password</Label>
+                  <Label htmlFor="password">{t('auth.newPassword')}</Label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                     <Input
@@ -133,12 +138,12 @@ export default function UpdatePasswordPage() {
                     </button>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Must be at least 6 characters
+                    {t('auth.passwordMinHint')}
                   </p>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                  <Label htmlFor="confirmPassword">{t('auth.confirmNewPassword')}</Label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                     <Input
@@ -169,12 +174,12 @@ export default function UpdatePasswordPage() {
                   {isLoading ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Updating...
+                      {t('auth.updating')}
                     </>
                   ) : (
                     <>
                       <Lock className="w-4 h-4 mr-2" />
-                      Update Password
+                      {t('auth.updatePassword')}
                     </>
                   )}
                 </Button>
@@ -185,9 +190,9 @@ export default function UpdatePasswordPage() {
                   <CheckCircle className="w-8 h-8 text-primary" />
                 </div>
                 <div className="space-y-2">
-                  <h2 className="text-2xl font-display font-semibold">Password Updated!</h2>
+                  <h2 className="text-2xl font-display font-semibold">{t('auth.passwordUpdatedTitle')}</h2>
                   <p className="text-sm text-muted-foreground">
-                    Your password has been successfully updated. Redirecting to home...
+                    {t('auth.passwordUpdatedRedirect')}
                   </p>
                 </div>
               </div>

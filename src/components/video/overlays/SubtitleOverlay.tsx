@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMemo } from "react";
 import type { VideoSettings } from "@/hooks/media/useVideoSettings";
 import { buildSubtitleCueStyle } from "@/lib/video/subtitleStyle";
@@ -17,6 +19,7 @@ interface SubtitleOverlayProps {
  * still parses cues but doesn't double-render them.
  */
 export function SubtitleOverlay({ lines, settings, controlsVisible }: SubtitleOverlayProps) {
+  useUiTranslation();
   const cueStyle = useMemo<React.CSSProperties>(() => buildSubtitleCueStyle(settings), [settings]);
 
   if (!lines.length) return null;

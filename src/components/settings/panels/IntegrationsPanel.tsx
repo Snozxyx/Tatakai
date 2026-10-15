@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Loader2, Link2, Trash2, CheckCircle, RefreshCw, ExternalLink } from 'lucide-react';
@@ -34,6 +36,7 @@ import {
 } from '@/components/settings/SettingsPrimitives';
 
 export function IntegrationsPanel() {
+  useUiTranslation();
   const { user, profile, refreshProfile } = useAuth();
 
   // MangaBaka (OAuth2) state — tokens live server-side; the UI only learns
@@ -100,11 +103,11 @@ export function IntegrationsPanel() {
       // `invalid_grant`). If a login is still in flight, make restarting
       // explicit instead of silently dooming the open tab.
       if (!force && isMalLoginPendingFresh()) {
-        toast.warning('A MyAnimeList login is already in progress.', {
-          description: 'Only the newest MAL tab can complete — finish it, or discard it and start fresh.',
+        toast.warning(uiI18n.t('app.a_myanimelist_login_is_already_in_progress_b915ce93'), {
+          get description() { return uiI18n.t('app.only_the_newest_mal_tab_can_complete_finish_it_o_47dddd30'); },
           duration: 10000,
           action: {
-            label: 'Discard & restart',
+            get label() { return uiI18n.t('app.discard_restart_d681b68e'); },
             onClick: () => {
               clearMalOAuthStorage();
               void handleMALConnect(true);
@@ -119,19 +122,19 @@ export function IntegrationsPanel() {
         // (AniList/MAL dashboards only need the https URI registered).
         const url = await getMalAuthUrl(getWebMalRedirectUri(), buildDesktopOAuthState());
         if (await openOAuthInBrowser(url)) {
-          toast.info('Complete the MyAnimeList login in your browser, then return to the app.');
+          toast.info(uiI18n.t('app.complete_the_myanimelist_login_in_your_browser_t_c231915a'));
           return;
         }
         // In-app navigation to myanimelist.net is blocked by the desktop
         // shell (will-navigate allow-list), so falling back to it would leave
         // the user stuck. Surface the failure instead of a dead navigation.
-        toast.error('Could not open your browser for MyAnimeList login. Please copy the login link manually.', {
+        toast.error(uiI18n.t('app.could_not_open_your_browser_for_myanimelist_logi_e6b20919'), {
           action: {
-            label: 'Copy link',
+            get label() { return uiI18n.t('app.copy_link_2f84eea5'); },
             onClick: () => {
               void navigator.clipboard?.writeText(url).then(
-                () => toast.success('Login link copied — paste it into your browser.'),
-                () => toast.error('Copy failed. Please try again.'),
+                () => toast.success(uiI18n.t('app.login_link_copied_paste_it_into_your_browser_3a607349')),
+                () => toast.error(uiI18n.t('app.copy_failed_please_try_again_5ebeda6d')),
               );
             },
           },
@@ -156,7 +159,7 @@ export function IntegrationsPanel() {
       }
       window.location.href = getMalAuthUrl(redirectUri);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not open MyAnimeList login.');
+      toast.error(err instanceof Error ? err.message : uiI18n.t('app.could_not_open_myanimelist_login_718df5bf'));
     }
   };
 
@@ -166,16 +169,16 @@ export function IntegrationsPanel() {
         // Same https bridge as MAL: `tatakai://` is never sent as redirect_uri.
         const url = getAniListAuthUrl(getWebAnilistRedirectUri(), buildDesktopOAuthState());
         if (await openOAuthInBrowser(url)) {
-          toast.info('Complete the AniList login in your browser, then return to the app.');
+          toast.info(uiI18n.t('app.complete_the_anilist_login_in_your_browser_then__3fb43480'));
           return;
         }
-        toast.error('Could not open your browser for AniList login. Please copy the login link manually.', {
+        toast.error(uiI18n.t('app.could_not_open_your_browser_for_anilist_login_pl_335291ff'), {
           action: {
-            label: 'Copy link',
+            get label() { return uiI18n.t('app.copy_link_2f84eea5'); },
             onClick: () => {
               void navigator.clipboard?.writeText(url).then(
-                () => toast.success('Login link copied — paste it into your browser.'),
-                () => toast.error('Copy failed. Please try again.'),
+                () => toast.success(uiI18n.t('app.login_link_copied_paste_it_into_your_browser_3a607349')),
+                () => toast.error(uiI18n.t('app.copy_failed_please_try_again_5ebeda6d')),
               );
             },
           },
@@ -184,7 +187,7 @@ export function IntegrationsPanel() {
       }
       window.location.href = getAniListAuthUrl();
     } catch {
-      toast.error('Could not open AniList login. Please try again.');
+      toast.error(uiI18n.t('app.could_not_open_anilist_login_please_try_again_26939c61'));
     }
   };
 
@@ -193,9 +196,9 @@ export function IntegrationsPanel() {
     try {
       await disconnectMal(user.id);
       await refreshProfile();
-      toast.success('MyAnimeList disconnected');
+      toast.success(uiI18n.t('app.myanimelist_disconnected_44575c90'));
     } catch {
-      toast.error('Failed to disconnect');
+      toast.error(uiI18n.t('app.failed_to_disconnect_2ec12e67'));
     }
   };
 
@@ -204,9 +207,9 @@ export function IntegrationsPanel() {
     try {
       await disconnectAniList(user.id);
       await refreshProfile();
-      toast.success('AniList disconnected');
+      toast.success(uiI18n.t('app.anilist_disconnected_86c071cc'));
     } catch {
-      toast.error('Failed to disconnect');
+      toast.error(uiI18n.t('app.failed_to_disconnect_2ec12e67'));
     }
   };
 
@@ -215,11 +218,11 @@ export function IntegrationsPanel() {
       // Same guard as MAL: each Connect click mints a fresh verifier, killing
       // any MangaBaka tab opened by a previous click.
       if (!force && isMangaBakaLoginPendingFresh()) {
-        toast.warning('A MangaBaka login is already in progress.', {
-          description: 'Only the newest MangaBaka tab can complete — finish it, or discard it and start fresh.',
+        toast.warning(uiI18n.t('app.a_mangabaka_login_is_already_in_progress_98f88e0d'), {
+          get description() { return uiI18n.t('app.only_the_newest_mangabaka_tab_can_complete_finis_b577b86f'); },
           duration: 10000,
           action: {
-            label: 'Discard & restart',
+            get label() { return uiI18n.t('app.discard_restart_d681b68e'); },
             onClick: () => {
               clearMangaBakaOAuthStorage();
               void handleMangaBakaConnect(true);
@@ -231,16 +234,16 @@ export function IntegrationsPanel() {
       if (isNativeOAuthApp()) {
         const url = await getMangaBakaAuthUrl(getWebMangabakaRedirectUri(), buildDesktopOAuthState());
         if (await openOAuthInBrowser(url)) {
-          toast.info('Complete the MangaBaka login in your browser, then return to the app.');
+          toast.info(uiI18n.t('app.complete_the_mangabaka_login_in_your_browser_the_b9d344fb'));
           return;
         }
-        toast.error('Could not open your browser for MangaBaka login. Please copy the login link manually.', {
+        toast.error(uiI18n.t('app.could_not_open_your_browser_for_mangabaka_login__750ae0b2'), {
           action: {
-            label: 'Copy link',
+            get label() { return uiI18n.t('app.copy_link_2f84eea5'); },
             onClick: () => {
               void navigator.clipboard?.writeText(url).then(
-                () => toast.success('Login link copied — paste it into your browser.'),
-                () => toast.error('Copy failed. Please try again.'),
+                () => toast.success(uiI18n.t('app.login_link_copied_paste_it_into_your_browser_3a607349')),
+                () => toast.error(uiI18n.t('app.copy_failed_please_try_again_5ebeda6d')),
               );
             },
           },
@@ -258,7 +261,7 @@ export function IntegrationsPanel() {
       }
       window.location.href = await getMangaBakaAuthUrl(redirectUri);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not open MangaBaka login.');
+      toast.error(err instanceof Error ? err.message : uiI18n.t('app.could_not_open_mangabaka_login_e7402e7b'));
     }
   };
 
@@ -268,9 +271,9 @@ export function IntegrationsPanel() {
       setHasMangaBaka(false);
       setMangabakaUsername(null);
       setMangabakaStatusError(null);
-      toast.success('MangaBaka disconnected');
+      toast.success(uiI18n.t('app.mangabaka_disconnected_b083be2c'));
     } catch {
-      toast.error('Failed to disconnect MangaBaka');
+      toast.error(uiI18n.t('app.failed_to_disconnect_mangabaka_d43bc8af'));
     }
   };
 
@@ -304,10 +307,10 @@ export function IntegrationsPanel() {
   const handleApplySyncModal = useCallback(async (selectedItems: SyncProposalItem[]) => {
     const result = await integrationSync.applySync(syncModalIntegration, selectedItems);
     if (result.success) {
-      toast.success(`Sync applied successfully — ${selectedItems.length} change${selectedItems.length !== 1 ? 's' : ''} applied.`);
+      toast.success(uiI18n.t('app.sync_applied_successfully_i18n_value_0_changei18_427a6c68', { value0: selectedItems.length, value1: selectedItems.length !== 1 ? 's' : '' }));
       setSyncModalOpen(false);
     } else {
-      toast.error(`Sync failed: ${result.error}`);
+      toast.error(uiI18n.t('app.sync_failed_i18n_value_0_633109a4', { value0: result.error }));
     }
   }, [integrationSync, syncModalIntegration]);
 
@@ -323,17 +326,17 @@ export function IntegrationsPanel() {
               <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div className="flex items-center gap-5">
                   <div className="w-14 h-14 rounded-2xl bg-[#2E51A2] flex items-center justify-center text-white font-black text-xl shadow-lg shadow-[#2E51A2]/20">
-                    MAL
+                    {uiI18n.t('app.mal_308b46c0')}
                   </div>
                   <div>
                     <h3 className="text-lg font-bold flex items-center gap-2">
-                      MyAnimeList
-                      {hasMAL && <SettingsBadge tone="success">Connected</SettingsBadge>}
+                      {uiI18n.t('app.myanimelist_be786904')}
+                      {hasMAL && <SettingsBadge tone="success">{uiI18n.t('app.connected_c2f9b7b4')}</SettingsBadge>}
                     </h3>
                     <p className="text-sm text-muted-foreground mt-0.5">
                       {hasMAL
-                        ? `Linked to MAL account: ${profile?.mal_user_id || 'Active'}`
-                        : 'Sync your anime and manga lists and ratings automatically'}
+                        ? uiI18n.t('app.linked_to_mal_account_i18n_value_0_a45b9d07', { value0: profile?.mal_user_id || 'Active' })
+                        : uiI18n.t('app.sync_your_anime_and_manga_lists_and_ratings_auto_01ecf4b9')}
                     </p>
                   </div>
                 </div>
@@ -347,7 +350,7 @@ export function IntegrationsPanel() {
                       className="gap-2 border-destructive/20 text-destructive hover:bg-destructive/10 hover:border-destructive/40 transition-all w-full sm:w-auto"
                     >
                       <Trash2 className="w-4 h-4" />
-                      Disconnect
+                      {uiI18n.t('app.disconnect_ed28e068')}
                     </Button>
                   ) : (
                     <Button
@@ -356,7 +359,7 @@ export function IntegrationsPanel() {
                       className="gap-2 bg-[#2E51A2] hover:bg-[#2E51A2]/90 px-6 shadow-lg shadow-[#2E51A2]/20"
                     >
                       <ExternalLink className="w-4 h-4" />
-                      Connect MyAnimeList
+                      {uiI18n.t('app.connect_myanimelist_dde6b79a')}
                     </Button>
                   )}
                 </div>
@@ -366,7 +369,7 @@ export function IntegrationsPanel() {
                 <div className="relative mt-5 pt-5 border-t border-white/5">
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <CheckCircle className="w-3.5 h-3.5 text-success" />
-                    Auto-sync is active. Episode / chapter updates push to MAL in the background.
+                    {uiI18n.t('app.auto_sync_is_active_episode_chapter_updates_push_7def4c40')}
                   </div>
                 </div>
               )}
@@ -385,13 +388,13 @@ export function IntegrationsPanel() {
                   </div>
                   <div>
                     <h3 className="text-lg font-bold flex items-center gap-2">
-                      AniList
-                      {hasAniList && <SettingsBadge tone="success">Connected</SettingsBadge>}
+                      {uiI18n.t('app.anilist_c03a6787')}
+                      {hasAniList && <SettingsBadge tone="success">{uiI18n.t('app.connected_c2f9b7b4')}</SettingsBadge>}
                     </h3>
                     <p className="text-sm text-muted-foreground mt-0.5">
                       {hasAniList
-                        ? `Linked to AniList account: ${profile?.anilist_user_id || 'Active'}`
-                        : 'Sync anime watch progress and manga chapter progress automatically'}
+                        ? uiI18n.t('app.linked_to_anilist_account_i18n_value_0_f22e4d10', { value0: profile?.anilist_user_id || 'Active' })
+                        : uiI18n.t('app.sync_anime_watch_progress_and_manga_chapter_prog_7a0e838a')}
                     </p>
                   </div>
                 </div>
@@ -405,7 +408,7 @@ export function IntegrationsPanel() {
                       className="gap-2 border-destructive/20 text-destructive hover:bg-destructive/10 hover:border-destructive/40 transition-all w-full sm:w-auto"
                     >
                       <Trash2 className="w-4 h-4" />
-                      Disconnect
+                      {uiI18n.t('app.disconnect_ed28e068')}
                     </Button>
                   ) : (
                     <Button
@@ -414,7 +417,7 @@ export function IntegrationsPanel() {
                       className="gap-2 bg-[#02A9FF] hover:bg-[#02A9FF]/90 px-6 shadow-lg shadow-[#02A9FF]/20"
                     >
                       <ExternalLink className="w-4 h-4" />
-                      Connect AniList
+                      {uiI18n.t('app.connect_anilist_1f9f781d')}
                     </Button>
                   )}
                 </div>
@@ -424,7 +427,7 @@ export function IntegrationsPanel() {
                 <div className="relative mt-5 pt-5 border-t border-white/5">
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <CheckCircle className="w-3.5 h-3.5 text-success" />
-                    Auto-sync is active. Chapter and episode updates push to AniList while you watch/read.
+                    {uiI18n.t('app.auto_sync_is_active_chapter_and_episode_updates__99b47c3f')}
                   </div>
                 </div>
               )}
@@ -440,24 +443,24 @@ export function IntegrationsPanel() {
                     {!mangabakaLogoFailed ? (
                       <img
                         src={MANGABAKA_LOGO_URL}
-                        alt="MangaBaka"
+                        alt={uiI18n.t('app.mangabaka_c4dfa49b')}
                         className="w-10 h-10 object-contain"
                         loading="lazy"
                         onError={() => setMangabakaLogoFailed(true)}
                       />
                     ) : (
-                      <span className="text-[#e30047] font-black text-lg">MB</span>
+                      <span className="text-[#e30047] font-black text-lg">{uiI18n.t('app.mb_6e979f42')}</span>
                     )}
                   </div>
                   <div>
                     <h3 className="text-lg font-bold flex items-center gap-2">
-                      MangaBaka
-                      {hasMangaBaka && <SettingsBadge tone="success">Connected</SettingsBadge>}
+                      {uiI18n.t('app.mangabaka_c4dfa49b')}
+                      {hasMangaBaka && <SettingsBadge tone="success">{uiI18n.t('app.connected_c2f9b7b4')}</SettingsBadge>}
                     </h3>
                     <p className="text-sm text-muted-foreground mt-0.5">
                       {hasMangaBaka
-                        ? `Linked to MangaBaka account: ${mangabakaUsername || 'Active'}`
-                        : 'Sync your manga readlist and chapter progress automatically'}
+                        ? uiI18n.t('app.linked_to_mangabaka_account_i18n_value_0_0a48a8ff', { value0: mangabakaUsername || 'Active' })
+                        : uiI18n.t('app.sync_your_manga_readlist_and_chapter_progress_au_a7c4ae66')}
                     </p>
                   </div>
                 </div>
@@ -471,7 +474,7 @@ export function IntegrationsPanel() {
                       className="gap-2 border-destructive/20 text-destructive hover:bg-destructive/10 hover:border-destructive/40 transition-all w-full sm:w-auto"
                     >
                       <Trash2 className="w-4 h-4" />
-                      Disconnect
+                      {uiI18n.t('app.disconnect_ed28e068')}
                     </Button>
                   ) : (
                     <Button
@@ -485,7 +488,7 @@ export function IntegrationsPanel() {
                       ) : (
                         <ExternalLink className="w-4 h-4" />
                       )}
-                      Connect MangaBaka
+                      {uiI18n.t('app.connect_mangabaka_6f19c8b6')}
                     </Button>
                   )}
                 </div>
@@ -495,8 +498,7 @@ export function IntegrationsPanel() {
                 <div className="relative mt-5 pt-5 border-t border-white/5">
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <CheckCircle className="w-3.5 h-3.5 text-success" />
-                    Auto-sync is active. Chapter updates push to MangaBaka while you read.
-                    Manage the connection anytime from{' '}
+                    {uiI18n.t('app.auto_sync_is_active_chapter_updates_push_to_mang_de0c9759')}{' '}
                     <a
                       href={MANGABAKA_SITE_URL}
                       target="_blank"
@@ -510,7 +512,7 @@ export function IntegrationsPanel() {
               ) : mangabakaStatusError ? (
                 <div className="relative mt-5 pt-5 border-t border-white/5">
                   <div className="flex flex-wrap items-center gap-2 text-xs text-amber-400">
-                    <span>Couldn't check the MangaBaka connection: {mangabakaStatusError}</span>
+                    <span>{uiI18n.t('app.couldn_t_check_the_mangabaka_connection_8e999b86')} {mangabakaStatusError}</span>
                     <Button
                       variant="outline"
                       size="sm"
@@ -523,7 +525,7 @@ export function IntegrationsPanel() {
                       ) : (
                         <RefreshCw className="w-3 h-3" />
                       )}
-                      Retry
+                      {uiI18n.t('app.retry_9f5cd8a2')}
                     </Button>
                   </div>
                 </div>
@@ -538,8 +540,8 @@ export function IntegrationsPanel() {
               <SettingsSection
                 icon={RefreshCw}
                 eyebrow="Sync"
-                title="Sync"
-                description="Review changes per service before applying. Episode and chapter updates also push automatically in the background."
+                title={uiI18n.t('app.sync_905f6309')}
+                description={uiI18n.t('app.review_changes_per_service_before_applying_episo_4e0f03b5')}
               >
                 <div className="flex flex-col sm:flex-row flex-wrap gap-2">
                   {hasMAL && (
@@ -554,7 +556,7 @@ export function IntegrationsPanel() {
                       ) : (
                         <RefreshCw className="w-4 h-4" />
                       )}
-                      Sync with MyAnimeList
+                      {uiI18n.t('app.sync_with_myanimelist_0bea8439')}
                     </Button>
                   )}
                   {hasAniList && (
@@ -569,7 +571,7 @@ export function IntegrationsPanel() {
                       ) : (
                         <RefreshCw className="w-4 h-4" />
                       )}
-                      Sync with AniList
+                      {uiI18n.t('app.sync_with_anilist_912fbedb')}
                     </Button>
                   )}
                   {hasMangaBaka && (
@@ -584,7 +586,7 @@ export function IntegrationsPanel() {
                       ) : (
                         <RefreshCw className="w-4 h-4" />
                       )}
-                      Sync with MangaBaka
+                      {uiI18n.t('app.sync_with_mangabaka_d369bcac')}
                     </Button>
                   )}
                 </div>
@@ -592,15 +594,15 @@ export function IntegrationsPanel() {
             )}
 
             <SettingsSection
-              title="What syncs"
-              description="Watchlist, watch history, and manga readlist with chapter progress sync with each connected service after you review the changes. Episode and chapter updates also push automatically in the background."
+              title={uiI18n.t('app.what_syncs_2a52ac56')}
+              description={uiI18n.t('app.watchlist_watch_history_and_manga_readlist_with__6b6bb7f2')}
             />
           </>
         ) : (
           <SettingsEmptyState
             icon={Link2}
-            title="Sign in to connect external services"
-            description="Link MyAnimeList, AniList, or MangaBaka to sync your watchlist, readlist, and progress automatically."
+            title={uiI18n.t('app.sign_in_to_connect_external_services_7c2fd1d5')}
+            description={uiI18n.t('app.link_myanimelist_anilist_or_mangabaka_to_sync_yo_75596d3d')}
           />
         )}
       </div>

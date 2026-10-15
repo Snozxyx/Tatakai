@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -15,6 +17,7 @@ export interface TrackedShow {
 
 /** The shows a user has pinned to their Tatakai Calendar, newest first. */
 export function useTrackedShows() {
+  useUiTranslation();
   const { user } = useAuth();
 
   return useQuery<TrackedShow[]>({
@@ -45,6 +48,7 @@ export function usePublicTrackedShows(
   isPublic: boolean,
   showCalendar: boolean = true,
 ) {
+  useUiTranslation();
   return useQuery<TrackedShow[]>({
     queryKey: ['public-tracked-shows', userId],
     queryFn: async () => {
@@ -68,6 +72,7 @@ export function usePublicTrackedShows(
  * added from the anime page, and stores a synthetic `anime_id` for the UNIQUE.
  */
 export function useToggleTrackedShowByAnilist() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
@@ -83,7 +88,7 @@ export function useToggleTrackedShowByAnilist() {
       imageUrl?: string | null;
       tracked: boolean;
     }) => {
-      if (!user) throw new Error('Sign in to track shows');
+      if (!user) throw new Error(uiI18n.t('app.sign_in_to_track_shows_17e52289'));
       if (tracked) {
         const { error } = await (supabase
           .from('tracked_shows' as any)
@@ -105,16 +110,17 @@ export function useToggleTrackedShowByAnilist() {
     },
     onSuccess: (nowTracked) => {
       queryClient.invalidateQueries({ queryKey: ['tracked-shows'] });
-      toast.success(nowTracked ? 'Added to your calendar' : 'Removed from your calendar');
+      toast.success(nowTracked ? uiI18n.t('app.added_to_your_calendar_68b0044b') : uiI18n.t('app.removed_from_your_calendar_46801188'));
     },
     onError: (error: Error) => {
-      toast.error(error.message || 'Failed to update calendar');
+      toast.error(error.message || uiI18n.t('app.failed_to_update_calendar_20622e7d'));
     },
   });
 }
 
 /** Pin/unpin a single show for the calendar. */
 export function useToggleTrackedShow() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
@@ -132,7 +138,7 @@ export function useToggleTrackedShow() {
       imageUrl?: string | null;
       tracked: boolean;
     }) => {
-      if (!user) throw new Error('Sign in to track shows');
+      if (!user) throw new Error(uiI18n.t('app.sign_in_to_track_shows_17e52289'));
       if (tracked) {
         const { error } = await (supabase
           .from('tracked_shows' as any)
@@ -154,10 +160,10 @@ export function useToggleTrackedShow() {
     },
     onSuccess: (nowTracked) => {
       queryClient.invalidateQueries({ queryKey: ['tracked-shows'] });
-      toast.success(nowTracked ? 'Added to your calendar' : 'Removed from your calendar');
+      toast.success(nowTracked ? uiI18n.t('app.added_to_your_calendar_68b0044b') : uiI18n.t('app.removed_from_your_calendar_46801188'));
     },
     onError: (error: Error) => {
-      toast.error(error.message || 'Failed to update calendar');
+      toast.error(error.message || uiI18n.t('app.failed_to_update_calendar_20622e7d'));
     },
   });
 }

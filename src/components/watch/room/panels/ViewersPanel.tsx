@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
@@ -6,6 +8,7 @@ import { useWatchRoomContext } from '../WatchRoomContext';
 
 /** Viewers: participant list + host-transfer button (host-only, per participant). */
 export function ViewersPanel() {
+  useUiTranslation();
     const { participants, isHost, user, hostTransferTarget, handleTransferHost } = useWatchRoomContext();
 
     return (
@@ -17,7 +20,7 @@ export function ViewersPanel() {
                     <span className="grid h-6 w-6 place-items-center rounded-full bg-[hsl(var(--isshoni-accent)/0.15)] ring-1 ring-[hsl(var(--isshoni-accent)/0.3)] shadow-[0_0_10px_hsl(var(--isshoni-accent)/0.2)]">
                         <Users className="h-3 w-3 text-[hsl(var(--isshoni-accent))]" />
                     </span>
-                    Viewers
+                    {uiI18n.t('app.viewers_0ae62965')}
                     <span className="ml-1 rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-bold text-muted-foreground shadow-inner">
                         {participants.length}
                     </span>
@@ -33,11 +36,9 @@ export function ViewersPanel() {
                         return (
                             <div 
                                 key={p.id} 
-                                className={`flex items-center gap-3 rounded-2xl border p-2.5 transition-all animate-in fade-in slide-in-from-bottom-2 fill-mode-both ${
-                                    isMe 
+                                className={`flex items-center gap-3 rounded-2xl border p-2.5 transition-all animate-in fade-in slide-in-from-bottom-2 fill-mode-both ${isMe
                                     ? 'border-[hsl(var(--isshoni-accent)/0.25)] bg-[hsl(var(--isshoni-accent)/0.08)] shadow-[0_0_15px_hsl(var(--isshoni-accent)/0.05)]' 
-                                    : 'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.06]'
-                                }`}
+                                    : 'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.06]'}`}
                                 style={{ animationDelay: `${i * 50}ms` }}
                             >
                                 {/* Avatar */}
@@ -56,7 +57,7 @@ export function ViewersPanel() {
                                         </span>
                                         {isMe && (
                                             <span className="shrink-0 text-[9px] font-extrabold uppercase tracking-widest text-[hsl(var(--isshoni-accent))] drop-shadow-sm">
-                                                (You)
+                                                {uiI18n.t('app.you_2d215d30')}
                                             </span>
                                         )}
                                     </div>
@@ -64,17 +65,17 @@ export function ViewersPanel() {
                                     <div className="flex items-center gap-1.5">
                                         {p.is_host && (
                                             <span className="flex items-center gap-1 rounded-md border border-amber-500/20 bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-400">
-                                                <Crown className="h-2.5 w-2.5" /> Host
+                                                <Crown className="h-2.5 w-2.5" /> {uiI18n.t('app.host_3960ec4c')}
                                             </span>
                                         )}
                                         {!p.is_host && p.is_ready && (
                                             <span className="flex items-center gap-1 rounded-md border border-emerald-500/20 bg-emerald-500/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-400">
-                                                <Zap className="h-2.5 w-2.5 fill-emerald-400" /> Ready
+                                                <Zap className="h-2.5 w-2.5 fill-emerald-400" /> {uiI18n.t('app.ready_20c7c552')}
                                             </span>
                                         )}
                                         {!p.is_host && !p.is_ready && (
                                             <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/50">
-                                                Watching
+                                                {uiI18n.t('app.watching_96d9e027')}
                                             </span>
                                         )}
                                     </div>
@@ -89,9 +90,9 @@ export function ViewersPanel() {
                                             disabled={hostTransferTarget === p.user_id}
                                             onClick={() => handleTransferHost(p.user_id, p.display_name)}
                                             className="h-8 rounded-full border border-white/10 bg-white/5 px-3 text-[10px] font-bold uppercase tracking-wider text-foreground/80 transition-all hover:border-[hsl(var(--isshoni-accent)/0.4)] hover:bg-[hsl(var(--isshoni-accent)/0.15)] hover:text-[hsl(var(--isshoni-accent))] hover:shadow-[0_0_15px_hsl(var(--isshoni-accent)/0.2)] active:scale-95 disabled:opacity-40"
-                                            title="Transfer host privileges to this user"
+                                            title={uiI18n.t('app.transfer_host_privileges_to_this_user_f34a962f')}
                                         >
-                                            {hostTransferTarget === p.user_id ? 'Transferring' : 'Make Host'}
+                                            {hostTransferTarget === p.user_id ? uiI18n.t('app.transferring_73f75316') : uiI18n.t('app.make_host_3cc6373d')}
                                         </Button>
                                     </div>
                                 )}

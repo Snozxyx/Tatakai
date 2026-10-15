@@ -1,4 +1,7 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import * as React from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,12 +34,15 @@ const ConfirmContext = React.createContext<ConfirmFn | null>(null);
  * Must be used within a <ConfirmProvider> (mounted once in MainLayout).
  */
 export function useConfirm(): ConfirmFn {
+  useUiTranslation();
   const ctx = React.useContext(ConfirmContext);
-  if (!ctx) throw new Error('useConfirm must be used within a ConfirmProvider');
+  if (!ctx) throw new Error(uiI18n.t('app.useconfirm_must_be_used_within_a_confirmprovider_04b47211'));
   return ctx;
 }
 
 export function ConfirmProvider({ children }: { children: React.ReactNode }) {
+  useUiTranslation();
+  const { t } = useTranslation();
   const [open, setOpen] = React.useState(false);
   const [options, setOptions] = React.useState<ConfirmOptions | null>(null);
   const resolverRef = React.useRef<((v: boolean) => void) | null>(null);
@@ -70,13 +76,13 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => settle(false)}>
-              {options?.cancelLabel || 'Cancel'}
+              {options?.cancelLabel || t('common.cancel')}
             </AlertDialogCancel>
             <AlertDialogAction
               className={cn(options?.destructive && buttonVariants({ variant: 'destructive' }))}
               onClick={() => settle(true)}
             >
-              {options?.confirmLabel || 'Confirm'}
+              {options?.confirmLabel || t('common.confirm')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useCallback, useEffect, useRef, useState } from "react";
 import { applyMobileProxyToSource } from '@/core/extensions/mobile/mobileProxy';
 import { isElectron } from '@/lib/platform/platform';
@@ -375,6 +377,7 @@ export function useExtensionSourceStream<T = any>(
   namespace: string,
   params: ExtensionSourceStreamParams
 ): ExtensionSourceStreamResult<T> {
+  useUiTranslation();
   const {
     anilistId,
     titles,
@@ -714,7 +717,7 @@ export function useExtensionSourceStream<T = any>(
         const data = (e as MessageEvent).data;
         if (data) {
           // Server-sent terminal error.
-          let message = "stream error";
+          let message = uiI18n.t('app.stream_error_45d1ba5c');
           try {
             message = JSON.parse(data)?.message || message;
           } catch {
@@ -741,7 +744,7 @@ export function useExtensionSourceStream<T = any>(
           setState((s) => ({
             ...s,
             phase: have ? "done" : "error",
-            error: have ? s.error : new Error("stream connection failed"),
+            error: have ? s.error : new Error(uiI18n.t('app.stream_connection_failed_8b7d8032')),
           }));
         } else if (have) {
           done = true;

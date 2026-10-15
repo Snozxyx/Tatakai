@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { Link, useNavigate } from 'react-router-dom';
 import { usePlaylists, usePlaylistItems, Playlist } from '@/hooks/user/usePlaylist';
 import { useAuth } from '@/contexts/AuthContext';
@@ -8,6 +10,7 @@ import { cn } from '@/lib/utils';
 
 // Mini playlist card with cover grid
 function PlaylistMiniCard({ playlist }: { playlist: Playlist }) {
+  useUiTranslation();
   const { data: items = [] } = usePlaylistItems(playlist.id);
   const navigate = useNavigate();
   const coverImages = items.slice(0, 4).map(item => item.anime_poster).filter(Boolean) as string[];
@@ -65,13 +68,14 @@ function PlaylistMiniCard({ playlist }: { playlist: Playlist }) {
         {playlist.name}
       </h3>
       <p className="text-xs text-muted-foreground">
-        {playlist.items_count} {playlist.items_count === 1 ? 'item' : 'items'}
+        {playlist.items_count} {playlist.items_count === 1 ? uiI18n.t('app.item_3a7d9767') : uiI18n.t('app.items_7316c8b2')}
       </p>
     </div>
   );
 }
 
 export function PlaylistSection() {
+  useUiTranslation();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { data: playlists = [], isLoading } = usePlaylists();
@@ -86,7 +90,7 @@ export function PlaylistSection() {
         <div className="flex items-center justify-between mb-6">
           <h2 className="font-display text-2xl font-semibold flex items-center gap-2">
             <Music2 className="w-6 h-6 text-primary" />
-            My Playlists
+            {uiI18n.t('app.my_playlists_f67e00ef')}
           </h2>
         </div>
         <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
@@ -107,13 +111,13 @@ export function PlaylistSection() {
       <div className="flex items-center justify-between mb-6">
         <h2 className="font-display text-2xl font-semibold flex items-center gap-2">
           <Music2 className="w-6 h-6 text-primary" />
-          My Playlists
+          {uiI18n.t('app.my_playlists_f67e00ef')}
         </h2>
         <Link 
           to="/playlists"
           className="flex items-center gap-1 text-sm text-muted-foreground hover:text-primary transition-colors"
         >
-          View All
+          {uiI18n.t('app.view_all_efd83559')}
           <ChevronRight className="w-4 h-4" />
         </Link>
       </div>
@@ -130,7 +134,7 @@ export function PlaylistSection() {
                 <Plus className="w-6 h-6 text-muted-foreground group-hover:text-primary transition-colors" />
               </div>
               <span className="text-sm text-muted-foreground group-hover:text-primary transition-colors">
-                Create New
+                {uiI18n.t('app.create_new_42604ae5')}
               </span>
             </div>
           </div>
@@ -146,13 +150,13 @@ export function PlaylistSection() {
             <Music2 className="w-8 h-8 text-primary" />
           </div>
           <div className="flex-1">
-            <h3 className="font-semibold mb-1">Create your first playlist</h3>
+            <h3 className="font-semibold mb-1">{uiI18n.t('app.create_your_first_playlist_2f9f306a')}</h3>
             <p className="text-sm text-muted-foreground mb-3">
-              Organize your favorite anime into playlists to watch later
+              {uiI18n.t('app.organize_your_favorite_anime_into_playlists_to_w_c8b176ce')}
             </p>
             <Button size="sm" onClick={() => navigate('/playlists')} className="gap-2">
               <Plus className="w-4 h-4" />
-              Create Playlist
+              {uiI18n.t('app.create_playlist_86374904')}
             </Button>
           </div>
         </div>

@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { installRemoteExtension, listRemoteExtensions, removeRemoteExtension } from "@/core/extensions/remote/installed";
 import { migrateExtensionStorage } from "@/core/extensions/ecosystems";
 migrateExtensionStorage();
@@ -59,6 +61,7 @@ const SIDELOAD_EVENT = "tatakai:extension-installed";
 
 /** localStorage changes in this window need an explicit React subscription. */
 function useLocalCatalogueRevision() {
+  useUiTranslation();
   const [revision, setRevision] = useState(0);
   useEffect(() => {
     const changed = () => setRevision(value => value + 1);
@@ -284,6 +287,7 @@ export function useStoreCatalogue({
   type = "all",
   limit = 100, ecosystem = "all", compatibility = "all",
 }: StoreCatalogueOptions = {}): StoreCatalogue {
+  useUiTranslation();
   const needle = search.trim();
   const localRevision = useLocalCatalogueRevision();
 
@@ -353,6 +357,7 @@ export function useStoreCatalogue({
 
 /** `GET /api/extension/tags`, for the store's tag rail. */
 export function useStoreTags() {
+  useUiTranslation();
   return useQuery({
     queryKey: ["extension-store", "tags"],
     queryFn: ({ signal }) => fetchStoreTags(signal),
@@ -367,6 +372,7 @@ export function useStoreTags() {
  * should not inflate the number it is displaying.
  */
 export function useStoreExtensionDetail(idOrSlug?: string) {
+  useUiTranslation();
   const localRevision = useLocalCatalogueRevision();
   const query = useQuery({
     queryKey: ["extension-store", "detail", idOrSlug],
@@ -412,6 +418,7 @@ export type InstallState = "idle" | "installing" | "installed" | "not_loaded";
  * ends in a distinct state rather than in a failure.
  */
 export function useExtensionInstaller() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const [installedIds, setInstalledIds] = useState<string[]>(() =>
     readJson<string[]>(INSTALLED_KEY, [])
@@ -545,15 +552,15 @@ export function useExtensionInstaller() {
 
       if (extension.ecosystem && extension.ecosystem !== 'tatakai') {
         if (!['stremio', 'seanime'].includes(extension.ecosystem) || ['external', 'unavailable'].includes(extension.compatibility || '')) {
-          throw new Error('This extension requires its original application');
+          throw new Error(uiI18n.t('app.this_extension_requires_its_original_application_1e26c48f'));
         }
         const endpoint = version?.manifestUrl || extension.manifestUrl || extension.latestVersion?.manifestUrl;
-        if (!endpoint) throw new Error('Extension manifest URL unavailable');
+        if (!endpoint) throw new Error(uiI18n.t('app.extension_manifest_url_unavailable_8c0cf80d'));
         const remoteManifest = await (await import('@/core/extensions/remote/transport')).fetchExtensionJson(endpoint);
         if (extension.ecosystem === 'stremio' && remoteManifest.behaviorHints?.configurationRequired) {
           const config = new URL(endpoint); config.pathname = config.pathname.replace(/manifest\.json$/, 'configure');
           window.open(config.href, '_blank', 'noopener,noreferrer');
-          throw new Error('Configure the addon, then use Add extension with its configured manifest URL');
+          throw new Error(uiI18n.t('app.configure_the_addon_then_use_add_extension_with__190f4e59'));
         }
         const remote = await installRemoteExtension(remoteManifest, endpoint);
         rememberAliases([extension.id, extension.slug, remote.id]);
@@ -637,12 +644,12 @@ export function useExtensionInstaller() {
       queryClient.invalidateQueries({ queryKey: ["extension-store"] });
       toast.success(
         loaded
-          ? "Extension installed"
-          : "Installed — waiting for the runtime to load it"
+          ? uiI18n.t('app.extension_installed_f2a980fc')
+          : uiI18n.t('app.installed_waiting_for_the_runtime_to_load_it_aedf7527')
       );
     },
     onError: (error: unknown) => {
-      const message = error instanceof Error ? error.message : "Install failed";
+      const message = error instanceof Error ? error.message : uiI18n.t('app.install_failed_50c51c74');
       toast.error(message);
     },
     onSettled: () => setPendingId(null),
@@ -698,13 +705,13 @@ export function useExtensionInstaller() {
       window.dispatchEvent(new CustomEvent(SIDELOAD_EVENT));
       queryClient.invalidateQueries({ queryKey: ["extensions"] });
       queryClient.invalidateQueries({ queryKey: ["extension-store"] });
-      toast.success("Extension removed");
+      toast.success(uiI18n.t('app.extension_removed_537fd833'));
     },
     onError: (error: unknown) => {
       const message =
         error instanceof Error
           ? error.message
-          : "Could not remove the extension";
+          : uiI18n.t('app.could_not_remove_the_extension_43bb962a');
       toast.error(message);
     },
     onSettled: () => setPendingId(null),
@@ -778,6 +785,7 @@ export interface ExtensionUpdate {
  * quiet until an even newer build appears.
  */
 export function useExtensionUpdates() {
+  useUiTranslation();
   const [dismissed, setDismissed] = useState<Record<string, string>>(() =>
     readJson<Record<string, string>>(DISMISSED_UPDATES_KEY, {})
   );
@@ -926,6 +934,7 @@ export interface RemoteExtensionUpdate {
  * "no update" per row.
  */
 export function useRemoteExtensionUpdates() {
+  useUiTranslation();
   const queryClient = useQueryClient();
 
   const [dismissed, setDismissed] = useState<Record<string, string>>(() =>
@@ -949,7 +958,7 @@ export function useRemoteExtensionUpdates() {
             fetchExtensionJson(row.manifestUrl),
             new Promise<never>((_, reject) =>
               window.setTimeout(
-                () => reject(new Error("manifest check timed out")),
+                () => reject(new Error(uiI18n.t('app.manifest_check_timed_out_4d34554b'))),
                 REMOTE_MANIFEST_TIMEOUT_MS
               )
             ),

@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
@@ -8,6 +10,7 @@ import { cn } from '@/lib/utils';
  * (`span[data-spoiler]`) and comment markdown (`||text||`).
  */
 export function SpoilerSpan({ children }: { children: ReactNode }) {
+  useUiTranslation();
   const [revealed, setRevealed] = useState(false);
 
   const reveal = (e: MouseEvent | KeyboardEvent) => {
@@ -21,7 +24,7 @@ export function SpoilerSpan({ children }: { children: ReactNode }) {
     <span
       role={revealed ? undefined : 'button'}
       tabIndex={revealed ? undefined : 0}
-      aria-label={revealed ? undefined : 'Spoiler, click to reveal'}
+      aria-label={revealed ? undefined : uiI18n.t('app.spoiler_click_to_reveal_e59237a3')}
       onClick={reveal}
       onKeyDown={(e) => {
         if (!revealed && (e.key === 'Enter' || e.key === ' ')) reveal(e);

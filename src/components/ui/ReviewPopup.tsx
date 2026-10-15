@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GlassPanel } from './GlassPanel';
@@ -17,6 +19,7 @@ interface ReviewPopupProps {
 }
 
 export function ReviewPopup({ isOpen: propIsOpen, onClose, animeId, animeName, userId }: ReviewPopupProps) {
+  useUiTranslation();
     const { user: authUser } = useAuth();
     const user = userId ? { id: userId } : authUser;
     const [internalIsOpen, setInternalIsOpen] = useState(false);
@@ -50,8 +53,8 @@ export function ReviewPopup({ isOpen: propIsOpen, onClose, animeId, animeName, u
             if (user?.id) {
                 await supabase.from('user_suggestions' as any).insert({
                     user_id: user.id,
-                    title: 'App Review',
-                    description: `Rating: ${rating}/5\n\n${feedback}`,
+                    get title() { return uiI18n.t('app.app_review_3a47975f'); },
+                    get description() { return uiI18n.t('app.rating_i18n_value_0_5_i18n_value_1_2750ae38', { value0: rating, value1: feedback }); },
                     category: 'feedback',
                     priority: 'normal',
                     status: 'pending',
@@ -70,9 +73,9 @@ export function ReviewPopup({ isOpen: propIsOpen, onClose, animeId, animeName, u
 
             setStep('thanks');
             localStorage.setItem('tatakai_review_shown', 'true');
-            toast.success('Thank you for your feedback!');
+            toast.success(uiI18n.t('app.thank_you_for_your_feedback_71fa63b4'));
         } catch (error) {
-            toast.error('Failed to submit review');
+            toast.error(uiI18n.t('app.failed_to_submit_review_dec0f44b'));
         } finally {
             setIsSubmitting(false);
             setTimeout(() => handleClose(), 3000);
@@ -102,19 +105,19 @@ export function ReviewPopup({ isOpen: propIsOpen, onClose, animeId, animeName, u
                                     <Heart className="w-6 h-6 text-primary fill-primary" />
                                 </div>
                                 <div>
-                                    <h3 className="text-xl font-bold">Enjoying Tatakai?</h3>
-                                    <p className="text-muted-foreground text-sm">Your feedback helps us build the best anime experience.</p>
+                                    <h3 className="text-xl font-bold">{uiI18n.t('app.enjoying_tatakai_7de18a1e')}</h3>
+                                    <p className="text-muted-foreground text-sm">{uiI18n.t('app.your_feedback_helps_us_build_the_best_anime_expe_5be1ad39')}</p>
                                 </div>
                                 <div className="flex gap-2">
-                                    <Button onClick={() => setStep('rating')} className="flex-1">Sure!</Button>
-                                    <Button variant="ghost" onClick={handleClose}>Maybe later</Button>
+                                    <Button onClick={() => setStep('rating')} className="flex-1">{uiI18n.t('app.sure_11354004')}</Button>
+                                    <Button variant="ghost" onClick={handleClose}>{uiI18n.t('app.maybe_later_27ad1d83')}</Button>
                                 </div>
                             </div>
                         )}
 
                         {step === 'rating' && (
                             <div className="space-y-6 text-center">
-                                <h3 className="text-xl font-bold">Rate your experience</h3>
+                                <h3 className="text-xl font-bold">{uiI18n.t('app.rate_your_experience_ac33ce37')}</h3>
                                 <div className="flex justify-center gap-2">
                                     {[1, 2, 3, 4, 5].map((s) => (
                                         <button
@@ -132,17 +135,17 @@ export function ReviewPopup({ isOpen: propIsOpen, onClose, animeId, animeName, u
                                         </button>
                                     ))}
                                 </div>
-                                <p className="text-xs text-muted-foreground">Select a star to continue</p>
+                                <p className="text-xs text-muted-foreground">{uiI18n.t('app.select_a_star_to_continue_b89d478f')}</p>
                             </div>
                         )}
 
                         {step === 'feedback' && (
                             <div className="space-y-4">
-                                <h3 className="text-xl font-bold">Anything else?</h3>
+                                <h3 className="text-xl font-bold">{uiI18n.t('app.anything_else_4689b412')}</h3>
                                 <textarea
                                     value={feedback}
                                     onChange={(e) => setFeedback(e.target.value)}
-                                    placeholder="Suggestions, bugs, or things you love..."
+                                    placeholder={uiI18n.t('app.suggestions_bugs_or_things_you_love_2d736d7c')}
                                     className="w-full h-24 bg-muted/30 border border-white/10 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
                                 />
                                 <Button
@@ -150,7 +153,7 @@ export function ReviewPopup({ isOpen: propIsOpen, onClose, animeId, animeName, u
                                     disabled={isSubmitting}
                                     className="w-full"
                                 >
-                                    {isSubmitting ? 'Submitting...' : 'Submit Feedback'}
+                                    {isSubmitting ? 'Submitting...' : uiI18n.t('app.submit_feedback_c5a35a73')}
                                 </Button>
                             </div>
                         )}
@@ -160,8 +163,8 @@ export function ReviewPopup({ isOpen: propIsOpen, onClose, animeId, animeName, u
                                 <div className="w-16 h-16 rounded-full bg-emerald-500/20 flex items-center justify-center mx-auto">
                                     <ThumbsUp className="w-8 h-8 text-emerald-500" />
                                 </div>
-                                <h3 className="text-xl font-bold">Arigato!</h3>
-                                <p className="text-muted-foreground text-sm">Your feedback has been received.</p>
+                                <h3 className="text-xl font-bold">{uiI18n.t('app.arigato_ed120d15')}</h3>
+                                <p className="text-muted-foreground text-sm">{uiI18n.t('app.your_feedback_has_been_received_5e1c5406')}</p>
                             </div>
                         )}
                     </GlassPanel>

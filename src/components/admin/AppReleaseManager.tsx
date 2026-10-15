@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -25,6 +27,7 @@ interface AppRelease {
 }
 
 export function AppReleaseManager() {
+  useUiTranslation();
     const queryClient = useQueryClient();
     const confirm = useConfirm();
     const [isAdding, setIsAdding] = useState(false);
@@ -78,12 +81,12 @@ export function AppReleaseManager() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['admin_app_releases'] });
-            toast.success(editingId ? 'Release updated' : 'Release added');
+            toast.success(editingId ? uiI18n.t('app.release_updated_ff22718f') : uiI18n.t('app.release_added_a9d2295c'));
             resetForm();
         },
         onError: (error) => {
             console.error('Save release error:', error);
-            toast.error('Failed to save release');
+            toast.error(uiI18n.t('app.failed_to_save_release_a633b5be'));
         }
     });
 
@@ -98,11 +101,11 @@ export function AppReleaseManager() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['admin_app_releases'] });
-            toast.success('Release deleted');
+            toast.success(uiI18n.t('app.release_deleted_bd2a1e29'));
         },
         onError: (error) => {
             console.error('Delete release error:', error);
-            toast.error('Failed to delete release');
+            toast.error(uiI18n.t('app.failed_to_delete_release_30f0aa4e'));
         }
     });
 
@@ -129,7 +132,7 @@ export function AppReleaseManager() {
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!version || !url) {
-            toast.error('Version and URL are required');
+            toast.error(uiI18n.t('app.version_and_url_are_required_f1548538'));
             return;
         }
         saveMutation.mutate({
@@ -157,11 +160,11 @@ export function AppReleaseManager() {
             <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                     <Download className="w-5 h-5 text-primary" />
-                    <h3 className="font-display text-lg font-semibold">App Downloads Management</h3>
+                    <h3 className="font-display text-lg font-semibold">{uiI18n.t('app.app_downloads_management_1ad702c9')}</h3>
                 </div>
                 {!isAdding && (
                     <Button onClick={() => setIsAdding(true)} size="sm" className="gap-2">
-                        <Plus className="w-4 h-4" /> Add Release
+                        <Plus className="w-4 h-4" /> {uiI18n.t('app.add_release_f572609f')}
                     </Button>
                 )}
             </div>
@@ -171,7 +174,7 @@ export function AppReleaseManager() {
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div className="flex justify-between items-center mb-2">
                             <h4 className="font-medium text-sm text-primary">
-                                {editingId ? 'Edit Release' : 'New Release'}
+                                {editingId ? uiI18n.t('app.edit_release_c0acc67e') : uiI18n.t('app.new_release_e75aa11b')}
                             </h4>
                             <Button type="button" variant="ghost" size="sm" onClick={resetForm}>
                                 <X className="w-4 h-4" />
@@ -180,7 +183,7 @@ export function AppReleaseManager() {
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <Label htmlFor="version">Version</Label>
+                                <Label htmlFor="version">{uiI18n.t('app.version_2da600bf')}</Label>
                                 <Input
                                     id="version"
                                     value={version}
@@ -190,22 +193,22 @@ export function AppReleaseManager() {
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="platform">Platform</Label>
+                                <Label htmlFor="platform">{uiI18n.t('app.platform_123a7f2f')}</Label>
                                 <select
                                     id="platform"
                                     value={platform}
                                     onChange={(e) => setPlatform(e.target.value as any)}
                                     className="w-full bg-background/50 border border-input rounded-md px-3 py-2 text-sm"
                                 >
-                                    <option value="win">Windows</option>
-                                    <option value="mac">macOS</option>
-                                    <option value="linux">Linux</option>
+                                    <option value="win">{uiI18n.t('app.windows_26d9c28d')}</option>
+                                    <option value="mac">{uiI18n.t('app.macos_cd6fdcbf')}</option>
+                                    <option value="linux">{uiI18n.t('app.linux_83ad8510')}</option>
                                 </select>
                             </div>
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="url">Download URL</Label>
+                            <Label htmlFor="url">{uiI18n.t('app.download_url_42aa0f68')}</Label>
                             <Input
                                 id="url"
                                 value={url}
@@ -216,12 +219,12 @@ export function AppReleaseManager() {
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="notes">Release Notes</Label>
+                            <Label htmlFor="notes">{uiI18n.t('app.release_notes_0ea4af90')}</Label>
                             <Textarea
                                 id="notes"
                                 value={notes}
                                 onChange={(e) => setNotes(e.target.value)}
-                                placeholder="What's new in this version?"
+                                placeholder={uiI18n.t('app.what_s_new_in_this_version_a5407fa9')}
                                 className="bg-background/50 min-h-[80px]"
                             />
                         </div>
@@ -234,26 +237,25 @@ export function AppReleaseManager() {
                                 onChange={(e) => setIsLatest(e.target.checked)}
                                 className="rounded border-gray-400 text-primary focus:ring-primary"
                             />
-                            <Label htmlFor="isLatest" className="cursor-pointer">Set as Latest</Label>
+                            <Label htmlFor="isLatest" className="cursor-pointer">{uiI18n.t('app.set_as_latest_f1e66ab3')}</Label>
                         </div>
 
                         <Button type="submit" disabled={saveMutation.isPending} className="w-full gap-2">
                             <Save className="w-4 h-4" />
-                            {saveMutation.isPending ? 'Saving...' : 'Save Release'}
+                            {saveMutation.isPending ? 'Saving...' : uiI18n.t('app.save_release_bed0f62b')}
                         </Button>
                     </form>
                 </GlassPanel>
             )}
 
             {isLoading ? (
-                <div className="text-center py-8 text-muted-foreground italic">Loading releases...</div>
+                <div className="text-center py-8 text-muted-foreground italic">{uiI18n.t('app.loading_releases_23834fbc')}</div>
             ) : releases && releases.length > 0 ? (
                 <div className="grid gap-3">
                     {releases.map((release) => (
                         <div
                             key={release.id}
-                            className={`p-4 rounded-xl border transition-all flex items-center justify-between gap-4 ${release.is_latest ? 'bg-primary/5 border-primary/20' : 'bg-muted/10 border-white/5'
-                                }`}
+                            className={`p-4 rounded-xl border transition-all flex items-center justify-between gap-4 ${release.is_latest ? 'bg-primary/5 border-primary/20' : 'bg-muted/10 border-white/5'}`}
                         >
                             <div className="flex items-center gap-4">
                                 <div className={`p-2 rounded-lg ${release.is_latest ? 'bg-primary/20 text-primary' : 'bg-muted/20 text-muted-foreground'}`}>
@@ -267,7 +269,7 @@ export function AppReleaseManager() {
                                         </span>
                                         {release.is_latest && (
                                             <span className="text-[10px] uppercase font-bold text-emerald-500 flex items-center gap-1">
-                                                <CheckCircle className="w-3 h-3" /> Latest
+                                                <CheckCircle className="w-3 h-3" /> {uiI18n.t('app.latest_decd7ca8')}
                                             </span>
                                         )}
                                     </div>
@@ -290,7 +292,7 @@ export function AppReleaseManager() {
                                     variant="ghost"
                                     size="sm"
                                     onClick={async () => {
-                                        if (await confirm({ title: 'Delete this release?', destructive: true })) deleteMutation.mutate(release.id);
+                                        if (await confirm({ get title() { return uiI18n.t('app.delete_this_release_46d27013'); }, destructive: true })) deleteMutation.mutate(release.id);
                                     }}
                                     className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
                                 >
@@ -303,7 +305,7 @@ export function AppReleaseManager() {
             ) : (
                 <div className="text-center py-12 rounded-xl border border-dashed border-white/10 text-muted-foreground">
                     <XCircle className="w-8 h-8 mx-auto mb-2 opacity-20" />
-                    <p>No releases found in the database.</p>
+                    <p>{uiI18n.t('app.no_releases_found_in_the_database_ace84e29')}</p>
                 </div>
             )}
         </div>

@@ -1,5 +1,8 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useRef } from "react";
 import { Subtitles, Upload, Type } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { getSubtitleSelectionKey } from "@/core/player/subtitle-utils";
 import type { ExternalSubtitle, CustomSubtitle, InternalSubtitleTrack, SubtitleSize, SubtitleFont, SubtitleBackground } from "../VideoPlayer.types";
 import { useVideoSettings } from "@/hooks/media/useVideoSettings";
@@ -8,19 +11,19 @@ const SIZE_OPTIONS: { value: SubtitleSize; label: string }[] = [
   { value: "small", label: "S" },
   { value: "medium", label: "M" },
   { value: "large", label: "L" },
-  { value: "xlarge", label: "XL" },
+  { value: "xlarge", get label() { return uiI18n.t('app.xl_a2f9d0d1'); } },
 ];
 
 const FONT_OPTIONS: { value: SubtitleFont; label: string }[] = [
-  { value: "default", label: "Default" },
-  { value: "serif", label: "Serif" },
-  { value: "mono", label: "Mono" },
+  { value: "default", get label() { return uiI18n.t('app.default_808d7dca'); } },
+  { value: "serif", get label() { return uiI18n.t('app.serif_a5c78a86'); } },
+  { value: "mono", get label() { return uiI18n.t('app.mono_c5c55338'); } },
 ];
 
 const BG_OPTIONS: { value: SubtitleBackground; label: string }[] = [
-  { value: "none", label: "None" },
-  { value: "semi", label: "Semi" },
-  { value: "solid", label: "Solid" },
+  { value: "none", get label() { return uiI18n.t('app.none_6eef6648'); } },
+  { value: "semi", get label() { return uiI18n.t('app.semi_3210d8fe'); } },
+  { value: "solid", get label() { return uiI18n.t('app.solid_d0063586'); } },
 ];
 
 interface SubtitleSelectorProps {
@@ -52,6 +55,8 @@ export function SubtitleSelector({
   onInternalSubtitleChange,
   onCustomUpload,
 }: SubtitleSelectorProps) {
+  useUiTranslation();
+  const { t } = useTranslation();
   const { settings, updateSetting } = useVideoSettings();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -64,7 +69,7 @@ export function SubtitleSelector({
       <button
         onClick={onToggleMenu}
         className={`p-2 rounded-lg hover:bg-white/10 transition-colors pointer-events-auto ${currentSubtitle !== "off" ? "text-primary" : ""}`}
-        title="Subtitles"
+        title={t('player.subtitles')}
       >
         <Subtitles className="w-4 h-4 md:w-5 md:h-5" />
       </button>
@@ -72,7 +77,7 @@ export function SubtitleSelector({
       {showSubtitleMenu && (
         <div className="absolute bottom-full right-0 mb-2 bg-background/95 backdrop-blur-md border border-border rounded-xl p-3 min-w-[180px] md:min-w-[220px] max-h-[450px] overflow-y-auto pointer-events-auto shadow-2xl">
           <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">
-            Subtitles
+            {t('player.subtitles')}
           </div>
           <div className="space-y-1 mb-3">
             <button
@@ -81,12 +86,12 @@ export function SubtitleSelector({
               }}
               className={`w-full px-3 py-1.5 text-left text-xs md:text-sm rounded-lg hover:bg-muted transition-colors ${currentSubtitle === "off" ? "text-primary font-medium bg-primary/10" : "text-foreground"}`}
             >
-              Off
+              {t('player.subtitlesOff')}
             </button>
 
             {internalSubtitles.length > 0 && (
               <div className="pt-1 pb-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Internal Tracks
+                {t('player.internalTracks')}
               </div>
             )}
 
@@ -124,12 +129,12 @@ export function SubtitleSelector({
           <div className="space-y-3">
             <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
               <Type className="w-3 h-3" />
-              <span>Style Settings</span>
+              <span>{t('player.subtitleStyle')}</span>
             </div>
 
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[10px] text-muted-foreground">Size</span>
+                <span className="text-[10px] text-muted-foreground">{t('player.subtitleSize')}</span>
                 <div className="flex gap-1">
                   {SIZE_OPTIONS.map((opt) => (
                     <button
@@ -144,7 +149,7 @@ export function SubtitleSelector({
               </div>
 
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[10px] text-muted-foreground">Font</span>
+                <span className="text-[10px] text-muted-foreground">{t('player.subtitleFont')}</span>
                 <div className="flex gap-1">
                   {FONT_OPTIONS.map((opt) => (
                     <button
@@ -159,7 +164,7 @@ export function SubtitleSelector({
               </div>
 
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[10px] text-muted-foreground">BG</span>
+                <span className="text-[10px] text-muted-foreground">{t('player.subtitleBackground')}</span>
                 <div className="flex gap-1">
                   {BG_OPTIONS.map((opt) => (
                     <button
@@ -179,7 +184,7 @@ export function SubtitleSelector({
 
           <label className="w-full px-3 py-1.5 text-left text-xs md:text-sm rounded-lg hover:bg-muted transition-colors text-foreground flex items-center gap-2 cursor-pointer group">
             <Upload className="w-3 h-3 group-hover:text-primary transition-colors" />
-            <span>Add Custom</span>
+            <span>{t('player.addCustomSubtitle')}</span>
             <input
               ref={fileInputRef}
               type="file"

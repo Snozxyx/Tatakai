@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 import {
   Dialog,
   DialogContent,
@@ -32,15 +33,16 @@ interface BanUserDialogProps {
 }
 
 /** Quick-timeout buttons for the common cases; the Select still covers 30d/custom. */
-const QUICK_PRESETS: { value: DurationPreset; label: string }[] = [
-  { value: '1h', label: '1 hour' },
-  { value: '24h', label: '24 hours' },
-  { value: '7d', label: '7 days' },
-  { value: 'permanent', label: 'Permanent' },
+const QUICK_PRESETS: { value: DurationPreset; labelKey: string }[] = [
+  { value: '1h', labelKey: 'moderation.preset1h' },
+  { value: '24h', labelKey: 'moderation.preset24h' },
+  { value: '7d', labelKey: 'moderation.preset7d' },
+  { value: 'permanent', labelKey: 'moderation.permanent' },
 ];
 
 /** Single-user ban dialog (reason + duration), shared by the moderation menu. */
 export function BanUserDialog({ open, onOpenChange, userId, userName }: BanUserDialogProps) {
+  const { t } = useTranslation();
   const [reason, setReason] = useState('');
   const [preset, setPreset] = useState<DurationPreset>('permanent');
   const [customDays, setCustomDays] = useState('');
@@ -74,12 +76,20 @@ export function BanUserDialog({ open, onOpenChange, userId, userName }: BanUserD
           const posts = await deleteContent.mutateAsync({ userId, scope: 'posts' });
           const comments = await deleteContent.mutateAsync({ userId, scope: 'comments' });
           const n = (posts.posts ?? 0) + (comments.comments ?? 0);
-          toast.success(`Banned ${userName || 'user'}${n ? ` · removed ${posts.posts} post(s), ${comments.comments} comment(s)` : ''}`);
+          toast.success(
+            n
+              ? t('moderation.bannedWithRemoval', {
+                  user: userName || t('moderation.fallbackUser'),
+                  posts: posts.posts,
+                  comments: comments.comments,
+                })
+              : t('moderation.banned', { user: userName || t('moderation.fallbackUser') }),
+          );
         } catch (delErr: any) {
-          toast.warning('Banned, but content removal failed: ' + (delErr?.message ?? 'unknown error'));
+          toast.warning(t('moderation.purgeFailed', { error: delErr?.message ?? 'unknown error' }));
         }
       } else {
-        toast.success(`Banned ${userName || 'user'}`);
+        toast.success(t('moderation.banned', { user: userName || t('moderation.fallbackUser') }));
       }
       onOpenChange(false);
       setReason('');
@@ -87,7 +97,7 @@ export function BanUserDialog({ open, onOpenChange, userId, userName }: BanUserD
       setCustomDays('');
       setPurgeContent(true);
     } catch (err: any) {
-      toast.error('Failed to ban: ' + (err?.message ?? 'unknown error'));
+      toast.error(t('moderation.banFailed', { error: err?.message ?? 'unknown error' }));
     }
   };
 
@@ -98,15 +108,15 @@ export function BanUserDialog({ open, onOpenChange, userId, userName }: BanUserD
           <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center mb-2">
             <Ban className="w-6 h-6 text-destructive" />
           </div>
-          <DialogTitle className="text-xl font-bold">Ban user</DialogTitle>
+          <DialogTitle className="text-xl font-bold">{t('moderation.banUser')}</DialogTitle>
           <DialogDescription>
-            Banning <span className="text-foreground font-medium">{userName || userId}</span>.
+            <Trans i18nKey="moderation.banningUserRich" values={{ user: userName || userId }} components={{ user: <span className="text-foreground font-medium" /> }} />
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
           <div className="space-y-2">
-            <label className="text-sm font-medium text-muted-foreground">Duration</label>
+            <label className="text-sm font-medium text-muted-foreground">{t('moderation.duration')}</label>
             <div className="flex flex-wrap gap-1.5">
               {QUICK_PRESETS.map((q) => (
                 <Button
@@ -117,7 +127,7 @@ export function BanUserDialog({ open, onOpenChange, userId, userName }: BanUserD
                   onClick={() => setPreset(q.value)}
                   className="h-7 px-2.5 text-xs"
                 >
-                  {q.label}
+                  {t(q.labelKey)}
                 </Button>
               ))}
             </div>
@@ -126,12 +136,12 @@ export function BanUserDialog({ open, onOpenChange, userId, userName }: BanUserD
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="permanent">Permanent</SelectItem>
-                <SelectItem value="1h">1 hour</SelectItem>
-                <SelectItem value="24h">24 hours</SelectItem>
-                <SelectItem value="7d">7 days</SelectItem>
-                <SelectItem value="30d">30 days</SelectItem>
-                <SelectItem value="custom">Custom…</SelectItem>
+                <SelectItem value="permanent">{t('moderation.permanent')}</SelectItem>
+                <SelectItem value="1h">{t('moderation.preset1h')}</SelectItem>
+                <SelectItem value="24h">{t('moderation.preset24h')}</SelectItem>
+                <SelectItem value="7d">{t('moderation.preset7d')}</SelectItem>
+                <SelectItem value="30d">{t('moderation.preset30d')}</SelectItem>
+                <SelectItem value="custom">{t('moderation.presetCustom')}</SelectItem>
               </SelectContent>
             </Select>
             {preset === 'custom' && (
@@ -139,7 +149,7 @@ export function BanUserDialog({ open, onOpenChange, userId, userName }: BanUserD
                 type="number"
                 min={1}
                 max={365}
-                placeholder="Days (1–365)"
+                placeholder={t('moderation.daysPlaceholder')}
                 value={customDays}
                 onChange={(e) => setCustomDays(e.target.value)}
                 className="bg-white/5 border-white/10"
@@ -147,9 +157,9 @@ export function BanUserDialog({ open, onOpenChange, userId, userName }: BanUserD
             )}
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium text-muted-foreground">Reason</label>
+            <label className="text-sm font-medium text-muted-foreground">{t('moderation.reason')}</label>
             <Textarea
-              placeholder="Reason (required, ≤500 chars)"
+              placeholder={t('moderation.reasonPlaceholder')}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               maxLength={500}
@@ -163,9 +173,9 @@ export function BanUserDialog({ open, onOpenChange, userId, userName }: BanUserD
               className="mt-0.5"
             />
             <span className="text-sm">
-              <span className="font-medium">Delete their posts & comments</span>
+              <span className="font-medium">{t('moderation.purgeTitle')}</span>
               <span className="block text-xs text-muted-foreground">
-                Soft-deletes all forum/community posts and comments by this user (thread structure kept). Playlists and tier lists are not affected.
+                {t('moderation.purgeHint')}
               </span>
             </span>
           </label>
@@ -173,11 +183,11 @@ export function BanUserDialog({ open, onOpenChange, userId, userName }: BanUserD
 
         <DialogFooter className="gap-2 sm:gap-0">
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={banUser.isPending || deleteContent.isPending}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button variant="destructive" onClick={handleBan} disabled={!valid || banUser.isPending || deleteContent.isPending}>
             {(banUser.isPending || deleteContent.isPending) ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-            Ban user
+            {t('moderation.banUser')}
           </Button>
         </DialogFooter>
       </DialogContent>

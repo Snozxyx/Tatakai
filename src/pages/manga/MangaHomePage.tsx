@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSettingsModal } from "@/contexts/SettingsModalContext";
@@ -98,6 +100,7 @@ function laneToCards(
 }
 
 export default function MangaHomePage() {
+  useUiTranslation();
   const navigate = useNavigate();
   const { openSettings } = useSettingsModal();
   const isNative = useIsNativeApp();
@@ -224,17 +227,17 @@ export default function MangaHomePage() {
               <div className="relative overflow-hidden rounded-3xl border border-destructive/30">
                 <img
                   src={`${import.meta.env.BASE_URL}assets/image/content/manga18+.jpg`}
-                  alt="18+ Manga Banner"
+                  alt={uiI18n.t('app.18_manga_banner_232fee14')}
                   className="h-44 w-full object-cover md:h-56"
                 />
                 <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-black/70" />
                 <div className="absolute inset-0 flex flex-col justify-end p-5 md:p-7">
-                  <p className="text-[11px] font-black uppercase tracking-[0.2em] text-destructive">18+ Zone</p>
+                  <p className="text-[11px] font-black uppercase tracking-[0.2em] text-destructive">{uiI18n.t('app.18_zone_ab82f3e1')}</p>
                   <h2 className="mt-2 text-2xl md:text-3xl font-black tracking-tight text-white">
-                    Hentai & Mature Manga
+                    {uiI18n.t('app.hentai_mature_manga_70f832d8')}
                   </h2>
                   <p className="mt-2 max-w-2xl text-sm text-white/80">
-                    This section stays hidden unless you confirm you are 18+ and explicitly opt in.
+                    {uiI18n.t('app.this_section_stays_hidden_unless_you_confirm_you_a8513b8f')}
                   </p>
 
                   <div className="mt-4 flex flex-wrap gap-2">
@@ -243,7 +246,7 @@ export default function MangaHomePage() {
                         onClick={() => openSettings('privacy', 'mature-content-controls')}
                         className="rounded-xl bg-destructive px-4 py-2 text-sm font-bold text-destructive-foreground hover:bg-destructive/85 transition-colors"
                       >
-                        Open 18+ Settings
+                        {uiI18n.t('app.open_18_settings_3e29afc5')}
                       </button>
                     ) : (
                       <button
@@ -255,7 +258,7 @@ export default function MangaHomePage() {
                         }
                         className="rounded-xl border border-white/30 bg-black/40 px-4 py-2 text-sm font-bold text-white hover:bg-black/60 transition-colors"
                       >
-                        Hide 18+ Section
+                        {uiI18n.t('app.hide_18_section_ff15f17a')}
                       </button>
                     )}
                   </div>
@@ -264,7 +267,7 @@ export default function MangaHomePage() {
 
               {canShowAdultEverywhere && (
                 <div className="mt-6">
-                  <h3 className="mb-3 text-lg md:text-xl font-black tracking-tight">Mature Picks</h3>
+                  <h3 className="mb-3 text-lg md:text-xl font-black tracking-tight">{uiI18n.t('app.mature_picks_ee174889')}</h3>
 
                   {isLoading ? (
                     <div data-mobile-home-rail className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
@@ -281,13 +284,13 @@ export default function MangaHomePage() {
                   ) : (
                     <GlassPanel className="p-5 border border-destructive/20">
                       <p className="text-sm text-muted-foreground">
-                        No mature titles were returned right now. Open settings to adjust mature filters and warnings.
+                        {uiI18n.t('app.no_mature_titles_were_returned_right_now_open_se_b91a7550')}
                       </p>
                       <button
                         onClick={() => openSettings('privacy', 'mature-content-controls')}
                         className="mt-3 rounded-lg border border-white/20 bg-white/5 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-foreground hover:bg-white/10 transition-colors"
                       >
-                        Open Privacy Settings
+                        {uiI18n.t('app.open_privacy_settings_c64c0642')}
                       </button>
                     </GlassPanel>
                   )}

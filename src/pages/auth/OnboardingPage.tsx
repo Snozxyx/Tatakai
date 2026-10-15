@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { usePersistentState } from '@/hooks/ui/usePersistentState';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -32,6 +34,7 @@ const GlassCard = ({ children, className }: { children: React.ReactNode; classNa
 );
 
 function ProfileSetupStep() {
+  useUiTranslation();
   const { profile, user } = useAuth();
   const { data: profileImages, isLoading: loadingProfile, refetch: refetchProfile } = useRandomProfileImages(12);
   const { data: bannerImages, isLoading: loadingBanner, refetch: refetchBanner } = useRandomBannerImages(6);
@@ -49,9 +52,9 @@ function ProfileSetupStep() {
     setSelectedAvatar(url);
     try {
       await updateAvatar.mutateAsync(url);
-      toast.success('Avatar updated');
+      toast.success(uiI18n.t('app.avatar_updated_46e014bb'));
     } catch (error) {
-      toast.error('Failed to update avatar');
+      toast.error(uiI18n.t('app.failed_to_update_avatar_ecd69081'));
     }
   };
 
@@ -59,9 +62,9 @@ function ProfileSetupStep() {
     setSelectedBanner(url);
     try {
       await updateBanner.mutateAsync(url);
-      toast.success('Banner updated');
+      toast.success(uiI18n.t('app.banner_updated_3b610d88'));
     } catch (error) {
-      toast.error('Failed to update banner');
+      toast.error(uiI18n.t('app.failed_to_update_banner_d9b81187'));
     }
   };
 
@@ -79,7 +82,7 @@ function ProfileSetupStep() {
         .eq('user_id', user.id);
 
       if (error) throw error;
-      toast.success('Profile saved successfully');
+      toast.success(uiI18n.t('app.profile_saved_successfully_eb0a2496'));
     } catch (error: any) {
       toast.error('Failed to save: ' + error.message);
     } finally {
@@ -93,7 +96,7 @@ function ProfileSetupStep() {
       <GlassCard className="shadow-2xl shadow-black/5">
         <div className="h-40 w-full relative group">
           {selectedBanner ? (
-            <img src={selectedBanner} loading="lazy" decoding="async" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Banner" />
+            <img src={selectedBanner} loading="lazy" decoding="async" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt={uiI18n.t('app.banner_c8af83fb')} />
           ) : (
             <div className="w-full h-full bg-gradient-to-tr from-primary/20 via-muted to-primary/10" />
           )}
@@ -110,13 +113,13 @@ function ProfileSetupStep() {
             </Avatar>
           </div>
           <div className="flex-1 text-center sm:text-left mb-2 w-full">
-            <h4 className="font-bold text-2xl tracking-tight text-foreground truncate">{displayName || 'Your Name'}</h4>
-            <p className="text-sm text-muted-foreground truncate font-medium">@{username || 'username'}</p>
+            <h4 className="font-bold text-2xl tracking-tight text-foreground truncate">{displayName || uiI18n.t('app.your_name_f48db7e9')}</h4>
+            <p className="text-sm text-muted-foreground truncate font-medium">@{username || uiI18n.t('app.username_249ba360')}</p>
           </div>
           <div className="w-full sm:w-auto flex justify-center sm:justify-end mb-2">
             <Button onClick={saveProfileInfo} disabled={isUpdating} className="rounded-full px-6 font-semibold shadow-lg shadow-primary/25 transition-all active:scale-95">
               {isUpdating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Check className="w-4 h-4 mr-2" />}
-              Save Profile
+              {uiI18n.t('app.save_profile_909bf3e8')}
             </Button>
           </div>
         </div>
@@ -125,18 +128,18 @@ function ProfileSetupStep() {
       {/* Identity Form */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         <div className="space-y-2">
-          <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider ml-1">Display Name</Label>
+          <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider ml-1">{uiI18n.t('app.display_name_8d6b3481')}</Label>
           <Input
-            placeholder="How others see you"
+            placeholder={uiI18n.t('app.how_others_see_you_7ea759f5')}
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
             className="h-12 bg-muted/50 border-border/50 focus-visible:ring-primary rounded-2xl px-4 text-base transition-all"
           />
         </div>
         <div className="space-y-2">
-          <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider ml-1">Username</Label>
+          <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider ml-1">{uiI18n.t('app.username_84c29015')}</Label>
           <Input
-            placeholder="unique_username"
+            placeholder={uiI18n.t('app.unique_username_75ee5b3a')}
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             className="h-12 bg-muted/50 border-border/50 focus-visible:ring-primary rounded-2xl px-4 text-base transition-all"
@@ -153,11 +156,11 @@ function ProfileSetupStep() {
           <div className="flex items-center justify-between mb-4">
             <h5 className="text-sm font-semibold text-muted-foreground tracking-wide flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-primary" />
-              Select Avatar
+              {uiI18n.t('app.select_avatar_6c6c6feb')}
             </h5>
             <Button variant="ghost" size="sm" onClick={() => refetchProfile()} disabled={loadingProfile} className="text-xs rounded-full hover:bg-muted">
               <RefreshCw className={cn("w-3 h-3 mr-2", loadingProfile && "animate-spin")} />
-              Refresh
+              {uiI18n.t('app.refresh_56e3badc')}
             </Button>
           </div>
           
@@ -176,7 +179,7 @@ function ProfileSetupStep() {
                       : "hover:ring-2 hover:ring-border hover:ring-offset-2 hover:ring-offset-background opacity-80 hover:opacity-100"
                   )}
                 >
-                  <img src={img.url} loading="lazy" decoding="async" className="w-full h-full object-cover" alt="Avatar option" />
+                  <img src={img.url} loading="lazy" decoding="async" className="w-full h-full object-cover" alt={uiI18n.t('app.avatar_option_6dae4dc2')} />
                 </button>
               ))}
             </div>
@@ -188,11 +191,11 @@ function ProfileSetupStep() {
           <div className="flex items-center justify-between mb-4">
             <h5 className="text-sm font-semibold text-muted-foreground tracking-wide flex items-center gap-2">
               <Camera className="w-4 h-4 text-primary" />
-              Select Banner
+              {uiI18n.t('app.select_banner_d611e563')}
             </h5>
             <Button variant="ghost" size="sm" onClick={() => refetchBanner()} disabled={loadingBanner} className="text-xs rounded-full hover:bg-muted">
               <RefreshCw className={cn("w-3 h-3 mr-2", loadingBanner && "animate-spin")} />
-              Refresh
+              {uiI18n.t('app.refresh_56e3badc')}
             </Button>
           </div>
           
@@ -211,7 +214,7 @@ function ProfileSetupStep() {
                       : "hover:ring-2 hover:ring-border hover:ring-offset-2 hover:ring-offset-background opacity-80 hover:opacity-100"
                   )}
                 >
-                  <img src={img.url} loading="lazy" decoding="async" className="w-full h-full object-cover" alt="Banner option" />
+                  <img src={img.url} loading="lazy" decoding="async" className="w-full h-full object-cover" alt={uiI18n.t('app.banner_option_0e82c648')} />
                 </button>
               ))}
             </div>
@@ -223,6 +226,7 @@ function ProfileSetupStep() {
 }
 
 function ThemeSelectionStep() {
+  useUiTranslation();
   const { theme, setTheme } = useTheme();
   const [reduceMotion, setReduceMotion] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('tatakai_reduce_motion') === 'true' : false);
   const [ultraLite, setUltraLite] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('tatakai_ultra_lite') === 'true' : false);
@@ -273,7 +277,7 @@ function ThemeSelectionStep() {
               
               {t === 'ultra-lite' && (
                 <div className="absolute top-4 right-4 px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-bold tracking-widest uppercase">
-                  Speed
+                  {uiI18n.t('app.speed_2d2cb022')}
                 </div>
               )}
               {isSelected && (
@@ -289,7 +293,7 @@ function ThemeSelectionStep() {
       <GlassCard className="p-2 space-y-1 mt-6">
         {[
           {
-            title: "Reduce Motion",
+            get title() { return uiI18n.t('app.reduce_motion_b331f2cf'); },
             desc: "Minimize animations for a calmer experience.",
             icon: <Activity className="w-5 h-5" />,
             state: reduceMotion,
@@ -297,7 +301,7 @@ function ThemeSelectionStep() {
             color: "text-blue-500"
           },
           {
-            title: "Ultra Lite Mode",
+            get title() { return uiI18n.t('app.ultra_lite_mode_3f3997b8'); },
             desc: "Simplify the UI for maximum device performance.",
             icon: <Cpu className="w-5 h-5" />,
             state: ultraLite,
@@ -332,19 +336,20 @@ function ThemeSelectionStep() {
 }
 
 const COMMUNITY_RULES: { title: string; tagline: string; icon: React.ReactNode }[] = [
-  { title: 'Be respectful', tagline: 'Disagree with the take, not the person.', icon: <Heart className="w-4 h-4" /> },
-  { title: 'No hate speech', tagline: "It's about what you do with a word, not that it exists.", icon: <ShieldAlert className="w-4 h-4" /> },
-  { title: 'Keep it safe for work', tagline: 'The 18+ gate exists; everything outside it stays SFW.', icon: <Eye className="w-4 h-4" /> },
-  { title: 'Tag your spoilers', tagline: 'Let everyone read and watch at their own pace.', icon: <EyeOff className="w-4 h-4" /> },
-  { title: "Don't spam", tagline: 'One good comment beats twenty copy-pasted ones.', icon: <MessageSquare className="w-4 h-4" /> },
-  { title: 'No advertising', tagline: "Don't use Tatakai to promote your stuff, or anyone's.", icon: <Megaphone className="w-4 h-4" /> },
-  { title: "Don't farm reputation", tagline: 'Earn reactions by being good, not by grinding for them.', icon: <TrendingUp className="w-4 h-4" /> },
-  { title: "Don't weaponize votes", tagline: 'The vote and report buttons are for bad posts, not people.', icon: <ThumbsDown className="w-4 h-4" /> },
-  { title: 'One person, one account', tagline: 'Alts used to break rules only make it worse.', icon: <Users className="w-4 h-4" /> },
-  { title: 'Respect privacy', tagline: "If it isn't yours to share, don't post it.", icon: <Lock className="w-4 h-4" /> },
+  { get title() { return uiI18n.t('app.be_respectful_c53e6434'); }, tagline: 'Disagree with the take, not the person.', icon: <Heart className="w-4 h-4" /> },
+  { get title() { return uiI18n.t('app.no_hate_speech_556adf87'); }, tagline: "It's about what you do with a word, not that it exists.", icon: <ShieldAlert className="w-4 h-4" /> },
+  { get title() { return uiI18n.t('app.keep_it_safe_for_work_88f88689'); }, tagline: 'The 18+ gate exists; everything outside it stays SFW.', icon: <Eye className="w-4 h-4" /> },
+  { get title() { return uiI18n.t('app.tag_your_spoilers_e5e456e2'); }, tagline: 'Let everyone read and watch at their own pace.', icon: <EyeOff className="w-4 h-4" /> },
+  { get title() { return uiI18n.t('app.don_t_spam_c41e17a3'); }, tagline: 'One good comment beats twenty copy-pasted ones.', icon: <MessageSquare className="w-4 h-4" /> },
+  { get title() { return uiI18n.t('app.no_advertising_5a2b6d58'); }, tagline: "Don't use Tatakai to promote your stuff, or anyone's.", icon: <Megaphone className="w-4 h-4" /> },
+  { get title() { return uiI18n.t('app.don_t_farm_reputation_5c6f5243'); }, tagline: 'Earn reactions by being good, not by grinding for them.', icon: <TrendingUp className="w-4 h-4" /> },
+  { get title() { return uiI18n.t('app.don_t_weaponize_votes_bfad69a7'); }, tagline: 'The vote and report buttons are for bad posts, not people.', icon: <ThumbsDown className="w-4 h-4" /> },
+  { get title() { return uiI18n.t('app.one_person_one_account_61cbf4f0'); }, tagline: 'Alts used to break rules only make it worse.', icon: <Users className="w-4 h-4" /> },
+  { get title() { return uiI18n.t('app.respect_privacy_02a5bced'); }, tagline: "If it isn't yours to share, don't post it.", icon: <Lock className="w-4 h-4" /> },
 ];
 
 function CommunityRulesStep() {
+  useUiTranslation();
   const navigate = useNavigate();
   return (
     <div className="space-y-5">
@@ -371,7 +376,7 @@ function CommunityRulesStep() {
       <div className="flex items-start gap-3 p-4 rounded-2xl border border-red-500/30 bg-red-500/10">
         <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
         <p className="text-xs text-foreground leading-relaxed">
-          <span className="font-semibold text-red-400">Zero tolerance:</span> Sexualizing minors — real or fictional — and doxxing or endangering another user are instant, permanent bans.
+          <span className="font-semibold text-red-400">{uiI18n.t('app.zero_tolerance_4a21a5c7')}</span> {uiI18n.t('app.sexualizing_minors_real_or_fictional_and_doxxing_e9e93957')}
         </p>
       </div>
 
@@ -380,7 +385,7 @@ function CommunityRulesStep() {
         className="w-full flex items-center justify-center gap-2 text-xs font-medium text-muted-foreground hover:text-primary transition-colors py-2"
       >
         <ScrollText className="w-4 h-4" />
-        Read the full Community Guidelines
+        {uiI18n.t('app.read_the_full_community_guidelines_25ab4ea8')}
         <ExternalLink className="w-3.5 h-3.5" />
       </button>
     </div>
@@ -390,8 +395,8 @@ function CommunityRulesStep() {
 const onboardingSteps: OnboardingStep[] = [
   {
     id: 'welcome',
-    title: 'Your Anime Journey Starts Here',
-    description: 'Immersive streaming, community interaction, and personalized experiences.',
+    get title() { return uiI18n.t('app.your_anime_journey_starts_here_69ed0082'); },
+    get description() { return uiI18n.t('app.immersive_streaming_community_interaction_and_pe_2b681c01'); },
     icon: <Sparkles className="w-8 h-8 text-primary" />,
     content: (
       <div className="text-center space-y-12 py-8">
@@ -410,17 +415,17 @@ const onboardingSteps: OnboardingStep[] = [
   },
   {
     id: 'purpose',
-    title: 'Project Purpose',
-    description: 'Understanding how Tatakai works under the hood.',
+    get title() { return uiI18n.t('app.project_purpose_ccdc8d28'); },
+    get description() { return uiI18n.t('app.understanding_how_tatakai_works_under_the_hood_d708dca4'); },
     icon: <BookOpen className="w-8 h-8 text-blue-500" />,
     content: (
       <div className="space-y-6">
         <GlassCard className="p-8 text-center relative overflow-hidden">
           <div className="absolute -top-12 -right-12 w-32 h-32 bg-blue-500/10 rounded-full blur-2xl" />
           <Shield className="w-12 h-12 mx-auto text-blue-500 mb-6" />
-          <h3 className="text-xl font-bold tracking-tight mb-3">Student & Portfolio Project</h3>
+          <h3 className="text-xl font-bold tracking-tight mb-3">{uiI18n.t('app.student_portfolio_project_df4c80ed')}</h3>
           <p className="text-muted-foreground text-sm leading-relaxed max-w-md mx-auto">
-            Tatakai is built for educational purposes. We do not host files on our servers. Content is aggregated from publicly available 3rd party providers.
+            {uiI18n.t('app.tatakai_is_built_for_educational_purposes_we_do__326890d5')}
           </p>
         </GlassCard>
       </div>
@@ -428,17 +433,17 @@ const onboardingSteps: OnboardingStep[] = [
   },
   {
     id: 'desktop-features',
-    title: 'Desktop Enhancements',
-    description: 'Exclusive features enabled in the app.',
+    get title() { return uiI18n.t('app.desktop_enhancements_978fbb84'); },
+    get description() { return uiI18n.t('app.exclusive_features_enabled_in_the_app_266d9444'); },
     icon: <Cpu className="w-8 h-8 text-orange-500" />,
     condition: () => !!(window as any).electron || !!(window as any).__TAURI_INTERNALS__ || !!(window as any).__TAURI__,
     content: (
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {[
-          { title: "Discord Presence", desc: "Share your watch status", icon: <MessageSquare className="w-5 h-5" />, color: "text-indigo-500" },
-          { title: "Offline Playback", desc: "Download and watch anywhere", icon: <RefreshCw className="w-5 h-5" />, color: "text-cyan-500" },
-          { title: "Native Speed", desc: "Hardware acceleration enabled", icon: <Zap className="w-5 h-5" />, color: "text-amber-500" },
-          { title: "System Alerts", desc: "Native OS notifications", icon: <Activity className="w-5 h-5" />, color: "text-emerald-500" }
+          { get title() { return uiI18n.t('app.discord_presence_fdb9e95b'); }, desc: "Share your watch status", icon: <MessageSquare className="w-5 h-5" />, color: "text-indigo-500" },
+          { get title() { return uiI18n.t('app.offline_playback_84990e6a'); }, desc: "Download and watch anywhere", icon: <RefreshCw className="w-5 h-5" />, color: "text-cyan-500" },
+          { get title() { return uiI18n.t('app.native_speed_2980cca5'); }, desc: "Hardware acceleration enabled", icon: <Zap className="w-5 h-5" />, color: "text-amber-500" },
+          { get title() { return uiI18n.t('app.system_alerts_f663d709'); }, desc: "Native OS notifications", icon: <Activity className="w-5 h-5" />, color: "text-emerald-500" }
         ].map((item, i) => (
           <div key={i} className="flex items-start gap-4 p-5 rounded-3xl bg-muted/30 border border-transparent hover:border-border hover:bg-muted/50 transition-colors">
             <div className={cn("p-3 rounded-2xl bg-background shadow-sm border border-border/50", item.color)}>{item.icon}</div>
@@ -453,29 +458,30 @@ const onboardingSteps: OnboardingStep[] = [
   },
   {
     id: 'rules',
-    title: 'Community Guidelines',
-    description: 'Help us maintain a positive atmosphere.',
+    get title() { return uiI18n.t('app.community_guidelines_75343669'); },
+    get description() { return uiI18n.t('app.help_us_maintain_a_positive_atmosphere_2d9ba252'); },
     icon: <Heart className="w-8 h-8 text-pink-500" />,
     content: <CommunityRulesStep />,
   },
   {
     id: 'profile',
-    title: 'Personalize Identity',
-    description: 'Show off your style to the community.',
+    get title() { return uiI18n.t('app.personalize_identity_c59194c8'); },
+    get description() { return uiI18n.t('app.show_off_your_style_to_the_community_c908e511'); },
     icon: <User className="w-8 h-8 text-primary" />,
     content: <ProfileSetupStep />,
     condition: (user: any) => !!user,
   },
   {
     id: 'theme',
-    title: 'Choose Experience',
-    description: 'Customize how the app looks and feels.',
+    get title() { return uiI18n.t('app.choose_experience_e813d3b5'); },
+    get description() { return uiI18n.t('app.customize_how_the_app_looks_and_feels_7dd53689'); },
     icon: <Palette className="w-8 h-8 text-purple-500" />,
     content: <ThemeSelectionStep />,
   },
 ];
 
 export default function OnboardingPage() {
+  useUiTranslation();
   const { user, isLoading } = useAuth();
   const filteredSteps = onboardingSteps.filter(step => !step.condition || step.condition(user));
 
@@ -518,8 +524,8 @@ export default function OnboardingPage() {
           <div className="w-24 h-24 mx-auto bg-primary rounded-full flex items-center justify-center shadow-2xl shadow-primary/30">
             <CheckCircle className="w-12 h-12 text-primary-foreground" />
           </div>
-          <h2 className="text-3xl font-bold tracking-tight">You're all set!</h2>
-          <p className="text-muted-foreground font-medium">Entering Tatakai...</p>
+          <h2 className="text-3xl font-bold tracking-tight">{uiI18n.t('app.you_re_all_set_058a8130')}</h2>
+          <p className="text-muted-foreground font-medium">{uiI18n.t('app.entering_tatakai_a74093ab')}</p>
         </motion.div>
       </div>
     );
@@ -536,7 +542,7 @@ export default function OnboardingPage() {
           onClick={handleComplete} 
           className="text-muted-foreground hover:text-foreground hover:bg-muted rounded-full px-6 font-medium text-sm transition-all"
         >
-          Skip Intro
+          {uiI18n.t('app.skip_intro_8789f6ce')}
         </Button>
       </header>
 
@@ -615,7 +621,7 @@ export default function OnboardingPage() {
                 currentStep === 0 ? "opacity-0 w-0 p-0 overflow-hidden" : "opacity-100 hover:bg-muted text-muted-foreground hover:text-foreground"
               )}
             >
-              Back
+              {uiI18n.t('app.back_b52b36b7')}
             </Button>
 
             {/* flex-1 + min-w-0 + truncated label: on 320px viewports the
@@ -627,7 +633,7 @@ export default function OnboardingPage() {
               className="h-12 min-w-0 flex-1 overflow-hidden rounded-full bg-foreground px-3 py-0 font-bold text-background text-sm shadow-lg transition-colors hover:bg-foreground/90 active:scale-95 group min-[380px]:px-4 min-[380px]:text-base sm:flex-none sm:px-8 sm:text-base [&_svg]:shrink-0"
             >
               <span className="min-w-0 flex-1 truncate">
-                {currentStep === filteredSteps.length - 1 ? 'Start Exploring' : 'Continue'}
+                {currentStep === filteredSteps.length - 1 ? uiI18n.t('app.start_exploring_b3f24eee') : uiI18n.t('app.continue_2e026239')}
               </span>
               <ArrowRight className="w-5 h-5 shrink-0 group-hover:translate-x-1 transition-transform" />
             </Button>

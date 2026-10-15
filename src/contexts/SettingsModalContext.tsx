@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 
 /**
@@ -69,6 +71,7 @@ interface SettingsModalContextValue {
 const SettingsModalContext = createContext<SettingsModalContextValue | null>(null);
 
 export function SettingsModalProvider({ children }: { children: ReactNode }) {
+  useUiTranslation();
   const [open, setOpen] = useState(false);
   const [category, setCategoryState] = useState<SettingsCategoryId>(DEFAULT_CATEGORY);
   const [section, setSection] = useState<string | undefined>(undefined);
@@ -98,9 +101,10 @@ export function SettingsModalProvider({ children }: { children: ReactNode }) {
 }
 
 export function useSettingsModal() {
+  useUiTranslation();
   const ctx = useContext(SettingsModalContext);
   if (!ctx) {
-    throw new Error('useSettingsModal must be used within a SettingsModalProvider');
+    throw new Error(uiI18n.t('app.usesettingsmodal_must_be_used_within_a_settingsm_1d9fbe8c'));
   }
   return ctx;
 }

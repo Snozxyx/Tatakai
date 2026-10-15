@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Play, Trash2, CircleDot, CircleCheck, Ban, AlertTriangle } from 'lucide-react';
@@ -12,11 +14,11 @@ import {
 import { cn } from '@/lib/utils';
 
 const STATUS_META: Record<LocalTorrentSessionItem['status'], { label: string; tone: SettingsTone; icon: any }> = {
-  active: { label: 'Active', tone: 'success', icon: CircleDot },
-  completed: { label: 'Completed', tone: 'primary', icon: CircleCheck },
-  blocked: { label: 'Blocked', tone: 'danger', icon: Ban },
-  error: { label: 'Error', tone: 'warning', icon: AlertTriangle },
-  stopped: { label: 'Stopped', tone: 'muted', icon: CircleDot },
+  active: { get label() { return uiI18n.t('app.active_a733b809'); }, tone: 'success', icon: CircleDot },
+  completed: { get label() { return uiI18n.t('app.completed_1798b3ba'); }, tone: 'primary', icon: CircleCheck },
+  blocked: { get label() { return uiI18n.t('app.blocked_99613c74'); }, tone: 'danger', icon: Ban },
+  error: { get label() { return uiI18n.t('app.error_7f2f6a15'); }, tone: 'warning', icon: AlertTriangle },
+  stopped: { get label() { return uiI18n.t('app.stopped_51e9111b'); }, tone: 'muted', icon: CircleDot },
 };
 
 const formatDateTime = (value: string) => {
@@ -33,6 +35,7 @@ const formatDateTime = (value: string) => {
 };
 
 export function TorrentSessionHistory() {
+  useUiTranslation();
   const navigate = useNavigate();
   const [items, setItems] = useState<LocalTorrentSessionItem[]>([]);
 
@@ -77,7 +80,7 @@ export function TorrentSessionHistory() {
   };
 
   if (!visibleItems.length) {
-    return <p className="py-3.5 text-sm text-muted-foreground">No torrent sessions recorded yet.</p>;
+    return <p className="py-3.5 text-sm text-muted-foreground">{uiI18n.t('app.no_torrent_sessions_recorded_yet_9eb43157')}</p>;
   }
 
   return (
@@ -90,7 +93,7 @@ export function TorrentSessionHistory() {
           className="gap-2 text-muted-foreground hover:text-foreground"
         >
           <Trash2 className="w-4 h-4" />
-          Clear all
+          {uiI18n.t('app.clear_all_c043160a')}
         </Button>
       </div>
 
@@ -126,15 +129,15 @@ export function TorrentSessionHistory() {
                   </div>
                   <div className="space-y-1">
                     <h4 className="font-semibold truncate">
-                      {item.animeName || item.torrentName || 'Unknown torrent'}
+                      {item.animeName || item.torrentName || uiI18n.t('app.unknown_torrent_ce98986e')}
                     </h4>
                     <p className="text-xs text-muted-foreground truncate">
-                      {item.fileName || 'No file selected'}
-                      {item.episodeNumber ? ` • Episode ${item.episodeNumber}` : ''}
+                      {item.fileName || uiI18n.t('app.no_file_selected_f76f1c1c')}
+                      {item.episodeNumber ? uiI18n.t('app.episode_i18n_value_0_62a4e71d', { value0: item.episodeNumber }) : ''}
                     </p>
                     <p className="text-[11px] text-muted-foreground">
                       {formatDateTime(item.updatedAt)}
-                      {item.error ? ` • ${item.error}` : ''}
+                      {item.error ? uiI18n.t('app.i18n_value_0_723b674d', { value0: item.error }) : ''}
                     </p>
                   </div>
                 </div>
@@ -150,7 +153,7 @@ export function TorrentSessionHistory() {
                       }}
                     >
                       <Play className="w-4 h-4" />
-                      Resume
+                      {uiI18n.t('app.resume_b3bd0b5a')}
                     </Button>
                   )}
                   <Button
@@ -163,21 +166,21 @@ export function TorrentSessionHistory() {
                     className="gap-2 text-muted-foreground hover:text-foreground"
                   >
                     <Trash2 className="w-4 h-4" />
-                    Remove
+                    {uiI18n.t('app.remove_e963907d')}
                   </Button>
                 </div>
               </div>
 
               <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px] text-muted-foreground">
                 <div className="rounded-xl bg-white/5 px-3 py-2">
-                  Peers: {item.seeders ?? 0} / {item.leechers ?? 0}
+                  {uiI18n.t('app.peers_76cad1d3')} {item.seeders ?? 0} / {item.leechers ?? 0}
                 </div>
-                <div className="rounded-xl bg-white/5 px-3 py-2">Progress: {item.progress ?? 0}%</div>
+                <div className="rounded-xl bg-white/5 px-3 py-2">{uiI18n.t('app.progress_04866c75')} {item.progress ?? 0}%</div>
                 <div className="rounded-xl bg-white/5 px-3 py-2">
-                  Session: {item.sessionId.slice(0, 12)}…
+                  {uiI18n.t('app.session_ae2e2549')} {item.sessionId.slice(0, 12)}…
                 </div>
                 <div className="rounded-xl bg-white/5 px-3 py-2">
-                  Started: {formatDateTime(item.startedAt)}
+                  {uiI18n.t('app.started_fe3824e9')} {formatDateTime(item.startedAt)}
                 </div>
               </div>
             </div>

@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
  * Reactions system for comments and posts
  */
@@ -40,6 +42,7 @@ export function useReactions(
   entityId: string | undefined,
   initial?: ReactionCounts | null,
 ) {
+  useUiTranslation();
   const { user } = useAuth();
 
   return useQuery({
@@ -88,6 +91,7 @@ export function useReactions(
  * Add or update a reaction
  */
 export function useReact() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
@@ -101,7 +105,7 @@ export function useReact() {
       entityId: string;
       reactionType: ReactionType;
     }) => {
-      if (!user) throw new Error('Not logged in');
+      if (!user) throw new Error(uiI18n.t('app.not_logged_in_53802e67'));
 
       // Check if user already reacted
       const { data: existing } = await supabase
@@ -151,7 +155,7 @@ export function useReact() {
       });
     },
     onError: () => {
-      toast.error('Failed to react');
+      toast.error(uiI18n.t('app.failed_to_react_9d153774'));
     },
   });
 }

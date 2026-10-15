@@ -1,4 +1,6 @@
+import uiI18n from '@/lib/uiI18n';
 import { useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, SearchX } from 'lucide-react';
 import { Background } from '@/components/layout/Background';
@@ -33,6 +35,7 @@ const toSlug = (genre: string) => genre.toLowerCase().replace(/\s+/g, '-');
  * the genre stays in the path, where the rest of the app already links it.
  */
 export default function GenrePage() {
+  const { t } = useTranslation();
   const { genre: genreSlug } = useParams<{ genre?: string }>();
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
@@ -50,8 +53,11 @@ export default function GenrePage() {
   const pageInfo = data?.pageInfo;
 
   const heading = useMemo(
-    () => (genreSlug ? `${genreDisplayName(genreSlug)} anime` : 'Browse everything'),
-    [genreSlug],
+    () =>
+      genreSlug
+        ? t('discover.genreHeading', { genre: genreDisplayName(genreSlug) })
+        : t('discover.browseEverything'),
+    [genreSlug, t],
   );
 
   /** Filter changes reset paging — page 4 of one filter is meaningless in another. */
@@ -93,8 +99,11 @@ export default function GenrePage() {
               </h2>
               {pageInfo && pageInfo.total > 0 && (
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {pageInfo.total.toLocaleString()} titles · page {pageInfo.currentPage} of{' '}
-                  {pageInfo.lastPage.toLocaleString()}
+                  {t('discover.titlesMeta', {
+                    total: pageInfo.total.toLocaleString(uiI18n.language),
+                    current: pageInfo.currentPage,
+                    last: pageInfo.lastPage.toLocaleString(uiI18n.language),
+                  })}
                 </p>
               )}
             </div>
@@ -117,11 +126,11 @@ export default function GenrePage() {
           {media.length === 0 && !isLoading ? (
             <div className="flex flex-col items-center justify-center rounded-3xl border border-white/[0.07] bg-white/[0.02] py-24 text-center">
               <SearchX className="h-10 w-10 text-muted-foreground/60" />
-              <p className="mt-4 text-lg font-semibold">Nothing matches those filters</p>
+              <p className="mt-4 text-lg font-semibold">{t('discover.nothingMatches')}</p>
               <p className="mt-1 max-w-sm text-sm text-muted-foreground">
                 {year
-                  ? `No ${resolvedGenre ?? 'anime'} titles from ${year}. Try “Any year”.`
-                  : 'Try a different genre or sort order.'}
+                  ? t('discover.noTitlesFromYear', { genre: resolvedGenre ?? 'anime', year })
+                  : t('discover.tryDifferentFilters')}
               </p>
             </div>
           ) : (
@@ -129,7 +138,7 @@ export default function GenrePage() {
           )}
 
           {pageInfo && pageInfo.lastPage > 1 && (
-            <nav className="mt-14 flex items-center justify-center gap-3" aria-label="Pagination">
+            <nav className="mt-14 flex items-center justify-center gap-3" aria-label={t('discover.pagination')}>
               <button
                 type="button"
                 onClick={() => goToPage(page - 1)}
@@ -137,10 +146,10 @@ export default function GenrePage() {
                 className={PAGER_CLASS}
               >
                 <ChevronLeft className="h-4 w-4" />
-                Previous
+                {t('common.previous')}
               </button>
               <span className="min-w-24 text-center text-sm font-semibold tabular-nums text-muted-foreground">
-                {pageInfo.currentPage} / {pageInfo.lastPage.toLocaleString()}
+                {pageInfo.currentPage} / {pageInfo.lastPage.toLocaleString(uiI18n.language)}
               </span>
               <button
                 type="button"
@@ -148,7 +157,7 @@ export default function GenrePage() {
                 disabled={!pageInfo.hasNextPage}
                 className={PAGER_CLASS}
               >
-                Next
+                {t('common.next')}
                 <ChevronRight className="h-4 w-4" />
               </button>
             </nav>

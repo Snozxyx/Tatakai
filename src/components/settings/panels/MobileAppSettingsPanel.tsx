@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { normalizeUpdateState } from '@/core/update/normalized-update';
 import { ReleaseDetails } from '../ReleaseDetails';
 import { clearMediaMetadataCache } from '@/lib/queryClient';
@@ -176,6 +178,7 @@ const DebridSettingsPanel = lazy(() =>
  * including all switches and the debrid client form.
  */
 const AppUpdateSection = memo(function AppUpdateSection() {
+  useUiTranslation();
   const mobileUpdate = useMobileUpdateState();
   const release = normalizeUpdateState(mobileUpdate, __APP_VERSION__);
   const { openSettings } = useSettingsModal();
@@ -196,13 +199,13 @@ const AppUpdateSection = memo(function AppUpdateSection() {
 
   return (
     <SettingsSection
-      title="App updates"
-      description="Check GitHub Releases and install mobile updates manually."
+      title={uiI18n.t('app.app_updates_16213f85')}
+      description={uiI18n.t('app.check_github_releases_and_install_mobile_updates_b4f33277')}
       action={
         mobileUpdate.phase === 'available' || mobileUpdate.phase === 'downloaded' || mobileUpdate.phase === 'downloading'
-          ? <SettingsBadge tone="warning">Update available</SettingsBadge>
+          ? <SettingsBadge tone="warning">{uiI18n.t('app.update_available_21f1865b')}</SettingsBadge>
           : mobileUpdate.phase === 'current'
-            ? <SettingsBadge>Up to date</SettingsBadge>
+            ? <SettingsBadge>{uiI18n.t('app.up_to_date_82fb1d51')}</SettingsBadge>
             : undefined
       }
     >
@@ -210,19 +213,19 @@ const AppUpdateSection = memo(function AppUpdateSection() {
         icon={Download}
         title={
           mobileUpdate.phase === 'available'
-            ? `Tatakai ${mobileUpdate.latestVersion} is available`
+            ? uiI18n.t('app.tatakai_i18n_value_0_is_available_ebdd15b3', { value0: mobileUpdate.latestVersion })
             : mobileUpdate.phase === 'downloading'
-              ? `Downloading ${mobileUpdate.latestVersion}… ${Math.round(Number(mobileUpdate.progress ?? 0))}%`
+              ? uiI18n.t('app.downloading_i18n_value_0_i18n_value_1_53326607', { value0: mobileUpdate.latestVersion, value1: Math.round(Number(mobileUpdate.progress ?? 0)) })
               : mobileUpdate.phase === 'downloaded' || mobileUpdate.phase === 'installing'
-                ? `Tatakai ${mobileUpdate.latestVersion} is ready to install`
-                : 'Check for updates'
+                ? uiI18n.t('app.tatakai_i18n_value_0_is_ready_to_install_3e1516d8', { value0: mobileUpdate.latestVersion })
+                : uiI18n.t('app.check_for_updates_736b9062')
         }
         description={
           isIOS()
-            ? 'iOS releases are unsigned. Download the IPA, then sign and sideload it with your own tool.'
+            ? uiI18n.t('app.ios_releases_are_unsigned_download_the_ipa_then__6b78019d')
             : autoCapable || mobileUpdate.phase === 'downloading' || mobileUpdate.phase === 'downloaded'
-              ? 'Android updates download and install inside the app — no browser needed.'
-              : 'Android updates open the latest release so you can install the new package manually.'
+              ? uiI18n.t('app.android_updates_download_and_install_inside_the__ea8c56b1')
+              : uiI18n.t('app.android_updates_open_the_latest_release_so_you_c_0c82d718')
         }
         control={
           <div className="flex shrink-0 items-center gap-2">
@@ -233,7 +236,7 @@ const AppUpdateSection = memo(function AppUpdateSection() {
                 size="sm"
                 onClick={() => void cancelMobileUpdateDownload()}
               >
-                Cancel
+                {uiI18n.t('app.cancel_77dfd213')}
               </Button>
             )}
             <Button
@@ -264,16 +267,16 @@ const AppUpdateSection = memo(function AppUpdateSection() {
                 <RefreshCw className="h-4 w-4" aria-hidden="true" />
               )}
               {mobileUpdate.phase === 'checking'
-                ? 'Checking'
+                ? uiI18n.t('app.checking_97876b83')
                 : mobileUpdate.phase === 'available'
-                  ? autoCapable ? 'Download' : 'Open releases'
+                  ? autoCapable ? uiI18n.t('app.download_a479c9c3') : uiI18n.t('app.open_releases_afdf6661')
                   : mobileUpdate.phase === 'downloading'
-                    ? `${Math.round(Number(mobileUpdate.progress ?? 0))}%`
+                    ? uiI18n.t('app.i18n_value_0_cac4fa79', { value0: Math.round(Number(mobileUpdate.progress ?? 0)) })
                     : mobileUpdate.phase === 'downloaded'
-                      ? 'Install'
+                      ? uiI18n.t('app.install_fd6c3ebf')
                       : mobileUpdate.phase === 'installing'
-                        ? 'Opening…'
-                        : 'Check now'}
+                        ? uiI18n.t('app.opening_b1b8530b')
+                        : uiI18n.t('app.check_now_2ce5dd0d')}
             </Button>
           </div>
         }
@@ -296,13 +299,13 @@ const AppUpdateSection = memo(function AppUpdateSection() {
       )}
       {mobileUpdate.phase === 'error' && (
         <p role="status" className="px-4 pb-3 text-xs text-red-300">
-          {mobileUpdate.message || 'The update check could not be completed.'}
+          {mobileUpdate.message || uiI18n.t('app.the_update_check_could_not_be_completed_8fe17d8b')}
         </p>
       )}
       <SettingRow
         icon={ScrollText}
-        title="What's new"
-        description="Read the changelog for this version."
+        title={uiI18n.t('app.what_s_new_4d8dc5fe')}
+        description={uiI18n.t('app.read_the_changelog_for_this_version_db98e369')}
         control={
           <Button
             type="button"
@@ -312,7 +315,7 @@ const AppUpdateSection = memo(function AppUpdateSection() {
             className="gap-2"
           >
             <ScrollText className="h-4 w-4" />
-            Open
+            {uiI18n.t('app.open_cf9b7706')}
           </Button>
         }
       />
@@ -322,6 +325,7 @@ const AppUpdateSection = memo(function AppUpdateSection() {
 });
 
 export function MobileAppSettingsPanel(_props: { section?: string }) {
+  useUiTranslation();
   const { config, updateConfig, resetConfig } = useMobileConfig();
   const { reduceMotion, setReduceMotion } = useTheme();
   const [device, setDevice] = useState<DeviceSummary>({});
@@ -374,9 +378,9 @@ export function MobileAppSettingsPanel(_props: { section?: string }) {
     setClearing(true);
     try {
       const n = await clearWebCaches();
-      toast.success('Cleared web and title metadata caches');
+      toast.success(uiI18n.t('app.cleared_web_and_title_metadata_caches_19a54106'));
     } catch {
-      toast.error('Could not clear caches');
+      toast.error(uiI18n.t('app.could_not_clear_caches_5a773f47'));
     } finally {
       if (mounted.current) setClearing(false);
     }
@@ -388,113 +392,112 @@ export function MobileAppSettingsPanel(_props: { section?: string }) {
     void applyOrientation('auto');
     void applyKeyboardResize('native');
     void applyKeepAwake(false);
-    toast.success('Mobile settings reset to defaults');
+    toast.success(uiI18n.t('app.mobile_settings_reset_to_defaults_9da9e1ab'));
   };
 
   const nativeBadge = isCapacitor() ? null : (
-    <SettingsBadge tone="warning">Preview</SettingsBadge>
+    <SettingsBadge tone="warning">{uiI18n.t('app.preview_f1fbb2b4')}</SettingsBadge>
   );
 
   return (
     <div className="min-w-0 space-y-6">
       {!isCapacitor() && (
         <p className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm text-muted-foreground">
-          You&apos;re viewing these on a non-mobile build. Preferences still save, but native
-          effects (status bar, orientation, haptics) only apply inside the Android / iOS app.
+          {uiI18n.t('app.you_apos_re_viewing_these_on_a_non_mobile_build__73428cbe')}
         </p>
       )}
 
       <SettingsSection
-        title="Haptics & feedback"
-        description="Vibration feedback for taps, toggles, and outcomes across the app."
+        title={uiI18n.t('app.haptics_feedback_ac5363a1')}
+        description={uiI18n.t('app.vibration_feedback_for_taps_toggles_and_outcomes_23ca5c51')}
         action={nativeBadge}
       >
         <SettingRow
           icon={Vibrate}
-          title="Haptic feedback"
-          description="Buzz on navigation, selections, and completed actions."
-          control={<Switch checked={config.hapticFeedback} onCheckedChange={handleHaptics} aria-label="Haptic feedback" />}
+          title={uiI18n.t('app.haptic_feedback_b0baa915')}
+          description={uiI18n.t('app.buzz_on_navigation_selections_and_completed_acti_3783e7e8')}
+          control={<Switch checked={config.hapticFeedback} onCheckedChange={handleHaptics} aria-label={uiI18n.t('app.haptic_feedback_b0baa915')} />}
         />
       </SettingsSection>
 
       <SettingsSection
-        title="Display & orientation"
-        description="How the app fills the screen and reacts to the device shell."
+        title={uiI18n.t('app.display_orientation_1bb7842e')}
+        description={uiI18n.t('app.how_the_app_fills_the_screen_and_reacts_to_the_d_a363f531')}
       >
         <div className="flex flex-col divide-y divide-white/5">
           <SettingRow
-            title="Mobile layout"
-            description="Refreshed adds a cinematic spotlight, glass header, and consistent posters. Also available in Appearance."
+            title={uiI18n.t('app.mobile_layout_39dde171')}
+            description={uiI18n.t('app.refreshed_adds_a_cinematic_spotlight_glass_heade_a2b3aafb')}
             control={
               <Select value={config.mobileLayout} onValueChange={(value) => updateConfig({ mobileLayout: value === 'classic' ? 'classic' : 'refreshed' })}>
-                <SelectTrigger className="h-11 w-36 rounded-lg text-sm" aria-label="Mobile layout"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-11 w-36 rounded-lg text-sm" aria-label={uiI18n.t('app.mobile_layout_39dde171')}><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="refreshed">Refreshed</SelectItem>
-                  <SelectItem value="classic">Classic</SelectItem>
+                  <SelectItem value="refreshed">{uiI18n.t('app.refreshed_b583face')}</SelectItem>
+                  <SelectItem value="classic">{uiI18n.t('app.classic_130cd7fe')}</SelectItem>
                 </SelectContent>
               </Select>
             }
           />
           <SettingRow
-            title="Reduce motion"
-            description="Minimize animations and transitions."
-            control={<Switch checked={reduceMotion} onCheckedChange={handleReduceMotion} aria-label="Reduce motion" />}
+            title={uiI18n.t('app.reduce_motion_25a5aef5')}
+            description={uiI18n.t('app.minimize_animations_and_transitions_e82ddf56')}
+            control={<Switch checked={reduceMotion} onCheckedChange={handleReduceMotion} aria-label={uiI18n.t('app.reduce_motion_25a5aef5')} />}
           />
           <SettingRow
-            title="Keep screen awake"
-            description="Prevent the screen from sleeping while the app is open."
-            control={<Switch checked={config.keepScreenAwake} onCheckedChange={handleKeepAwake} aria-label="Keep screen awake" />}
+            title={uiI18n.t('app.keep_screen_awake_e4656630')}
+            description={uiI18n.t('app.prevent_the_screen_from_sleeping_while_the_app_i_4a864c8a')}
+            control={<Switch checked={config.keepScreenAwake} onCheckedChange={handleKeepAwake} aria-label={uiI18n.t('app.keep_screen_awake_e4656630')} />}
           />
           <SettingRow
-            title="Status bar"
-            description="Icon color of the system status bar."
+            title={uiI18n.t('app.status_bar_31b8336a')}
+            description={uiI18n.t('app.icon_color_of_the_system_status_bar_1f2c6957')}
             control={
               <Select value={config.statusBarStyle} onValueChange={(v) => handleStatusBar(v as StatusBarStyle)}>
                 <SelectTrigger className="h-9 w-36 rounded-lg text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="auto">Auto</SelectItem>
-                  <SelectItem value="light">Light icons</SelectItem>
-                  <SelectItem value="dark">Dark icons</SelectItem>
+                  <SelectItem value="auto">{uiI18n.t('app.auto_c614ba7c')}</SelectItem>
+                  <SelectItem value="light">{uiI18n.t('app.light_icons_ae976f23')}</SelectItem>
+                  <SelectItem value="dark">{uiI18n.t('app.dark_icons_58ad4f8f')}</SelectItem>
                 </SelectContent>
               </Select>
             }
           />
           <SettingRow
-            title="Orientation lock"
-            description="Lock the app to one orientation, or allow rotation."
+            title={uiI18n.t('app.orientation_lock_189da7d6')}
+            description={uiI18n.t('app.lock_the_app_to_one_orientation_or_allow_rotatio_9e62e7c3')}
             control={
               <Select value={config.orientationLock} onValueChange={(v) => handleOrientation(v as OrientationLock)}>
                 <SelectTrigger className="h-9 w-36 rounded-lg text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="auto">Auto</SelectItem>
-                  <SelectItem value="portrait">Portrait</SelectItem>
-                  <SelectItem value="landscape">Landscape</SelectItem>
+                  <SelectItem value="auto">{uiI18n.t('app.auto_c614ba7c')}</SelectItem>
+                  <SelectItem value="portrait">{uiI18n.t('app.portrait_92b6b1bf')}</SelectItem>
+                  <SelectItem value="landscape">{uiI18n.t('app.landscape_7dc4bea6')}</SelectItem>
                 </SelectContent>
               </Select>
             }
           />
           <SettingRow
-            title="Landscape in player"
-            description="Rotate to landscape automatically when a video opens."
+            title={uiI18n.t('app.landscape_in_player_5a1b624b')}
+            description={uiI18n.t('app.rotate_to_landscape_automatically_when_a_video_o_b79b9186')}
             control={
               <Switch
                 checked={config.forceLandscapeInPlayer}
                 onCheckedChange={(v) => updateConfig({ forceLandscapeInPlayer: v })}
-                aria-label="Force landscape in player"
+                aria-label={uiI18n.t('app.force_landscape_in_player_c383ff26')}
               />
             }
           />
           <SettingRow
-            title="Keyboard resize"
-            description="How the view adjusts when the soft keyboard appears."
+            title={uiI18n.t('app.keyboard_resize_9dc46a00')}
+            description={uiI18n.t('app.how_the_view_adjusts_when_the_soft_keyboard_appe_09d13a97')}
             control={
               <Select value={config.keyboardResize} onValueChange={(v) => handleKeyboard(v as KeyboardResizeMode)}>
                 <SelectTrigger className="h-9 w-36 rounded-lg text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="native">Native</SelectItem>
-                  <SelectItem value="body">Body</SelectItem>
-                  <SelectItem value="ionic">Ionic</SelectItem>
-                  <SelectItem value="none">None</SelectItem>
+                  <SelectItem value="native">{uiI18n.t('app.native_4fc6e7f7')}</SelectItem>
+                  <SelectItem value="body">{uiI18n.t('app.body_718a7e8a')}</SelectItem>
+                  <SelectItem value="ionic">{uiI18n.t('app.ionic_bbbb4d77')}</SelectItem>
+                  <SelectItem value="none">{uiI18n.t('app.none_6eef6648')}</SelectItem>
                 </SelectContent>
               </Select>
             }
@@ -503,41 +506,41 @@ export function MobileAppSettingsPanel(_props: { section?: string }) {
       </SettingsSection>
 
       <SettingsSection
-        title="Notifications"
-        description="Local notifications shown in the device tray."
+        title={uiI18n.t('app.notifications_753a22b2')}
+        description={uiI18n.t('app.local_notifications_shown_in_the_device_tray_0dff312b')}
       >
         <div className="flex flex-col divide-y divide-white/5">
           <SettingRow
             icon={Bell}
-            title="Download progress"
-            description="Ongoing notification while downloads run."
+            title={uiI18n.t('app.download_progress_9c8fe84b')}
+            description={uiI18n.t('app.ongoing_notification_while_downloads_run_8e47e684')}
             control={
               <Switch
                 checked={config.downloadNotifications}
                 onCheckedChange={(v) => updateConfig({ downloadNotifications: v })}
-                aria-label="Download progress notifications"
+                aria-label={uiI18n.t('app.download_progress_notifications_8f3e293a')}
               />
             }
           />
           <SettingRow
-            title="Download complete"
-            description="Notify when a download finishes."
+            title={uiI18n.t('app.download_complete_95efb337')}
+            description={uiI18n.t('app.notify_when_a_download_finishes_67800420')}
             control={
               <Switch
                 checked={config.downloadCompleteNotifications}
                 onCheckedChange={(v) => updateConfig({ downloadCompleteNotifications: v })}
-                aria-label="Download complete notifications"
+                aria-label={uiI18n.t('app.download_complete_notifications_a69e19e2')}
               />
             }
           />
           <SettingRow
-            title="General notifications"
-            description="Route in-app notifications to the system tray."
+            title={uiI18n.t('app.general_notifications_0694e086')}
+            description={uiI18n.t('app.route_in_app_notifications_to_the_system_tray_347ab8dd')}
             control={
               <Switch
                 checked={config.generalNotifications}
                 onCheckedChange={(v) => updateConfig({ generalNotifications: v })}
-                aria-label="General notifications"
+                aria-label={uiI18n.t('app.general_notifications_0694e086')}
               />
             }
           />
@@ -548,20 +551,20 @@ export function MobileAppSettingsPanel(_props: { section?: string }) {
         <DebridSettingsPanel />
       </Suspense>
 
-      <SettingsSection title="Cloudflare" description="Try to resolve provider challenges before retrying playback. Interactive CAPTCHAs may still require visiting the provider.">
-        <SettingRow title="Resolve challenges" description="Reuse clearance cookies from an on-device browser session."
-          control={<Switch checked={config.cloudflareBypass} onCheckedChange={(cloudflareBypass) => updateConfig({ cloudflareBypass })} aria-label="Resolve Cloudflare challenges" />} />
+      <SettingsSection title={uiI18n.t('app.cloudflare_a5b966cd')} description={uiI18n.t('app.try_to_resolve_provider_challenges_before_retryi_d2842567')}>
+        <SettingRow title={uiI18n.t('app.resolve_challenges_538c5675')} description={uiI18n.t('app.reuse_clearance_cookies_from_an_on_device_browse_b5e5a10a')}
+          control={<Switch checked={config.cloudflareBypass} onCheckedChange={(cloudflareBypass) => updateConfig({ cloudflareBypass })} aria-label={uiI18n.t('app.resolve_cloudflare_challenges_9fa40ba4')} />} />
         <label className="mt-3 block text-sm">
-          FlareSolverr server (optional)
+          {uiI18n.t('app.flaresolverr_server_optional_5d41ae0f')}
           <input type="url" defaultValue={config.flaresolverrUrl} key={config.flaresolverrUrl}
-            placeholder="http://192.168.1.10:8191" aria-label="FlareSolverr server URL"
+            placeholder="http://192.168.1.10:8191" aria-label={uiI18n.t('app.flaresolverr_server_url_95a5bc1b')}
             className="mt-2 w-full rounded-lg border border-border bg-background px-3 py-2"
             onBlur={(event) => {
               const value = event.target.value.trim();
               try {
-                if (value && !['http:', 'https:'].includes(new URL(value).protocol)) throw new Error('protocol');
+                if (value && !['http:', 'https:'].includes(new URL(value).protocol)) throw new Error(uiI18n.t('app.protocol_6e9b4af6'));
                 updateConfig({ flaresolverrUrl: value });
-              } catch { toast.error('Enter a valid HTTP or HTTPS server URL'); }
+              } catch { toast.error(uiI18n.t('app.enter_a_valid_http_or_https_server_url_04ec9e83')); }
             }} />
         </label>
         {config.flaresolverrUrl && <Button variant="outline" size="sm" className="mt-3" onClick={async (event) => {
@@ -570,22 +573,22 @@ export function MobileAppSettingsPanel(_props: { section?: string }) {
           try {
             const endpoint = config.flaresolverrUrl.replace(/\/v1\/?$/, '').replace(/\/$/, '');
             const response = await CapacitorHttp.get({ url: endpoint, connectTimeout: 5000, readTimeout: 5000 });
-            if (response.status !== 200 || !JSON.stringify(response.data).toLowerCase().includes('flaresolverr')) throw new Error('unreachable');
-            toast.success('FlareSolverr is reachable');
-          } catch { toast.error('Could not reach FlareSolverr. Check the server URL and network.'); }
+            if (response.status !== 200 || !JSON.stringify(response.data).toLowerCase().includes('flaresolverr')) throw new Error(uiI18n.t('app.unreachable_408e9edf'));
+            toast.success(uiI18n.t('app.flaresolverr_is_reachable_65cb3e26'));
+          } catch { toast.error(uiI18n.t('app.could_not_reach_flaresolverr_check_the_server_ur_536a72db')); }
           finally { button.disabled = false; }
-        }}>Test connection</Button>}
-        <p className="mt-2 text-xs text-muted-foreground">Leave blank to use the on-device browser. A configured server receives the provider URL; if it fails, the app tries the browser.</p>
+        }}>{uiI18n.t('app.test_connection_ccf66f07')}</Button>}
+        <p className="mt-2 text-xs text-muted-foreground">{uiI18n.t('app.leave_blank_to_use_the_on_device_browser_a_confi_d57284ef')}</p>
       </SettingsSection>
 
       <SettingsSection
-        title="Data saver"
-        description="Cap quality to 720p, force low-memory buffers, disable autoplay and heavy preloading."
+        title={uiI18n.t('app.data_saver_07147bcc')}
+        description={uiI18n.t('app.cap_quality_to_720p_force_low_memory_buffers_dis_2c25402b')}
       >
         <div className="flex flex-col divide-y divide-white/5">
           <SettingRow
-            title="Data saver"
-            description="Best for metered links. Posters stay full-size; streams and preloads shrink."
+            title={uiI18n.t('app.data_saver_07147bcc')}
+            description={uiI18n.t('app.best_for_metered_links_posters_stay_full_size_st_4af3a780')}
             control={
               <Switch
                 checked={config.dataSaver}
@@ -593,40 +596,40 @@ export function MobileAppSettingsPanel(_props: { section?: string }) {
                   updateConfig({ dataSaver: v });
                   if (v) void triggerHaptic('success');
                 }}
-                aria-label="Data saver"
+                aria-label={uiI18n.t('app.data_saver_07147bcc')}
               />
             }
           />
           <SettingRow
-            title="Auto-download next"
-            description="Queue the next episode / chapter when one finishes downloading."
+            title={uiI18n.t('app.auto_download_next_b31a103e')}
+            description={uiI18n.t('app.queue_the_next_episode_chapter_when_one_finishes_86779ce7')}
             control={
               <Switch
                 checked={config.autoDownloadNext}
                 onCheckedChange={(v) => updateConfig({ autoDownloadNext: v })}
-                aria-label="Auto-download next"
+                aria-label={uiI18n.t('app.auto_download_next_b31a103e')}
               />
             }
           />
           <SettingRow
-            title="WiFi only"
-            description="Only auto-download on unmetered WiFi. Manual downloads always work."
+            title={uiI18n.t('app.wifi_only_f4f241e2')}
+            description={uiI18n.t('app.only_auto_download_on_unmetered_wifi_manual_down_eaec6f25')}
             control={
               <Switch
                 checked={config.wifiOnlyDownloads}
                 onCheckedChange={(v) => updateConfig({ wifiOnlyDownloads: v })}
-                aria-label="WiFi only downloads"
+                aria-label={uiI18n.t('app.wifi_only_downloads_38b691c8')}
               />
             }
           />
           <SettingRow
-            title="Auto-evict watched"
-            description="Free watched offline items first when storage runs low."
+            title={uiI18n.t('app.auto_evict_watched_90609d00')}
+            description={uiI18n.t('app.free_watched_offline_items_first_when_storage_ru_838c60fd')}
             control={
               <Switch
                 checked={config.autoEvictWatched}
                 onCheckedChange={(v) => updateConfig({ autoEvictWatched: v })}
-                aria-label="Auto-evict watched"
+                aria-label={uiI18n.t('app.auto_evict_watched_90609d00')}
               />
             }
           />
@@ -634,11 +637,11 @@ export function MobileAppSettingsPanel(_props: { section?: string }) {
       </SettingsSection>
 
       <DownloadResumeSetting />
-      <SettingsSection title="Storage" description="Free up space used by cached pages and images.">
+      <SettingsSection title={uiI18n.t('app.storage_9e092dda')} description={uiI18n.t('app.free_up_space_used_by_cached_pages_and_images_3262a695')}>
         <SettingRow
           icon={HardDrive}
-          title="Clear cache"
-          description="Remove saved title metadata, web responses, and images. Downloads are not affected."
+          title={uiI18n.t('app.clear_cache_22bc1a4e')}
+          description={uiI18n.t('app.remove_saved_title_metadata_web_responses_and_im_3890f79c')}
           control={
             <button
               type="button"
@@ -646,22 +649,22 @@ export function MobileAppSettingsPanel(_props: { section?: string }) {
               disabled={clearing}
               className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 disabled:opacity-50"
             >
-              {clearing ? 'Clearing…' : 'Clear cache'}
+              {clearing ? uiI18n.t('app.clearing_bc7a2b58') : uiI18n.t('app.clear_cache_22bc1a4e')}
             </button>
           }
         />
       </SettingsSection>
 
-      <SettingsSection title="Developer" description="Expose advanced affordances for debugging.">
+      <SettingsSection title={uiI18n.t('app.developer_7e08ebec')} description={uiI18n.t('app.expose_advanced_affordances_for_debugging_dad721ae')}>
         <SettingRow
           icon={Code2}
-          title="Developer mode"
-          description="Show extra diagnostics and sideloading controls."
+          title={uiI18n.t('app.developer_mode_98322696')}
+          description={uiI18n.t('app.show_extra_diagnostics_and_sideloading_controls_0965075a')}
           control={
             <Switch
               checked={config.devMode}
               onCheckedChange={(v) => updateConfig({ devMode: v })}
-              aria-label="Developer mode"
+              aria-label={uiI18n.t('app.developer_mode_98322696')}
             />
           }
         />
@@ -669,35 +672,35 @@ export function MobileAppSettingsPanel(_props: { section?: string }) {
 
       <AppUpdateSection />
 
-      <SettingsSection title="Device" description="This device and app build.">
+      <SettingsSection title={uiI18n.t('app.device_a5a74a6d')} description={uiI18n.t('app.this_device_and_app_build_b6844cd9')}>
         <div className="rounded-lg border border-white/10 bg-white/[0.02] px-4 py-3 text-sm">
           <dl className="grid grid-cols-[auto,1fr] gap-x-4 gap-y-1.5 text-muted-foreground">
-            <dt className="flex items-center gap-2"><Smartphone className="h-3.5 w-3.5" /> Model</dt>
+            <dt className="flex items-center gap-2"><Smartphone className="h-3.5 w-3.5" /> {uiI18n.t('app.model_68c2cc7f')}</dt>
             <dd className="text-right text-foreground">{device.model || '—'}</dd>
-            <dt>Platform</dt>
-            <dd className="text-right text-foreground">{device.platform || 'web'}</dd>
-            <dt>OS</dt>
+            <dt>{uiI18n.t('app.platform_123a7f2f')}</dt>
+            <dd className="text-right text-foreground">{device.platform || uiI18n.t('app.web_ca84d134')}</dd>
+            <dt>{uiI18n.t('app.os_de8aa862')}</dt>
             <dd className="text-right text-foreground">{device.osVersion || '—'}</dd>
-            <dt className="flex items-center gap-2"><Info className="h-3.5 w-3.5" /> App version</dt>
+            <dt className="flex items-center gap-2"><Info className="h-3.5 w-3.5" /> {uiI18n.t('app.app_version_0e25be38')}</dt>
             <dd className="text-right text-foreground">
-              {device.appVersion ? `${device.appVersion}${device.appBuild ? ` (${device.appBuild})` : ''}` : '—'}
+              {device.appVersion ? uiI18n.t('app.i18n_value_0i18n_value_1_bb0b4be1', { value0: device.appVersion, value1: device.appBuild ? ` (${device.appBuild})` : '' }) : '—'}
             </dd>
           </dl>
         </div>
       </SettingsSection>
 
-      <SettingsSection title="Reset" description="Restore every mobile preference to its default.">
+      <SettingsSection title={uiI18n.t('app.reset_44c57abd')} description={uiI18n.t('app.restore_every_mobile_preference_to_its_default_f089e9ba')}>
         <SettingRow
           icon={RotateCcw}
-          title="Reset mobile settings"
-          description="Haptics, display, orientation, notifications, and developer mode."
+          title={uiI18n.t('app.reset_mobile_settings_1dcf203f')}
+          description={uiI18n.t('app.haptics_display_orientation_notifications_and_de_9f917bb5')}
           control={
             <button
               type="button"
               onClick={handleReset}
               className="rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-1.5 text-sm font-medium text-red-300 transition-colors hover:border-red-500/40 hover:bg-red-500/10"
             >
-              Reset to defaults
+              {uiI18n.t('app.reset_to_defaults_ddefe47d')}
             </button>
           }
         />

@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { CalendarDays, ChevronRight, Tv } from 'lucide-react';
@@ -11,6 +13,7 @@ export interface OverviewCalendarIntegrationProps {
 export function OverviewCalendarIntegration({
   watchlist = [],
 }: OverviewCalendarIntegrationProps) {
+  useUiTranslation();
   const weekStart = useMemo(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -57,10 +60,10 @@ export function OverviewCalendarIntegration({
               </div>
               <div>
                 <h4 className="font-display font-bold text-base text-foreground tracking-tight">
-                  Tatakai Airing Calendar
+                  {uiI18n.t('app.tatakai_airing_calendar_1745027d')}
                 </h4>
                 <p className="text-xs text-muted-foreground/70 font-medium">
-                  Upcoming episode airings synced with watchlist
+                  {uiI18n.t('app.upcoming_episode_airings_synced_with_watchlist_e208a444')}
                 </p>
               </div>
             </div>
@@ -69,7 +72,7 @@ export function OverviewCalendarIntegration({
               to="/calendar"
               className="flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary/80 transition-colors group shrink-0"
             >
-              <span>Full Calendar</span>
+              <span>{uiI18n.t('app.full_calendar_5d37050e')}</span>
               <ChevronRight className="w-3.5 h-3.5 transition-transform duration-200 group-hover:translate-x-0.5" />
             </Link>
           </div>
@@ -85,11 +88,11 @@ export function OverviewCalendarIntegration({
             <div className="space-y-2.5">
               {matchedSchedule.map((entry: AiringEntry) => {
                 const airDate = new Date(entry.airingAt * 1000);
-                const timeStr = airDate.toLocaleTimeString(undefined, {
+                const timeStr = airDate.toLocaleTimeString(uiI18n.language, {
                   hour: '2-digit',
                   minute: '2-digit',
                 });
-                const dayStr = airDate.toLocaleDateString(undefined, {
+                const dayStr = airDate.toLocaleDateString(uiI18n.language, {
                   weekday: 'short',
                   month: 'short',
                   day: 'numeric',
@@ -119,7 +122,7 @@ export function OverviewCalendarIntegration({
                           {entry.title}
                         </h5>
                         <span className="text-[10px] text-muted-foreground/70 font-medium">
-                          Episode {entry.episode} {entry.totalEpisodes ? `of ${entry.totalEpisodes}` : ''}
+                          {uiI18n.t('app.episode_8669aa56')} {entry.episode} {entry.totalEpisodes ? uiI18n.t('app.of_i18n_value_0_739f670f', { value0: entry.totalEpisodes }) : ''}
                         </span>
                       </div>
                     </div>
@@ -139,7 +142,7 @@ export function OverviewCalendarIntegration({
           ) : (
             <div className="text-center py-8 border border-dashed border-white/[0.08] rounded-xl bg-white/[0.01]">
               <CalendarDays className="w-8 h-8 mx-auto text-muted-foreground/30 mb-2" />
-              <p className="text-xs text-muted-foreground/70">No upcoming airing shows tracked this week</p>
+              <p className="text-xs text-muted-foreground/70">{uiI18n.t('app.no_upcoming_airing_shows_tracked_this_week_7c753512')}</p>
             </div>
           )}
         </div>
@@ -150,7 +153,7 @@ export function OverviewCalendarIntegration({
             to="/calendar"
             className="w-full py-2.5 px-3 rounded-xl bg-white/[0.03] hover:bg-primary/10 border border-white/[0.06] hover:border-primary/20 text-xs font-bold text-center block text-foreground hover:text-primary transition-all duration-200"
           >
-            Explore Airing Schedules →
+            {uiI18n.t('app.explore_airing_schedules_80695540')}
           </Link>
         </div>
       </div>

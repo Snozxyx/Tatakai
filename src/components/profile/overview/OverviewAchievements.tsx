@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Trophy, ArrowRight, Flame, PlayCircle, Lock, CheckCircle2 } from 'lucide-react';
@@ -36,6 +38,7 @@ export function OverviewAchievements({
   units,
   onNavigateTab,
 }: OverviewAchievementsProps) {
+  useUiTranslation();
   const score = rankScore ?? episodesCount;
   const currentRank = getRankTier(score);
   const nextRank = getNextRankTier(score);
@@ -66,7 +69,7 @@ export function OverviewAchievements({
 
         <div className="flex-1 w-full">
           <p className="text-[10px] sm:text-xs text-muted-foreground/80 uppercase tracking-widest font-semibold mb-1">
-            Current Rank
+            {uiI18n.t('app.current_rank_f996d22f')}
           </p>
           <div className="flex items-baseline gap-3 mb-2.5">
             <h2
@@ -76,15 +79,15 @@ export function OverviewAchievements({
               {currentRank.name}
             </h2>
             <span className="text-xs text-muted-foreground/50 font-mono">
-              Rank {currentRank.rank} / 16 · {score.toLocaleString()} RP
+              {uiI18n.t('app.rank_dd48a114')} {currentRank.rank} / 16 · {score.toLocaleString(uiI18n.language)} {uiI18n.t('app.rp_d31618d2')}
             </span>
           </div>
 
           {nextRank && (
             <div className="space-y-1.5 w-full max-w-md">
               <div className="flex justify-between items-center text-xs">
-                <span className="text-muted-foreground">Progress to {nextRank.tier.name}</span>
-                <span className="font-mono text-muted-foreground/80">{nextRank.needed} RP left</span>
+                <span className="text-muted-foreground">{uiI18n.t('app.progress_to_bc5e6d58')} {nextRank.tier.name}</span>
+                <span className="font-mono text-muted-foreground/80">{nextRank.needed} {uiI18n.t('app.rp_left_f7e9aa71')}</span>
               </div>
               <div className="h-1.5 w-full bg-white/[0.05] rounded-full overflow-hidden">
                 <motion.div
@@ -106,9 +109,9 @@ export function OverviewAchievements({
             <Flame className="w-4 h-4" />
           </div>
           <div>
-            <p className="text-[10px] uppercase font-semibold text-muted-foreground/60 tracking-wider">Watch Streak</p>
+            <p className="text-[10px] uppercase font-semibold text-muted-foreground/60 tracking-wider">{uiI18n.t('app.watch_streak_2ad427cc')}</p>
             <p className="font-display text-sm font-bold text-foreground">
-              {streakDays} Days <span className="text-[10px] font-normal text-muted-foreground/50 ml-1">Best: {longestStreak}</span>
+              {streakDays} {uiI18n.t('app.days_f6bb0f46')} <span className="text-[10px] font-normal text-muted-foreground/50 ml-1">{uiI18n.t('app.best_33abaf20')} {longestStreak}</span>
             </p>
           </div>
         </div>
@@ -117,7 +120,7 @@ export function OverviewAchievements({
             <PlayCircle className="w-4 h-4" />
           </div>
           <div>
-            <p className="text-[10px] uppercase font-semibold text-muted-foreground/60 tracking-wider">Ranks Unlocked</p>
+            <p className="text-[10px] uppercase font-semibold text-muted-foreground/60 tracking-wider">{uiI18n.t('app.ranks_unlocked_5ba1fc2d')}</p>
             <p className="font-display text-sm font-bold text-foreground">
               {unlockedCount} / 16
             </p>
@@ -135,9 +138,9 @@ export function OverviewAchievements({
             >
               <span className="font-semibold text-foreground/80">{MEDIA_LABEL[row.kind]}</span>
               <span className="text-muted-foreground/60">
-                {row.units.toLocaleString()} {MEDIA_UNIT[row.kind]}
+                {row.units.toLocaleString(uiI18n.language)} {MEDIA_UNIT[row.kind]}
               </span>
-              <span className="font-mono text-primary/70">+{row.points} RP</span>
+              <span className="font-mono text-primary/70">+{row.points} {uiI18n.t('app.rp_d31618d2')}</span>
             </span>
           ))}
         </div>
@@ -147,7 +150,7 @@ export function OverviewAchievements({
       <div className="z-10 flex flex-col gap-4">
         <div className="flex items-center gap-2">
           <Trophy className="w-4 h-4 text-primary/80" />
-          <h3 className="font-display font-semibold text-sm sm:text-base text-foreground">Rank Badges</h3>
+          <h3 className="font-display font-semibold text-sm sm:text-base text-foreground">{uiI18n.t('app.rank_badges_8f907804')}</h3>
           <span className="text-xs text-muted-foreground/50 ml-1">{unlockedCount} / 16</span>
         </div>
 
@@ -158,7 +161,7 @@ export function OverviewAchievements({
             return (
               <div
                 key={tier.rank}
-                title={`${tier.name} — ${tier.minScore.toLocaleString()} RP`}
+                title={uiI18n.t('app.i18n_value_0_i18n_value_1_rp_f9741354', { value0: tier.name, value1: tier.minScore.toLocaleString(uiI18n.language) })}
                 className={cn(
                   'group relative flex flex-col items-center text-center gap-1 rounded-xl border p-2.5 duration-300 select-none',
                   unlocked
@@ -192,7 +195,7 @@ export function OverviewAchievements({
                   {tier.name}
                 </div>
                 <div className="font-mono text-[8px] text-muted-foreground/40">
-                  {tier.minScore.toLocaleString()} RP
+                  {tier.minScore.toLocaleString(uiI18n.language)} {uiI18n.t('app.rp_d31618d2')}
                 </div>
               </div>
             );
@@ -203,12 +206,12 @@ export function OverviewAchievements({
       {/* ── FOOTER ── */}
       {onNavigateTab && (
         <div className="relative z-10 pt-4 mt-2 border-t border-white/[0.03] flex items-center justify-between text-xs">
-          <span className="text-muted-foreground/60">Keep going to unlock higher tiers</span>
+          <span className="text-muted-foreground/60">{uiI18n.t('app.keep_going_to_unlock_higher_tiers_48ce4bf7')}</span>
           <button
             onClick={() => onNavigateTab('streaks')}
             className="flex items-center gap-1.5 font-medium text-primary hover:text-primary/80 transition-colors group"
           >
-            <span>All Milestones</span>
+            <span>{uiI18n.t('app.all_milestones_ffe7564a')}</span>
             <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
           </button>
         </div>

@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
  * Discover hero (docs/image-8.png): eyebrow, display heading, description, a
  * primary-gradient pill CTA and carousel dots on the left; the ranked poster fan
@@ -23,6 +25,7 @@ import {
 import { RankedPosterRail } from './RankedPosterRail';
 
 export function DiscoverHero({ className }: { className?: string }) {
+  useUiTranslation();
   const [index, setIndex] = useState(0);
   const board = RANKED_BOARDS[index];
   const { data, isLoading } = useRankedBoard(board.id);
@@ -40,7 +43,7 @@ export function DiscoverHero({ className }: { className?: string }) {
         className,
       )}
       aria-roledescription="carousel"
-      aria-label="Ranked boards"
+      aria-label={uiI18n.t('app.ranked_boards_b0563120')}
     >
       {/* Backdrop: the leader's banner, pushed back far enough to read text over. */}
       <AnimatePresence mode="wait">

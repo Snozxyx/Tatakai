@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useHomeData } from "@/hooks/api/useAnimeData";
 import { Background } from "@/components/layout/Background";
 import { Sidebar } from "@/components/layout/Sidebar";
@@ -57,6 +59,7 @@ const RevealSection = ({ children, delay }: { children: ReactNode; delay?: numbe
 );
 
 const Index = () => {
+  useUiTranslation();
   const { data, isLoading, error, refetch, isFetching } = useHomeData();
   const isNative = useIsNativeApp();
   const isDesktopApp = useIsDesktopApp(); // Only Electron/Tauri
@@ -93,11 +96,11 @@ const Index = () => {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center px-6">
         <div className="text-center">
-          <h1 className="text-2xl font-bold mb-2">Failed to load</h1>
-          <p className="text-muted-foreground mb-6">Something went wrong loading your home feed.</p>
+          <h1 className="text-2xl font-bold mb-2">{uiI18n.t('app.failed_to_load_af14db26')}</h1>
+          <p className="text-muted-foreground mb-6">{uiI18n.t('app.something_went_wrong_loading_your_home_feed_e34817d4')}</p>
           <Button onClick={() => refetch()} disabled={isFetching}>
             <RefreshCw className={cn("mr-2 h-4 w-4", isFetching && "animate-spin")} />
-            {isFetching ? "Retrying…" : "Try again"}
+            {isFetching ? uiI18n.t('app.retrying_2310131b') : uiI18n.t('app.try_again_042c862e')}
           </Button>
         </div>
       </div>
@@ -176,14 +179,14 @@ const Index = () => {
                 <RevealSection>
                   <AnimeGrid
                     animes={data.mostPopularAnimes.slice(0, 6)}
-                    title="Most Popular"
+                    title={uiI18n.t('app.most_popular_385b4b23')}
                     icon={<Heart className="w-5 h-5 text-destructive fill-destructive" />}
                   />
                 </RevealSection>
                 <RevealSection>
                   <AnimeGrid
                     animes={data.mostFavoriteAnimes.slice(0, 6)}
-                    title="Most Favorite"
+                    title={uiI18n.t('app.most_favorite_cbe5ea81')}
                     icon={<Sparkles className="w-5 h-5 text-amber" />}
                   />
                 </RevealSection>

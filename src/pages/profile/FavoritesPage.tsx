@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
  * Favorites (docs/Plans.md §2 "Favorites Page"), rebuilt in the discover design
  * language of docs/image-8.png.
@@ -88,14 +90,14 @@ type TabType =
   | 'dropped';
 
 const TABS: ReadonlyArray<PillOption<TabType>> = [
-  { id: 'for-you', label: 'For you', icon: <Sparkles className="h-3.5 w-3.5" /> },
-  { id: 'ai-recs', label: 'AI picks', icon: <Brain className="h-3.5 w-3.5" /> },
-  { id: 'all', label: 'All saved', icon: <BookOpen className="h-3.5 w-3.5" /> },
-  { id: 'watching', label: 'Watching', icon: <TrendingUp className="h-3.5 w-3.5" /> },
-  { id: 'completed', label: 'Completed', icon: <CheckCircle2 className="h-3.5 w-3.5" /> },
-  { id: 'plan', label: 'Planned', icon: <Clock className="h-3.5 w-3.5" /> },
-  { id: 'on-hold', label: 'On hold', icon: <Pause className="h-3.5 w-3.5" /> },
-  { id: 'dropped', label: 'Dropped', icon: <X className="h-3.5 w-3.5" /> },
+  { id: 'for-you', get label() { return uiI18n.t('app.for_you_7e13d94a'); }, icon: <Sparkles className="h-3.5 w-3.5" /> },
+  { id: 'ai-recs', get label() { return uiI18n.t('app.ai_picks_c9b4570a'); }, icon: <Brain className="h-3.5 w-3.5" /> },
+  { id: 'all', get label() { return uiI18n.t('app.all_saved_c84b82cf'); }, icon: <BookOpen className="h-3.5 w-3.5" /> },
+  { id: 'watching', get label() { return uiI18n.t('app.watching_96d9e027'); }, icon: <TrendingUp className="h-3.5 w-3.5" /> },
+  { id: 'completed', get label() { return uiI18n.t('app.completed_1798b3ba'); }, icon: <CheckCircle2 className="h-3.5 w-3.5" /> },
+  { id: 'plan', get label() { return uiI18n.t('app.planned_9cbe42aa'); }, icon: <Clock className="h-3.5 w-3.5" /> },
+  { id: 'on-hold', get label() { return uiI18n.t('app.on_hold_7725fc0e'); }, icon: <Pause className="h-3.5 w-3.5" /> },
+  { id: 'dropped', get label() { return uiI18n.t('app.dropped_8cf622d3'); }, icon: <X className="h-3.5 w-3.5" /> },
 ];
 
 /** Tab → the `watchlist.status` it filters on. Null means "not a list tab". */
@@ -121,44 +123,44 @@ const STATUS_LABEL: Record<WatchlistStatus, string> = {
 type SortBy = 'recent' | 'alpha';
 
 const SORTS: ReadonlyArray<{ id: SortBy; label: string }> = [
-  { id: 'recent', label: 'Recently added' },
+  { id: 'recent', get label() { return uiI18n.t('app.recently_added_53696342'); } },
   { id: 'alpha', label: 'A–Z' },
 ];
 
 /** Headings per tab, so the section under the filter row says what it lists. */
 const TAB_COPY: Record<TabType, { eyebrow: string; title: string }> = {
-  'for-you': { eyebrow: 'Picked for you', title: 'Because of what you watch' },
-  'ai-recs': { eyebrow: 'Taste model', title: 'Ranked by match' },
-  all: { eyebrow: 'Your collection', title: 'Everything saved' },
-  watching: { eyebrow: 'In progress', title: 'Currently watching' },
-  completed: { eyebrow: 'Finished', title: 'Completed' },
-  plan: { eyebrow: 'Queued', title: 'Planned to watch' },
-  'on-hold': { eyebrow: 'Paused', title: 'On hold' },
-  dropped: { eyebrow: 'Set aside', title: 'Dropped' },
+  'for-you': { eyebrow: 'Picked for you', get title() { return uiI18n.t('app.because_of_what_you_watch_9e62e4f5'); } },
+  'ai-recs': { eyebrow: 'Taste model', get title() { return uiI18n.t('app.ranked_by_match_76daec7b'); } },
+  all: { eyebrow: 'Your collection', get title() { return uiI18n.t('app.everything_saved_f335b1d8'); } },
+  watching: { eyebrow: 'In progress', get title() { return uiI18n.t('app.currently_watching_8cb3624c'); } },
+  completed: { eyebrow: 'Finished', get title() { return uiI18n.t('app.completed_1798b3ba'); } },
+  plan: { eyebrow: 'Queued', get title() { return uiI18n.t('app.planned_to_watch_71debb3b'); } },
+  'on-hold': { eyebrow: 'Paused', get title() { return uiI18n.t('app.on_hold_7725fc0e'); } },
+  dropped: { eyebrow: 'Set aside', get title() { return uiI18n.t('app.dropped_8cf622d3'); } },
 };
 
 /** Empty copy per tab — eight tabs, one panel, no generic "nothing here". */
 const EMPTY_COPY: Record<TabType, { title: string; hint: string }> = {
   'for-you': {
-    title: 'No recommendations yet',
+    get title() { return uiI18n.t('app.no_recommendations_yet_d2c6e797'); },
     hint: 'Watch a few episodes and this fills in with titles like the ones you finish.',
   },
   'ai-recs': {
-    title: 'The taste model needs more history',
+    get title() { return uiI18n.t('app.the_taste_model_needs_more_history_3c5b934d'); },
     hint: 'Complete a couple of series and the match scores start to mean something.',
   },
-  all: { title: 'Nothing saved yet', hint: 'Add a title from its page and it lands here.' },
+  all: { get title() { return uiI18n.t('app.nothing_saved_yet_b54a5380'); }, hint: 'Add a title from its page and it lands here.' },
   watching: {
-    title: 'Nothing in progress',
+    get title() { return uiI18n.t('app.nothing_in_progress_a710d3cd'); },
     hint: 'Titles you are part-way through show up here.',
   },
-  completed: { title: 'Nothing finished yet', hint: 'Mark a title completed and it moves here.' },
-  plan: { title: 'Your queue is empty', hint: 'Save anything you want to get to later.' },
+  completed: { get title() { return uiI18n.t('app.nothing_finished_yet_d7a5a84b'); }, hint: 'Mark a title completed and it moves here.' },
+  plan: { get title() { return uiI18n.t('app.your_queue_is_empty_fb670bd9'); }, hint: 'Save anything you want to get to later.' },
   'on-hold': {
-    title: 'Nothing on hold',
+    get title() { return uiI18n.t('app.nothing_on_hold_63f4a621'); },
     hint: 'Paused a series? Park it here so it stays out of your active list.',
   },
-  dropped: { title: 'Nothing dropped', hint: 'Titles you set aside show up here.' },
+  dropped: { get title() { return uiI18n.t('app.nothing_dropped_f27f0df5'); }, hint: 'Titles you set aside show up here.' },
 };
 
 /**
@@ -202,6 +204,7 @@ function suggestionToPosterItem(
 }
 
 export default function FavoritesPage() {
+  useUiTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
   const isDesktopApp = useIsDesktopApp();
@@ -366,7 +369,7 @@ export default function FavoritesPage() {
             score: media?.averageScore ? (media.averageScore / 10).toFixed(1) : undefined,
           },
           suggestion,
-          note: `${media?.favourites?.toLocaleString() ?? '—'} favorites`,
+          note: `${media?.favourites?.toLocaleString(uiI18n.language) ?? '—'} favorites`,
         };
       }),
     [aniListFavorites],
@@ -391,7 +394,7 @@ export default function FavoritesPage() {
 
   const removeSelected = async () => {
     if (selectedIds.length === 0) return;
-    if (!(await confirm({ title: `Remove ${selectedIds.length} title${selectedIds.length === 1 ? '' : 's'}?`, destructive: true }))) return;
+    if (!(await confirm({ get title() { return uiI18n.t('app.remove_i18n_value_0_titlei18n_value_1_fdf60645', { value0: selectedIds.length, value1: selectedIds.length === 1 ? '' : 's' }); }, destructive: true }))) return;
     await bulkRemove.mutateAsync(selectedIds);
     setSelectedIds([]);
     setSelectMode(false);
@@ -416,21 +419,20 @@ export default function FavoritesPage() {
                 <Heart className="h-7 w-7 text-primary" />
               </span>
               <p className="mt-6 text-[11px] font-bold uppercase tracking-[0.28em] text-primary">
-                Your collection
+                {uiI18n.t('app.your_collection_f01e10ce')}
               </p>
               <h1 className="font-display mt-3 text-4xl font-black tracking-tight text-foreground sm:text-5xl">
-                Favorites live behind sign-in
+                {uiI18n.t('app.favorites_live_behind_sign_in_112f5156')}
               </h1>
               <p className="mt-4 max-w-md text-sm leading-relaxed text-white/55 sm:text-base">
-                Sign in to keep a watchlist, pick up where you left off, and get recommendations
-                built from what you actually watch.
+                {uiI18n.t('app.sign_in_to_keep_a_watchlist_pick_up_where_you_le_94db824c')}
               </p>
               <button
                 type="button"
                 onClick={() => navigate('/auth')}
                 className="group mt-8 inline-flex items-center gap-2 rounded-full bg-gradient-to-b from-primary to-secondary px-6 py-3 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:from-primary/90 hover:to-secondary/90 hover:shadow-primary/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
               >
-                Sign in
+                {uiI18n.t('app.sign_in_ada2e9e9')}
               </button>
             </div>
           </section>
@@ -466,11 +468,11 @@ export default function FavoritesPage() {
         <BoardHero
           className="mt-2"
           eyebrow="Your collection"
-          heading={counts.total ? 'Everything you saved' : 'Start your collection'}
+          heading={counts.total ? uiI18n.t('app.everything_you_saved_4f729b86') : uiI18n.t('app.start_your_collection_de2b910c')}
           description={
             counts.total
-              ? 'Your watchlist, the titles the recommenders think you should try next, and what the wider fandom keeps coming back to — all on one page.'
-              : 'Save a title from any page and it lands here, alongside recommendations built from what you actually watch.'
+              ? uiI18n.t('app.your_watchlist_the_titles_the_recommenders_think_f6ca6ad3')
+              : uiI18n.t('app.save_a_title_from_any_page_and_it_lands_here_alo_c00968bf')
           }
           leader={heroItems[0]}
           leaderPrefix={heroRow?.status === 'watching' ? 'Resume' : 'Latest'}
@@ -487,7 +489,7 @@ export default function FavoritesPage() {
             // accepts an updater function, and that candidate would widen the
             // pill group's id type to bare `string`.
             onChange={(id) => setActiveTab(id)}
-            label="Collection filter"
+            label={uiI18n.t('app.collection_filter_09bab600')}
           />
         </BoardHero>
 
@@ -500,7 +502,7 @@ export default function FavoritesPage() {
               isListTab ? (
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="mr-1 text-xs font-medium text-white/40">
-                    {activeEntries.length} {activeEntries.length === 1 ? 'title' : 'titles'}
+                    {activeEntries.length} {activeEntries.length === 1 ? uiI18n.t('app.title_3c6de1b7') : uiI18n.t('app.titles_50c9e3dd')}
                   </span>
 
                   <DropdownMenu>
@@ -530,7 +532,7 @@ export default function FavoritesPage() {
                       className="inline-flex items-center gap-1.5 rounded-full border border-destructive/40 bg-destructive/15 px-4 py-2 text-sm font-semibold text-destructive transition-colors hover:border-destructive/70 hover:bg-destructive/25 hover:text-destructive-foreground disabled:opacity-50"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
-                      Remove {selectedIds.length}
+                      {uiI18n.t('app.remove_e963907d')} {selectedIds.length}
                     </button>
                   )}
 
@@ -543,7 +545,7 @@ export default function FavoritesPage() {
                       }}
                       className={controlTriggerClass}
                     >
-                      {selectMode ? 'Done' : 'Manage list'}
+                      {selectMode ? uiI18n.t('app.done_e9b450d1') : uiI18n.t('app.manage_list_6c7a898b')}
                     </button>
                   )}
                 </div>
@@ -559,14 +561,14 @@ export default function FavoritesPage() {
                     <Brain className="h-5 w-5 text-primary" />
                   </span>
                   <div>
-                    <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-primary">Taste model</p>
-                    <h3 className="text-sm font-semibold text-white">Ranked from your history &amp; ratings</h3>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-primary">{uiI18n.t('app.taste_model_df23c612')}</p>
+                    <h3 className="text-sm font-semibold text-white">{uiI18n.t('app.ranked_from_your_history_amp_ratings_6cfc3f75')}</h3>
                   </div>
                 </div>
 
                 {tasteProfile.preferredGenres.length > 0 && (
                   <div className="min-w-0">
-                    <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-white/40">Top genres</p>
+                    <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-white/40">{uiI18n.t('app.top_genres_1c865de6')}</p>
                     <div className="flex flex-wrap gap-1.5">
                       {tasteProfile.preferredGenres.slice(0, 5).map((g) => (
                         <span
@@ -581,15 +583,15 @@ export default function FavoritesPage() {
                 )}
 
                 <div>
-                  <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-white/40">Rating range</p>
+                  <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-white/40">{uiI18n.t('app.rating_range_afd5d520')}</p>
                   <p className="text-sm font-semibold text-white">
                     {tasteProfile.preferredRatings.min.toFixed(1)}–{tasteProfile.preferredRatings.max.toFixed(1)}{' '}
-                    <span className="font-normal text-white/45">avg {tasteProfile.preferredRatings.average.toFixed(1)}</span>
+                    <span className="font-normal text-white/45">{uiI18n.t('app.avg_97e77871')} {tasteProfile.preferredRatings.average.toFixed(1)}</span>
                   </p>
                 </div>
 
                 <div className="min-w-[150px]">
-                  <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-white/40">Diversity</p>
+                  <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-white/40">{uiI18n.t('app.diversity_dcb3f6f3')}</p>
                   <div className="flex items-center gap-2">
                     <div className="h-1.5 w-24 overflow-hidden rounded-full bg-white/10">
                       <div className="h-full bg-primary" style={{ width: `${Math.round(tasteProfile.diversityScore * 100)}%` }} />
@@ -603,7 +605,7 @@ export default function FavoritesPage() {
                   className="ml-auto inline-flex items-center gap-1.5 self-center rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-white/70 transition-colors hover:border-white/25 hover:text-white"
                 >
                   <Sparkles className="h-3.5 w-3.5" />
-                  Full recommendations
+                  {uiI18n.t('app.full_recommendations_e905140f')}
                 </Link>
               </div>
             </div>
@@ -629,7 +631,7 @@ export default function FavoritesPage() {
                   to="/genre"
                   className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-white/70 transition-colors hover:border-white/25 hover:text-white"
                 >
-                  Browse anime
+                  {uiI18n.t('app.browse_anime_b42f8c8d')}
                 </Link>
               }
             />
@@ -660,7 +662,7 @@ export default function FavoritesPage() {
                             type="button"
                             onClick={() => toggleSelected(animeId)}
                             aria-pressed={selected}
-                            aria-label={`Select ${entry.item.title}`}
+                            aria-label={uiI18n.t('app.select_i18n_value_0_ad7d83f4', { value0: entry.item.title })}
                             className={cn(
                               'absolute right-2 top-2 z-20 flex h-8 w-8 items-center justify-center rounded-full border backdrop-blur-sm transition-colors',
                               selected
@@ -684,21 +686,21 @@ export default function FavoritesPage() {
           <section className="mt-14">
             <SectionHeading
               eyebrow="Your taste model"
-              title="What the match scores are built from"
+              title={uiI18n.t('app.what_the_match_scores_are_built_from_3afb7394')}
             />
             <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <StatTile
-                label="Diversity"
+                label={uiI18n.t('app.diversity_dcb3f6f3')}
                 value={`${Math.round(tasteProfile.diversityScore * 100)}%`}
                 hint="How widely your history spreads"
               />
               <StatTile
-                label="Scores you finish"
+                label={uiI18n.t('app.scores_you_finish_6698d69b')}
                 value={tasteProfile.preferredRatings.average.toFixed(1)}
                 hint={`Mostly ${tasteProfile.preferredRatings.min.toFixed(1)}–${tasteProfile.preferredRatings.max.toFixed(1)}`}
               />
               <StatTile
-                label="Top genre"
+                label={uiI18n.t('app.top_genre_e1ef7452')}
                 value={tasteProfile.preferredGenres[0]?.genre ?? '—'}
                 hint={
                   tasteProfile.preferredGenres.length > 1
@@ -707,7 +709,7 @@ export default function FavoritesPage() {
                 }
               />
               <StatTile
-                label="Preferred format"
+                label={uiI18n.t('app.preferred_format_3b4987ff')}
                 value={tasteProfile.preferredTypes[0]?.type ?? '—'}
                 hint={
                   tasteProfile.preferredTypes[0]
@@ -721,7 +723,7 @@ export default function FavoritesPage() {
 
         {showRecommendations && (genrePrefs?.length ?? 0) > 0 && (
           <section className="mt-14">
-            <SectionHeading eyebrow="Your genres" title="Weighted by what you finish" />
+            <SectionHeading eyebrow="Your genres" title={uiI18n.t('app.weighted_by_what_you_finish_168f3cf4')} />
             <div className="mt-5 flex flex-wrap gap-2">
               {(genrePrefs ?? []).slice(0, 12).map((preference) => (
                 <Link
@@ -741,7 +743,7 @@ export default function FavoritesPage() {
           <section className="mt-14">
             <SectionHeading
               eyebrow="From your history"
-              title="Watched, never saved"
+              title={uiI18n.t('app.watched_never_saved_b2f3037d')}
               meta="Scored on episodes, completions and recency"
             />
             <div className={cn(POSTER_GRID_CLASS, 'mt-6')}>
@@ -769,7 +771,7 @@ export default function FavoritesPage() {
         )}
 
         <section className="mt-14">
-          <SectionHeading eyebrow="All-time" title="Fan favorites" meta="Most favorited on AniList" />
+          <SectionHeading eyebrow="All-time" title={uiI18n.t('app.fan_favorites_c94fbc02')} meta="Most favorited on AniList" />
 
           {loadingAniListFavorites && aniListEntries.length === 0 ? (
             <PosterGridSkeleton className="mt-6" count={12} />
@@ -823,6 +825,7 @@ function EmptyPanel({
   hint: string;
   action?: ReactNode;
 }) {
+  useUiTranslation();
   return (
     <div className="mt-6 flex flex-col items-center gap-2 rounded-3xl border border-white/[0.07] bg-white/[0.02] py-20 text-center">
       {icon}
@@ -835,6 +838,7 @@ function EmptyPanel({
 
 /** A single taste-profile figure. */
 function StatTile({ label, value, hint }: { label: string; value: string; hint: string }) {
+  useUiTranslation();
   return (
     <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5">
       <p className="text-[10px] font-bold uppercase tracking-widest text-white/35">{label}</p>
@@ -857,6 +861,7 @@ function AddToListButton({
   pending: boolean;
   onAdd: () => void;
 }) {
+  useUiTranslation();
   return (
     <button
       type="button"
@@ -870,7 +875,7 @@ function AddToListButton({
       )}
     >
       {saved ? <Check className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
-      {saved ? 'In your list' : pending ? 'Adding…' : 'Add to list'}
+      {saved ? uiI18n.t('app.in_your_list_e18f2da3') : pending ? uiI18n.t('app.adding_ffb2e628') : uiI18n.t('app.add_to_list_5618a882')}
     </button>
   );
 }

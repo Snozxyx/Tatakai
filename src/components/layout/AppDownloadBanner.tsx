@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X, Download, Smartphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useIsNativeApp } from '@/hooks/ui/useIsNativeApp';
 import { Capacitor } from '@capacitor/core';
 
 export function AppDownloadBanner() {
+  const { t } = useTranslation();
   const [isVisible, setIsVisible] = useState(false);
   const isNative = useIsNativeApp();
   const isMobile = Capacitor.isNativePlatform();
@@ -45,6 +47,7 @@ export function AppDownloadBanner() {
           {/* Close button */}
           <button
             onClick={handleDismiss}
+            aria-label={t('common.close')}
             className="absolute top-2 right-2 p-1 rounded-lg hover:bg-muted/50 transition-colors"
           >
             <X className="w-4 h-4 text-muted-foreground" />
@@ -57,10 +60,10 @@ export function AppDownloadBanner() {
             </div>
             <div className="flex-1 pt-0.5">
               <h3 className="font-semibold text-sm mb-1">
-                Watch in the Tatakai app
+                {t('layout.appBannerTitle')}
               </h3>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                Full playback, offline downloads, Discord RPC, and fewer web limits — grab the desktop or mobile build.
+                {t('layout.appBannerDescription')}
               </p>
             </div>
           </div>
@@ -73,7 +76,7 @@ export function AppDownloadBanner() {
               variant="secondary"
             >
               <Download className="w-4 h-4" />
-              Download for Windows
+              {t('layout.appBannerWindows')}
             </Button>
             <Button
               onClick={handleDownload}
@@ -81,7 +84,7 @@ export function AppDownloadBanner() {
               variant="ghost"
             >
               <Download className="w-4 h-4" />
-              macOS & Linux
+              {t('layout.appBannerMacLinux')}
             </Button>
           </div>
 
@@ -95,7 +98,7 @@ export function AppDownloadBanner() {
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M17.523 15.341c-.527 0-.954.427-.954.954s.427.954.954.954.954-.427.954-.954-.427-.954-.954-.954zm-11.046 0c-.527 0-.954.427-.954.954s.427.954.954.954.954-.427.954-.954-.427-.954-.954-.954zm11.405-6.634l1.716-2.972c.094-.162.038-.369-.124-.463-.162-.094-.369-.038-.463.124l-1.737 3.008c-1.391-.64-2.952-1.002-4.596-1.002s-3.205.362-4.596 1.002L6.345 6.396c-.094-.162-.301-.218-.463-.124-.162.094-.218.301-.124.463l1.716 2.972C3.645 11.369 1.5 14.762 1.5 18.682h21c0-3.92-2.145-7.313-5.974-8.975h.356z"/>
               </svg>
-              Android APK
+              {t('layout.appBannerAndroid')}
             </Button>
           </div>
         </div>

@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useWatchHistory } from '@/hooks/user/useWatchHistory';
@@ -101,15 +103,15 @@ export function computeAchievements(
   return [
     {
       id: 'filler-watcher',
-      title: 'Filler Watcher',
-      description: 'Watch your very first episode',
+      get title() { return uiI18n.t('app.filler_watcher_0e1c3113'); },
+      get description() { return uiI18n.t('app.watch_your_very_first_episode_4b56fb89'); },
       unlocked: totalEpisodes >= 1 || manualSet.has('filler-watcher'),
       color: 'text-gray-400',
     },
     {
       id: 'genin',
-      title: 'Genin',
-      description: 'Watch 5 episodes — the journey begins',
+      get title() { return uiI18n.t('app.genin_2413cc6b'); },
+      get description() { return uiI18n.t('app.watch_5_episodes_the_journey_begins_83941e08'); },
       unlocked: totalEpisodes >= 5 || manualSet.has('genin'),
       progress: Math.min(totalEpisodes, 5),
       total: 5,
@@ -117,8 +119,8 @@ export function computeAchievements(
     },
     {
       id: 'chunin',
-      title: 'Chunin',
-      description: 'Reach 10 episodes watched',
+      get title() { return uiI18n.t('app.chunin_b4f5c7c2'); },
+      get description() { return uiI18n.t('app.reach_10_episodes_watched_26030e87'); },
       unlocked: totalEpisodes >= 10 || manualSet.has('chunin'),
       progress: Math.min(totalEpisodes, 10),
       total: 10,
@@ -126,8 +128,8 @@ export function computeAchievements(
     },
     {
       id: 'week-warrior',
-      title: 'Jonin',
-      description: 'Maintain a 7-day watch streak',
+      get title() { return uiI18n.t('app.jonin_47d17d37'); },
+      get description() { return uiI18n.t('app.maintain_a_7_day_watch_streak_b15b426b'); },
       unlocked: streak.longestStreak >= 7 || manualSet.has('week-warrior'),
       progress: Math.min(streak.longestStreak, 7),
       total: 7,
@@ -135,8 +137,8 @@ export function computeAchievements(
     },
     {
       id: 'plus-ultra',
-      title: 'Plus Ultra',
-      description: 'Watch 35 episodes — go beyond!',
+      get title() { return uiI18n.t('app.plus_ultra_6132df1c'); },
+      get description() { return uiI18n.t('app.watch_35_episodes_go_beyond_f518153d'); },
       unlocked: totalEpisodes >= 35 || manualSet.has('plus-ultra'),
       progress: Math.min(totalEpisodes, 35),
       total: 35,
@@ -144,8 +146,8 @@ export function computeAchievements(
     },
     {
       id: 'pro-hero',
-      title: 'Pro Hero',
-      description: 'Watch 50 episodes — you\'re a hero',
+      get title() { return uiI18n.t('app.pro_hero_127d94b4'); },
+      get description() { return uiI18n.t('app.watch_50_episodes_you_re_a_hero_e2077666'); },
       unlocked: totalEpisodes >= 50 || manualSet.has('pro-hero'),
       progress: Math.min(totalEpisodes, 50),
       total: 50,
@@ -153,8 +155,8 @@ export function computeAchievements(
     },
     {
       id: 'soul-reaper',
-      title: 'Soul Reaper',
-      description: 'Explore 25 different anime series',
+      get title() { return uiI18n.t('app.soul_reaper_989e2cc9'); },
+      get description() { return uiI18n.t('app.explore_25_different_anime_series_f8659885'); },
       unlocked: uniqueAnime >= 25 || manualSet.has('soul-reaper'),
       progress: Math.min(uniqueAnime, 25),
       total: 25,
@@ -162,8 +164,8 @@ export function computeAchievements(
     },
     {
       id: 'bankai',
-      title: 'Bankai',
-      description: 'Reach 100 total episodes watched',
+      get title() { return uiI18n.t('app.bankai_364abdb8'); },
+      get description() { return uiI18n.t('app.reach_100_total_episodes_watched_d67ae764'); },
       unlocked: totalEpisodes >= 100 || manualSet.has('bankai'),
       progress: Math.min(totalEpisodes, 100),
       total: 100,
@@ -171,8 +173,8 @@ export function computeAchievements(
     },
     {
       id: 'survey-corps',
-      title: 'Survey Corps',
-      description: 'Explore 50 different anime series',
+      get title() { return uiI18n.t('app.survey_corps_facfd0c9'); },
+      get description() { return uiI18n.t('app.explore_50_different_anime_series_0361332e'); },
       unlocked: uniqueAnime >= 50 || manualSet.has('survey-corps'),
       progress: Math.min(uniqueAnime, 50),
       total: 50,
@@ -180,8 +182,8 @@ export function computeAchievements(
     },
     {
       id: 'month-legend',
-      title: 'Titan Shifter',
-      description: 'Maintain a 30-day watch streak',
+      get title() { return uiI18n.t('app.titan_shifter_cba657eb'); },
+      get description() { return uiI18n.t('app.maintain_a_30_day_watch_streak_c0f24734'); },
       unlocked: streak.longestStreak >= 30 || manualSet.has('month-legend'),
       progress: Math.min(streak.longestStreak, 30),
       total: 30,
@@ -189,8 +191,8 @@ export function computeAchievements(
     },
     {
       id: 'demon-slayer',
-      title: 'Demon Slayer',
-      description: 'Accumulate 5000+ watch minutes',
+      get title() { return uiI18n.t('app.demon_slayer_08007ef2'); },
+      get description() { return uiI18n.t('app.accumulate_5000_watch_minutes_cd286bd7'); },
       unlocked: totalMinutes >= 5000 || manualSet.has('demon-slayer'),
       progress: Math.min(totalMinutes, 5000),
       total: 5000,
@@ -198,8 +200,8 @@ export function computeAchievements(
     },
     {
       id: 'hashira',
-      title: 'Hashira',
-      description: 'Watch 600 total episodes — a true Pillar',
+      get title() { return uiI18n.t('app.hashira_c094eb38'); },
+      get description() { return uiI18n.t('app.watch_600_total_episodes_a_true_pillar_0346bf9b'); },
       unlocked: totalEpisodes >= 600 || manualSet.has('hashira'),
       progress: Math.min(totalEpisodes, 600),
       total: 600,
@@ -230,6 +232,7 @@ async function fetchManualGrants(userId: string): Promise<string[]> {
 
 /** Streaks/achievements for the signed-in user. */
 export function useWatchStreaks() {
+  useUiTranslation();
   const { data: history = [] } = useWatchHistory();
   const { profile } = useAuth();
 
@@ -261,6 +264,7 @@ export function useWatchStreaks() {
  * achievements, plus a bounded row set for streak / unique-anime / minutes.
  */
 export function usePublicWatchStreaks(userId?: string, isPublic = false, showHistory = true) {
+  useUiTranslation();
   const enabled = !!userId && isPublic && showHistory;
 
   const { data: history = [] } = useQuery({

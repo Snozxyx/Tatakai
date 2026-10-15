@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Sidebar } from '@/components/layout/Sidebar';
@@ -75,7 +77,7 @@ import {
   useSavedPlaylists,
   usePlaylistProgress,
 } from '@/hooks/user/usePlaylistSocial';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from '@/lib/localeFormat';
 import {
   CollaboratorRole,
   useAddCollaborator,
@@ -152,6 +154,7 @@ function getPlaylistEditDraftStorageKey(playlistId?: string): string | null {
 
 // Compact card for a saved (followed) playlist
 function SavedPlaylistCard({ playlist }: { playlist: Playlist }) {
+  useUiTranslation();
   const { data: items = [] } = usePlaylistItems(playlist.id);
   const progress = usePlaylistProgress(items);
   const covers = items.slice(0, 4).map((item) => item.anime_poster).filter(Boolean) as string[];
@@ -185,7 +188,7 @@ function SavedPlaylistCard({ playlist }: { playlist: Playlist }) {
         <h3 className="font-bold text-lg truncate group-hover:text-primary transition-colors">{playlist.name}</h3>
         <p className="text-sm text-muted-foreground mb-3 flex items-center gap-2">
           <Layers className="w-3.5 h-3.5" />
-          {playlist.items_count} {playlist.items_count === 1 ? 'item' : 'items'}
+          {playlist.items_count} {playlist.items_count === 1 ? uiI18n.t('app.item_3a7d9767') : uiI18n.t('app.items_7316c8b2')}
         </p>
         <div className="flex items-center gap-3">
           <Progress value={progress.percent} className="h-2 flex-1 bg-background" />
@@ -200,6 +203,7 @@ function SavedPlaylistCard({ playlist }: { playlist: Playlist }) {
 
 // Quick helper icon for layers
 function Layers(props: any) {
+  useUiTranslation();
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
       <polygon points="12 2 2 7 12 12 22 7 12 2" />
@@ -210,6 +214,7 @@ function Layers(props: any) {
 }
 
 export default function PlaylistsPage() {
+  useUiTranslation();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { data: playlists = [], isLoading } = usePlaylists();
@@ -265,10 +270,10 @@ export default function PlaylistsPage() {
             <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
               <Music2 className="w-10 h-10 text-primary" />
             </div>
-            <h1 className="text-3xl font-bold mb-3 tracking-tight">Your Library</h1>
-            <p className="text-muted-foreground mb-8 text-lg">Sign in to curate, share, and manage your personal anime & manga collections.</p>
+            <h1 className="text-3xl font-bold mb-3 tracking-tight">{uiI18n.t('app.your_library_fd740ffd')}</h1>
+            <p className="text-muted-foreground mb-8 text-lg">{uiI18n.t('app.sign_in_to_curate_share_and_manage_your_personal_57122058')}</p>
             <Button size="lg" className="w-full rounded-full h-12 text-base font-semibold" onClick={() => navigate('/auth')}>
-              Sign In to Continue
+              {uiI18n.t('app.sign_in_to_continue_90fc26ef')}
             </Button>
           </GlassPanel>
         </main>
@@ -295,11 +300,11 @@ export default function PlaylistsPage() {
                   <Music2 className="w-6 h-6" />
                 </div>
                 <h1 className="font-display text-4xl md:text-5xl font-extrabold tracking-tight">
-                  My Playlists
+                  {uiI18n.t('app.my_playlists_f67e00ef')}
                 </h1>
               </div>
               <p className="text-muted-foreground text-lg ml-1">
-                {playlists.length} {playlists.length === 1 ? 'collection' : 'collections'} crafted by you
+                {playlists.length} {playlists.length === 1 ? uiI18n.t('app.collection_2037de43') : uiI18n.t('app.collections_fa4b9d69')} {uiI18n.t('app.crafted_by_you_337389c4')}
               </p>
             </div>
 
@@ -307,29 +312,29 @@ export default function PlaylistsPage() {
               <DialogTrigger asChild>
                 <Button size="lg" className="gap-2 rounded-full shadow-lg shadow-primary/20 transition-all hover:scale-105 active:scale-95">
                   <Plus className="w-5 h-5" />
-                  Create Playlist
+                  {uiI18n.t('app.create_playlist_86374904')}
                 </Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-md rounded-3xl">
                 <DialogHeader>
-                  <DialogTitle className="text-2xl font-bold">New Playlist</DialogTitle>
+                  <DialogTitle className="text-2xl font-bold">{uiI18n.t('app.new_playlist_e45051eb')}</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-5 py-4">
                   <div className="space-y-2">
-                    <Label className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Name</Label>
+                    <Label className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">{uiI18n.t('app.name_709a2322')}</Label>
                     <Input
                       value={newName}
                       onChange={(e) => setNewName(e.target.value)}
-                      placeholder="e.g. Summer 2024 Binge"
+                      placeholder={uiI18n.t('app.e_g_summer_2024_binge_58a44042')}
                       className="h-12 text-lg bg-muted/50 border-transparent focus-visible:border-primary"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Description (optional)</Label>
+                    <Label className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">{uiI18n.t('app.description_optional_388de6fa')}</Label>
                     <Textarea
                       value={newDesc}
                       onChange={(e) => setNewDesc(e.target.value)}
-                      placeholder="What is this collection about?"
+                      placeholder={uiI18n.t('app.what_is_this_collection_about_95b22f5d')}
                       rows={3}
                       className="resize-none bg-muted/50 border-transparent focus-visible:border-primary"
                     />
@@ -340,8 +345,8 @@ export default function PlaylistsPage() {
                         {newPublic ? <Globe className="w-5 h-5" /> : <Lock className="w-5 h-5" />}
                       </div>
                       <div>
-                        <Label className="text-base font-semibold cursor-pointer" htmlFor="public-toggle">Public Visibility</Label>
-                        <p className="text-xs text-muted-foreground">Allow others to discover this playlist</p>
+                        <Label className="text-base font-semibold cursor-pointer" htmlFor="public-toggle">{uiI18n.t('app.public_visibility_2da7d9f1')}</Label>
+                        <p className="text-xs text-muted-foreground">{uiI18n.t('app.allow_others_to_discover_this_playlist_f861ef93')}</p>
                       </div>
                     </div>
                     <Switch
@@ -352,13 +357,13 @@ export default function PlaylistsPage() {
                   </div>
                 </div>
                 <DialogFooter>
-                  <Button variant="ghost" onClick={() => setShowCreate(false)} className="rounded-full">Cancel</Button>
+                  <Button variant="ghost" onClick={() => setShowCreate(false)} className="rounded-full">{uiI18n.t('app.cancel_77dfd213')}</Button>
                   <Button
                     onClick={handleCreate}
                     disabled={!newName.trim() || createPlaylist.isPending}
                     className="rounded-full px-8"
                   >
-                    {createPlaylist.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Create'}
+                    {createPlaylist.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : uiI18n.t('app.create_6e157c5d')}
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -400,13 +405,13 @@ export default function PlaylistsPage() {
               <div className="w-16 h-16 bg-muted/50 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Sparkles className="w-8 h-8 text-muted-foreground" />
               </div>
-              <h2 className="text-2xl font-bold mb-2">It's a little quiet here</h2>
+              <h2 className="text-2xl font-bold mb-2">{uiI18n.t('app.it_s_a_little_quiet_here_4e56c2b9')}</h2>
               <p className="text-muted-foreground mb-6 max-w-sm mx-auto">
-                Create your first playlist to start organizing your favorite anime and manga titles.
+                {uiI18n.t('app.create_your_first_playlist_to_start_organizing_y_592f3e95')}
               </p>
               <Button onClick={() => setShowCreate(true)} className="gap-2 rounded-full">
                 <Plus className="w-5 h-5" />
-                Create your first playlist
+                {uiI18n.t('app.create_your_first_playlist_2f9f306a')}
               </Button>
             </div>
           )}
@@ -419,8 +424,8 @@ export default function PlaylistsPage() {
                   <BookmarkCheck className="w-5 h-5" />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-bold tracking-tight">Saved Playlists</h2>
-                  <p className="text-sm text-muted-foreground">{savedPlaylists.length} collections from the community</p>
+                  <h2 className="text-2xl font-bold tracking-tight">{uiI18n.t('app.saved_playlists_fb1bd3db')}</h2>
+                  <p className="text-sm text-muted-foreground">{savedPlaylists.length} {uiI18n.t('app.collections_from_the_community_cc653348')}</p>
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -439,9 +444,9 @@ export default function PlaylistsPage() {
                   <div className="p-2 bg-purple-500/10 rounded-lg text-purple-500">
                     <Compass className="w-6 h-6" />
                   </div>
-                  <h2 className="font-display text-3xl font-bold tracking-tight">Discover</h2>
+                  <h2 className="font-display text-3xl font-bold tracking-tight">{uiI18n.t('app.discover_4827ea22')}</h2>
                 </div>
-                <p className="text-muted-foreground">Explore public collections created by the community</p>
+                <p className="text-muted-foreground">{uiI18n.t('app.explore_public_collections_created_by_the_commun_902f670a')}</p>
               </div>
               
               <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
@@ -450,7 +455,7 @@ export default function PlaylistsPage() {
                   <Input
                     value={discoverInput}
                     onChange={(e) => setDiscoverInput(e.target.value)}
-                    placeholder="Search titles, themes..."
+                    placeholder={uiI18n.t('app.search_titles_themes_bab3c5e6')}
                     className="pl-10 h-11 rounded-full bg-card/50 backdrop-blur border-border/50 focus-visible:ring-purple-500/30"
                   />
                 </div>
@@ -460,13 +465,13 @@ export default function PlaylistsPage() {
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">
                     <SelectItem value="trending" className="rounded-lg cursor-pointer">
-                      <span className="flex items-center gap-2 py-1"><TrendingUp className="w-4 h-4 text-orange-500" /> Trending</span>
+                      <span className="flex items-center gap-2 py-1"><TrendingUp className="w-4 h-4 text-orange-500" /> {uiI18n.t('app.trending_8a12d562')}</span>
                     </SelectItem>
                     <SelectItem value="most_liked" className="rounded-lg cursor-pointer">
-                      <span className="flex items-center gap-2 py-1"><Heart className="w-4 h-4 text-pink-500" /> Most Liked</span>
+                      <span className="flex items-center gap-2 py-1"><Heart className="w-4 h-4 text-pink-500" /> {uiI18n.t('app.most_liked_1471ef25')}</span>
                     </SelectItem>
                     <SelectItem value="newest" className="rounded-lg cursor-pointer">
-                      <span className="flex items-center gap-2 py-1"><Clock className="w-4 h-4 text-blue-500" /> Newest</span>
+                      <span className="flex items-center gap-2 py-1"><Clock className="w-4 h-4 text-blue-500" /> {uiI18n.t('app.newest_d0442824')}</span>
                     </SelectItem>
                   </SelectContent>
                 </Select>
@@ -502,9 +507,9 @@ export default function PlaylistsPage() {
             ) : (
               <div className="w-full p-12 text-center rounded-3xl border border-border/40 bg-card/20 backdrop-blur">
                 <Compass className="w-12 h-12 mx-auto text-muted-foreground/30 mb-4" />
-                <h3 className="text-xl font-semibold mb-2">No results found</h3>
+                <h3 className="text-xl font-semibold mb-2">{uiI18n.t('app.no_results_found_658e79f9')}</h3>
                 <p className="text-muted-foreground">
-                  {discoverSearch ? `Try adjusting your search for "${discoverSearch}".` : 'No public playlists to discover right now.'}
+                  {discoverSearch ? uiI18n.t('app.try_adjusting_your_search_for_i18n_value_0_4ce4da69', { value0: discoverSearch }) : uiI18n.t('app.no_public_playlists_to_discover_right_now_034dbc46')}
                 </p>
               </div>
             )}
@@ -516,15 +521,15 @@ export default function PlaylistsPage() {
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent className="rounded-3xl">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-xl">Delete Playlist?</AlertDialogTitle>
+            <AlertDialogTitle className="text-xl">{uiI18n.t('app.delete_playlist_e480e36f')}</AlertDialogTitle>
             <AlertDialogDescription className="text-base">
-              This will permanently delete this playlist and remove all its items. This action cannot be undone.
+              {uiI18n.t('app.this_will_permanently_delete_this_playlist_and_r_20b68266')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-6">
-            <AlertDialogCancel className="rounded-full">Cancel</AlertDialogCancel>
+            <AlertDialogCancel className="rounded-full">{uiI18n.t('app.cancel_77dfd213')}</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Yes, Delete
+              {uiI18n.t('app.yes_delete_4cf9c973')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -536,6 +541,7 @@ export default function PlaylistsPage() {
 }
 
 export function PlaylistViewPage() {
+  useUiTranslation();
   const { playlistId } = useParams<{ playlistId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -680,7 +686,7 @@ export function PlaylistViewPage() {
 
   const openEdit = () => {
     if (!playlist) return;
-    if (!canEdit) return toast.error('You do not have edit access to this playlist');
+    if (!canEdit) return toast.error(uiI18n.t('app.you_do_not_have_edit_access_to_this_playlist_1c85f1c7'));
     
     let resolvedDraft: PlaylistEditDraft = {
       name: playlist.name,
@@ -731,12 +737,12 @@ export function PlaylistViewPage() {
         throw err;
       }
     }
-    toast.error('Failed to generate a unique share link. Try again later.');
+    toast.error(uiI18n.t('app.failed_to_generate_a_unique_share_link_try_again_ea9e14f2'));
   };
 
   const handleUpdate = async () => {
     if (!playlist || !editName.trim()) return;
-    if (!canEdit) return toast.error('You do not have edit access to this playlist');
+    if (!canEdit) return toast.error(uiI18n.t('app.you_do_not_have_edit_access_to_this_playlist_1c85f1c7'));
     
     await updatePlaylist.mutateAsync({
       id: playlist.id,
@@ -762,13 +768,13 @@ export function PlaylistViewPage() {
 
   const handleRemoveItem = async (animeId: string) => {
     if (!playlist) return;
-    if (!canEdit) return toast.error('You do not have permission to edit this playlist');
+    if (!canEdit) return toast.error(uiI18n.t('app.you_do_not_have_permission_to_edit_this_playlist_7578ae12'));
     await removeFromPlaylist.mutateAsync({ playlistId: playlist.id, animeId });
   };
 
   const handleLaunchWatchRoom = (animeId: string, animeName: string, animePoster?: string | null) => {
     const media = parsePlaylistMediaRef(animeId);
-    if (media.kind !== 'anime' || !media.id) return toast.error('Watch rooms currently support anime items only.');
+    if (media.kind !== 'anime' || !media.id) return toast.error(uiI18n.t('app.watch_rooms_currently_support_anime_items_only_79dec5ac'));
     const params = new URLSearchParams({ anime: media.id, title: animeName });
     if (animePoster) params.set('poster', animePoster);
     navigate(`/isshoni?${params.toString()}`);
@@ -785,7 +791,7 @@ export function PlaylistViewPage() {
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="flex flex-col items-center gap-4 text-muted-foreground">
           <Loader2 className="w-10 h-10 animate-spin text-primary" />
-          <p className="font-medium animate-pulse">Loading playlist...</p>
+          <p className="font-medium animate-pulse">{uiI18n.t('app.loading_playlist_4c5c7814')}</p>
         </div>
       </div>
     );
@@ -798,9 +804,9 @@ export function PlaylistViewPage() {
         <main className="relative z-10 pl-0 md:pl-20 lg:pl-24 w-full flex items-center justify-center min-h-[80vh]">
           <GlassPanel className="max-w-md mx-auto p-10 text-center rounded-3xl">
             <Music2 className="w-16 h-16 mx-auto text-muted-foreground/50 mb-4" />
-            <h1 className="text-2xl font-bold mb-2">Playlist not found</h1>
-            <p className="text-muted-foreground mb-8">This playlist might be private, deleted, or the link is invalid.</p>
-            <Button size="lg" className="rounded-full" onClick={() => navigate('/playlists')}>Return to Playlists</Button>
+            <h1 className="text-2xl font-bold mb-2">{uiI18n.t('app.playlist_not_found_38ca712b')}</h1>
+            <p className="text-muted-foreground mb-8">{uiI18n.t('app.this_playlist_might_be_private_deleted_or_the_li_44e8030b')}</p>
+            <Button size="lg" className="rounded-full" onClick={() => navigate('/playlists')}>{uiI18n.t('app.return_to_playlists_724a13bf')}</Button>
           </GlassPanel>
         </main>
         <MobileNav />
@@ -817,8 +823,8 @@ export function PlaylistViewPage() {
     <div className="min-h-screen bg-background text-foreground relative overflow-x-hidden">
       {playlist && (
         <Seo
-          title={playlist.name || 'Playlist'}
-          description={playlist.share_description || playlist.description || `A playlist with ${playlist.items_count ?? items.length} titles on Tatakai.`}
+          title={playlist.name || uiI18n.t('app.playlist_cd95b41f')}
+          description={playlist.share_description || playlist.description || uiI18n.t('app.a_playlist_with_i18n_value_0_titles_on_tatakai_d1560bb7', { value0: playlist.items_count ?? items.length })}
           image={coverImages[0] || undefined}
           canonicalPath={`/p/${playlist.share_slug || playlist.id}`}
           kind="website"
@@ -845,7 +851,7 @@ export function PlaylistViewPage() {
             className="group flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground mb-8 transition-colors w-fit px-3 py-1.5 rounded-full hover:bg-muted/50"
           >
             <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-            Back
+            {uiI18n.t('app.back_b52b36b7')}
           </button>
 
           {/* Hero Content */}
@@ -879,10 +885,10 @@ export function PlaylistViewPage() {
               <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 mb-4">
                 <span className="px-3 py-1 rounded-full bg-background/50 backdrop-blur-md border border-border/50 text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5">
                   {playlist.is_public ? <Globe className="w-3.5 h-3.5 text-green-500" /> : <Lock className="w-3.5 h-3.5 text-amber-500" />}
-                  {playlist.is_public ? 'Public' : 'Private'}
+                  {playlist.is_public ? uiI18n.t('app.public_dc5eb704') : uiI18n.t('app.private_237dfa0a')}
                 </span>
                 <span className="px-3 py-1 rounded-full bg-background/50 backdrop-blur-md border border-border/50 text-xs font-semibold uppercase tracking-wider">
-                  Playlist
+                  {uiI18n.t('app.playlist_cd95b41f')}
                 </span>
                 {ownerDisplayName && (
                   <span className="px-3 py-1 rounded-full bg-background/50 backdrop-blur-md border border-border/50 text-xs font-semibold flex items-center gap-2">
@@ -906,11 +912,11 @@ export function PlaylistViewPage() {
               )}
 
               <div className="text-sm text-muted-foreground font-medium flex flex-wrap items-center justify-center md:justify-start gap-x-4 gap-y-2 mb-8">
-                <span className="text-foreground">{playlist.items_count} items</span>
+                <span className="text-foreground">{playlist.items_count} {uiI18n.t('app.items_7316c8b2')}</span>
                 <span className="hidden sm:inline text-border">•</span>
-                <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4" /> Created {new Date(playlist.created_at).getFullYear()}</span>
+                <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4" /> {uiI18n.t('app.created_accf40c8')} {new Date(playlist.created_at).getFullYear()}</span>
                 <span className="hidden sm:inline text-border">•</span>
-                <span className="flex items-center gap-1.5"><Clock className="w-4 h-4" /> Updated {formatDistanceToNow(new Date(playlist.updated_at))} ago</span>
+                <span className="flex items-center gap-1.5"><Clock className="w-4 h-4" /> {uiI18n.t('app.updated_f2f8570d')} {formatDistanceToNow(new Date(playlist.updated_at))} {uiI18n.t('app.ago_f03c0a59')}</span>
               </div>
 
               {/* Action Buttons */}
@@ -922,7 +928,7 @@ export function PlaylistViewPage() {
                     onClick={() => navigate(getPlaylistItemHref(firstItem.anime_id))}
                   >
                     {firstItemMedia?.kind === 'manga' ? <BookOpen className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current" />}
-                    Play
+                    {uiI18n.t('app.play_5d12bd53')}
                   </Button>
                 )}
 
@@ -934,7 +940,7 @@ export function PlaylistViewPage() {
                     onClick={() => handleLaunchWatchRoom(firstItem.anime_id, firstItem.anime_name, firstItem.anime_poster)}
                   >
                     <Users className="w-5 h-5" />
-                    Watch Party
+                    {uiI18n.t('app.watch_party_0c134c5e')}
                   </Button>
                 )}
 
@@ -963,7 +969,7 @@ export function PlaylistViewPage() {
                   )}
 
                   {playlist.is_public && (
-                    <Button variant="ghost" size="icon" onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/p/${playlist.share_slug || playlist.id}`); toast.success('Link copied!'); }} className="rounded-full w-10 h-10 hover:bg-background/80">
+                    <Button variant="ghost" size="icon" onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/p/${playlist.share_slug || playlist.id}`); toast.success(uiI18n.t('app.link_copied_88fe9d21')); }} className="rounded-full w-10 h-10 hover:bg-background/80">
                       <Share2 className="w-4 h-4" />
                     </Button>
                   )}
@@ -999,7 +1005,7 @@ export function PlaylistViewPage() {
                   <div className="flex items-center justify-between text-sm mb-2 font-medium">
                     <span className="flex items-center gap-2">
                       <BookmarkCheck className="w-4 h-4 text-blue-500" />
-                      Completion
+                      {uiI18n.t('app.completion_2ff25568')}
                     </span>
                     <span>{progress.percent}%</span>
                   </div>
@@ -1012,13 +1018,13 @@ export function PlaylistViewPage() {
           {/* Items Section */}
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <h2 className="text-2xl font-bold tracking-tight">Content</h2>
+              <h2 className="text-2xl font-bold tracking-tight">{uiI18n.t('app.content_4f9be057')}</h2>
               
               <div className="flex items-center gap-3">
                 {canEdit && (
                   <Button size="sm" onClick={() => setShowAddMedia(true)} className="gap-2 rounded-full">
                     <Plus className="w-4 h-4" />
-                    Add Media
+                    {uiI18n.t('app.add_media_ac5a720f')}
                   </Button>
                 )}
                 
@@ -1080,14 +1086,14 @@ export function PlaylistViewPage() {
                 <div className="w-20 h-20 bg-muted/40 rounded-full flex items-center justify-center mx-auto mb-6">
                   <Sparkles className="w-10 h-10 text-muted-foreground" />
                 </div>
-                <h3 className="text-xl font-bold mb-2">This collection is empty</h3>
+                <h3 className="text-xl font-bold mb-2">{uiI18n.t('app.this_collection_is_empty_5d21e262')}</h3>
                 <p className="text-muted-foreground max-w-sm mx-auto mb-6">
-                  {canEdit ? "Start building your playlist by adding your favorite anime and manga." : "The owner hasn't added any items to this playlist yet."}
+                  {canEdit ? uiI18n.t('app.start_building_your_playlist_by_adding_your_favo_cb2ba3f1') : uiI18n.t('app.the_owner_hasn_t_added_any_items_to_this_playlis_46105bd5')}
                 </p>
                 {canEdit && (
                   <Button size="lg" onClick={() => setShowAddMedia(true)} className="gap-2 rounded-full">
                     <Plus className="w-5 h-5" />
-                    Add First Item
+                    {uiI18n.t('app.add_first_item_6739a1c2')}
                   </Button>
                 )}
               </div>
@@ -1100,7 +1106,7 @@ export function PlaylistViewPage() {
               <div className="p-2.5 bg-primary/10 rounded-xl text-primary">
                 <MessageSquare className="w-6 h-6" />
               </div>
-              <h2 className="text-2xl font-bold tracking-tight">Discussion</h2>
+              <h2 className="text-2xl font-bold tracking-tight">{uiI18n.t('app.discussion_8fb937b6')}</h2>
             </div>
             <div className="bg-card/30 border border-border/40 rounded-3xl p-6 sm:p-8 backdrop-blur-sm">
               <Comments entityType="playlist" entityId={playlist.id} entityName={playlist.name} />
@@ -1114,31 +1120,31 @@ export function PlaylistViewPage() {
       <Dialog open={showEdit} onOpenChange={setShowEdit}>
         <DialogContent className="sm:max-w-xl rounded-[2rem]">
           <DialogHeader>
-            <DialogTitle className="text-2xl">Edit Playlist</DialogTitle>
+            <DialogTitle className="text-2xl">{uiI18n.t('app.edit_playlist_99909470')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-6 py-4">
             <div className="space-y-2">
-              <Label className="text-xs uppercase font-bold text-muted-foreground tracking-wider">Playlist Name</Label>
+              <Label className="text-xs uppercase font-bold text-muted-foreground tracking-wider">{uiI18n.t('app.playlist_name_26f3e33f')}</Label>
               <Input value={editName} onChange={(e) => setEditName(e.target.value)} className="h-12 bg-muted/50 border-none" />
             </div>
             <div className="space-y-2">
-              <Label className="text-xs uppercase font-bold text-muted-foreground tracking-wider">Description</Label>
+              <Label className="text-xs uppercase font-bold text-muted-foreground tracking-wider">{uiI18n.t('app.description_55f8ebc8')}</Label>
               <Textarea value={editDesc} onChange={(e) => setEditDesc(e.target.value)} rows={4} className="bg-muted/50 border-none resize-none" />
             </div>
 
             <div className="grid gap-4 p-5 bg-muted/30 rounded-2xl border border-border/50">
               <div className="flex items-center justify-between">
                 <div>
-                  <Label className="text-base font-semibold">Public Access</Label>
-                  <p className="text-sm text-muted-foreground">Anyone can view this playlist</p>
+                  <Label className="text-base font-semibold">{uiI18n.t('app.public_access_678731c9')}</Label>
+                  <p className="text-sm text-muted-foreground">{uiI18n.t('app.anyone_can_view_this_playlist_18fc6fee')}</p>
                 </div>
                 <Switch checked={editPublic} onCheckedChange={async (val) => { setEditPublic(val); if (val && !editShareSlug) await handleGenerateSlug(); }} />
               </div>
               
               <div className="flex items-center justify-between pt-4 border-t border-border/50">
                 <div>
-                  <Label className="text-base font-semibold">Allow Embedding</Label>
-                  <p className="text-sm text-muted-foreground">Allow others to embed this on their sites</p>
+                  <Label className="text-base font-semibold">{uiI18n.t('app.allow_embedding_d01bd45a')}</Label>
+                  <p className="text-sm text-muted-foreground">{uiI18n.t('app.allow_others_to_embed_this_on_their_sites_08a50e75')}</p>
                 </div>
                 <Switch checked={editEmbedAllowed} onCheckedChange={setEditEmbedAllowed} />
               </div>
@@ -1146,13 +1152,13 @@ export function PlaylistViewPage() {
 
             {editPublic && (
               <div className="space-y-3">
-                <Label className="text-xs uppercase font-bold text-muted-foreground tracking-wider">Share Link</Label>
+                <Label className="text-xs uppercase font-bold text-muted-foreground tracking-wider">{uiI18n.t('app.share_link_ef050958')}</Label>
                 <div className="flex items-center gap-2">
-                  <Input value={editShareSlug ? `${window.location.origin}/p/${editShareSlug}` : ''} readOnly placeholder="No link generated" className="bg-muted/50 border-none text-muted-foreground" />
-                  <Button variant="secondary" onClick={handleGenerateSlug} className="shrink-0"><GripVertical className="w-4 h-4 mr-2"/> Generate</Button>
+                  <Input value={editShareSlug ? `${window.location.origin}/p/${editShareSlug}` : ''} readOnly placeholder={uiI18n.t('app.no_link_generated_5e54909c')} className="bg-muted/50 border-none text-muted-foreground" />
+                  <Button variant="secondary" onClick={handleGenerateSlug} className="shrink-0"><GripVertical className="w-4 h-4 mr-2"/> {uiI18n.t('app.generate_fc45f9b7')}</Button>
                   {editShareSlug && (
-                    <Button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/p/${editShareSlug}`); toast.success('Link copied'); }} className="shrink-0">
-                      Copy
+                    <Button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/p/${editShareSlug}`); toast.success(uiI18n.t('app.link_copied_c2e98476')); }} className="shrink-0">
+                      {uiI18n.t('app.copy_af74f7c5')}
                     </Button>
                   )}
                 </div>
@@ -1160,9 +1166,9 @@ export function PlaylistViewPage() {
             )}
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setShowEdit(false)} className="rounded-full">Cancel</Button>
+            <Button variant="ghost" onClick={() => setShowEdit(false)} className="rounded-full">{uiI18n.t('app.cancel_77dfd213')}</Button>
             <Button onClick={handleUpdate} disabled={!editName.trim() || updatePlaylist.isPending} className="rounded-full px-8">
-              {updatePlaylist.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save Changes'}
+              {updatePlaylist.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : uiI18n.t('app.save_changes_fa2984b3')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1172,16 +1178,16 @@ export function PlaylistViewPage() {
         <AlertDialogContent className="rounded-3xl">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-xl text-destructive flex items-center gap-2">
-              <Trash2 className="w-5 h-5" /> Delete Playlist
+              <Trash2 className="w-5 h-5" /> {uiI18n.t('app.delete_playlist_3163212e')}
             </AlertDialogTitle>
             <AlertDialogDescription className="text-base pt-2">
-              Are you absolutely sure? This will permanently delete <strong>{playlist.name}</strong> and all its content. This action cannot be reversed.
+              {uiI18n.t('app.are_you_absolutely_sure_this_will_permanently_de_500d55d9')} <strong>{playlist.name}</strong> {uiI18n.t('app.and_all_its_content_this_action_cannot_be_revers_ade928bd')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-6">
-            <AlertDialogCancel className="rounded-full">Keep Playlist</AlertDialogCancel>
+            <AlertDialogCancel className="rounded-full">{uiI18n.t('app.keep_playlist_d5b250d3')}</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Yes, Delete It
+              {uiI18n.t('app.yes_delete_it_710a239c')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1203,7 +1209,7 @@ export function PlaylistViewPage() {
           <div className="w-full max-w-md bg-card border border-border shadow-2xl rounded-[2rem] overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold flex items-center gap-2"><Users className="w-5 h-5 text-primary" /> Collaborators</h2>
+                <h2 className="text-xl font-bold flex items-center gap-2"><Users className="w-5 h-5 text-primary" /> {uiI18n.t('app.collaborators_6eb695e5')}</h2>
                 <Button variant="ghost" size="icon" className="rounded-full bg-muted/50 hover:bg-muted" onClick={() => setShowCollaborators(false)}>
                   <X className="w-4 h-4" />
                 </Button>
@@ -1219,10 +1225,10 @@ export function PlaylistViewPage() {
                     </Avatar>
                     <div>
                       <p className="text-sm font-bold">{ownerDisplayName}</p>
-                      <p className="text-xs text-muted-foreground">@{ownerProfile?.username || 'owner'}</p>
+                      <p className="text-xs text-muted-foreground">@{ownerProfile?.username || uiI18n.t('app.owner_579233b2')}</p>
                     </div>
                   </div>
-                  <span className="px-2.5 py-1 rounded-full bg-primary/20 text-primary text-[10px] uppercase font-bold tracking-wider">Owner</span>
+                  <span className="px-2.5 py-1 rounded-full bg-primary/20 text-primary text-[10px] uppercase font-bold tracking-wider">{uiI18n.t('app.owner_89ff3122')}</span>
                 </div>
 
                 {collaborators.map((collaborator) => {
@@ -1236,7 +1242,7 @@ export function PlaylistViewPage() {
                         </Avatar>
                         <div className="min-w-0">
                           <p className="text-sm font-semibold truncate">{displayName}</p>
-                          <p className="text-xs text-muted-foreground truncate">@{collaborator.profile?.username || 'unknown'}</p>
+                          <p className="text-xs text-muted-foreground truncate">@{collaborator.profile?.username || uiI18n.t('app.unknown_50d8b4a9')}</p>
                         </div>
                       </div>
 
@@ -1247,9 +1253,9 @@ export function PlaylistViewPage() {
                             onChange={(e) => handleUpdateCollaboratorRole(collaborator.id, e.target.value as CollaboratorRole)}
                             className="h-8 rounded-lg bg-background border border-border text-xs font-medium px-2 outline-none focus:ring-1 focus:ring-primary"
                           >
-                            <option value="viewer">Viewer</option>
-                            <option value="editor">Editor</option>
-                            <option value="admin">Admin</option>
+                            <option value="viewer">{uiI18n.t('app.viewer_dbad9f12')}</option>
+                            <option value="editor">{uiI18n.t('app.editor_c7e9fb2e')}</option>
+                            <option value="admin">{uiI18n.t('app.admin_4e7afebc')}</option>
                           </select>
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10" onClick={() => handleRemoveCollaborator(collaborator.id)}>
                             <Trash2 className="w-4 h-4" />
@@ -1261,19 +1267,19 @@ export function PlaylistViewPage() {
                     </div>
                   );
                 })}
-                {collaborators.length === 0 && <p className="text-sm text-center py-4 text-muted-foreground">No collaborators added yet.</p>}
+                {collaborators.length === 0 && <p className="text-sm text-center py-4 text-muted-foreground">{uiI18n.t('app.no_collaborators_added_yet_1edbfbf2')}</p>}
               </div>
 
               {canManageCollaborators && (
                 <div className="mt-6 pt-6 border-t border-border/50">
-                  <Label className="text-xs font-bold uppercase text-muted-foreground tracking-wider mb-3 block">Add Collaborator</Label>
+                  <Label className="text-xs font-bold uppercase text-muted-foreground tracking-wider mb-3 block">{uiI18n.t('app.add_collaborator_b363c6da')}</Label>
                   <div className="flex gap-2">
                     <div className="relative flex-1">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <Input
                         value={collaboratorSearch}
                         onChange={(e) => setCollaboratorSearch(e.target.value)}
-                        placeholder="Search users..."
+                        placeholder={uiI18n.t('app.search_users_8cdc4c09')}
                         className="pl-9 h-10 bg-muted/50 border-transparent focus-visible:border-primary rounded-xl"
                       />
                     </div>
@@ -1282,9 +1288,9 @@ export function PlaylistViewPage() {
                       onChange={(e) => setNewCollaboratorRole(e.target.value as CollaboratorRole)}
                       className="h-10 rounded-xl bg-muted/50 border-transparent px-3 text-sm font-medium outline-none focus:ring-1 focus:ring-primary"
                     >
-                      <option value="viewer">Viewer</option>
-                      <option value="editor">Editor</option>
-                      <option value="admin">Admin</option>
+                      <option value="viewer">{uiI18n.t('app.viewer_dbad9f12')}</option>
+                      <option value="editor">{uiI18n.t('app.editor_c7e9fb2e')}</option>
+                      <option value="admin">{uiI18n.t('app.admin_4e7afebc')}</option>
                     </select>
                   </div>
 
@@ -1295,7 +1301,7 @@ export function PlaylistViewPage() {
                           <Loader2 className="w-4 h-4 animate-spin" /> Searching...
                         </div>
                       ) : collaboratorSearchResults.length === 0 ? (
-                        <div className="p-4 text-center text-sm text-muted-foreground">No users found.</div>
+                        <div className="p-4 text-center text-sm text-muted-foreground">{uiI18n.t('app.no_users_found_e611ef57')}</div>
                       ) : (
                         collaboratorSearchResults.map((profile) => (
                           <div key={profile.user_id} className="p-3 flex items-center justify-between hover:bg-muted/50 transition-colors border-b border-border/50 last:border-0 cursor-pointer" onClick={() => handleAddCollaborator(profile.user_id)}>

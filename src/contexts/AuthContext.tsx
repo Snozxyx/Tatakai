@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { User, Session } from '@supabase/supabase-js';
@@ -5,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { getLocalContinueWatching, clearLocalContinueWatching } from '@/lib/localStorage';
 import { notifyUserCreated } from '@/core/network/discord-webhook';
 import { resolveStaffRoles } from '@/lib/roles';
+import { setAccountTitleLanguage } from '@/lib/titleLanguage';
 
 export interface Profile {
   id: string;
@@ -99,9 +102,13 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutMessage: 
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  useUiTranslation();
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  useEffect(() => {
+    setAccountTitleLanguage(user && profile?.user_id === user.id ? profile.preferred_title_language : undefined);
+  }, [user?.id, profile?.preferred_title_language]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isModerator, setIsModerator] = useState(false);
   const [isBanned, setIsBanned] = useState(false);
@@ -308,9 +315,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
         const result = await response.json();
         if (!response.ok) return { error: new Error(result.error || 'Registration unavailable') };
-        if (result.mode !== 'restricted' && result.mode !== 'otp_required') return { error: new Error('Invalid registration response') };
+        if (result.mode !== 'restricted' && result.mode !== 'otp_required') return { error: new Error(uiI18n.t('app.invalid_registration_response_2c1e735e')) };
         return { error: null, mode: result.mode as 'restricted' | 'otp_required' };
-      } catch { return { error: new Error('Registration temporarily unavailable') }; }
+      } catch { return { error: new Error(uiI18n.t('app.registration_temporarily_unavailable_30b74395')) }; }
     }
     const redirectUrl = `${window.location.origin}/`;
 
@@ -413,9 +420,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 }
 
 export function useAuth() {
+  useUiTranslation();
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error(uiI18n.t('app.useauth_must_be_used_within_an_authprovider_da42f389'));
   }
   return context;
 }

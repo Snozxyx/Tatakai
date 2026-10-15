@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
  * Cloudflare Turnstile widget (explicit-render). Renders nothing when Turnstile
  * is disabled for this environment (no site key / desktop file://), so callers
@@ -49,7 +51,7 @@ declare global {
 let scriptPromise: Promise<void> | null = null;
 
 function loadTurnstileScript(): Promise<void> {
-  if (typeof window === "undefined") return Promise.reject(new Error("no window"));
+  if (typeof window === "undefined") return Promise.reject(new Error(uiI18n.t('app.no_window_59c1ca45')));
   if (window.turnstile) return Promise.resolve();
   if (scriptPromise) return scriptPromise;
 
@@ -72,7 +74,7 @@ function loadTurnstileScript(): Promise<void> {
       const onError = () => {
         cleanup();
         scriptPromise = null;
-        reject(new Error("turnstile script failed"));
+        reject(new Error(uiI18n.t('app.turnstile_script_failed_7297629f')));
       };
       const cleanup = () => {
         existing.removeEventListener("load", onLoad);
@@ -89,7 +91,7 @@ function loadTurnstileScript(): Promise<void> {
     script.onload = () => resolve();
     script.onerror = () => {
       scriptPromise = null;
-      reject(new Error("turnstile script failed"));
+      reject(new Error(uiI18n.t('app.turnstile_script_failed_7297629f')));
     };
     document.head.appendChild(script);
   });
@@ -111,6 +113,7 @@ interface TurnstileWidgetProps {
 
 export const TurnstileWidget = forwardRef<TurnstileWidgetHandle, TurnstileWidgetProps>(
   function TurnstileWidget({ onToken, onExpire, onError, onTimeout, action, className }, ref) {
+  useUiTranslation();
     const containerRef = useRef<HTMLDivElement | null>(null);
     const widgetIdRef = useRef<string | null>(null);
     // Keep the latest callbacks without forcing a re-render/re-mount of the widget.

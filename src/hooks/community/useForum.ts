@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -54,6 +56,7 @@ export function useForumPosts(options?: {
   sortBy?: 'hot' | 'new' | 'top';
   limit?: number;
 }) {
+  useUiTranslation();
   const { user } = useAuth();
   const sortBy = options?.sortBy || 'hot';
   const limit = options?.limit || 20;
@@ -126,6 +129,7 @@ export function useForumPosts(options?: {
 
 // Fetch single forum post
 export function useForumPost(postId: string) {
+  useUiTranslation();
   const { user } = useAuth();
 
   return useQuery({
@@ -182,6 +186,7 @@ export function useForumPost(postId: string) {
 
 // Create forum post
 export function useCreateForumPost() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
@@ -205,7 +210,7 @@ export function useCreateForumPost() {
       flair?: string;
       is_spoiler?: boolean;
     }) => {
-      if (!user) throw new Error('Must be logged in');
+      if (!user) throw new Error(uiI18n.t('app.must_be_logged_in_9cf435d8'));
 
       // Auto-moderate content
       const titleModeration = moderateContent(post.title);
@@ -331,6 +336,7 @@ export function useCreateForumPost() {
 
 // Vote on post or comment
 export function useForumVote() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
@@ -346,7 +352,7 @@ export function useForumVote() {
       voteType: 1 | -1;
       currentVote?: 1 | -1 | null;
     }) => {
-      if (!user) throw new Error('Must be logged in');
+      if (!user) throw new Error(uiI18n.t('app.must_be_logged_in_9cf435d8'));
 
       // If same vote, remove it
       if (currentVote === voteType) {
@@ -399,6 +405,7 @@ export function useForumVote() {
 
 // Edit a forum post (author only — RLS gates auth.uid() = user_id). Sets edited_at.
 export function useUpdateForumPost() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
@@ -416,7 +423,7 @@ export function useUpdateForumPost() {
       flair?: string | null;
       is_spoiler?: boolean;
     }) => {
-      if (!user) throw new Error('Must be logged in');
+      if (!user) throw new Error(uiI18n.t('app.must_be_logged_in_9cf435d8'));
 
       const patch: Record<string, any> = { edited_at: new Date().toISOString() };
       if (content !== undefined) {
@@ -447,6 +454,7 @@ export function useUpdateForumPost() {
 
 // Pin/unpin via SECURITY DEFINER RPC (moderator/admin gated server-side).
 export function useSetPinned() {
+  useUiTranslation();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -471,6 +479,7 @@ export function useSetPinned() {
 // staff, and stamps deleted_by_role for the tombstone). Falls back to a direct
 // soft-delete, then a hard delete, if the RPC isn't deployed yet.
 export function useDeleteForumPost() {
+  useUiTranslation();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -502,6 +511,7 @@ export function useDeleteForumPost() {
 
 // Fetch pending forum posts (admin only)
 export function usePendingForumPosts() {
+  useUiTranslation();
   const { user, isAdmin } = useAuth();
 
   return useQuery({
@@ -551,12 +561,13 @@ export function usePendingForumPosts() {
 
 // Approve forum post
 export function useApproveForumPost() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
   return useMutation({
     mutationFn: async ({ postId }: { postId: string }) => {
-      if (!user) throw new Error('Must be logged in');
+      if (!user) throw new Error(uiI18n.t('app.must_be_logged_in_9cf435d8'));
 
       const { error } = await supabase
         .from('forum_posts')
@@ -585,12 +596,13 @@ export function useApproveForumPost() {
 
 // Reject forum post (delete)
 export function useRejectForumPost() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
   return useMutation({
     mutationFn: async ({ postId }: { postId: string }) => {
-      if (!user) throw new Error('Must be logged in');
+      if (!user) throw new Error(uiI18n.t('app.must_be_logged_in_9cf435d8'));
 
       const { error } = await supabase
         .from('forum_posts')
@@ -619,6 +631,7 @@ export function useRejectForumPost() {
 
 // Fetch user's forum posts (including pending posts for the owner)
 export function useUserForumPosts(userId?: string) {
+  useUiTranslation();
   const { user } = useAuth();
 
   return useQuery({
@@ -666,6 +679,7 @@ export function useUserForumPosts(userId?: string) {
 // posts regardless of who is viewing (admin user page). Distinct queryKey so it
 // never collides with the own-profile-gated useUserForumPosts cache.
 export function useUserForumPostsStaff(userId?: string) {
+  useUiTranslation();
   return useQuery({
     queryKey: ['user_forum_posts_staff', userId],
     queryFn: async () => {
@@ -697,12 +711,13 @@ export function useUserForumPostsStaff(userId?: string) {
 
 // Pin/Unpin forum post (admin only)
 export function usePinForumPost() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user, isAdmin } = useAuth();
 
   return useMutation({
     mutationFn: async ({ postId, isPinned }: { postId: string; isPinned: boolean }) => {
-      if (!user || !isAdmin) throw new Error('Admin access required');
+      if (!user || !isAdmin) throw new Error(uiI18n.t('app.admin_access_required_737b16b6'));
 
       const { error } = await supabase
         .from('forum_posts')
@@ -736,6 +751,7 @@ export function usePinForumPost() {
 
 // Fetch community stats
 export function useCommunityStats() {
+  useUiTranslation();
   return useQuery({
     queryKey: ['community_stats'],
     queryFn: async () => {

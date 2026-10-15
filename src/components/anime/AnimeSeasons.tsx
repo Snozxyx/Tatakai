@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { Link } from 'react-router-dom';
 import { useAnimeSeasons } from '@/hooks/api/useAnimeSeasons';
 import { getProxiedImageUrl } from '@/lib/api';
@@ -15,6 +17,7 @@ interface AnimeSeasonsProps {
 }
 
 export function AnimeSeasons({ animeId, compact = false, showTitle = true }: AnimeSeasonsProps) {
+  useUiTranslation();
   const { data: seasons = [], isLoading } = useAnimeSeasons(animeId);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -51,7 +54,7 @@ export function AnimeSeasons({ animeId, compact = false, showTitle = true }: Ani
       {showTitle && (
         <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
           <Layers className="w-4 h-4 text-primary" />
-          Watch Order ({seasons.length})
+          {uiI18n.t('app.watch_order_ebe52c88')}{seasons.length})
         </h3>
       )}
 
@@ -74,12 +77,12 @@ export function AnimeSeasons({ animeId, compact = false, showTitle = true }: Ani
             const isMovie = season.format === 'Movie';
             const isOvaSpecial = season.format === 'OVA' || season.format === 'Special' || season.format === 'ONA';
             const badgeLabel = season.isCurrent
-              ? 'NOW'
+              ? uiI18n.t('app.now_9841c420')
               : isMovie
-                ? 'MOVIE'
+                ? uiI18n.t('app.movie_83d1753d')
                 : isOvaSpecial
                   ? (season.format ?? 'SPECIAL').toUpperCase()
-                  : `S${season.seasonNumber}`;
+                  : uiI18n.t('app.si18n_value_0_a9453ba1', { value0: season.seasonNumber });
 
             return (
               <Peekable
@@ -125,7 +128,7 @@ export function AnimeSeasons({ animeId, compact = false, showTitle = true }: Ani
                   {/* Episode count */}
                   {season.episodeCount && (
                     <div className="absolute bottom-1 left-1 text-[9px] font-bold text-white/90 drop-shadow">
-                      {season.episodeCount} EP
+                      {season.episodeCount} {uiI18n.t('app.ep_00c1bff9')}
                     </div>
                   )}
                 </div>
@@ -166,6 +169,7 @@ interface SeasonCardProps {
 }
 
 export function SeasonCard({ animeId, animeName, animePoster }: SeasonCardProps) {
+  useUiTranslation();
   const { data: seasons = [] } = useAnimeSeasons(animeId);
 
   // Only render if there are multiple entries
@@ -185,8 +189,8 @@ export function SeasonCard({ animeId, animeName, animePoster }: SeasonCardProps)
           <h4 className="font-semibold line-clamp-1">{animeName}</h4>
           <p className="text-sm text-muted-foreground">
             {current
-              ? `Season ${current.seasonNumber} of ${seasons.length}`
-              : `${seasons.length} entries`}
+              ? uiI18n.t('app.season_i18n_value_0_of_i18n_value_1_69f68467', { value0: current.seasonNumber, value1: seasons.length })
+              : uiI18n.t('app.i18n_value_0_entries_cf6d6f40', { value0: seasons.length })}
           </p>
         </div>
       </div>

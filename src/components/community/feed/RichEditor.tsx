@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { forwardRef, useImperativeHandle, useEffect, useState } from 'react';
 import { useEditor, EditorContent, ReactRenderer, BubbleMenu, type Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -31,6 +33,7 @@ const SuggestionList = forwardRef<
   { onKeyDown: (p: SuggestionKeyDownProps) => boolean },
   { items: SuggItem[]; command: (item: SuggItem) => void }
 >(({ items, command }, ref) => {
+  useUiTranslation();
   const [sel, setSel] = useState(0);
   useEffect(() => setSel(0), [items]);
   useImperativeHandle(ref, () => ({
@@ -61,7 +64,7 @@ const SuggestionList = forwardRef<
               : <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-primary/20 text-[10px] font-bold">{item.label[0]?.toUpperCase()}</span>
           )}
           <span className="min-w-0 flex-1 truncate">
-            <span className="font-medium">{item.isNew ? `Create #${item.label}` : (item.display || `#${item.label}`)}</span>
+            <span className="font-medium">{item.isNew ? uiI18n.t('app.create_i18n_value_0_17982ebc', { value0: item.label }) : (item.display || uiI18n.t('app.i18n_value_0_84e19ea0', { value0: item.label }))}</span>
             {item.hint && <span className="ml-1.5 text-xs text-muted-foreground">{item.hint}</span>}
           </span>
         </button>
@@ -251,6 +254,7 @@ interface RichEditorProps {
 }
 
 function ToolbarBtn({ active, onClick, children }: { active?: boolean; onClick: () => void; children: React.ReactNode }) {
+  useUiTranslation();
   return (
     <button
       type="button"
@@ -266,9 +270,10 @@ function ToolbarBtn({ active, onClick, children }: { active?: boolean; onClick: 
 }
 
 export const RichEditor = forwardRef<RichEditorHandle, RichEditorProps>(function RichEditor(
-  { content = '', placeholder = 'What’s happening?', editable = true, autofocus = false, className, minHeight = '80px', onChange, onSubmit, onPasteFiles },
+  { content = '', placeholder = uiI18n.t('app.what_s_happening_617696c8'), editable = true, autofocus = false, className, minHeight = '80px', onChange, onSubmit, onPasteFiles },
   ref,
 ) {
+  useUiTranslation();
   const editor = useEditor({
     editable,
     autofocus,

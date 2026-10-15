@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 "use client";
 
 import { useEffect, useRef } from "react";
@@ -26,6 +28,7 @@ const phones: PhoneShot[] = [
 ];
 
 export function MobileShowcase() {
+  useUiTranslation();
   const reduceMotion = useMotionPreference();
   const trackRef = useRef<HTMLDivElement>(null);
   const railRef = useRef<HTMLDivElement>(null);
@@ -90,17 +93,16 @@ export function MobileShowcase() {
             <div className="mb-6 flex items-center gap-3 text-xs font-bold uppercase tracking-[0.2em] text-violet-300/90">
               <span className="h-px w-8 bg-gradient-to-r from-violet-400/80 to-transparent" />
               <Smartphone className="h-4 w-4" />
-              Mobile App
+              {uiI18n.t('app.mobile_app_cd39eab7')}
             </div>
             <h2
               id="mobile-heading"
               className="font-display text-[clamp(2.25rem,4.5vw,4rem)] font-semibold leading-[1.05] tracking-[-0.03em] text-white"
             >
-              Your anime world, <br className="hidden sm:block"/> in your pocket
+              {uiI18n.t('app.your_anime_world_a310ca53')} <br className="hidden sm:block"/> {uiI18n.t('app.in_your_pocket_28fe3887')}
             </h2>
             <p className="mt-6 max-w-xl text-base leading-relaxed text-white/60 sm:text-lg">
-              Track, browse, and keep up with the community from anywhere. The
-              mobile app carries your entire library seamlessly on the go.
+              {uiI18n.t('app.track_browse_and_keep_up_with_the_community_from_fef07814')}
             </p>
           </div>
 
@@ -108,7 +110,7 @@ export function MobileShowcase() {
             <button
               type="button"
               onClick={() => nudge(-1)}
-              aria-label="Scroll left"
+              aria-label={uiI18n.t('app.scroll_left_2c9e5a60')}
               className="group flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 backdrop-blur-md transition-[color,background-color,border-color,opacity,transform,box-shadow] hover:border-white/20 hover:bg-white/10 hover:text-white active:scale-95"
             >
               <ChevronLeft className="h-5 w-5 transition-transform group-hover:-translate-x-0.5" />
@@ -116,7 +118,7 @@ export function MobileShowcase() {
             <button
               type="button"
               onClick={() => nudge(1)}
-              aria-label="Scroll right"
+              aria-label={uiI18n.t('app.scroll_right_2994b49c')}
               className="group flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 backdrop-blur-md transition-[color,background-color,border-color,opacity,transform,box-shadow] hover:border-white/20 hover:bg-white/10 hover:text-white active:scale-95"
             >
               <ChevronRight className="h-5 w-5 transition-transform group-hover:translate-x-0.5" />
@@ -153,7 +155,7 @@ export function MobileShowcase() {
                     <div className="relative aspect-[9/19] overflow-hidden rounded-[2.2rem] bg-black ring-1 ring-white/10 shadow-[inset_0_0_20px_rgba(0,0,0,0.8)]">
                       <img
                         src={shot.src}
-                        alt={`${shot.name} screen`}
+                        alt={uiI18n.t('app.i18n_value_0_screen_f77ec101', { value0: shot.name })}
                         loading={i < 3 ? "eager" : "lazy"}
                         decoding="async"
                         draggable={false}
@@ -189,7 +191,7 @@ export function MobileShowcase() {
           <figure className="group relative overflow-hidden rounded-[2rem] border border-white/10 bg-[#0d0c13] shadow-[0_30px_90px_-20px_rgba(0,0,0,0.9)] ring-1 ring-white/5">
             <img
               src={`${BRAND}/mobile_playersetting.jpg`}
-              alt="Player settings"
+              alt={uiI18n.t('app.player_settings_c1823e10')}
               loading="lazy"
               decoding="async"
               draggable={false}
@@ -209,10 +211,10 @@ export function MobileShowcase() {
                   </span>
                   <div>
                     <p className="font-display text-lg font-semibold text-white">
-                      Fine-tuned playback
+                      {uiI18n.t('app.fine_tuned_playback_afe69d95')}
                     </p>
                     <p className="mt-1 text-sm leading-relaxed text-white/60">
-                      Quality, subtitles, audio & upscaling. Perfectly configured per-device, remembered everywhere.
+                      {uiI18n.t('app.quality_subtitles_audio_upscaling_perfectly_conf_928bd1bc')}
                     </p>
                   </div>
                 </div>

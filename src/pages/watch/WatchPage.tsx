@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { TorrentPreloadController } from '@/core/player/TorrentPreloadController';
 import { useDeveloperMode } from '@/hooks/ui/useDeveloperMode';
 import { SourceDebug } from '@/components/extensions/SourceDebug';
@@ -162,6 +164,7 @@ function isNebulaServer(serverName?: string | null): boolean {
 }
 
 export default function WatchPage() {
+  useUiTranslation();
   const { episodeId } = useParams<{ episodeId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
@@ -460,7 +463,7 @@ export default function WatchPage() {
         });
       } catch (error: any) {
         if (generation !== debridResolveGenerationRef.current) return;
-        const message = error?.message || 'Could not resolve this release with the selected debrid service.';
+        const message = error?.message || uiI18n.t('app.could_not_resolve_this_release_with_the_selected_f8b49fce');
         toast.error(message);
       } finally {
         if (generation === debridResolveGenerationRef.current) {
@@ -732,7 +735,7 @@ export default function WatchPage() {
     const stopMetadataReady = runtime.onTorrentMetadataReady?.((data: any) => {
       if (data?.sessionId === torrentSessionId) {
         setTorrentRetryTrigger(prev => prev + 1);
-        toast.success('Torrent metadata resolved! Starting stream...');
+        toast.success(uiI18n.t('app.torrent_metadata_resolved_starting_stream_6895291f'));
       }
     });
 
@@ -767,7 +770,7 @@ export default function WatchPage() {
       const transcodeStatus = String(stats?.transcode?.status || '').toLowerCase();
       const transcodePercent = stats?.transcode?.percent;
       if (transcodeStatus === 'running') {
-        const pctText = Number.isFinite(transcodePercent) ? ` (${Math.max(0, Math.min(99, Math.round(transcodePercent)))}%)` : '';
+        const pctText = Number.isFinite(transcodePercent) ? uiI18n.t('app.i18n_value_0_08b700b3', { value0: Math.max(0, Math.min(99, Math.round(transcodePercent))) }) : '';
         setTorrentPlaybackError(`Preparing multi-audio stream${pctText}...`);
       } else if (transcodeStatus === 'ready') {
         setTorrentPlaybackError((current: string | null) => (
@@ -861,7 +864,7 @@ export default function WatchPage() {
           setTorrentRetryTrigger(prev => prev + 1);
         }, 500);
 
-        toast.success('Download complete — playing from local file');
+        toast.success(uiI18n.t('app.download_complete_playing_from_local_file_78503eb1'));
       } catch (err: any) {
         console.error('[WatchPage] Failed to handle torrent completion:', err);
       }
@@ -1237,7 +1240,7 @@ export default function WatchPage() {
     setTorrentRetryTrigger(prev => prev + 1);
     queryClient.invalidateQueries({ queryKey: ["servers", decodedEpisodeId] });
     queryClient.invalidateQueries({ queryKey: ["sources", decodedEpisodeId] });
-    toast.success("Refreshing sources...");
+    toast.success(uiI18n.t('app.refreshing_sources_5d2c90da'));
   }, [decodedEpisodeId, queryClient]);
 
   const availableServers = useMemo(() => {
@@ -1514,7 +1517,7 @@ export default function WatchPage() {
     if (!iso) return "Air date hasn't been announced yet";
     const parsed = new Date(iso);
     if (Number.isNaN(parsed.getTime())) return String(ep?.airDate || iso);
-    const date = parsed.toLocaleDateString(undefined, {
+    const date = parsed.toLocaleDateString(uiI18n.language, {
       month: "short",
       day: "numeric",
       year: "numeric",
@@ -2817,7 +2820,7 @@ export default function WatchPage() {
 
     setFailedServers(new Set());
     setTorrentRetryTrigger(prev => prev + 1);
-    toast.success("Refreshing servers...");
+    toast.success(uiI18n.t('app.refreshing_servers_1b84e332'));
 
     try {
       clearCachedCombinedSourcesByEpisodeAndCategory(decodedEpisodeId, category);
@@ -2976,7 +2979,7 @@ export default function WatchPage() {
 
       // If prompt, we can't easily show a standard confirm here because it's async and navigation is already happening
       // For now, we'll default to 'keep' but notify the user
-      toast.info('Torrent session is running in the background. You can stop it from the Home page or Settings.');
+      toast.info(uiI18n.t('app.torrent_session_is_running_in_the_background_you_122c1bdb'));
     };
   }, [torrentSessionId, torrentServiceAvailable]);
 
@@ -3059,7 +3062,7 @@ export default function WatchPage() {
               className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors group"
             >
               <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-              <span className="hidden sm:inline">Back</span>
+              <span className="hidden sm:inline">{uiI18n.t('app.back_b52b36b7')}</span>
             </button>
             {/* Web-only: bounce this exact route into the desktop app via tatakai:// */}
             <OpenInAppButton className="hidden sm:inline-flex" />
@@ -3074,7 +3077,7 @@ export default function WatchPage() {
                 {viewCount !== undefined && viewCount > 0 && (
                   <span className="text-xs text-muted-foreground flex items-center justify-end gap-1">
                     <Eye className="w-3 h-3" />
-                    {formatViewCount(viewCount)} views
+                    {formatViewCount(viewCount)} {uiI18n.t('app.views_81f33187')}
                   </span>
                 )}
               </div>
@@ -3110,24 +3113,24 @@ export default function WatchPage() {
                   ) : null}
                   <div>
                     <p className="text-[11px] font-black uppercase tracking-[0.2em] text-primary">
-                      Episode {currentEpisode?.number} · Upcoming
+                      {uiI18n.t('app.episode_8669aa56')} {currentEpisode?.number} {uiI18n.t('app.upcoming_a688fdde')}
                     </p>
                     <h2 className="mt-2 font-display text-xl md:text-2xl font-bold">
-                      {currentEpisode?.title || `Episode ${currentEpisode?.number ?? ""}`}
+                      {currentEpisode?.title || uiI18n.t('app.episode_i18n_value_0_f05acda8', { value0: currentEpisode?.number ?? "" })}
                     </h2>
                     <p className="mt-2 flex items-center justify-center gap-1.5 text-sm text-muted-foreground">
                       <Clock className="w-4 h-4" aria-hidden="true" />
                       {unairedAirDateText}
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground/70">
-                      Unreleased episodes can&apos;t be played yet — check back after it airs.
+                      {uiI18n.t('app.unreleased_episodes_can_apos_t_be_played_yet_che_617488dc')}
                     </p>
                   </div>
                   <button
                     onClick={() => animeId && navigate(`/anime/${encodeURIComponent(animeId)}`)}
                     className="rounded-full border border-white/15 bg-white/5 px-5 py-2 text-xs font-bold uppercase tracking-wider text-foreground transition-colors hover:bg-white/10"
                   >
-                    Back to anime
+                    {uiI18n.t('app.back_to_anime_22ccef1b')}
                   </button>
                 </div>
               ) : activePlaybackSource?.isEmbed ? (
@@ -3231,9 +3234,9 @@ export default function WatchPage() {
                   onTorrentRepair={async () => {
                     try {
                       await (window as any).tatakaiRuntime?.reannounceTorrent?.(torrentSessionId);
-                      toast.success('Repair requested');
+                      toast.success(uiI18n.t('app.repair_requested_7faf912e'));
                     } catch (e) {
-                      toast.error('Repair failed');
+                      toast.error(uiI18n.t('app.repair_failed_1e8cfc05'));
                     }
                   }}
                   onTorrentStop={async () => {
@@ -3242,9 +3245,9 @@ export default function WatchPage() {
                       // stripped too — otherwise the torrent branch keeps
                       // winning every playback decision after the stop.
                       leaveTorrentSession();
-                      toast.success('Torrent stopped');
+                      toast.success(uiI18n.t('app.torrent_stopped_0da55671'));
                     } catch (e) {
-                      toast.error('Failed to stop torrent');
+                      toast.error(uiI18n.t('app.failed_to_stop_torrent_51403f48'));
                     }
                   }}
                 />
@@ -3265,14 +3268,14 @@ export default function WatchPage() {
                 onRepair={async () => {
                   try {
                     await (window as any).tatakaiRuntime?.reannounceTorrent?.(torrentSessionId);
-                    toast.success('Looking for more peers');
+                    toast.success(uiI18n.t('app.looking_for_more_peers_58424834'));
                   } catch {
-                    toast.error('Repair failed');
+                    toast.error(uiI18n.t('app.repair_failed_1e8cfc05'));
                   }
                 }}
                 onStop={() => {
                   leaveTorrentSession();
-                  toast.success('Torrent stopped');
+                  toast.success(uiI18n.t('app.torrent_stopped_0da55671'));
                 }}
               />
             )}
@@ -3282,8 +3285,8 @@ export default function WatchPage() {
               <div>
                 <h1 className="font-display text-lg md:text-2xl font-bold">
                   {isGenericTorrent
-                    ? (torrentLiveStats?.name || 'Torrent Content')
-                    : `Episode ${currentEpisode?.number || (isOfflineMode ? offlineManifest?.episodes.find((e: any) => e.id === decodedEpisodeId)?.number : "?")}`
+                    ? (torrentLiveStats?.name || uiI18n.t('app.torrent_content_839cb364'))
+                    : uiI18n.t('app.episode_i18n_value_0_f05acda8', { value0: currentEpisode?.number || (isOfflineMode ? offlineManifest?.episodes.find((e: any) => e.id === decodedEpisodeId)?.number : "?") })
                   }
                 </h1>
                 {!isGenericTorrent && currentEpisode?.title && (
@@ -3300,7 +3303,7 @@ export default function WatchPage() {
                     <button
                       onClick={() => setIsReportModalOpen(true)}
                       className="p-2 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
-                      title="Report issue"
+                      title={uiI18n.t('app.report_issue_6e2c7123')}
                     >
                       <Flag className="w-4 h-4" />
                     </button>
@@ -3312,11 +3315,11 @@ export default function WatchPage() {
                         prevEpisode && handleEpisodeChange(prevEpisode.episodeId)
                       }
                       disabled={!prevEpisode || isEpisodeUnaired(prevEpisode as any)}
-                      title={prevEpisode && isEpisodeUnaired(prevEpisode as any) ? "Previous episode hasn't aired yet" : undefined}
+                      title={prevEpisode && isEpisodeUnaired(prevEpisode as any) ? uiI18n.t('app.previous_episode_hasn_t_aired_yet_389e009f') : undefined}
                       className="flex-1 sm:flex-none h-10 px-3 md:px-4 rounded-xl bg-muted hover:bg-muted/80 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all text-sm"
                     >
                       <ChevronLeft className="w-4 h-4" />
-                      <span>Prev</span>
+                      <span>{uiI18n.t('app.prev_e96fea52')}</span>
                     </button>
 
                     <button
@@ -3324,10 +3327,10 @@ export default function WatchPage() {
                         nextEpisode && handleEpisodeChange(nextEpisode.episodeId)
                       }
                       disabled={!nextEpisode || isEpisodeUnaired(nextEpisode as any)}
-                      title={nextEpisode && isEpisodeUnaired(nextEpisode as any) ? "Next episode hasn't aired yet" : undefined}
+                      title={nextEpisode && isEpisodeUnaired(nextEpisode as any) ? uiI18n.t('app.next_episode_hasn_t_aired_yet_87ad61fb') : undefined}
                       className="flex-1 sm:flex-none h-10 px-3 md:px-4 rounded-xl bg-primary hover:bg-primary/80 text-primary-foreground disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all text-sm"
                     >
-                      <span>Next</span>
+                      <span>{uiI18n.t('app.next_bc981983')}</span>
                       <ChevronRight className="w-4 h-4" />
                     </button>
                   </div>
@@ -3343,18 +3346,17 @@ export default function WatchPage() {
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 text-xs md:text-sm font-medium text-muted-foreground">
                       <Volume2 className="w-4 h-4" />
-                      Audio
+                      {uiI18n.t('app.audio_acdac205')}
                     </div>
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => handleCategoryChange("sub")}
                         className={`h-9 md:h-10 px-4 md:px-5 rounded-xl flex items-center gap-2 font-medium transition-all text-sm ${category === "sub"
                           ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25"
-                          : "bg-muted hover:bg-muted/80"
-                          }`}
+                          : "bg-muted hover:bg-muted/80"}`}
                       >
                         <Subtitles className="w-4 h-4" />
-                        Sub
+                        {uiI18n.t('app.sub_1f3c17ad')}
                       </button>
                       {/*
                         The Dub toggle (and its stability/quality profile select)
@@ -3375,10 +3377,10 @@ export default function WatchPage() {
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 text-xs md:text-sm font-medium text-muted-foreground">
                       <Server className="w-4 h-4" />
-                      Server
+                      {uiI18n.t('app.server_cb0cb170')}
                       <button
                         onClick={handleForceRefreshSources}
-                        title="Fetch more servers"
+                        title={uiI18n.t('app.fetch_more_servers_351857c3')}
                         className="p-1 hover:bg-muted rounded-md transition-colors"
                       >
                         <RefreshCw className={`w-3.5 h-3.5 ${loadingSources || fetchingSources ? 'animate-spin' : ''}`} />
@@ -3386,7 +3388,7 @@ export default function WatchPage() {
                       {isDeveloperMode && (
                         <button
                           onClick={() => setShowSourceDebug(v => !v)}
-                          title="Toggle source debug"
+                          title={uiI18n.t('app.toggle_source_debug_46f6d2f5')}
                           className={`p-1 rounded-md transition-colors ${showSourceDebug ? 'bg-primary/20 text-primary' : 'hover:bg-muted text-muted-foreground'}`}
                         >
                           <Eye className="w-3.5 h-3.5" />
@@ -3394,27 +3396,27 @@ export default function WatchPage() {
                       )}
                       <div className="ml-auto flex items-center gap-2">
                         <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full">
-                          {providerSourceCount} sources
+                          {providerSourceCount} {uiI18n.t('app.sources_bce16dd0')}
                         </span>
                         {(loadingSources || fetchingSources) && (
                           <span className="text-xs bg-amber-500/15 text-amber-400 px-2 py-0.5 rounded-full">
-                            {providerSourceCount > 0 ? 'Adding more servers...' : 'Finding servers...'}
+                            {providerSourceCount > 0 ? uiI18n.t('app.adding_more_servers_0379b08f') : uiI18n.t('app.finding_servers_6f871241')}
                           </span>
                         )}
                         {newProviderCount > 0 && (
                           <span className="text-xs bg-emerald-500/15 text-emerald-400 px-2 py-0.5 rounded-full">
-                            +{newProviderCount} new
+                            +{newProviderCount} {uiI18n.t('app.new_c2a6b03f')}
                           </span>
                         )}
                         {!(loadingSources || fetchingSources) && providerFeedUpdatedAt && (
                           <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                            Updated
+                            {uiI18n.t('app.updated_f2f8570d')}
                           </span>
                         )}
                         {hasWatchAnimeWorldAvailable && (
                           <span className="flex items-center gap-1 text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full">
                             <Globe className="w-3 h-3" />
-                            Multi-Language
+                            {uiI18n.t('app.multi_language_60d39b5b')}
                           </span>
                         )}
                       </div>
@@ -3443,7 +3445,7 @@ export default function WatchPage() {
                               const failCount = getSourceFailureCount(comboKey);
                               const healthScore = getSourceHealthScore(server.serverName);
                               const workingState = failCount >= 2 || failedServers.has(server.serverName) ? "Not working" : "Working";
-                              const serverDescription = `${workingState} • Health ${healthScore}/100 • Fails ${failCount} • Source ${server.serverName}${serverSource?.url ? ` • ${getUrlHost(serverSource.url)}` : ""}`;
+                              const serverDescription = uiI18n.t('app.i18n_value_0_health_i18n_value_1_100_fails_i18n__73fcf62f', { value0: workingState, value1: healthScore, value2: failCount, value3: server.serverName, value4: serverSource?.url ? ` • ${getUrlHost(serverSource.url)}` : "" });
                               const providerSourceCount = (server as any).sourceCount ?? visibleSources.filter((s: any) => String(s.server || s.providerKey || s.providerName || "") === String(server.serverName)).length;
                               const serverHoverRows = buildSourceHoverRows(serverSource || server, { count: providerSourceCount });
                               const serverRealProvider = (serverSource as any)?.providerName || server.providerName || server.serverName;
@@ -3469,8 +3471,7 @@ export default function WatchPage() {
                                           ? "bg-foreground text-background shadow-lg"
                                           : failedServers.has(server.serverName)
                                             ? "bg-destructive/20 text-destructive"
-                                            : getSourceTypeColorClass(serverSource || server, { isProviderServer: server.isProviderServer })
-                                          }`}
+                                            : getSourceTypeColorClass(serverSource || server, { isProviderServer: server.isProviderServer })}`}
                                       >
                                         {serverLabel}
                                         {isVerifiedProvider(server.providerKey || (server as any).providerName, server.serverName) && (
@@ -3483,8 +3484,8 @@ export default function WatchPage() {
                                       <div className="space-y-1.5 p-1">
                                         <div className="flex items-center justify-between gap-2">
                                           <span className="text-xs font-semibold">{serverLabel}</span>
-                                          <span className="text-[10px] text-muted-foreground truncate max-w-[10rem]" title={serverRealKey ? `${serverRealProvider} (${serverRealKey})` : serverRealProvider}>
-                                            {serverRealProvider}{serverRealKey ? ` · ${serverRealKey}` : ""}
+                                          <span className="text-[10px] text-muted-foreground truncate max-w-[10rem]" title={serverRealKey ? uiI18n.t('app.i18n_value_0_i18n_value_1_8568f691', { value0: serverRealProvider, value1: serverRealKey }) : serverRealProvider}>
+                                            {serverRealProvider}{serverRealKey ? uiI18n.t('app.i18n_value_0_92e4cd32', { value0: serverRealKey }) : ""}
                                           </span>
                                         </div>
                                         {serverHoverRows.length > 0 && (
@@ -3501,7 +3502,7 @@ export default function WatchPage() {
                                         {nextEstimate && (
                                           <div className="flex items-center gap-1.5 text-[10px] text-primary">
                                             <Clock className="w-3 h-3" />
-                                            <span>Next {serverSource?.language || "episode"}: {nextEstimate}</span>
+                                            <span>{uiI18n.t('app.next_bc981983')} {serverSource?.language || uiI18n.t('app.episode_39ae6b3c')}: {nextEstimate}</span>
                                           </div>
                                         )}
                                       </div>
@@ -3550,7 +3551,7 @@ export default function WatchPage() {
                           <div key={lang} className="flex flex-col gap-2">
                             <div className="text-xs text-muted-foreground font-medium flex items-center gap-2">
                               <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-                              {lang} Sources
+                              {lang} {uiI18n.t('app.sources_2eb56be3')}
                             </div>
                             <div className="flex flex-wrap gap-2">
                               {sources.map((source, sIdx) => {
@@ -3611,8 +3612,7 @@ export default function WatchPage() {
                                           }}
                                           className={`h-9 px-3 md:px-4 rounded-xl font-medium transition-all text-sm flex items-center gap-2 ${isSelected
                                             ? "bg-foreground text-background shadow-lg"
-                                            : getSourceTypeColorClass(source)
-                                            }`}
+                                            : getSourceTypeColorClass(source)}`}
                                           title={hoverInfo}
                                         >
                                           {source.isEmbed ? <Globe className="w-3 h-3" /> : <Server className="w-3 h-3 text-muted-foreground" />}
@@ -3625,7 +3625,7 @@ export default function WatchPage() {
                                           {isVerifiedProvider(source.providerKey, source.server || source.providerName) && (
                                             <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-primary/20 text-[9px] font-bold text-primary border border-primary/30 ml-auto animate-in fade-in slide-in-from-right-2">
                                               <CircleCheck className="w-2.5 h-2.5" />
-                                              <span>VERIFIED</span>
+                                              <span>{uiI18n.t('app.verified_597bc3e9')}</span>
                                             </div>
                                           )}
                                         </button>
@@ -3640,8 +3640,8 @@ export default function WatchPage() {
                                           )}
                                           <div className="flex items-center justify-between gap-2">
                                             <span className="text-xs font-semibold">{label}</span>
-                                            <span className="text-[10px] text-muted-foreground truncate max-w-[10rem]" title={sourceRealKey ? `${sourceRealProvider} (${sourceRealKey})` : sourceRealProvider}>
-                                              {sourceRealProvider}{sourceRealKey ? ` · ${sourceRealKey}` : ""}
+                                            <span className="text-[10px] text-muted-foreground truncate max-w-[10rem]" title={sourceRealKey ? uiI18n.t('app.i18n_value_0_i18n_value_1_8568f691', { value0: sourceRealProvider, value1: sourceRealKey }) : sourceRealProvider}>
+                                              {sourceRealProvider}{sourceRealKey ? uiI18n.t('app.i18n_value_0_92e4cd32', { value0: sourceRealKey }) : ""}
                                             </span>
                                           </div>
                                           {sourceHoverRows.length > 0 && (
@@ -3658,7 +3658,7 @@ export default function WatchPage() {
                                           {nextEstimate && (
                                             <div className="flex items-center gap-1.5 text-[10px] text-primary">
                                               <Clock className="w-3 h-3" />
-                                              <span>Next episode: {nextEstimate}</span>
+                                              <span>{uiI18n.t('app.next_episode_75b387d7')} {nextEstimate}</span>
                                             </div>
                                           )}
                                         </div>
@@ -3676,13 +3676,13 @@ export default function WatchPage() {
                           <div className="flex flex-col items-center justify-center p-6 text-center bg-muted/20 rounded-2xl border border-dashed border-border/50">
                             <AlertCircle className="w-8 h-8 text-muted-foreground mb-2 opacity-50" />
                             <p className="text-sm text-muted-foreground">
-                              No available servers found for this episode.
+                              {uiI18n.t('app.no_available_servers_found_for_this_episode_0b7c6d5b')}
                             </p>
                             <button
                               onClick={handleForceRefreshSources}
                               className="mt-3 text-xs bg-primary/10 hover:bg-primary/20 text-primary px-3 py-1.5 rounded-lg font-bold transition-all"
                             >
-                              Try Fetching Again
+                              {uiI18n.t('app.try_fetching_again_ef4cac75')}
                             </button>
                           </div>
                         )}
@@ -3690,11 +3690,11 @@ export default function WatchPage() {
                         <SourceDebug kind="anime" sources={sourcesData?.sources || []} diagnostics={(sourcesData as any)?.providerStatus || []} />
                         {isDeveloperMode && showSourceDebug && (
                           <div className="rounded-xl border border-white/10 bg-black/30 p-3 text-xs font-mono overflow-auto max-h-64">
-                            <div>category: {category}</div>
-                            <div>serverIndex: {selectedServerIndex}</div>
-                            <div>sourceReady: {String(sourceReady)}</div>
-                            <div>refererRetryIndex: {refererRetryIndex}</div>
-                            <div>currentServer: {currentServer?.serverName || "none"}</div>
+                            <div>{uiI18n.t('app.category_39063f1d')} {category}</div>
+                            <div>{uiI18n.t('app.serverindex_0f7aa536')} {selectedServerIndex}</div>
+                            <div>{uiI18n.t('app.sourceready_0c91a160')} {String(sourceReady)}</div>
+                            <div>{uiI18n.t('app.refererretryindex_da95efcc')} {refererRetryIndex}</div>
+                            <div>{uiI18n.t('app.currentserver_8140ce2b')} {currentServer?.serverName || uiI18n.t('app.none_71f8e797')}</div>
                             <pre className="mt-2 whitespace-pre-wrap break-all">{JSON.stringify(activePlaybackSource || selectedSource || null, null, 2)}</pre>
                           </div>
                         )}
@@ -3712,7 +3712,7 @@ export default function WatchPage() {
               <GlassPanel className="p-4 md:p-5 max-h-[400px] xl:max-h-[700px] flex flex-col">
                 <div className="flex items-center gap-3 mb-3 md:mb-4">
                   <ListVideo className="w-5 h-5 text-primary" />
-                  <h3 className="font-display text-base md:text-lg font-semibold">Episodes</h3>
+                  <h3 className="font-display text-base md:text-lg font-semibold">{uiI18n.t('app.episodes_49d641ba')}</h3>
                   <span className="ml-auto text-xs md:text-sm text-muted-foreground">
                     {episodesData?.totalEpisodes || 0}
                   </span>
@@ -3725,7 +3725,7 @@ export default function WatchPage() {
                     <div className="relative">
                       <input
                         type="number"
-                        placeholder="Jump to episode..."
+                        placeholder={uiI18n.t('app.jump_to_episode_b5922fd5')}
                         min={1}
                         max={episodesData?.totalEpisodes}
                         className="w-full h-8 px-3 rounded-lg bg-muted/50 border border-border text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
@@ -3765,8 +3765,7 @@ export default function WatchPage() {
                             }}
                             className={`px-2 py-1 text-xs rounded ${isActive
                               ? 'bg-primary text-primary-foreground'
-                              : 'bg-muted/50 hover:bg-muted'
-                              }`}
+                              : 'bg-muted/50 hover:bg-muted'}`}
                           >
                             {start}-{end}
                           </button>
@@ -3786,7 +3785,7 @@ export default function WatchPage() {
                       id={`ep-${ep.episodeId || ep.id}`}
                       disabled={unaired}
                       aria-disabled={unaired}
-                      title={unaired ? `Episode ${ep.number} — not yet aired${ep.airDate ? ` (${ep.airDate})` : ""}` : undefined}
+                      title={unaired ? uiI18n.t('app.episode_i18n_value_0_not_yet_airedi18n_value_1_fee4b531', { value0: ep.number, value1: ep.airDate ? ` (${ep.airDate})` : "" }) : undefined}
                       onClick={() => {
                         if (unaired) return;
                         if (isOfflineMode) {
@@ -3801,19 +3800,18 @@ export default function WatchPage() {
                           ? "border border-dashed border-white/15 bg-muted/30 opacity-70"
                           : ep.isFiller
                             ? "bg-orange/10 border border-orange/30 hover:bg-orange/20"
-                            : "bg-muted/50 hover:bg-muted"
-                        }`}
+                            : "bg-muted/50 hover:bg-muted"}`}
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <span className="font-bold">EP {ep.number}</span>
+                        <span className="font-bold">{uiI18n.t('app.ep_00c1bff9')} {ep.number}</span>
                         {unaired ? (
                           <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-primary/20 text-primary">
-                            Upcoming{ep.airDate ? ` · ${ep.airDate}` : ""}
+                            {uiI18n.t('app.upcoming_523baab9')}{ep.airDate ? uiI18n.t('app.i18n_value_0_92e4cd32', { value0: ep.airDate }) : ""}
                           </span>
                         ) : (
                           ep.isFiller && (
                             <span className="text-xs px-1.5 py-0.5 rounded-full bg-orange/20 text-orange">
-                              Filler
+                              {uiI18n.t('app.filler_e0a62127')}
                             </span>
                           )
                         )}
@@ -3892,25 +3890,25 @@ export default function WatchPage() {
             <div className="bg-card border border-white/10 p-6 rounded-2xl max-w-md w-full shadow-2xl space-y-4 m-4">
               <div className="flex items-center gap-3 text-yellow-500">
                 <AlertCircle className="w-6 h-6" />
-                <h3 className="font-bold text-lg">External Link Warning</h3>
+                <h3 className="font-bold text-lg">{uiI18n.t('app.external_link_warning_61cf31f2')}</h3>
               </div>
               <p className="text-muted-foreground">
-                This content is trying to open an external link.
+                {uiI18n.t('app.this_content_is_trying_to_open_an_external_link_0d561043')}
               </p>
               <div className="p-3 bg-black/30 rounded-lg border border-white/5 text-xs font-mono break-all text-white/70 max-h-24 overflow-y-auto">
                 {pendingRedirect}
               </div>
               <p className="text-xs text-muted-foreground">
-                External sites may contain ads or trackers. Proceed with caution.
+                {uiI18n.t('app.external_sites_may_contain_ads_or_trackers_proce_c18d47a0')}
               </p>
               <div className="flex justify-end gap-3 pt-2">
-                <Button variant="ghost" onClick={() => setPendingRedirect(null)}>Cancel</Button>
+                <Button variant="ghost" onClick={() => setPendingRedirect(null)}>{uiI18n.t('app.cancel_77dfd213')}</Button>
                 <Button variant="destructive" onClick={() => {
                   const url = pendingRedirect;
                   setPendingRedirect(null);
                   window.open(url, '_blank');
                 }}>
-                  Open Link
+                  {uiI18n.t('app.open_link_b3bd5077')}
                 </Button>
               </div>
             </div>

@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useNavigate } from 'react-router-dom';
 import { Layers, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -49,6 +51,7 @@ export function TierListWidget({
   className,
   imageSrc,
 }: TierListWidgetProps) {
+  useUiTranslation();
   const navigate = useNavigate();
 
   // If a custom image is provided, inject it into the S-tier preview
@@ -76,7 +79,7 @@ export function TierListWidget({
             <Layers className="h-3.5 w-3.5 text-amber-400" />
           </div>
           <span className="text-[11px] font-bold uppercase tracking-widest text-amber-400">
-            Tier Maker
+            {uiI18n.t('app.tier_maker_2fb84bcf')}
           </span>
         </div>
       </div>
@@ -118,7 +121,7 @@ export function TierListWidget({
                 >
                   <img
                     src={img}
-                    alt={`${tier.label} Tier Item`}
+                    alt={uiI18n.t('app.i18n_value_0_tier_item_fa9f210c', { value0: tier.label })}
                     className="h-full w-full object-cover"
                   />
                 </div>
@@ -127,7 +130,7 @@ export function TierListWidget({
               {/* Placeholder text if empty */}
               {tier.images.length === 0 && tier.label === 'B' && (
                 <span className="relative z-10 ml-2 text-[10px] font-medium text-white/30 transition-colors duration-300 group-hover:text-white/50">
-                  Drag items here
+                  {uiI18n.t('app.drag_items_here_c19dde8d')}
                 </span>
               )}
             </div>
@@ -141,10 +144,10 @@ export function TierListWidget({
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0 flex-1">
               <h3 className="truncate text-sm font-bold text-white transition-colors group-hover:text-amber-400">
-                Rank Your Favorites
+                {uiI18n.t('app.rank_your_favorites_034fcc76')}
               </h3>
               <p className="mt-0.5 text-[11px] font-medium text-muted-foreground">
-                Build your ultimate anime list
+                {uiI18n.t('app.build_your_ultimate_anime_list_e8404428')}
               </p>
             </div>
 

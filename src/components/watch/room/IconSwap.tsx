@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import type { ReactNode } from 'react';
 
@@ -25,6 +27,7 @@ export function IconSwap({
     rotation = 30, // A subtle 30-degree spin creates a beautiful morphing effect
     className = '' 
 }: IconSwapProps) {
+  useUiTranslation();
     const reduce = useReducedMotion();
 
     return (

@@ -1,6 +1,9 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { usePersistentState } from '@/hooks/ui/usePersistentState';
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { appendCommentQuote, type CommentQuoteDraft } from '@/lib/commentQuotes';
+import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
@@ -106,8 +109,8 @@ const MENTION_TOKEN = /@([a-zA-Z0-9_]{0,32})$/;
 export function RichCommentComposer({
   onSubmit,
   submitting = false,
-  placeholder = 'Share your thoughts...',
-  submitLabel = 'Post Comment',
+  placeholder,
+  submitLabel,
   autoFocus = false,
   compact = false,
   showSpoiler = true,
@@ -119,9 +122,13 @@ export function RichCommentComposer({
   allowEmbeds = false,
   initialEmbeds,
 }: RichCommentComposerProps) {
+  useUiTranslation();
+  const { t } = useTranslation();
   const { user } = useAuth();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  const resolvedPlaceholder = placeholder ?? t('comments.shareThoughts');
+  const resolvedSubmitLabel = submitLabel ?? t('comments.postComment');
   const draftPrefix = user && draftKey ? `tatakai_comment_draft:${user.id}:${draftKey}` : null;
   const fieldKey = (field: string) => draftPrefix ? `${draftPrefix}:${field}` : null;
   const [content, setContent] = usePersistentState(fieldKey('content'), initialContent);
@@ -177,7 +184,7 @@ export function RichCommentComposer({
       if (error) throw error;
       return (data ?? []).map((p: any) => ({
         id: String(p.id),
-        label: (p.title && p.title !== p.content ? p.title : p.content) || 'Untitled post',
+        label: (p.title && p.title !== p.content ? p.title : p.content) || t('migration.untitledPost'),
       }));
     },
     enabled: allowEmbeds && !!user,
@@ -265,7 +272,7 @@ export function RichCommentComposer({
     const raw = v && Number.isFinite(v.currentTime) ? v.currentTime : getLastSavedTime();
     const total = Math.max(0, Math.floor(raw));
     if (!total && !v) {
-      toast.error('No video is playing right now');
+      toast.error(t('migration.noVideo'));
       return;
     }
     const h = Math.floor(total / 3600);
@@ -281,7 +288,7 @@ export function RichCommentComposer({
 
   const addImageAttachment = (img: PickedImage) => {
     if (attachments.length >= 4) {
-      toast.error('Up to 4 attachments per comment');
+      toast.error(t('migration.attachmentLimit'));
       return;
     }
     setAttachments((prev) => [...prev, { type: 'image', url: img.url, width: img.width, height: img.height }]);
@@ -289,7 +296,7 @@ export function RichCommentComposer({
 
   const addGif = (attachment: CommentAttachment) => {
     if (attachments.length >= 4) {
-      toast.error('Up to 4 attachments per comment');
+      toast.error(t('migration.attachmentLimit'));
       return;
     }
     setAttachments((prev) => [...prev, attachment]);
@@ -298,8 +305,8 @@ export function RichCommentComposer({
   // Shared path for images arriving by drag-drop or clipboard paste — validates,
   // uploads to the comment bucket, then attaches (same result as the picker).
   const intakeImageFile = async (file: File) => {
-    if (!user) { toast.error('Sign in to attach images'); return; }
-    if (attachments.length >= 4) { toast.error('Up to 4 attachments per comment'); return; }
+    if (!user) { toast.error(t('migration.signInImages')); return; }
+    if (attachments.length >= 4) { toast.error(t('migration.attachmentLimit')); return; }
     const err = validateImageFile(file);
     if (err) { toast.error(err); return; }
     setIntakeBusy(true);
@@ -309,7 +316,7 @@ export function RichCommentComposer({
         prev.length >= 4 ? prev : [...prev, { type: 'image', url: a.url, width: a.width, height: a.height }],
       );
     } catch (e) {
-      toast.error('Upload failed', { description: e instanceof Error ? e.message : undefined });
+      toast.error(t('migration.uploadFailed'), { description: e instanceof Error ? e.message : undefined });
     } finally {
       setIntakeBusy(false);
     }
@@ -346,7 +353,7 @@ export function RichCommentComposer({
   const handleSubmit = async () => {
     if (!canSubmit) return;
     if (poll && !pollValid) {
-      toast.error('A poll needs at least 2 choices');
+      toast.error(t('migration.pollChoices'));
       return;
     }
 
@@ -418,13 +425,13 @@ export function RichCommentComposer({
         setDropActive(false);
         const file = imageFileFromTransfer(e.dataTransfer);
         if (file) intakeImageFile(file);
-        else toast.error('Please choose an image file');
+        else toast.error(t('migration.chooseImage'));
       }}
     >
       {(dropActive || intakeBusy) && (
         <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center rounded-xl border-2 border-dashed border-primary/60 bg-background/80 backdrop-blur-sm">
           <p className="flex items-center gap-2 text-sm font-semibold text-primary">
-            {intakeBusy ? <><Loader2 className="h-4 w-4 animate-spin" /> Uploading…</> : 'Drop image to attach'}
+            {intakeBusy ? <><Loader2 className="h-4 w-4 animate-spin" /> {t('migration.uploading')}</> : t('migration.dropImage')}
           </p>
         </div>
       )}
@@ -441,8 +448,8 @@ export function RichCommentComposer({
           trigger={
             <button
               type="button"
-              title="Emoji"
-              aria-label="Emoji"
+              title={t('migration.emoji')}
+              aria-label={t('migration.emoji')}
               className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             >
               <EmojiIcon className="h-4 w-4" />
@@ -454,11 +461,11 @@ export function RichCommentComposer({
           trigger={
             <button
               type="button"
-              title="GIF"
-              aria-label="GIF"
+              title={uiI18n.t('app.gif_758f6c93')}
+              aria-label={uiI18n.t('app.gif_758f6c93')}
               className="flex h-8 items-center justify-center rounded-md px-2 text-xs font-bold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             >
-              GIF
+              {uiI18n.t('app.gif_758f6c93')}
             </button>
           }
         />
@@ -466,7 +473,7 @@ export function RichCommentComposer({
           userId={user?.id}
           align="start"
           uploadFile={async (f) => {
-            if (!user) throw new Error('Sign in to upload');
+            if (!user) throw new Error(t('migration.signInUpload'));
             const a = await uploadCommentMedia(f, user.id);
             return { url: a.url, width: a.width, height: a.height };
           }}
@@ -474,8 +481,8 @@ export function RichCommentComposer({
           trigger={
             <button
               type="button"
-              title="Attach image"
-              aria-label="Attach image"
+              title={t('migration.attachImage')}
+              aria-label={t('migration.attachImage')}
               className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             >
               <ImagePlus className="h-4 w-4" />
@@ -485,20 +492,20 @@ export function RichCommentComposer({
         {allowTimestamp && (
           <>
             <span className="mx-1 h-5 w-px bg-border/60" />
-            {toolbarButton(<Clock className="h-4 w-4" />, 'Insert current time', insertCurrentTime)}
+            {toolbarButton(<Clock className="h-4 w-4" />, t('migration.insertTime'), insertCurrentTime)}
           </>
         )}
         {allowEmbeds && (
           <>
             <span className="mx-1 h-5 w-px bg-border/60" />
-            {toolbarButton(<ListChecks className="h-4 w-4" />, 'Add a poll', togglePoll)}
+            {toolbarButton(<ListChecks className="h-4 w-4" />, t('migration.addPoll'), togglePoll)}
             <MediaPicker
               onSelect={setMedia}
               trigger={
                 <button
                   type="button"
-                  title="Share anime / manga"
-                  aria-label="Share anime / manga"
+                  title={t('migration.shareMedia')}
+                  aria-label={t('migration.shareMedia')}
                   className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                 >
                   <Tv className="h-4 w-4" />
@@ -507,23 +514,23 @@ export function RichCommentComposer({
             />
             <EmbedPicker
               icon={<Music2 className="h-4 w-4" />}
-              label="Link a playlist"
+              label={t('migration.linkPlaylist')}
               items={playlists.map((p) => ({ id: p.id, label: p.name }))}
-              empty="You have no playlists yet."
+              empty={t('migration.noPlaylists')}
               onPick={setPlaylistId}
             />
             <EmbedPicker
               icon={<Layers className="h-4 w-4" />}
-              label="Link a tier list"
+              label={t('migration.linkTierlist')}
               items={tierlists.map((t) => ({ id: t.id, label: t.title }))}
-              empty="You have no tier lists yet."
+              empty={t('migration.noTierlists')}
               onPick={setTierlistId}
             />
             <EmbedPicker
               icon={<MessageSquareQuote className="h-4 w-4" />}
-              label="Link a community post"
+              label={t('migration.linkPost')}
               items={myPosts.data ?? []}
-              empty={myPosts.isLoading ? 'Loading…' : 'You have no posts yet.'}
+              empty={myPosts.isLoading ? 'Loading…' : t('migration.noPosts')}
               onPick={setPostId}
             />
           </>
@@ -591,19 +598,19 @@ export function RichCommentComposer({
             <div key={`${a.url}-${i}`} className="group relative">
               <img
                 src={a.preview || a.url}
-                alt={a.title || 'attachment'}
+                alt={a.title || uiI18n.t('app.attachment_1625e5ed')}
                 className="h-20 w-20 rounded-lg object-contain bg-muted/40"
               />
               {a.type === 'gif' && (
                 <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1 text-[9px] font-bold text-white">
-                  GIF
+                  {uiI18n.t('app.gif_758f6c93')}
                 </span>
               )}
               <button
                 type="button"
                 onClick={() => removeAttachment(i)}
                 className="absolute -right-1.5 -top-1.5 rounded-full bg-destructive p-0.5 text-destructive-foreground"
-                aria-label="Remove attachment"
+                aria-label={t('migration.removeAttachment')}
               >
                 <X className="h-3 w-3" />
               </button>
@@ -621,7 +628,7 @@ export function RichCommentComposer({
                 <Input
                   value={choice}
                   maxLength={80}
-                  placeholder={`Choice ${i + 1}`}
+                  placeholder={uiI18n.t('app.choice_i18n_value_0_6c996baf', { value0: i + 1 })}
                   onChange={(e) =>
                     setPoll((p) => (p ? { ...p, choices: p.choices.map((c, idx) => (idx === i ? e.target.value : c)) } : p))
                   }
@@ -630,7 +637,7 @@ export function RichCommentComposer({
                 {poll.choices.length > 2 && (
                   <button
                     type="button"
-                    aria-label="Remove choice"
+                    aria-label={t('migration.removeChoice')}
                     onClick={() => setPoll((p) => (p ? { ...p, choices: p.choices.filter((_, idx) => idx !== i) } : p))}
                     className="text-muted-foreground hover:text-destructive"
                   >
@@ -640,7 +647,7 @@ export function RichCommentComposer({
                 {i === poll.choices.length - 1 && poll.choices.length < 4 && (
                   <button
                     type="button"
-                    aria-label="Add choice"
+                    aria-label={t('migration.addChoice')}
                     onClick={() => setPoll((p) => (p ? { ...p, choices: [...p.choices, ''] } : p))}
                     className="text-primary hover:text-primary/80"
                   >
@@ -651,11 +658,11 @@ export function RichCommentComposer({
             ))}
           </div>
           <div>
-            <p className="mb-1.5 text-xs font-semibold text-muted-foreground">Poll length</p>
+            <p className="mb-1.5 text-xs font-semibold text-muted-foreground">{t('migration.pollLength')}</p>
             <div className="grid grid-cols-3 gap-2">
               {(['days', 'hours', 'minutes'] as const).map((unit) => (
                 <div key={unit}>
-                  <label className="mb-1 block text-[10px] uppercase tracking-wider text-muted-foreground/70">{unit}</label>
+                  <label className="mb-1 block text-[10px] uppercase tracking-wider text-muted-foreground/70">{uiI18n.t(({"days":"app.days_5548ae4f","hours":"app.hours_5aedee09","minutes":"app.minutes_be2e2bb6"})[unit])}</label>
                   <Select value={String(poll[unit])} onValueChange={(v) => setPoll((p) => (p ? { ...p, [unit]: Number(v) } : p))}>
                     <SelectTrigger className="h-9 bg-muted/40 text-sm"><SelectValue /></SelectTrigger>
                     <SelectContent>{POLL_DURATION[unit].map((n) => <SelectItem key={n} value={String(n)}>{n}</SelectItem>)}</SelectContent>
@@ -665,7 +672,7 @@ export function RichCommentComposer({
             </div>
           </div>
           <button type="button" onClick={() => setPoll(null)} className="text-xs font-medium text-destructive hover:underline">
-            Remove poll
+            {t('migration.removePoll')}
           </button>
         </div>
       )}
@@ -673,10 +680,10 @@ export function RichCommentComposer({
       {/* Embed chips */}
       {(media || playlistId || tierlistId || postId) && (
         <div className="flex flex-wrap gap-2">
-          {media && <EmbedChip label={`${media.type}: ${media.name}`} onClear={() => setMedia(null)} />}
-          {playlistId && <EmbedChip label={`Playlist: ${playlists.find((p) => p.id === playlistId)?.name ?? ''}`} onClear={() => setPlaylistId(null)} />}
-          {tierlistId && <EmbedChip label={`Tier list: ${tierlists.find((t) => t.id === tierlistId)?.title ?? ''}`} onClear={() => setTierlistId(null)} />}
-          {postId && <EmbedChip label={`Post: ${(myPosts.data ?? []).find((p) => p.id === postId)?.label ?? 'linked'}`} onClear={() => setPostId(null)} />}
+          {media && <EmbedChip label={uiI18n.t('app.i18n_value_0_i18n_value_1_b6af3412', { value0: media.type, value1: media.name })} onClear={() => setMedia(null)} />}
+          {playlistId && <EmbedChip label={uiI18n.t('app.playlist_i18n_value_0_bc8e64ab', { value0: playlists.find((p) => p.id === playlistId)?.name ?? '' })} onClear={() => setPlaylistId(null)} />}
+          {tierlistId && <EmbedChip label={uiI18n.t('app.tier_list_i18n_value_0_56537b3b', { value0: tierlists.find((t) => t.id === tierlistId)?.title ?? '' })} onClear={() => setTierlistId(null)} />}
+          {postId && <EmbedChip label={uiI18n.t('app.post_i18n_value_0_bbb880c3', { value0: (myPosts.data ?? []).find((p) => p.id === postId)?.label ?? 'linked' })} onClear={() => setPostId(null)} />}
         </div>
       )}
 
@@ -685,7 +692,7 @@ export function RichCommentComposer({
         {showSpoiler ? (
           <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
             <Checkbox checked={isSpoiler} onCheckedChange={(c) => setIsSpoiler(c as boolean)} />
-            Contains spoilers
+            {t('migration.spoilers')}
           </label>
         ) : (
           <span />
@@ -693,7 +700,7 @@ export function RichCommentComposer({
         <div className="flex items-center gap-2">
           {onCancel && (
             <Button size="sm" variant="outline" onClick={onCancel} type="button">
-              Cancel
+              {t('common.cancel')}
             </Button>
           )}
           <Button size="sm" onClick={handleSubmit} disabled={!canSubmit} type="button">
@@ -720,6 +727,7 @@ function EmbedPicker({
   empty: string;
   onPick: (id: string) => void;
 }) {
+  useUiTranslation();
   const [open, setOpen] = useState(false);
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -758,10 +766,11 @@ function EmbedPicker({
 
 /** Removable chip summarising a chosen embed. */
 function EmbedChip({ label, onClear }: { label: string; onClear: () => void }) {
+  useUiTranslation();
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
       <span className="max-w-[180px] truncate">{label}</span>
-      <button type="button" aria-label="Remove" onClick={onClear} className="hover:text-primary/70">
+      <button type="button" aria-label={uiI18n.t('migration.remove')} onClick={onClear} className="hover:text-primary/70">
         <X className="h-3 w-3" />
       </button>
     </span>

@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 "use client";
 
 import { useState, useEffect } from "react";
@@ -17,6 +19,7 @@ const navLinks = [
 ];
 
 export function Navigation() {
+  useUiTranslation();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { user, profile, signOut } = useAuth();
@@ -52,13 +55,11 @@ export function Navigation() {
   const renderMobileMenu = () => {
     const overlay = (
       <DialogPrimitive.Content aria-describedby={undefined}
-        className={`md:hidden fixed inset-0 z-[55] bg-background overflow-hidden transition-[background-color,border-color,opacity,transform] duration-200 ${
-          isMobileMenuOpen
+        className={`md:hidden fixed inset-0 z-[55] bg-background overflow-hidden transition-[background-color,border-color,opacity,transform] duration-200 ${isMobileMenuOpen
             ? "opacity-100 pointer-events-auto"
-            : "opacity-0 pointer-events-none"
-        }`}
+            : "opacity-0 pointer-events-none"}`}
       >
-        <DialogPrimitive.Title className="sr-only">Navigation</DialogPrimitive.Title>
+        <DialogPrimitive.Title className="sr-only">{uiI18n.t('app.navigation_cf03cf2e')}</DialogPrimitive.Title>
         {/* Overlay close button */}
         <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-6 h-20">
           <Link
@@ -66,13 +67,13 @@ export function Navigation() {
             onClick={() => setIsMobileMenuOpen(false)}
             className="flex items-center gap-2 group"
           >
-            <span className="font-display tracking-tight text-2xl text-foreground">TATAKAI</span>
-            <span className="font-mono text-xs mt-1 text-muted-foreground">ANIME</span>
+            <span className="font-display tracking-tight text-2xl text-foreground">{uiI18n.t('app.tatakai_72f9bae9')}</span>
+            <span className="font-mono text-xs mt-1 text-muted-foreground">{uiI18n.t('app.anime_80b75c1a')}</span>
           </Link>
           <button
             onClick={() => setIsMobileMenuOpen(false)}
             className="p-2 text-foreground"
-            aria-label="Close menu"
+            aria-label={uiI18n.t('app.close_menu_6c9fc990')}
           >
             <X className="w-6 h-6" />
           </button>
@@ -86,11 +87,9 @@ export function Navigation() {
                 key={link.name}
                 to={link.href}
                 onClick={() => setIsMobileMenuOpen(false)}
-                className={`text-4xl font-display text-foreground hover:text-muted-foreground transition-[background-color,border-color,opacity,transform] duration-200 ${
-                  isMobileMenuOpen
+                className={`text-4xl font-display text-foreground hover:text-muted-foreground transition-[background-color,border-color,opacity,transform] duration-200 ${isMobileMenuOpen
                     ? "opacity-100 translate-y-0"
-                    : "opacity-0 translate-y-4"
-                }`}
+                    : "opacity-0 translate-y-4"}`}
                 style={{ transitionDelay: isMobileMenuOpen ? `${i * 60}ms` : "0ms" }}
               >
                 {link.name}
@@ -99,11 +98,9 @@ export function Navigation() {
           </div>
 
           {/* Bottom CTAs */}
-          <div className={`flex gap-4 pt-8 border-t border-foreground/10 transition-[background-color,border-color,opacity,transform] duration-200 ${
-            isMobileMenuOpen
+          <div className={`flex gap-4 pt-8 border-t border-foreground/10 transition-[background-color,border-color,opacity,transform] duration-200 ${isMobileMenuOpen
               ? "opacity-100 translate-y-0"
-              : "opacity-0 translate-y-4"
-          }`}
+              : "opacity-0 translate-y-4"}`}
           style={{ transitionDelay: isMobileMenuOpen ? "250ms" : "0ms" }}
           >
             {user ? (
@@ -113,7 +110,7 @@ export function Navigation() {
                 onClick={handleSignOut}
               >
                 <LogOut className="w-4 h-4" />
-                Sign Out
+                {uiI18n.t('app.sign_out_61fd08ff')}
               </Button>
             ) : (
               <Button
@@ -124,7 +121,7 @@ export function Navigation() {
                   navigate("/auth");
                 }}
               >
-                Sign in
+                {uiI18n.t('app.sign_in_ada2e9e9')}
               </Button>
             )}
 
@@ -135,7 +132,7 @@ export function Navigation() {
                 navigate(user ? "/browse" : "/auth");
               }}
             >
-              {user ? "Watch Now" : "Get Started"}
+              {user ? uiI18n.t('app.watch_now_fe70cb6e') : uiI18n.t('app.get_started_bd2cb051')}
             </Button>
           </div>
         </div>
@@ -150,28 +147,22 @@ export function Navigation() {
       {renderMobileMenu()}
 
       <header
-        className={`fixed z-50 transition-[background-color,border-color,opacity,transform] duration-200 ${
-          isScrolled
+        className={`fixed z-50 transition-[background-color,border-color,opacity,transform] duration-200 ${isScrolled
             ? "top-4 left-4 right-4"
-            : "top-0 left-0 right-0"
-        }`}
+            : "top-0 left-0 right-0"}`}
       >
         <nav
-          className={`mx-auto transition-[background-color,border-color,opacity,transform] duration-200 ${
-            isScrolled || isMobileMenuOpen
+          className={`mx-auto transition-[background-color,border-color,opacity,transform] duration-200 ${isScrolled || isMobileMenuOpen
               ? "bg-background/80 backdrop-blur-xl border border-foreground/10 rounded-2xl shadow-lg max-w-[1200px]"
-              : "bg-transparent max-w-[1400px]"
-          }`}
+              : "bg-transparent max-w-[1400px]"}`}
         >
           <div
-            className={`flex items-center justify-between transition-[background-color,border-color,opacity,transform] duration-200 px-6 lg:px-8 ${
-              isScrolled ? "h-14" : "h-20"
-            }`}
+            className={`flex items-center justify-between transition-[background-color,border-color,opacity,transform] duration-200 px-6 lg:px-8 ${isScrolled ? "h-14" : "h-20"}`}
           >
             {/* Logo */}
             <Link to={user ? "/browse" : "/welcome"} className="flex items-center gap-2 group">
-              <span className={`font-display tracking-tight transition-[background-color,border-color,opacity,transform] duration-200 ${isScrolled ? "text-xl text-foreground" : "text-2xl text-white"}`}>TATAKAI</span>
-              <span className={`font-mono transition-[background-color,border-color,opacity,transform] duration-200 ${isScrolled ? "text-[10px] mt-0.5 text-muted-foreground" : "text-xs mt-1 text-white/60"}`}>ANIME</span>
+              <span className={`font-display tracking-tight transition-[background-color,border-color,opacity,transform] duration-200 ${isScrolled ? "text-xl text-foreground" : "text-2xl text-white"}`}>{uiI18n.t('app.tatakai_72f9bae9')}</span>
+              <span className={`font-mono transition-[background-color,border-color,opacity,transform] duration-200 ${isScrolled ? "text-[10px] mt-0.5 text-muted-foreground" : "text-xs mt-1 text-white/60"}`}>{uiI18n.t('app.anime_80b75c1a')}</span>
             </Link>
 
             {/* Desktop Navigation */}
@@ -194,9 +185,7 @@ export function Navigation() {
                 <div className="flex items-center gap-3">
                   <Link
                     to="/profile"
-                    className={`flex items-center gap-2 text-sm transition-[background-color,border-color,opacity,transform] duration-200 ${
-                      isScrolled ? "text-foreground/80 hover:text-foreground" : "text-white/80 hover:text-white"
-                    }`}
+                    className={`flex items-center gap-2 text-sm transition-[background-color,border-color,opacity,transform] duration-200 ${isScrolled ? "text-foreground/80 hover:text-foreground" : "text-white/80 hover:text-white"}`}
                   >
                     <Avatar className="h-7 w-7 border border-white/20">
                       <AvatarImage src={profile?.avatar_url || undefined} />
@@ -212,10 +201,8 @@ export function Navigation() {
                     variant="ghost"
                     size="icon"
                     onClick={handleSignOut}
-                    className={`h-8 w-8 rounded-full ${
-                      isScrolled ? "text-foreground/70 hover:text-foreground hover:bg-foreground/10" : "text-white/70 hover:text-white hover:bg-white/10"
-                    }`}
-                    title="Sign out"
+                    className={`h-8 w-8 rounded-full ${isScrolled ? "text-foreground/70 hover:text-foreground hover:bg-foreground/10" : "text-white/70 hover:text-white hover:bg-white/10"}`}
+                    title={uiI18n.t('app.sign_out_dc1649a1')}
                   >
                     <LogOut className="w-4 h-4" />
                   </Button>
@@ -223,22 +210,18 @@ export function Navigation() {
               ) : (
                 <Link
                   to="/auth"
-                  className={`transition-[background-color,border-color,opacity,transform] duration-200 font-medium ${
-                    isScrolled ? "text-xs text-foreground/70 hover:text-foreground" : "text-sm text-white/70 hover:text-white"
-                  }`}
+                  className={`transition-[background-color,border-color,opacity,transform] duration-200 font-medium ${isScrolled ? "text-xs text-foreground/70 hover:text-foreground" : "text-sm text-white/70 hover:text-white"}`}
                 >
-                  Sign in
+                  {uiI18n.t('app.sign_in_ada2e9e9')}
                 </Link>
               )}
 
               <Button
                 size="sm"
                 onClick={() => navigate(user ? "/browse" : "/auth")}
-                className={`rounded-full transition-[background-color,border-color,opacity,transform] duration-200 font-medium ${
-                  isScrolled ? "bg-foreground hover:bg-foreground/90 text-background px-4 h-8 text-xs" : "bg-white hover:bg-white/90 text-black px-6"
-                }`}
+                className={`rounded-full transition-[background-color,border-color,opacity,transform] duration-200 font-medium ${isScrolled ? "bg-foreground hover:bg-foreground/90 text-background px-4 h-8 text-xs" : "bg-white hover:bg-white/90 text-black px-6"}`}
               >
-                {user ? "Watch Now" : "Get Started"}
+                {user ? uiI18n.t('app.watch_now_fe70cb6e') : uiI18n.t('app.get_started_bd2cb051')}
               </Button>
             </div>
 
@@ -246,7 +229,7 @@ export function Navigation() {
             <DialogPrimitive.Trigger asChild>
             <button
               className={`md:hidden min-h-11 min-w-11 p-2 transition-colors duration-200 relative z-[60] ${isScrolled || isMobileMenuOpen ? "text-foreground" : "text-white"}`}
-              aria-label="Toggle menu"
+              aria-label={uiI18n.t('app.toggle_menu_52092247')}
               aria-expanded={isMobileMenuOpen}
               aria-haspopup="dialog"
             >

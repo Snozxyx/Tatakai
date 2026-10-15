@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
  * Playlist collaboration hooks
  */
@@ -28,6 +30,7 @@ interface Collaborator {
  * Get collaborators for a playlist
  */
 export function usePlaylistCollaborators(playlistId: string | undefined) {
+  useUiTranslation();
   return useQuery({
     queryKey: ['playlist_collaborators', playlistId],
     queryFn: async () => {
@@ -69,6 +72,7 @@ export function usePlaylistCollaborators(playlistId: string | undefined) {
  * Check if user can edit a playlist
  */
 export function useCanEditPlaylist(playlistId: string | undefined) {
+  useUiTranslation();
   const { user } = useAuth();
 
   return useQuery({
@@ -103,6 +107,7 @@ export function useCanEditPlaylist(playlistId: string | undefined) {
  * Add a collaborator to a playlist
  */
 export function useAddCollaborator() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
@@ -116,7 +121,7 @@ export function useAddCollaborator() {
       userId: string;
       role?: CollaboratorRole;
     }) => {
-      if (!user) throw new Error('Not logged in');
+      if (!user) throw new Error(uiI18n.t('app.not_logged_in_53802e67'));
 
       const { data, error } = await supabase
         .from('playlist_collaborators')
@@ -139,10 +144,10 @@ export function useAddCollaborator() {
       queryClient.invalidateQueries({
         queryKey: ['can_edit_playlist', variables.playlistId],
       });
-      toast.success('Collaborator added');
+      toast.success(uiI18n.t('app.collaborator_added_30f9f0b4'));
     },
     onError: (error: Error) => {
-      toast.error(error.message || 'Failed to add collaborator');
+      toast.error(error.message || uiI18n.t('app.failed_to_add_collaborator_64022a3c'));
     },
   });
 }
@@ -151,6 +156,7 @@ export function useAddCollaborator() {
  * Update collaborator role
  */
 export function useUpdateCollaborator() {
+  useUiTranslation();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -174,10 +180,10 @@ export function useUpdateCollaborator() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['playlist_collaborators', variables.playlistId] });
       queryClient.invalidateQueries({ queryKey: ['can_edit_playlist', variables.playlistId] });
-      toast.success('Collaborator updated');
+      toast.success(uiI18n.t('app.collaborator_updated_9d83bc77'));
     },
     onError: () => {
-      toast.error('Failed to update collaborator');
+      toast.error(uiI18n.t('app.failed_to_update_collaborator_6b6432d7'));
     },
   });
 }
@@ -186,6 +192,7 @@ export function useUpdateCollaborator() {
  * Remove a collaborator
  */
 export function useRemoveCollaborator() {
+  useUiTranslation();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -201,10 +208,10 @@ export function useRemoveCollaborator() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['playlist_collaborators', variables.playlistId] });
       queryClient.invalidateQueries({ queryKey: ['can_edit_playlist', variables.playlistId] });
-      toast.success('Collaborator removed');
+      toast.success(uiI18n.t('app.collaborator_removed_04258d86'));
     },
     onError: () => {
-      toast.error('Failed to remove collaborator');
+      toast.error(uiI18n.t('app.failed_to_remove_collaborator_d0efcc86'));
     },
   });
 }

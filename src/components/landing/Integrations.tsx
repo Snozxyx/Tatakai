@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 "use client";
 
 import { useEffect, useRef, useState, useCallback, forwardRef } from "react";
@@ -44,9 +46,9 @@ const trackers: Tracker[] = [
   {
     name: "AniList",
     kind: "Anime & manga tracking",
-    body: "OAuth connect with ID-first import — your scores, statuses and progress land on the right entries.",
+    get body() { return uiI18n.t('app.oauth_connect_with_id_first_import_your_scores_s_c04d2c5a'); },
     logo: "https://cdn.simpleicons.org/anilist/02A9FF",
-    fallback: "AL",
+    get fallback() { return uiI18n.t('app.al_cf681cfb'); },
     ring: "hover:border-[#02A9FF]/40",
     dot: "bg-[#02A9FF]",
     accent: "#02A9FF",
@@ -55,9 +57,9 @@ const trackers: Tracker[] = [
   {
     name: "MyAnimeList",
     kind: "Anime & manga tracking",
-    body: "Bring years of MAL history along — stable mal_id mapping keeps rewatches and rereads matched.",
+    get body() { return uiI18n.t('app.bring_years_of_mal_history_along_stable_mal_id_m_279a313b'); },
     logo: "https://cdn.simpleicons.org/myanimelist/2E51A2",
-    fallback: "MAL",
+    get fallback() { return uiI18n.t('app.mal_308b46c0'); },
     ring: "hover:border-[#2E51A2]/50",
     dot: "bg-[#2E51A2]",
     accent: "#2E51A2",
@@ -66,9 +68,9 @@ const trackers: Tracker[] = [
   {
     name: "MangaBaka",
     kind: "Open manga & novel DB",
-    body: "The community open database for manga, manhwa and light novels — chapters, volumes and notes in sync.",
+    get body() { return uiI18n.t('app.the_community_open_database_for_manga_manhwa_and_ef929a4b'); },
     logo: "https://mangabaka.org/images/logo.png",
-    fallback: "MB",
+    get fallback() { return uiI18n.t('app.mb_6e979f42'); },
     ring: "hover:border-amber-300/40",
     dot: "bg-amber-300",
     accent: "#FCD34D",
@@ -85,18 +87,18 @@ interface EcoStep {
 const syncSteps: EcoStep[] = [
   {
     icon: Link2,
-    title: "Connect once",
-    body: "Link AniList, MAL and MangaBaka with OAuth — no passwords stored.",
+    get title() { return uiI18n.t('app.connect_once_5a553912'); },
+    get body() { return uiI18n.t('app.link_anilist_mal_and_mangabaka_with_oauth_no_pas_3818e9c4'); },
   },
   {
     icon: Import,
-    title: "Import history",
-    body: "ID-first mapping matches by mal_id / anilist_id, with manual override in review.",
+    get title() { return uiI18n.t('app.import_history_e0d1ded6'); },
+    get body() { return uiI18n.t('app.id_first_mapping_matches_by_mal_id_anilist_id_wi_2269b13e'); },
   },
   {
     icon: RefreshCw,
-    title: "Stay in sync",
-    body: "Progress, scores and statuses follow you across every device.",
+    get title() { return uiI18n.t('app.stay_in_sync_bad35ffe'); },
+    get body() { return uiI18n.t('app.progress_scores_and_statuses_follow_you_across_e_e5594535'); },
   },
 ];
 
@@ -117,9 +119,9 @@ const ecosystems: Ecosystem[] = [
   {
     name: "Seanime",
     tag: "JS / TS providers",
-    body: "Streaming, torrent and manga providers from the Seanime ecosystem — paste a manifest and Tatakai wires up the Provider methods.",
+    get body() { return uiI18n.t('app.streaming_torrent_and_manga_providers_from_the_s_2ba88464'); },
     logo: "https://seanime.app/seanime-logo.png",
-    fallback: "SE",
+    get fallback() { return uiI18n.t('app.se_5dce41c3'); },
     accent: "text-white",
     accentColor: "#ffffff",
     glow: "bg-white/[0.04]",
@@ -133,9 +135,9 @@ const ecosystems: Ecosystem[] = [
   {
     name: "Stremio",
     tag: "HTTP / JSON add-ons",
-    body: "Any Stremio add-on becomes a Tatakai source — streams and subtitles over the open protocol, mapped to your library.",
+    get body() { return uiI18n.t('app.any_stremio_add_on_becomes_a_tatakai_source_stre_98e87835'); },
     logo: "https://cdn.simpleicons.org/stremio/8A5CF6",
-    fallback: "ST",
+    get fallback() { return uiI18n.t('app.st_95061581'); },
     accent: "text-violet-200",
     accentColor: "#8A5CF6",
     glow: "bg-violet-500/[0.06]",
@@ -175,6 +177,7 @@ function SpotlightCard({
   spotlightColor?: string;
   spotlightSize?: number;
 }) {
+  useUiTranslation();
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const [hovered, setHovered] = useState(false);
@@ -219,6 +222,7 @@ function LogoImg({
   size?: string;
   rounded?: string;
 }) {
+  useUiTranslation();
   const [failed, setFailed] = useState(false);
   return (
     <span
@@ -253,6 +257,7 @@ const BeamNode = forwardRef<
   HTMLDivElement,
   { className?: string; label: string; children?: React.ReactNode }
 >(({ className, label, children }, ref) => {
+  useUiTranslation();
   return (
     <div className="flex flex-col items-center gap-2">
       <div
@@ -274,6 +279,7 @@ const BeamNode = forwardRef<
 BeamNode.displayName = "BeamNode";
 
 function BeamTrackerLogo({ index, name }: { index: number; name: string }) {
+  useUiTranslation();
   const [failed, setFailed] = useState(false);
   const t = trackers[index];
   return (
@@ -299,6 +305,7 @@ function BeamTrackerLogo({ index, name }: { index: number; name: string }) {
 }
 
 function IntegrationBeams() {
+  useUiTranslation();
   const reduceMotion = useMotionPreference();
   const containerRef = useRef<HTMLDivElement>(null);
   const alRef = useRef<HTMLDivElement>(null);
@@ -312,7 +319,7 @@ function IntegrationBeams() {
     <div
       ref={containerRef}
       role="img"
-      aria-label="Live sync map: AniList, MyAnimeList and MangaBaka flow into the Tatakai hub, then out to your library and live sync."
+      aria-label={uiI18n.t('app.live_sync_map_anilist_myanimelist_and_mangabaka__889679b9')}
       className="relative mb-8 flex h-[460px] items-center justify-between gap-1 overflow-hidden rounded-2xl border border-white/[0.08] bg-black/40 px-3 backdrop-blur-md sm:h-[420px] sm:px-8"
     >
       {/* Backdrop */}
@@ -329,13 +336,13 @@ function IntegrationBeams() {
 
       {/* Left — tracker sources */}
       <div className="flex h-full max-h-[330px] flex-col items-stretch justify-between py-2 sm:max-h-[300px]">
-        <BeamNode ref={alRef} label="AniList">
+        <BeamNode ref={alRef} label={uiI18n.t('app.anilist_c03a6787')}>
           <BeamTrackerLogo index={0} name="AniList" />
         </BeamNode>
-        <BeamNode ref={malRef} label="MyAnimeList">
+        <BeamNode ref={malRef} label={uiI18n.t('app.myanimelist_be786904')}>
           <BeamTrackerLogo index={1} name="MyAnimeList" />
         </BeamNode>
-        <BeamNode ref={mbRef} label="MangaBaka">
+        <BeamNode ref={mbRef} label={uiI18n.t('app.mangabaka_c4dfa49b')}>
           <BeamTrackerLogo index={2} name="MangaBaka" />
         </BeamNode>
       </div>
@@ -354,7 +361,7 @@ function IntegrationBeams() {
         >
           <img
             src={TATAKAI_LOGO}
-            alt="Tatakai"
+            alt={uiI18n.t('app.tatakai_28bda6bd')}
             loading="lazy"
             decoding="async"
             className="h-9 w-9 object-contain sm:h-11 sm:w-11"
@@ -364,16 +371,16 @@ function IntegrationBeams() {
           />
         </div>
         <span className="z-10 whitespace-nowrap text-[9px] font-semibold uppercase tracking-[0.14em] text-violet-200/70 sm:text-[10px]">
-          Tatakai hub
+          {uiI18n.t('app.tatakai_hub_ee62db03')}
         </span>
       </div>
 
       {/* Right — sync outputs */}
       <div className="flex h-full max-h-[220px] flex-col items-stretch justify-between py-2">
-        <BeamNode ref={libRef} label="Library">
+        <BeamNode ref={libRef} label={uiI18n.t('app.library_b8100f5b')}>
           <Archive className="h-5 w-5 text-cyan-200" />
         </BeamNode>
-        <BeamNode ref={syncRef} label="Live sync">
+        <BeamNode ref={syncRef} label={uiI18n.t('app.live_sync_18f2df09')}>
           <BarChart3 className="h-5 w-5 text-emerald-200" />
         </BeamNode>
       </div>
@@ -452,7 +459,7 @@ function IntegrationBeams() {
        
         <span className="flex items-center gap-1.5 rounded-full border border-emerald-300/20 bg-emerald-400/[0.07] px-3 py-1 text-[10px] font-semibold text-emerald-200">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
-          3 connected
+          {uiI18n.t('app.3_connected_4901d615')}
         </span>
       </div>
     </div>
@@ -470,6 +477,7 @@ function SectionHeading({
   title: string;
   children: React.ReactNode;
 }) {
+  useUiTranslation();
   return (
     <Reveal>
       <div className="mb-12 max-w-3xl lg:mb-14">
@@ -496,6 +504,7 @@ function SectionHeading({
 /* ------------------------------------------------------------------ */
 
 export function Integrations() {
+  useUiTranslation();
   const navigate = useNavigate();
   const reduceMotion = useMotionPreference();
   const trackRef = useRef<HTMLDivElement>(null);
@@ -613,10 +622,9 @@ export function Integrations() {
           <SectionHeading
             id="integrations-heading"
             kicker="Integrations"
-            title="Bring your list with you"
+            title={uiI18n.t('app.bring_your_list_with_you_a155b918')}
           >
-            Tatakai plugs into the places you already track — connect once,
-            import your history, and keep every list in sync.
+            {uiI18n.t('app.tatakai_plugs_into_the_places_you_already_track__71f9b290')}
           </SectionHeading>
 
           <Reveal>
@@ -636,10 +644,10 @@ export function Integrations() {
                 />
 
                 <div className="relative mb-5 flex items-start justify-between gap-3">
-                  <LogoImg src={t.logo} alt={`${t.name} logo`} fallback={t.fallback} />
+                  <LogoImg src={t.logo} alt={uiI18n.t('app.i18n_value_0_logo_03df73f2', { value0: t.name })} fallback={t.fallback} />
                   <span className="flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-black/40 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/50">
                     <span className={`h-1.5 w-1.5 rounded-full ${t.dot}`} />
-                    OAuth ready
+                    {uiI18n.t('app.oauth_ready_f476467b')}
                   </span>
                 </div>
 
@@ -653,7 +661,7 @@ export function Integrations() {
                   {t.body}
                 </p>
 
-                <ul className="relative mt-5 flex flex-wrap gap-2" aria-label={`${t.name} capabilities`}>
+                <ul className="relative mt-5 flex flex-wrap gap-2" aria-label={uiI18n.t('app.i18n_value_0_capabilities_f43c69af', { value0: t.name })}>
                   {t.tags.map((tag) => (
                     <li
                       key={tag}
@@ -691,7 +699,7 @@ export function Integrations() {
                     </span>
                     <div className="min-w-0">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/25">
-                        Step {i + 1}
+                        {uiI18n.t('app.step_dc416e10')} {i + 1}
                       </p>
                       <p className="font-display text-sm font-medium text-white">{s.title}</p>
                       <p className="mt-1 text-xs leading-relaxed text-white/40">{s.body}</p>
@@ -733,10 +741,9 @@ export function Integrations() {
           <SectionHeading
             id="ecosystems-heading"
             kicker="Extension ecosystems"
-            title="Now speaks Seanime & Stremio"
+            title={uiI18n.t('app.now_speaks_seanime_stremio_ecee6c3a')}
           >
-            Install providers from the ecosystems you already use — streaming,
-            torrent and manga sources, wired straight into your library.
+            {uiI18n.t('app.install_providers_from_the_ecosystems_you_alread_15fda945')}
           </SectionHeading>
 
           <Reveal>
@@ -785,10 +792,10 @@ export function Integrations() {
 
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-display text-sm font-medium text-white">
-                    Paste a manifest — Tatakai reviews, then installs
+                    {uiI18n.t('app.paste_a_manifest_tatakai_reviews_then_installs_70d1ac38')}
                   </p>
                   <p className="truncate text-xs text-white/35">
-                    Nothing installs silently · your action required
+                    {uiI18n.t('app.nothing_installs_silently_your_action_required_0d1145b6')}
                   </p>
                 </div>
 
@@ -801,7 +808,7 @@ export function Integrations() {
                     />
                     <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-cyan-300" />
                   </span>
-                  Open protocol
+                  {uiI18n.t('app.open_protocol_6cd20c79')}
                 </span>
               </div>
             </div>
@@ -823,7 +830,7 @@ export function Integrations() {
                 <div className="relative mb-5 flex items-start justify-between gap-3">
                   <LogoImg
                     src={e.logo}
-                    alt={`${e.name} logo`}
+                    alt={uiI18n.t('app.i18n_value_0_logo_03df73f2', { value0: e.name })}
                     fallback={e.fallback}
                     size="h-11 w-11"
                   />
@@ -843,7 +850,7 @@ export function Integrations() {
                   {e.body}
                 </p>
 
-                <ul aria-label={`${e.name} support details`} className="relative mt-5 grid gap-2">
+                <ul aria-label={uiI18n.t('app.i18n_value_0_support_details_6ede0b37', { value0: e.name })} className="relative mt-5 grid gap-2">
                   {e.points.map((p) => (
                     <li key={p} className="flex items-center gap-2.5 text-sm text-white/55">
                       <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-emerald-300/15 bg-emerald-400/[0.06]">
@@ -880,9 +887,9 @@ export function Integrations() {
                   </span>
                   <div className="min-w-0">
                     <p className="font-display text-sm font-medium text-white">
-                      Add extension — paste, review, install
+                      {uiI18n.t('app.add_extension_paste_review_install_d5783c13')}
                     </p>
-                    <div className="mt-2 flex flex-wrap gap-1.5" aria-label="Supported install inputs">
+                    <div className="mt-2 flex flex-wrap gap-1.5" aria-label={uiI18n.t('app.supported_install_inputs_adbe12cb')}>
                       {installInputs.map((label) => (
                         <code
                           key={label}
@@ -897,7 +904,7 @@ export function Integrations() {
 
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                   <p className="hidden text-xs text-white/30 xl:block">
-                    Your action required — nothing installs silently.
+                    {uiI18n.t('app.your_action_required_nothing_installs_silently_5923b085')}
                   </p>
                   <button
                     type="button"
@@ -905,7 +912,7 @@ export function Integrations() {
                     className="group/btn relative inline-flex h-12 cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-full border border-white/20 bg-white px-7 text-sm font-semibold text-black transition-all duration-200 ease-out hover:shadow-[0_0_50px_-8px_rgba(255,255,255,0.4)] motion-safe:active:scale-[0.97] motion-reduce:transition-none"
                   >
                     <Plug className="relative h-4 w-4" />
-                    <span className="relative">Open Extension Hub</span>
+                    <span className="relative">{uiI18n.t('app.open_extension_hub_68bb8d7f')}</span>
                     <ArrowUpRight className="relative h-4 w-4 transition-transform duration-200 group-hover/btn:translate-x-0.5 group-hover/btn:-translate-y-0.5" />
                   </button>
                 </div>

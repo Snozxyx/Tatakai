@@ -1,4 +1,5 @@
 import { Fragment, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { getGlobalVideo } from '@/core/player/global-video-ref';
@@ -196,6 +197,7 @@ export function CommentContent({
   const text = String(content ?? '').replace(/\r\n/g, '\n');
   const blocks = splitCommentBlocks(text);
 
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const [overflows, setOverflows] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -234,7 +236,7 @@ export function CommentContent({
           onClick={() => setExpanded((e) => !e)}
           className="mt-0.5 text-xs font-semibold text-primary hover:underline"
         >
-          {expanded ? 'Show less' : 'Show more'}
+          {expanded ? t('comments.showLess') : t('comments.showMore')}
         </button>
       )}
     </div>

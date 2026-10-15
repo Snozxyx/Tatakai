@@ -1,5 +1,6 @@
 import { useCallback, useRef } from "react";
 import { toast } from "sonner";
+import i18n from "@/lib/i18n";
 import { sourceAdapterRegistry } from "@/core/player/SourceAdapterRegistry";
 import type {
   UseAudioTrackManagerParams,
@@ -58,7 +59,7 @@ export function useAudioTrackManager({
             const currentTimeSnapshot = Number.isFinite(video.currentTime) ? video.currentTime : 0;
             const wasPaused = video.paused;
 
-            toast.loading("Switching audio track (reloading stream)...");
+            toast.loading(i18n.t('player.audioSwitching'));
             const stream = await runtime.getTorrentStreamUrl(
               sessionId,
               (window as any).currentFileIndex ?? undefined,
@@ -67,7 +68,7 @@ export function useAudioTrackManager({
             toast.dismiss();
 
             if (!stream?.success || !stream.url) {
-              toast.error(stream?.error || "Failed to request audio-switched stream");
+              toast.error(stream?.error || i18n.t('player.audioSwitchRequestFailed'));
               return;
             }
 
@@ -82,11 +83,11 @@ export function useAudioTrackManager({
             });
 
             handleSubtitleChange(currentSubtitle);
-            toast.success("Audio track switched");
+            toast.success(i18n.t('player.audioSwitched'));
             return;
           } catch (err: any) {
             toast.dismiss();
-            toast.error(err?.message || "Error switching audio track");
+            toast.error(err?.message || i18n.t('player.audioSwitchError'));
             return;
           }
         }
@@ -101,14 +102,14 @@ export function useAudioTrackManager({
           }
           setActiveExtractedAudioTrack(null);
           setCurrentAudioTrack(trackId);
-          toast.success("Audio track switched");
+          toast.success(i18n.t('player.audioSwitched'));
           return;
         }
 
         // ── Fallback: extract the track to a separate file ───────────────────
         try {
           if (!runtime?.extractAudioTrack) {
-            toast.error("Audio extraction runtime unavailable");
+            toast.error(i18n.t('player.audioExtractionUnavailable'));
             return;
           }
 
@@ -116,11 +117,11 @@ export function useAudioTrackManager({
           if (existing) {
             setCurrentAudioTrack(trackId);
             setActiveExtractedAudioTrack(trackId);
-            toast.success("Audio track switched");
+            toast.success(i18n.t('player.audioSwitched'));
             return;
           }
 
-          toast.loading("Extracting audio track...");
+          toast.loading(i18n.t('player.audioExtracting'));
           let probeUrl = currentSource?.url || "";
           if (video?.src) probeUrl = video.src;
 
@@ -151,13 +152,13 @@ export function useAudioTrackManager({
             setExtractedAudioUrls((prev) => ({ ...prev, [trackId]: extractedUrl }));
             setCurrentAudioTrack(trackId);
             setActiveExtractedAudioTrack(trackId);
-            toast.success("Audio track loaded");
+            toast.success(i18n.t('player.audioLoaded'));
           } else {
-            toast.error(result?.error || "Failed to extract audio track");
+            toast.error(result?.error || i18n.t('player.audioExtractFailed'));
           }
         } catch (err: any) {
           toast.dismiss();
-          toast.error(err?.message || "Error extracting audio track");
+          toast.error(err?.message || i18n.t('player.audioExtractError'));
         }
       })();
     },

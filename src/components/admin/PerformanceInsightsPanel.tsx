@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -21,7 +23,8 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import { subDays, startOfDay, format } from 'date-fns';
+import { subDays, startOfDay } from 'date-fns';
+import { format } from '@/lib/localeFormat';
 import { versionDistribution, adoptionRate } from '@/utils/performanceInsights';
 import type { VersionDistribution, PerfSnapshot } from '@/types/admin-dashboard';
 
@@ -36,6 +39,7 @@ const ADOPTION_KEY = ['admin_perf_adoption'] as const;
 // Helpers
 // ---------------------------------------------------------------------------
 function SectionLoader() {
+  useUiTranslation();
   return (
     <div className="flex items-center justify-center py-10">
       <Loader2 className="w-7 h-7 animate-spin text-primary opacity-50" />
@@ -44,10 +48,11 @@ function SectionLoader() {
 }
 
 function SectionError({ onRetry }: { onRetry: () => void }) {
+  useUiTranslation();
   return (
     <GlassPanel className="p-8 text-center border-destructive/20 bg-destructive/5">
       <XCircle className="w-8 h-8 text-destructive/50 mx-auto mb-3" />
-      <p className="text-sm font-medium text-destructive mb-3">Failed to load data</p>
+      <p className="text-sm font-medium text-destructive mb-3">{uiI18n.t('app.failed_to_load_data_2208840e')}</p>
       <Button
         variant="outline"
         size="sm"
@@ -55,7 +60,7 @@ function SectionError({ onRetry }: { onRetry: () => void }) {
         className="gap-2 border-destructive/30 hover:bg-destructive/10 text-destructive"
       >
         <RefreshCw className="w-4 h-4" />
-        Retry
+        {uiI18n.t('app.retry_9f5cd8a2')}
       </Button>
     </GlassPanel>
   );
@@ -65,6 +70,7 @@ function SectionError({ onRetry }: { onRetry: () => void }) {
 // Version Distribution Section
 // ---------------------------------------------------------------------------
 function VersionDistributionSection() {
+  useUiTranslation();
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: VERSION_DIST_KEY,
     queryFn: async (): Promise<VersionDistribution[]> => {
@@ -88,7 +94,7 @@ function VersionDistributionSection() {
   if (!data || data.length === 0) {
     return (
       <p className="text-sm text-muted-foreground text-center py-6">
-        Version distribution data not available
+        {uiI18n.t('app.version_distribution_data_not_available_ae97ef5b')}
       </p>
     );
   }
@@ -102,7 +108,7 @@ function VersionDistributionSection() {
           <div className="flex items-center justify-between text-xs">
             <span className="font-mono font-medium">v{entry.version}</span>
             <span className="text-muted-foreground tabular-nums">
-              {entry.count.toLocaleString()} ({entry.percent.toFixed(1)}%)
+              {entry.count.toLocaleString(uiI18n.language)} ({entry.percent.toFixed(1)}%)
             </span>
           </div>
           <div className="h-2 rounded-full bg-white/5 overflow-hidden">
@@ -121,6 +127,7 @@ function VersionDistributionSection() {
 // Adoption Rate Section
 // ---------------------------------------------------------------------------
 function AdoptionRateSection() {
+  useUiTranslation();
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ADOPTION_KEY,
     queryFn: async (): Promise<{ rate: number | null; targetVersion: string | null }> => {
@@ -162,7 +169,7 @@ function AdoptionRateSection() {
   if (data?.rate === null) {
     return (
       <p className="text-sm text-muted-foreground text-center py-6">
-        No active stable channel policy
+        {uiI18n.t('app.no_active_stable_channel_policy_0f26c66a')}
       </p>
     );
   }
@@ -171,7 +178,7 @@ function AdoptionRateSection() {
     <div className="flex items-center gap-6 p-4 rounded-xl bg-white/5">
       <div className="flex-1">
         <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium mb-1">
-          Stable Policy Target
+          {uiI18n.t('app.stable_policy_target_2cdcef1c')}
         </p>
         <p className="font-mono font-semibold text-sm">v{data?.targetVersion}</p>
       </div>
@@ -179,7 +186,7 @@ function AdoptionRateSection() {
         <p className="text-3xl font-bold text-primary tabular-nums">
           {(data?.rate ?? 0).toFixed(1)}%
         </p>
-        <p className="text-xs text-muted-foreground">Adoption Rate</p>
+        <p className="text-xs text-muted-foreground">{uiI18n.t('app.adoption_rate_f8720f55')}</p>
       </div>
     </div>
   );
@@ -189,6 +196,7 @@ function AdoptionRateSection() {
 // Crash Rate Section
 // ---------------------------------------------------------------------------
 function CrashRateSection() {
+  useUiTranslation();
   const [days, setDays] = useState(30);
   const [inputDays, setInputDays] = useState('30');
 
@@ -236,7 +244,7 @@ function CrashRateSection() {
     <div className="space-y-4">
       {/* Range control */}
       <div className="flex items-center gap-3 flex-wrap">
-        <span className="text-xs text-muted-foreground font-medium">Range (days):</span>
+        <span className="text-xs text-muted-foreground font-medium">{uiI18n.t('app.range_days_76741bbd')}</span>
         <input
           type="number"
           min={1}
@@ -246,7 +254,7 @@ function CrashRateSection() {
           className="w-20 bg-white/5 border border-white/10 rounded px-2 py-1 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-primary"
         />
         <Button size="sm" variant="outline" onClick={handleApplyDays} className="text-xs h-7">
-          Apply
+          {uiI18n.t('app.apply_cfea419c')}
         </Button>
         <Button
           size="sm"
@@ -256,13 +264,13 @@ function CrashRateSection() {
           className="gap-1 text-xs h-7 text-muted-foreground"
         >
           <RefreshCw className="w-3 h-3" />
-          Refresh
+          {uiI18n.t('app.refresh_56e3badc')}
         </Button>
       </div>
 
       {isEmpty ? (
         <p className="text-sm text-muted-foreground text-center py-6">
-          No crash telemetry data
+          {uiI18n.t('app.no_crash_telemetry_data_2019cfdb')}
         </p>
       ) : (
         <div className="h-48">
@@ -309,6 +317,7 @@ function CrashRateSection() {
 // Perf Snapshot Section (Electron-only)
 // ---------------------------------------------------------------------------
 function PerfSnapshotSection() {
+  useUiTranslation();
   const [snapshots, setSnapshots] = useState<PerfSnapshot[] | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -336,7 +345,7 @@ function PerfSnapshotSection() {
   if (!snapshots || snapshots.length === 0) {
     return (
       <p className="text-sm text-muted-foreground text-center py-6">
-        No performance snapshot data available
+        {uiI18n.t('app.no_performance_snapshot_data_available_403427d6')}
       </p>
     );
   }
@@ -398,6 +407,7 @@ function PerfSnapshotSection() {
 // Main Component
 // ---------------------------------------------------------------------------
 export function PerformanceInsightsPanel() {
+  useUiTranslation();
   const isElectron = !!(window as any).electron;
 
   return (
@@ -406,7 +416,7 @@ export function PerformanceInsightsPanel() {
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold flex items-center gap-2">
           <Activity className="w-6 h-6 text-primary" />
-          Performance Insights
+          {uiI18n.t('app.performance_insights_d780c351')}
         </h2>
       </div>
 
@@ -414,7 +424,7 @@ export function PerformanceInsightsPanel() {
       <GlassPanel className="p-6 border-white/10">
         <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
           <ChevronUp className="w-4 h-4 text-primary" />
-          App Version Distribution
+          {uiI18n.t('app.app_version_distribution_c20c81f8')}
         </h3>
         <VersionDistributionSection />
       </GlassPanel>
@@ -423,7 +433,7 @@ export function PerformanceInsightsPanel() {
       <GlassPanel className="p-6 border-white/10">
         <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
           <ChevronDown className="w-4 h-4 text-primary" />
-          Stable Policy Adoption Rate
+          {uiI18n.t('app.stable_policy_adoption_rate_298f9d17')}
         </h3>
         <AdoptionRateSection />
       </GlassPanel>
@@ -432,7 +442,7 @@ export function PerformanceInsightsPanel() {
       <GlassPanel className="p-6 border-white/10">
         <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
           <Activity className="w-4 h-4 text-destructive" />
-          Crash Rate Trend
+          {uiI18n.t('app.crash_rate_trend_cfe31ecc')}
         </h3>
         <CrashRateSection />
       </GlassPanel>
@@ -442,7 +452,7 @@ export function PerformanceInsightsPanel() {
         <GlassPanel className="p-6 border-white/10">
           <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
             <Activity className="w-4 h-4 text-emerald-400" />
-            Memory Snapshots (Desktop)
+            {uiI18n.t('app.memory_snapshots_desktop_1543539f')}
           </h3>
           <PerfSnapshotSection />
         </GlassPanel>

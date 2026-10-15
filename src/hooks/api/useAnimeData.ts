@@ -1,3 +1,6 @@
+import { getPreferredTitleLanguage, selectMediaTitle } from '@/lib/titleLanguage';
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { applyEpisodeAvailability } from '@/lib/episodeAvailability';
 import { contentGraph, toAnimeCard, toHomeData } from "@/core";
@@ -138,8 +141,8 @@ function buildEpisodeId(baseId: string, episodeNumber: number): string {
 function normalizeEpisodeTitle(rawTitle?: string | null, number?: number): string {
   const cleaned = String(rawTitle || '').trim();
   if (cleaned) return cleaned;
-  if (number) return `Episode ${number}`;
-  return "Episode";
+  if (number) return uiI18n.t('app.episode_i18n_value_0_f05acda8', { value0: number });
+  return uiI18n.t('app.episode_8669aa56');
 }
 
 function normalizeTitle(value?: string | null): string {
@@ -233,16 +236,16 @@ const STALE_TIME = {
 
 function mediaToAnimeInfo(m: TatakaiMedia, mapping: AniZipMapping | null = null): AnimeInfo {
   const statusLabel = m.status === 'RELEASING'
-    ? 'Currently Airing'
+    ? uiI18n.t('app.currently_airing_024e7049')
     : m.status === 'FINISHED'
-      ? 'Finished'
+      ? uiI18n.t('app.finished_355bcc57')
       : m.status === 'NOT_YET_RELEASED'
-        ? 'Upcoming'
+        ? uiI18n.t('app.upcoming_523baab9')
         : m.status === 'CANCELLED'
-          ? 'Cancelled'
+          ? uiI18n.t('app.cancelled_a1bf92ef')
           : m.status === 'HIATUS'
-            ? 'On Hiatus'
-            : 'Unknown';
+            ? uiI18n.t('app.on_hiatus_f3705c90')
+            : uiI18n.t('app.unknown_bc7819b3');
 
   // AniList's own titles first (they match what the rest of the UI shows), then
   // AniList synonyms, then ani.zip's ~14 localized titles. Deduped
@@ -263,7 +266,7 @@ function mediaToAnimeInfo(m: TatakaiMedia, mapping: AniZipMapping | null = null)
         : m.malId
           ? `mal:${m.malId}`
           : m.tatakaiId || "",
-      name: m.titleEnglish ?? m.titleRomaji,
+      name: selectMediaTitle(m),
       poster: m.coverImageLarge ?? m.coverImageMedium ?? "",
       description: m.description ?? "",
       stats: {
@@ -276,7 +279,7 @@ function mediaToAnimeInfo(m: TatakaiMedia, mapping: AniZipMapping | null = null)
         type: m.format ?? "TV",
         duration: m.duration ? `${m.duration}m` : "Unknown",
       },
-      promotionalVideos: m.trailerUrl ? [{ title: "Trailer", source: m.trailerUrl, thumbnail: "" }] : [],
+      promotionalVideos: m.trailerUrl ? [{ get title() { return uiI18n.t('app.trailer_26013bcc'); }, source: m.trailerUrl, thumbnail: "" }] : [],
       characterVoiceActor: m.characters?.map(c => ({
         character: {
           id: String(c.id),
@@ -520,10 +523,12 @@ function computeNextAiringFromBroadcast(broadcast?: {
 }
 
 export function useHomeData() {
+  useUiTranslation();
   const { settings } = useContentSafetySettings();
   const showAdult = settings.showAdultEverywhere;
   return useQuery({
-    queryKey: ["home"],
+    queryKey: ["home", getPreferredTitleLanguage()],
+    placeholderData: previous => previous,
     queryFn: async () => {
       const bundle = await contentGraph.getHomePage();
       return toHomeData(bundle);
@@ -559,10 +564,12 @@ function filterHomeDataAdult(home: HomeData, showAdult: boolean): HomeData {
 }
 
 export function useAnimeInfo(animeId: string | undefined) {
+  useUiTranslation();
   return useQuery({
-    queryKey: ["anime", animeId],
+    queryKey: ["anime", animeId, getPreferredTitleLanguage()],
+    placeholderData: (previous, previousQuery) => previousQuery?.queryKey[1] === animeId ? previous : undefined,
     queryFn: async (): Promise<AnimeInfo> => {
-      if (!animeId) throw new Error("Anime ID is required");
+      if (!animeId) throw new Error(uiI18n.t('app.anime_id_is_required_5696eadf'));
       const media = await contentGraph.getMedia(animeId);
       const mapping = await fetchAniZipMapping(media.anilistId);
 
@@ -589,10 +596,11 @@ export function useAnimeInfo(animeId: string | undefined) {
 }
 
 export function useEpisodes(animeId: string | undefined) {
+  useUiTranslation();
   return useQuery({
     queryKey: ["episodes", animeId],
     queryFn: async (): Promise<{ totalEpisodes: number; episodes: EpisodeData[]; specials: EpisodeData[] }> => {
-      if (!animeId) throw new Error("Anime ID is required");
+      if (!animeId) throw new Error(uiI18n.t('app.anime_id_is_required_5696eadf'));
       const media = await contentGraph.getMedia(animeId);
       const baseId = media.tatakaiId || animeId;
       let episodes: EpisodeData[] = [];
@@ -630,7 +638,7 @@ export function useEpisodes(animeId: string | undefined) {
         episodes = Array.from({ length: count }, (_, i) => ({
           episodeId: buildEpisodeId(baseId, i + 1),
           number: i + 1,
-          title: `Episode ${i + 1}`,
+          get title() { return uiI18n.t('app.episode_i18n_value_0_f05acda8', { value0: i + 1 }); },
           isFiller: false,
         }));
       }
@@ -664,6 +672,7 @@ export function useEpisodes(animeId: string | undefined) {
 }
 
 export function useEpisodeServers(episodeId: string | undefined) {
+  useUiTranslation();
   return useQuery({
     queryKey: ["servers", episodeId],
     queryFn: async (): Promise<{ sub: EpisodeServer[]; dub: EpisodeServer[] }> => {
@@ -679,6 +688,7 @@ export function useStreamingSources(
   server: string = "hd-2",
   category: string = "sub"
 ) {
+  useUiTranslation();
   return useQuery({
     queryKey: ["sources", episodeId, server, category],
     queryFn: async (): Promise<StreamingData> => {
@@ -698,8 +708,9 @@ export function useStreamingSources(
 }
 
 export function useSearch(query: string, page: number = 1, filters: AnimeSearchFilters = {}) {
+  useUiTranslation();
   return useQuery({
-    queryKey: ["search", query, page, filters],
+    queryKey: ["search", query, page, filters, getPreferredTitleLanguage()],
     queryFn: async (): Promise<SearchResult> => {
       const result = await contentGraph.search(buildSearchFilters(query, page, filters));
       return {
@@ -722,8 +733,9 @@ export function useInfiniteSearch(
   enabled: boolean = true,
   allowEmptyQuery: boolean = false
 ) {
+  useUiTranslation();
   return useInfiniteQuery({
-    queryKey: ["search-infinite", query, filters],
+    queryKey: ["search-infinite", query, filters, getPreferredTitleLanguage()],
     queryFn: ({ pageParam = 1 }) =>
       contentGraph.search(buildSearchFilters(query, Number(pageParam), filters)).then((result): SearchResult => ({
         animes: result.media.map(toAnimeCard),
@@ -744,10 +756,11 @@ export function useInfiniteSearch(
 }
 
 export function useGenreAnimes(genre: string | undefined, page: number = 1) {
+  useUiTranslation();
   const { settings } = useContentSafetySettings();
   const showAdult = settings.showAdultEverywhere;
   return useQuery({
-    queryKey: ["genre", genre, page, showAdult],
+    queryKey: ["genre", genre, page, showAdult, getPreferredTitleLanguage()],
     queryFn: async (): Promise<SearchResult> => {
       const result = await contentGraph.search({
         page,
@@ -770,10 +783,11 @@ export function useGenreAnimes(genre: string | undefined, page: number = 1) {
 }
 
 export function useInfiniteGenreAnimes(genre: string | undefined) {
+  useUiTranslation();
   const { settings } = useContentSafetySettings();
   const showAdult = settings.showAdultEverywhere;
   return useInfiniteQuery({
-    queryKey: ["genre-infinite", genre, showAdult],
+    queryKey: ["genre-infinite", genre, showAdult, getPreferredTitleLanguage()],
     queryFn: ({ pageParam = 1 }) =>
       contentGraph.search({
         page: Number(pageParam),
@@ -799,6 +813,7 @@ export function useInfiniteGenreAnimes(genre: string | undefined) {
 }
 
 export function useNextEpisodeSchedule(animeId: string | undefined) {
+  useUiTranslation();
   return useQuery({
     queryKey: ["next-episode-schedule", animeId],
     queryFn: async (): Promise<NextEpisodeSchedule | null> => {
@@ -908,6 +923,7 @@ export type EpisodeSearchHit = {
  * Only fires when `query` is at least 3 characters.
  */
 export function useEpisodeTitleSearch(query: string, enabled = true) {
+  useUiTranslation();
   return useQuery({
     queryKey: ['episode-title-search', query],
     queryFn: async (): Promise<EpisodeSearchHit[]> => {

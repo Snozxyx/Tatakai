@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -41,6 +43,7 @@ export function MarketplaceModal({
     onClose,
     typeFilter
 }: MarketplaceModalProps) {
+  useUiTranslation();
     const [searchQuery, setSearchQuery] = useState("");
     const [installingId, setInstallingId] = useState<string | null>(null);
     const [installError, setInstallError] = useState<string | null>(null);
@@ -105,9 +108,9 @@ export function MarketplaceModal({
                                 <Globe className="w-5 h-5 text-primary" />
                             </div>
                             <div>
-                                <DialogTitle className="text-xl font-bold">Extension Marketplace</DialogTitle>
+                                <DialogTitle className="text-xl font-bold">{uiI18n.t('app.extension_marketplace_c67afdef')}</DialogTitle>
                                 <DialogDescription className="text-xs">
-                                    Browse and install community extensions
+                                    {uiI18n.t('app.browse_and_install_community_extensions_86d71c1d')}
                                 </DialogDescription>
                             </div>
                         </div>
@@ -119,14 +122,14 @@ export function MarketplaceModal({
                             className="h-9 px-4 rounded-xl bg-primary/10 border-primary/30 text-primary hover:bg-primary/20 hover:border-primary/50 text-xs font-bold gap-1.5"
                         >
                             <FolderUp className="w-4 h-4" />
-                            Sideload Extension
+                            {uiI18n.t('app.sideload_extension_9e220d8a')}
                         </Button>
                     </div>
 
                     <div className="relative mb-4">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                         <Input
-                            placeholder="Search extensions..."
+                            placeholder={uiI18n.t('app.search_extensions_5ba4f342')}
                             className="bg-white/5 border-white/10 pl-10 h-11 rounded-xl"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
@@ -144,13 +147,13 @@ export function MarketplaceModal({
                     {isLoading ? (
                         <div className="flex flex-col items-center justify-center py-16 gap-3">
                             <Loader2 className="w-8 h-8 text-primary animate-spin" />
-                            <p className="text-sm text-muted-foreground font-medium">Loading extensions...</p>
+                            <p className="text-sm text-muted-foreground font-medium">{uiI18n.t('app.loading_extensions_38fed259')}</p>
                         </div>
                     ) : error ? (
                         <div className="py-12 text-center border border-dashed border-destructive/20 rounded-2xl bg-destructive/5">
-                            <p className="text-sm font-medium text-destructive">Failed to load extensions</p>
+                            <p className="text-sm font-medium text-destructive">{uiI18n.t('app.failed_to_load_extensions_0919e926')}</p>
                             <p className="text-[10px] text-muted-foreground mt-1">
-                                {error instanceof Error ? error.message : "Unknown error"}
+                                {error instanceof Error ? error.message : uiI18n.t('app.unknown_error_e5fd9aa2')}
                             </p>
                         </div>
                     ) : filteredExtensions.length > 0 ? (
@@ -177,7 +180,7 @@ export function MarketplaceModal({
                                                 </div>
                                             </div>
                                             {ext.signedBy && (
-                                                <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" aria-label="Verified" />
+                                                <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" aria-label={uiI18n.t('app.verified_aed3b8c6')} />
                                             )}
                                         </div>
 
@@ -216,7 +219,7 @@ export function MarketplaceModal({
                                                 ) : (
                                                     <>
                                                         <Download className="w-3 h-3" />
-                                                        Install
+                                                        {uiI18n.t('app.install_fd6c3ebf')}
                                                     </>
                                                 )}
                                             </Button>
@@ -230,13 +233,13 @@ export function MarketplaceModal({
                             <Search className="w-10 h-10 text-muted-foreground/20 mx-auto mb-4" />
                             {searchQuery ? (
                                 <>
-                                    <p className="text-sm font-medium text-muted-foreground">No extensions found for "{searchQuery}"</p>
-                                    <p className="text-[10px] text-muted-foreground mt-1">Try a different search term</p>
+                                    <p className="text-sm font-medium text-muted-foreground">{uiI18n.t('app.no_extensions_found_for_54ca1508')}{searchQuery}"</p>
+                                    <p className="text-[10px] text-muted-foreground mt-1">{uiI18n.t('app.try_a_different_search_term_39d6420e')}</p>
                                 </>
                             ) : (
                                 <>
-                                    <p className="text-sm font-medium text-muted-foreground">No extensions available</p>
-                                    <p className="text-[10px] text-muted-foreground mt-1">Check back later for new extensions</p>
+                                    <p className="text-sm font-medium text-muted-foreground">{uiI18n.t('app.no_extensions_available_ef8dbf84')}</p>
+                                    <p className="text-[10px] text-muted-foreground mt-1">{uiI18n.t('app.check_back_later_for_new_extensions_525e5cee')}</p>
                                 </>
                             )}
                         </div>

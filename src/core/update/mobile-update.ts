@@ -1,3 +1,5 @@
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
+import uiI18n from '@/lib/uiI18n';
 import { normalizeReleaseNotes } from './release-details';
 import { useEffect, useSyncExternalStore } from 'react';
 import { App } from '@capacitor/app';
@@ -152,7 +154,7 @@ export async function checkMobileUpdate(
 
       if (available) {
         const autoTarget = isAndroidAutoUpdateTarget() && !!downloadUrl && !!getUpdaterPlugin();
-        toast.info(`Tatakai ${latestVersion} is available`, {
+        toast.info(uiI18n.t('app.tatakai_i18n_value_0_is_available_ebdd15b3', { value0: latestVersion }), {
           id: 'mobile-manual-update',
           description: Capacitor.getPlatform() === 'ios'
             ? 'Download the unsigned IPA, then sign and sideload it with your preferred tool.'
@@ -172,13 +174,13 @@ export async function checkMobileUpdate(
               },
         });
       } else if (options.announce) {
-        toast.success(`Tatakai ${currentVersion} is up to date`);
+        toast.success(uiI18n.t('app.tatakai_i18n_value_0_is_up_to_date_62dc154b', { value0: currentVersion }));
       }
       return next;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const next = publish({ phase: 'error', message, checkedAt: Date.now() });
-      if (options.announce) toast.error('Could not check for updates', { description: message });
+      if (options.announce) toast.error(uiI18n.t('app.could_not_check_for_updates_7df938eb'), { description: message });
       return next;
     } finally {
       checkInFlight = null;
@@ -255,7 +257,7 @@ export async function downloadMobileUpdate(): Promise<void> {
     }
     const result = await plugin.downloadApk({ url: downloadUrl, version: latestVersion });
     publish({ phase: 'downloaded', progress: 100, apkPath: String(result?.path || '') || undefined });
-    toast.success(`Tatakai ${latestVersion} downloaded`, {
+    toast.success(uiI18n.t('app.tatakai_i18n_value_0_downloaded_abb72489', { value0: latestVersion }), {
       id: 'mobile-update-downloaded',
       description: 'Tap Install to finish the update.',
       duration: 8000,
@@ -271,7 +273,7 @@ export async function downloadMobileUpdate(): Promise<void> {
       publish({ phase: 'available', progress: undefined });
     } else {
       publish({ phase: 'error', message, progress: undefined });
-      toast.error('Update download failed', {
+      toast.error(uiI18n.t('app.update_download_failed_5dbe5b1c'), {
         description: message,
         action: {
           label: 'Open releases',
@@ -318,7 +320,7 @@ export async function installMobileUpdate(): Promise<void> {
     });
     if (result?.needsPermission) {
       publish({ phase: 'downloaded' });
-      toast.warning('Permission needed to install updates', {
+      toast.warning(uiI18n.t('app.permission_needed_to_install_updates_e5e698cd'), {
         id: 'mobile-update-permission',
         description: 'Allow "Install unknown apps" for Tatakai, then tap Install again.',
         duration: 10000,
@@ -330,7 +332,7 @@ export async function installMobileUpdate(): Promise<void> {
       });
       return;
     }
-    toast.info('Opening the installer…', {
+    toast.info(uiI18n.t('app.opening_the_installer_e8883229'), {
       id: 'mobile-update-installing',
       description: 'Confirm the install to finish updating.',
       duration: 6000,
@@ -341,7 +343,7 @@ export async function installMobileUpdate(): Promise<void> {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     publish({ phase: 'downloaded', message });
-    toast.error('Could not open the installer', { description: message });
+    toast.error(uiI18n.t('app.could_not_open_the_installer_a59d8717'), { description: message });
   }
 }
 
@@ -355,12 +357,14 @@ function getSnapshot(): MobileUpdateState {
 }
 
 export function useMobileUpdateState(): MobileUpdateState {
+  useUiTranslation();
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
 
 const STALE_AFTER_MS = 24 * 60 * 60 * 1000;
 
 export function useMobileUpdateOrchestrator(): void {
+  useUiTranslation();
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
     let interval = 0;

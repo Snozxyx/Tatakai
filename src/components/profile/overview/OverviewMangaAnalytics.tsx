@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, Radar, Tooltip } from 'recharts';
@@ -7,12 +9,13 @@ import { useMangaMetaByIds, type MangaFormatBucket } from '@/hooks/api/useMangaM
 
 // Same tooltip treatment as the anime Genre Analytics radar.
 const GlassTooltip = ({ active, payload }: any) => {
+  useUiTranslation();
   if (active && payload && payload.length) {
     return (
       <div className="rounded-xl border border-white/[0.08] bg-background/80 p-3 shadow-2xl backdrop-blur-2xl">
         <p className="text-xs font-semibold text-foreground/90">{payload[0].payload.genre}</p>
         <p className="text-xs text-muted-foreground/70">
-          Affinity <span className="font-mono font-semibold text-foreground">{payload[0].value}%</span>
+          {uiI18n.t('app.affinity_2d3ad175')} <span className="font-mono font-semibold text-foreground">{payload[0].value}%</span>
         </p>
       </div>
     );
@@ -32,12 +35,13 @@ export interface OverviewMangaAnalyticsProps {
 }
 
 const FORMAT_META: Record<MangaFormatBucket, { label: string; color: string }> = {
-  manga: { label: 'Manga', color: '#8b5cf6' }, // violet
-  manhwa: { label: 'Manhwa', color: '#38bdf8' }, // sky
-  manhua: { label: 'Manhua', color: '#f59e0b' }, // amber
+  manga: { get label() { return uiI18n.t('app.manga_87db0f99'); }, color: '#8b5cf6' }, // violet
+  manhwa: { get label() { return uiI18n.t('app.manhwa_8251bcf8'); }, color: '#38bdf8' }, // sky
+  manhua: { get label() { return uiI18n.t('app.manhua_b6ddb037'); }, color: '#f59e0b' }, // amber
 };
 
 export function OverviewMangaAnalytics({ mangaReadlist = [] }: OverviewMangaAnalyticsProps) {
+  useUiTranslation();
   const anilistIds = useMemo(
     () =>
       mangaReadlist
@@ -132,11 +136,11 @@ export function OverviewMangaAnalytics({ mangaReadlist = [] }: OverviewMangaAnal
         <div className="flex items-center gap-2 mb-1">
           <BookOpen className="w-4 h-4 text-primary/80" />
           <h3 className="font-display font-bold text-base sm:text-lg text-foreground tracking-tight">
-            Manga & Manhwa
+            {uiI18n.t('app.manga_manhwa_3dfc1148')}
           </h3>
         </div>
         <p className="text-xs text-muted-foreground/70">
-          Format split, top genres, and reading totals
+          {uiI18n.t('app.format_split_top_genres_and_reading_totals_132da48f')}
         </p>
       </div>
 
@@ -145,7 +149,7 @@ export function OverviewMangaAnalytics({ mangaReadlist = [] }: OverviewMangaAnal
           <div className="flex flex-col items-center justify-center h-[220px] text-center">
             <BookMarked className="w-10 h-10 text-muted-foreground/30 mb-3" />
             <p className="text-sm text-muted-foreground/60 max-w-[220px]">
-              No manga in your readlist yet. Add titles to see your reading breakdown.
+              {uiI18n.t('app.no_manga_in_your_readlist_yet_add_titles_to_see__47d8925a')}
             </p>
           </div>
         ) : (
@@ -159,7 +163,7 @@ export function OverviewMangaAnalytics({ mangaReadlist = [] }: OverviewMangaAnal
                 <div className="font-display text-lg font-black text-foreground tabular-nums">
                   {analytics.total}
                 </div>
-                <div className="text-[10px] text-muted-foreground/60 uppercase tracking-wide">Titles</div>
+                <div className="text-[10px] text-muted-foreground/60 uppercase tracking-wide">{uiI18n.t('app.titles_a116f725')}</div>
               </div>
               <div className="rounded-xl border border-white/[0.04] bg-white/[0.02] p-3 text-center">
                 <div className="flex items-center justify-center gap-1 text-emerald-400 mb-1">
@@ -169,7 +173,7 @@ export function OverviewMangaAnalytics({ mangaReadlist = [] }: OverviewMangaAnal
                   {analytics.chaptersRead > 0 ? analytics.chaptersRead : analytics.completed}
                 </div>
                 <div className="text-[10px] text-muted-foreground/60 uppercase tracking-wide">
-                  {analytics.chaptersRead > 0 ? 'Chapters' : 'Completed'}
+                  {analytics.chaptersRead > 0 ? uiI18n.t('app.chapters_034e2733') : uiI18n.t('app.completed_1798b3ba')}
                 </div>
               </div>
               <div className="rounded-xl border border-white/[0.04] bg-white/[0.02] p-3 text-center">
@@ -179,7 +183,7 @@ export function OverviewMangaAnalytics({ mangaReadlist = [] }: OverviewMangaAnal
                 <div className="font-display text-lg font-black text-foreground tabular-nums">
                   {analytics.avgScore > 0 ? (analytics.avgScore / 10).toFixed(1) : '—'}
                 </div>
-                <div className="text-[10px] text-muted-foreground/60 uppercase tracking-wide">Avg Score</div>
+                <div className="text-[10px] text-muted-foreground/60 uppercase tracking-wide">{uiI18n.t('app.avg_score_5617dba1')}</div>
               </div>
             </div>
 
@@ -188,10 +192,10 @@ export function OverviewMangaAnalytics({ mangaReadlist = [] }: OverviewMangaAnal
               <div>
                 <div className="flex items-center justify-between mb-2.5">
                   <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">
-                    Format Split
+                    {uiI18n.t('app.format_split_28b79ad8')}
                   </span>
                   <span className="text-[10px] text-muted-foreground/50">
-                    {formatTotal} classified
+                    {formatTotal} {uiI18n.t('app.classified_05812b70')}
                   </span>
                 </div>
                 <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-white/[0.04]">
@@ -203,7 +207,7 @@ export function OverviewMangaAnalytics({ mangaReadlist = [] }: OverviewMangaAnal
                       viewport={{ once: true }}
                       transition={{ duration: 0.6, ease: 'easeOut' }}
                       style={{ backgroundColor: f.color }}
-                      title={`${f.label}: ${f.count}`}
+                      title={uiI18n.t('app.i18n_value_0_i18n_value_1_b6af3412', { value0: f.label, value1: f.count })}
                     />
                   ))}
                 </div>
@@ -227,7 +231,7 @@ export function OverviewMangaAnalytics({ mangaReadlist = [] }: OverviewMangaAnal
             {/* Top genres — same radar as the anime Genre Analytics card */}
             <div>
               <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">
-                Genre Affinity
+                {uiI18n.t('app.genre_affinity_8ac133c4')}
               </span>
               {isLoading && analytics.topGenres.length === 0 ? (
                 <div className="mt-2.5 h-[240px] w-full animate-pulse rounded-xl bg-white/[0.02]" />
@@ -275,7 +279,7 @@ export function OverviewMangaAnalytics({ mangaReadlist = [] }: OverviewMangaAnal
                 </div>
               ) : (
                 <p className="mt-2 text-xs text-muted-foreground/50">
-                  Genre data unavailable for these titles.
+                  {uiI18n.t('app.genre_data_unavailable_for_these_titles_eed5ddc5')}
                 </p>
               )}
             </div>
@@ -284,7 +288,7 @@ export function OverviewMangaAnalytics({ mangaReadlist = [] }: OverviewMangaAnal
             {analytics.topTags.length > 0 && (
               <div>
                 <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">
-                  Top Tags
+                  {uiI18n.t('app.top_tags_0fb32d3b')}
                 </span>
                 <div className="mt-2.5 flex flex-wrap gap-2">
                   {analytics.topTags.map((t) => (

@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { Loader2, RefreshCw } from "lucide-react";
@@ -11,6 +13,7 @@ import {
 } from "@/core/extensions/mobile/mobileProxy";
 import { triggerHaptic } from "@/lib/haptics";
 import { shouldUseReaderHeaderBlob } from "@/lib/reader/imageLifecycle";
+import { useTranslation } from "react-i18next";
 
 /** Minimal page shape the reader image needs. `MangaPage` and the custom-source
  *  `CustomReadPage` are both structurally compatible with this. */
@@ -48,7 +51,9 @@ export function ReaderImage({ page, mode, style, eager, onRetryChapter }: {
   eager: boolean;
   onRetryChapter?: () => void;
 }) {
+  useUiTranslation();
   const src = page.proxiedImageUrl || page.imageUrl;
+  const { t } = useTranslation();
   // Native loopback (`http://127.0.0.1:<port>/stream/…`) loads directly in
   // `<img>` like desktop — headers are replayed server-side, CORS is `*`.
   const isNativeLoopback = isNativeProxyUrl(src);
@@ -147,9 +152,9 @@ export function ReaderImage({ page, mode, style, eager, onRetryChapter }: {
         for (let i = 0; i < 3; i++) {
           try {
             const r = await fetch(src);
-            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            if (!r.ok) throw new Error(uiI18n.t('app.http_i18n_value_0_63a176f2', { value0: r.status }));
             const b = await r.blob();
-            if (!b || b.size === 0) throw new Error("empty");
+            if (!b || b.size === 0) throw new Error(uiI18n.t('app.empty_ad87109b'));
             if (cancelled || !mountedRef.current) return;
             obj = URL.createObjectURL(b);
             owned = true;
@@ -202,9 +207,9 @@ export function ReaderImage({ page, mode, style, eager, onRetryChapter }: {
             resolved = await getMobileHeaderedImageBlobUrl(src, page.headers, { retries: 1 });
           } else {
             const r = await fetch(src);
-            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            if (!r.ok) throw new Error(uiI18n.t('app.http_i18n_value_0_63a176f2', { value0: r.status }));
             const b = await r.blob();
-            if (!b || b.size === 0) throw new Error("empty");
+            if (!b || b.size === 0) throw new Error(uiI18n.t('app.empty_ad87109b'));
             resolved = URL.createObjectURL(b);
             ownsResolved = true;
           }
@@ -294,13 +299,13 @@ export function ReaderImage({ page, mode, style, eager, onRetryChapter }: {
         className="mx-auto flex w-full flex-col items-center justify-center gap-2 rounded-none bg-white/[0.04] px-6 py-14 text-center"
         style={{ ...style, minHeight: "32vh" }}
       >
-        <p className="text-sm text-muted-foreground">Page {page.pageNumber} failed to load</p>
+        <p className="text-sm text-muted-foreground">{t('migration.pageFailed', { number: page.pageNumber })}</p>
         <button
           type="button"
           onClick={retry}
           className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 px-3 py-1.5 text-sm font-semibold hover:bg-white/10 active:scale-95"
         >
-          <RefreshCw className="h-4 w-4" /> Retry
+          <RefreshCw className="h-4 w-4" /> {t('common.retry')}
         </button>
       </div>
     );
@@ -321,7 +326,7 @@ export function ReaderImage({ page, mode, style, eager, onRetryChapter }: {
         <img
           data-page={page.pageNumber}
           src={imgSrc}
-          alt={`Page ${page.pageNumber}`}
+          alt={t('reader.pageNumber', { number: page.pageNumber })}
           className="mx-auto block h-auto rounded-none bg-black/30"
           style={{ ...style, ...reserve }}
           loading={eager ? "eager" : "lazy"}
@@ -347,13 +352,13 @@ export function ReaderImage({ page, mode, style, eager, onRetryChapter }: {
           className="mx-auto flex w-full flex-col items-center justify-center gap-2 rounded-none bg-white/[0.04] px-6 py-14 text-center"
           style={{ minHeight: "32vh" }}
         >
-          <p className="text-sm text-muted-foreground">Page {page.pageNumber} needs a headered reload</p>
+          <p className="text-sm text-muted-foreground">{t('migration.pageReload', { number: page.pageNumber })}</p>
           <button
             type="button"
             onClick={retry}
             className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 px-3 py-1.5 text-sm font-semibold hover:bg-white/10"
           >
-            <RefreshCw className="h-4 w-4" /> Reload
+            <RefreshCw className="h-4 w-4" /> {t('migration.reload')}
           </button>
         </div>
       )}

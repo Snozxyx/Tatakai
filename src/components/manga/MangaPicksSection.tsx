@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
  * Manga and manhwa picks, driven by the visitor's own genre weights
  * (docs/Plans.md §2 — "Favorites Page").
@@ -46,13 +48,14 @@ export function MangaPicksSection({
   limit = 12,
   className,
 }: MangaPicksSectionProps) {
+  useUiTranslation();
   const options = useMemo<ReadonlyArray<PillOption<string>>>(() => {
     const top = genres.filter(Boolean).slice(0, maxGenres);
     return [
-      { id: TRENDING, label: 'Trending', icon: <Flame className="h-3.5 w-3.5" /> },
+      { id: TRENDING, get label() { return uiI18n.t('app.trending_8a12d562'); }, icon: <Flame className="h-3.5 w-3.5" /> },
       ...top.map((genre) => ({ id: genre, label: genre })),
     ];
-  }, [genres, maxGenres]);
+  }, [genres, maxGenres, uiI18n.language]);
 
   /**
    * Null until the visitor picks, rather than seeding state from `genres`: the
@@ -90,10 +93,10 @@ export function MangaPicksSection({
   }, [emptyGenre, fallback.data, picks.data, limit]);
 
   const description = emptyGenre
-    ? `Nothing tagged ${active} — here is what is trending instead`
+    ? uiI18n.t('app.nothing_tagged_i18n_value_0_here_is_what_is_tren_de4a0855', { value0: active })
     : active === TRENDING
-      ? 'The manga and manhwa charts right now'
-      : `Popular ${active.toLowerCase()} manga and manhwa`;
+      ? uiI18n.t('app.the_manga_and_manhwa_charts_right_now_18377fb8')
+      : uiI18n.t('app.popular_i18n_value_0_manga_and_manhwa_7fbd86b0', { value0: active.toLowerCase() });
 
   // Nothing to switch between if the manga API is unreachable, so the whole
   // section stays out of the page rather than parking an empty panel in it.
@@ -103,13 +106,13 @@ export function MangaPicksSection({
     <section className={cn(className)}>
       <SectionHeading
         eyebrow="Read next"
-        title="Manga & manhwa for you"
+        title={uiI18n.t('app.manga_manhwa_for_you_7626bbeb')}
         action={
           <Link
             to="/manga"
             className="group inline-flex items-center gap-1 text-xs font-bold uppercase tracking-widest text-white/45 transition-colors hover:text-white"
           >
-            View all
+            {uiI18n.t('app.view_all_931e1a4b')}
             <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
           </Link>
         }
@@ -121,7 +124,7 @@ export function MangaPicksSection({
             options={options}
             value={active}
             onChange={(id) => setChosen(id)}
-            label="Manga genre"
+            label={uiI18n.t('app.manga_genre_99daa607')}
           />
         )}
         <p className="text-xs font-medium text-white/40">{description}</p>

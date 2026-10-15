@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MonitorPlay, CheckCircle2, PlaySquare, Settings2, ShieldAlert, Plus, X, Zap } from 'lucide-react';
@@ -17,6 +19,7 @@ interface ExternalPlayer {
 }
 
 export function ExternalPlayerSettings() {
+  useUiTranslation();
   const [players, setPlayers] = useState<ExternalPlayer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -30,7 +33,7 @@ export function ExternalPlayerSettings() {
       try {
         const rt = (window as any).tatakaiRuntime;
         if (!rt?.detectExternalPlayers) {
-          setError('External player feature requires Tatakai Desktop.');
+          setError(uiI18n.t('app.external_player_feature_requires_tatakai_desktop_40ecb066'));
           setLoading(false);
           return;
         }
@@ -43,14 +46,14 @@ export function ExternalPlayerSettings() {
         if (detectRes.success) {
           setPlayers(detectRes.players);
         } else {
-          setError(detectRes.error || 'Failed to detect players');
+          setError(detectRes.error || uiI18n.t('app.failed_to_detect_players_e0921332'));
         }
 
         if (prefRes?.executablePath) {
           setSelectedPath(prefRes.executablePath);
         }
       } catch (err: any) {
-        setError(err.message || 'Error loading player settings');
+        setError(err.message || uiI18n.t('app.error_loading_player_settings_3c941a0e'));
       } finally {
         setLoading(false);
       }
@@ -84,12 +87,12 @@ export function ExternalPlayerSettings() {
     try {
       const rt = (window as any).electron;
       if (!rt?.selectFile) {
-         toast.error('File selection is only available on Desktop.');
+         toast.error(uiI18n.t('app.file_selection_is_only_available_on_desktop_8b00b684'));
          return;
       }
       
       const path = await rt.selectFile({
-        title: 'Select External Player Executable',
+        get title() { return uiI18n.t('app.select_external_player_executable_b66acd50'); },
         filters: [{ name: 'Executables', extensions: ['exe', 'app', 'sh'] }]
       });
 
@@ -106,7 +109,7 @@ export function ExternalPlayerSettings() {
     return (
       <div className="flex items-center gap-3 text-muted-foreground p-4">
         <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-        <span className="text-sm">Detecting external players…</span>
+        <span className="text-sm">{uiI18n.t('app.detecting_external_players_ff0000b2')}</span>
       </div>
     );
   }
@@ -122,14 +125,14 @@ export function ExternalPlayerSettings() {
 
   return (
     <SettingsSection
-      title="External Player"
-      description="Open streams directly in MPV, VLC, or MPC-HC"
+      title={uiI18n.t('app.external_player_d6d6f3a4')}
+      description={uiI18n.t('app.open_streams_directly_in_mpv_vlc_or_mpc_hc_c0d6c318')}
     >
       {players.length === 0 ? (
         <div className="p-4 rounded-xl bg-muted/20 border border-border text-sm text-muted-foreground text-center">
-          No supported external players detected on your system.
+          {uiI18n.t('app.no_supported_external_players_detected_on_your_s_00eecad0')}
           <br />
-          <span className="text-xs">Supported: MPV, VLC, MPC-HC, MPC-BE</span>
+          <span className="text-xs">{uiI18n.t('app.supported_mpv_vlc_mpc_hc_mpc_be_26354fd6')}</span>
         </div>
       ) : (
         <div className="grid gap-2">
@@ -146,8 +149,8 @@ export function ExternalPlayerSettings() {
             <div className="flex min-w-0 flex-1 items-center gap-3">
               <PlaySquare className={cn('w-5 h-5 shrink-0', !selectedPath ? 'text-primary' : 'text-muted-foreground')} />
               <div className="min-w-0">
-                <p className="text-sm font-medium text-foreground truncate">Built-in Player</p>
-                <p className="text-xs text-muted-foreground truncate">Tatakai's internal video player</p>
+                <p className="text-sm font-medium text-foreground truncate">{uiI18n.t('app.built_in_player_62eea64f')}</p>
+                <p className="text-xs text-muted-foreground truncate">{uiI18n.t('app.tatakai_s_internal_video_player_de18d7e1')}</p>
               </div>
             </div>
             {!selectedPath && <CheckCircle2 className="w-5 h-5 shrink-0 text-primary" />}
@@ -191,12 +194,12 @@ export function ExternalPlayerSettings() {
                   className="w-full justify-start text-xs text-muted-foreground hover:text-primary"
                 >
                    <Plus className="w-3 h-3 mr-2" />
-                   Add custom player path...
+                   {uiI18n.t('app.add_custom_player_path_c71f1711')}
                 </Button>
              ) : (
                 <div className="space-y-3 p-3 rounded-xl bg-black/20 border border-white/5">
                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Custom Executable Path</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{uiI18n.t('app.custom_executable_path_45bbc0e5')}</span>
                       <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setShowManualInput(false)}>
                          <X className="w-3 h-3" />
                       </Button>
@@ -205,11 +208,11 @@ export function ExternalPlayerSettings() {
                       <Input 
                         value={manualPath}
                         onChange={(e) => setManualPath(e.target.value)}
-                        placeholder="C:\Path\to\player.exe"
+                        placeholder={uiI18n.t('app.c_path_to_player_exe_c2c2de74')}
                         className="h-9 text-xs bg-black/40"
                       />
                       <Button variant="secondary" size="sm" onClick={handleSelectManualPath}>
-                         Browse
+                         {uiI18n.t('app.browse_2f3b5c55')}
                       </Button>
                    </div>
                    {manualPath && (
@@ -218,7 +221,7 @@ export function ExternalPlayerSettings() {
                         onClick={() => handleSelect(manualPath)}
                         disabled={selectedPath === manualPath}
                       >
-                         {selectedPath === manualPath ? 'Currently Selected' : 'Set as Preferred Player'}
+                         {selectedPath === manualPath ? uiI18n.t('app.currently_selected_ca576636') : uiI18n.t('app.set_as_preferred_player_b1759ca0')}
                       </Button>
                    )}
                 </div>
@@ -229,8 +232,8 @@ export function ExternalPlayerSettings() {
                 <SettingRow
                   tone="accent"
                   icon={Zap}
-                  title="Launch Automatically"
-                  description="Always use external player when a stream starts"
+                  title={uiI18n.t('app.launch_automatically_944cdc53')}
+                  description={uiI18n.t('app.always_use_external_player_when_a_stream_starts_e1141caf')}
                   control={
                     <Switch
                       checked={settings.alwaysUseExternalPlayer}

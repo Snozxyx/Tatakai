@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMemo, useState } from 'react';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Compass } from 'lucide-react';
@@ -17,6 +19,7 @@ function Segmented<T extends string>({
   options: Array<{ id: T; label: string }>;
   onChange: (id: T) => void;
 }) {
+  useUiTranslation();
   return (
     <div className="inline-flex overflow-hidden rounded-lg border border-white/10 text-[11px]">
       {options.map((o) => (
@@ -49,6 +52,7 @@ export function AnimeAtlasPanel({
   mangaRecs: EngineRecommendation[];
   novelRecs?: EngineRecommendation[];
 }) {
+  useUiTranslation();
   const [colorBy, setColorBy] = useState<ColorBy>('year');
   const [media, setMedia] = useState<MediaFilter>('all');
 
@@ -76,24 +80,24 @@ export function AnimeAtlasPanel({
 
   const controls = (
     <>
-      <span className="text-[10px] font-medium uppercase tracking-wide text-white/45">Color</span>
+      <span className="text-[10px] font-medium uppercase tracking-wide text-white/45">{uiI18n.t('app.color_1d0c8304')}</span>
       <Segmented
         value={colorBy}
         onChange={(id) => setColorBy(id)}
-        options={[{ id: 'year', label: 'Year' }, { id: 'rating', label: 'Rating' }]}
+        options={[{ id: 'year', get label() { return uiI18n.t('app.year_879e3232'); } }, { id: 'rating', get label() { return uiI18n.t('app.rating_6437b7bf'); } }]}
       />
       {(hasManga || hasNovels) && (
         <>
           <span className="mx-0.5 h-4 w-px bg-white/15" />
-          <span className="text-[10px] font-medium uppercase tracking-wide text-white/45">Type</span>
+          <span className="text-[10px] font-medium uppercase tracking-wide text-white/45">{uiI18n.t('app.type_3deb7456')}</span>
           <Segmented
             value={effectiveMedia}
             onChange={(id) => setMedia(id)}
             options={[
-              { id: 'all', label: 'All' },
-              { id: 'anime', label: 'Anime' },
-              ...(hasManga ? [{ id: 'manga', label: 'Manga' } as const] : []),
-              ...(hasNovels ? [{ id: 'novel', label: 'Novels' } as const] : []),
+              { id: 'all', get label() { return uiI18n.t('app.all_6a720856'); } },
+              { id: 'anime', get label() { return uiI18n.t('app.anime_f1b32a19'); } },
+              ...(hasManga ? [{ id: 'manga', get label() { return uiI18n.t('app.manga_87db0f99'); } } as const] : []),
+              ...(hasNovels ? [{ id: 'novel', get label() { return uiI18n.t('app.novels_4ae488fd'); } } as const] : []),
             ]}
           />
         </>
@@ -109,21 +113,21 @@ export function AnimeAtlasPanel({
             <Compass className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h3 className="font-bold">Anime &amp; Manga Atlas</h3>
-            <p className="text-xs text-muted-foreground">Your recommendation space, mapped by similarity — closer titles are more alike.</p>
+            <h3 className="font-bold">{uiI18n.t('app.anime_amp_manga_atlas_378b99d1')}</h3>
+            <p className="text-xs text-muted-foreground">{uiI18n.t('app.your_recommendation_space_mapped_by_similarity_c_f620ca10')}</p>
           </div>
         </div>
       </div>
 
       {layout.nodes.length < 3 ? (
         <p className="py-16 text-center text-sm text-muted-foreground">
-          Not enough recommendations to map yet. Watch, rate or read more to populate the atlas.
+          {uiI18n.t('app.not_enough_recommendations_to_map_yet_watch_rate_e108e5d7')}
         </p>
       ) : (
         <>
           <AnimeAtlas layout={layout} colorBy={colorBy} controls={controls} />
           <div className="mt-3 flex items-center gap-3 text-[10px] text-white/50">
-            <span>{colorBy === 'year' ? 'Older' : 'Lower rated'}</span>
+            <span>{colorBy === 'year' ? uiI18n.t('app.older_63f34dd2') : uiI18n.t('app.lower_rated_a8cc13ad')}</span>
             <div
               className="h-2 flex-1 rounded-full"
               style={{
@@ -133,7 +137,7 @@ export function AnimeAtlasPanel({
                     : 'linear-gradient(90deg, rgb(215,48,39), rgb(254,224,139), rgb(26,152,80))',
               }}
             />
-            <span>{colorBy === 'year' ? 'Newer' : 'Higher rated'}</span>
+            <span>{colorBy === 'year' ? uiI18n.t('app.newer_56b079ac') : uiI18n.t('app.higher_rated_337cfeb8')}</span>
           </div>
         </>
       )}

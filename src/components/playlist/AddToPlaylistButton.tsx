@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -43,6 +44,7 @@ export function AddToPlaylistButton({
   variant = 'default',
   className
 }: AddToPlaylistButtonProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
@@ -56,7 +58,7 @@ export function AddToPlaylistButton({
   const createPlaylist = useCreatePlaylist();
   const addToPlaylist = useAddToPlaylist();
   const mediaLabel =
-    mediaFormat === 'novel' ? 'Novel' : mediaType === 'manga' ? 'Manga' : 'Anime';
+    mediaFormat === 'novel' ? t('nav.novels') : mediaType === 'manga' ? t('playlist.manga') : t('playlist.anime');
 
   // Show a visual indication if this anime is already in any of the user's playlists
   const isInAnyPlaylist = (inPlaylists || []).length > 0;
@@ -64,7 +66,7 @@ export function AddToPlaylistButton({
   if (!user) {
     return (
       <Button 
-        aria-label="Add to playlist"
+        aria-label={t('migration.addPlaylist')}
         variant="outline" 
         size={variant === 'icon' ? 'icon' : variant === 'mini' ? 'sm' : 'default'}
         className={className}
@@ -75,7 +77,7 @@ export function AddToPlaylistButton({
         ) : (
           <>
             <ListPlus className="w-4 h-4 mr-2" />
-            Add to Playlist
+            {t('playlist.addToPlaylist')}
           </>
         )}
       </Button>
@@ -126,7 +128,7 @@ export function AddToPlaylistButton({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button 
-          aria-label="Add to playlist"
+          aria-label={t('migration.addPlaylist')}
           variant="outline" 
           size={variant === 'icon' ? 'icon' : variant === 'mini' ? 'sm' : 'default'}
           className={cn(
@@ -148,7 +150,7 @@ export function AddToPlaylistButton({
               ) : (
                 <ListPlus className="w-4 h-4 mr-2" />
               )}
-              {isInAnyPlaylist ? 'Added' : 'Add to Playlist'}
+              {isInAnyPlaylist ? t('playlist.added') : t('playlist.addToPlaylist')}
             </>
           )}
         </Button>
@@ -157,7 +159,7 @@ export function AddToPlaylistButton({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Music2 className="w-5 h-5 text-primary" />
-            Add to Playlist
+            {t('playlist.addToPlaylist')}
           </DialogTitle>
         </DialogHeader>
 
@@ -187,20 +189,20 @@ export function AddToPlaylistButton({
                 className="space-y-4"
               >
                 <div className="space-y-2">
-                  <Label>Playlist Name</Label>
+                  <Label>{t('playlist.playlistName')}</Label>
                   <Input
                     value={newPlaylistName}
                     onChange={(e) => setNewPlaylistName(e.target.value)}
-                    placeholder="My awesome playlist"
+                    placeholder={t('playlist.playlistNamePlaceholder')}
                     autoFocus
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Description (optional)</Label>
+                  <Label>{t('playlist.descriptionOptional')}</Label>
                   <Textarea
                     value={newPlaylistDesc}
                     onChange={(e) => setNewPlaylistDesc(e.target.value)}
-                    placeholder="What's this playlist about?"
+                    placeholder={t('playlist.descriptionPlaceholder')}
                     rows={2}
                   />
                 </div>
@@ -211,7 +213,7 @@ export function AddToPlaylistButton({
                     ) : (
                       <Lock className="w-4 h-4 text-muted-foreground" />
                     )}
-                    <Label>Public playlist</Label>
+                    <Label>{t('playlist.publicPlaylist')}</Label>
                   </div>
                   <Switch
                     checked={newPlaylistPublic}
@@ -224,7 +226,7 @@ export function AddToPlaylistButton({
                     onClick={() => setShowCreate(false)}
                     className="flex-1"
                   >
-                    Back
+                    {t('common.back')}
                   </Button>
                   <Button
                     onClick={handleCreateAndAdd}
@@ -234,7 +236,7 @@ export function AddToPlaylistButton({
                     {createPlaylist.isPending ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
                     ) : (
-                      'Create & Add'
+                      t('playlist.createAndAdd')
                     )}
                   </Button>
                 </div>
@@ -256,7 +258,7 @@ export function AddToPlaylistButton({
                   <div className="w-8 h-8 rounded bg-primary/10 flex items-center justify-center">
                     <Plus className="w-4 h-4 text-primary" />
                   </div>
-                  Create new playlist
+                  {t('playlist.createNew')}
                 </Button>
 
                 {/* Existing playlists */}
@@ -294,10 +296,10 @@ export function AddToPlaylistButton({
                             <div className="flex-1 min-w-0">
                               <p className="font-medium line-clamp-1">{playlist.name}</p>
                               <p className="text-xs text-muted-foreground">
-                                {playlist.items_count} {playlist.items_count === 1 ? 'item' : 'items'}
+                                {t('playlist.itemCount', { count: playlist.items_count })}
                                 {playlist.is_public && (
                                   <span className="ml-2 inline-flex items-center gap-1">
-                                    <Globe className="w-3 h-3" /> Public
+                                    <Globe className="w-3 h-3" /> {t('privacy.public')}
                                   </span>
                                 )}
                               </p>
@@ -313,8 +315,8 @@ export function AddToPlaylistButton({
                 ) : (
                   <div className="text-center py-6 text-muted-foreground">
                     <Music2 className="w-10 h-10 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">No playlists yet</p>
-                    <p className="text-xs">Create your first playlist above!</p>
+                    <p className="text-sm">{t('playlist.noPlaylists')}</p>
+                    <p className="text-xs">{t('playlist.createFirst')}</p>
                   </div>
                 )}
               </motion.div>

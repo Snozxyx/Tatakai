@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useConfirm } from '@/components/ui/confirm-dialog';
@@ -44,6 +46,7 @@ import { groupProviderServers } from './watchRoomShared';
  * verbatim out of the CustomVideoSourceModal JSX).
  */
 export function useWatchRoomController() {
+  useUiTranslation();
     const { roomId } = useParams<{ roomId: string }>();
     const navigate = useNavigate();
     const isDesktopApp = useIsDesktopApp();
@@ -157,7 +160,7 @@ export function useWatchRoomController() {
             {
                 onSuccess: () => {
                     reconnectAttemptRef.current += 1;
-                    toast.success('Reconnected to room');
+                    toast.success(uiI18n.t('app.reconnected_to_room_486ad13b'));
                 },
                 onError: () => {
                     hasAutoJoinRef.current = false;
@@ -328,11 +331,11 @@ export function useWatchRoomController() {
             }],
             headers: {},
             subtitles: room.share_subtitle_url
-                ? [{ lang: 'Default', url: room.share_subtitle_url, label: 'Subtitles' }]
+                ? [{ lang: 'Default', url: room.share_subtitle_url, get label() { return uiI18n.t('app.subtitles_17770471'); } }]
                 : [],
             tracks: [], intro: null, outro: null, providerServers: [],
         } as any;
-    }, [isViewerOnShare, room?.share_stream_url, room?.share_stream_type, room?.share_subtitle_url]);
+    }, [isViewerOnShare, room?.share_stream_url, room?.share_stream_type, room?.share_subtitle_url, uiI18n.language]);
 
     // Host local-file path: the host plays its own picked file off the loopback
     // proxy (participants get the tunnel URL from the room row). Direct file, so
@@ -417,7 +420,7 @@ export function useWatchRoomController() {
                             share_host_platform: 'desktop',
                         } as any,
                     });
-                    toast.success('Watch party stream is live', { id: loadingId });
+                    toast.success(uiI18n.t('app.watch_party_stream_is_live_6cae5c45'), { id: loadingId });
                 } else if (res?.error) {
                     publishTokenRef.current = '';
                     // If cloudflared couldn't be found or auto-installed, guide the
@@ -425,13 +428,12 @@ export function useWatchRoomController() {
                     const needsCloudflared =
                         res.status?.installState === 'failed' || res.status?.binaryResolved === false;
                     if (needsCloudflared) {
-                        toast.error('cloudflared is required to host a watch party', {
+                        toast.error(uiI18n.t('app.cloudflared_is_required_to_host_a_watch_party_30d48d27'), {
                             id: loadingId,
-                            description:
-                                "Couldn't install it automatically (you may be offline). Download cloudflared, add it to your PATH, then reopen the room.",
+                            get description() { return uiI18n.t('app.couldn_t_install_it_automatically_you_may_be_off_827d6bff'); },
                             duration: 15000,
                             action: {
-                                label: 'Download',
+                                get label() { return uiI18n.t('app.download_a479c9c3'); },
                                 onClick: () =>
                                     (window as any).electron?.openExternal?.(
                                         'https://github.com/cloudflare/cloudflared/releases/latest',
@@ -439,14 +441,14 @@ export function useWatchRoomController() {
                             },
                         });
                     } else {
-                        toast.error(`Watch party stream failed: ${res.error}`, { id: loadingId });
+                        toast.error(uiI18n.t('app.watch_party_stream_failed_i18n_value_0_afc83d3b', { value0: res.error }), { id: loadingId });
                     }
                 } else {
                     toast.dismiss(loadingId);
                 }
             } catch (err: any) {
                 publishTokenRef.current = '';
-                toast.error(`Watch party stream failed: ${err?.message || err}`, { id: loadingId });
+                toast.error(uiI18n.t('app.watch_party_stream_failed_i18n_value_0_afc83d3b', { value0: err?.message || err }), { id: loadingId });
             }
         })();
     }, [isHost, isDesktopApp, roomId, isCustomRoom, localShare, resolvedSources, currentEpisodeId, selectedServer, selectedCategory]);
@@ -508,11 +510,11 @@ export function useWatchRoomController() {
         const nextServer = allServers.find(s => !triedServers.has(s.serverName));
 
         if (nextServer) {
-            toast.info(`Switching server to ${nextServer.serverName}...`);
+            toast.info(uiI18n.t('app.switching_server_to_i18n_value_0_c66817a7', { value0: nextServer.serverName }));
             setTriedServers(prev => new Set([...prev, nextServer.serverName]));
             setSelectedServer(nextServer.serverName);
         } else {
-            toast.error("No working servers found. Try another episode.");
+            toast.error(uiI18n.t('app.no_working_servers_found_try_another_episode_88faf833'));
         }
     }, [serversData, isHost, triedServers, localShare]);
     // ── Host: stream a local file (device pick or offline-library episode) ────
@@ -523,7 +525,7 @@ export function useWatchRoomController() {
         if (!roomId) return;
         const rt = (window as any).tatakaiRuntime;
         if (!isDesktopApp || !rt?.publishLocalFile) {
-            toast.error('Streaming a local file needs the desktop app');
+            toast.error(uiI18n.t('app.streaming_a_local_file_needs_the_desktop_app_d40633ac'));
             return;
         }
         setPublishingLocal(true);
@@ -548,19 +550,18 @@ export function useWatchRoomController() {
                         share_host_platform: 'desktop',
                     } as any,
                 });
-                toast.success(`Now streaming ${res.fileName || label || 'your file'}`, { id: loadingId });
+                toast.success(uiI18n.t('app.now_streaming_i18n_value_0_aaf63ecc', { value0: res.fileName || label || 'your file' }), { id: loadingId });
                 setShowLibraryPicker(false);
             } else if (res?.error) {
                 const needsCloudflared =
                     res.status?.installState === 'failed' || res.status?.binaryResolved === false;
                 if (needsCloudflared) {
-                    toast.error('cloudflared is required to host a watch party', {
+                    toast.error(uiI18n.t('app.cloudflared_is_required_to_host_a_watch_party_30d48d27'), {
                         id: loadingId,
-                        description:
-                            "Couldn't install it automatically (you may be offline). Download cloudflared, add it to your PATH, then try again.",
+                        get description() { return uiI18n.t('app.couldn_t_install_it_automatically_you_may_be_off_a82a6e6b'); },
                         duration: 15000,
                         action: {
-                            label: 'Download',
+                            get label() { return uiI18n.t('app.download_a479c9c3'); },
                             onClick: () =>
                                 (window as any).electron?.openExternal?.(
                                     'https://github.com/cloudflare/cloudflared/releases/latest',
@@ -568,13 +569,13 @@ export function useWatchRoomController() {
                         },
                     });
                 } else {
-                    toast.error(`Couldn't stream that file: ${res.error}`, { id: loadingId });
+                    toast.error(uiI18n.t('app.couldn_t_stream_that_file_i18n_value_0_136e04d9', { value0: res.error }), { id: loadingId });
                 }
             } else {
                 toast.dismiss(loadingId);
             }
         } catch (err: any) {
-            toast.error(`Couldn't stream that file: ${err?.message || err}`, { id: loadingId });
+            toast.error(uiI18n.t('app.couldn_t_stream_that_file_i18n_value_0_136e04d9', { value0: err?.message || err }), { id: loadingId });
         } finally {
             setPublishingLocal(false);
         }
@@ -583,12 +584,12 @@ export function useWatchRoomController() {
     const handlePickLocalFile = useCallback(async () => {
         const electron = (window as any).electron;
         if (!electron?.selectFile) {
-            toast.error('File picking needs the desktop app');
+            toast.error(uiI18n.t('app.file_picking_needs_the_desktop_app_80c407ae'));
             return;
         }
         try {
             const filePath = await electron.selectFile({
-                title: 'Choose a video to stream',
+                get title() { return uiI18n.t('app.choose_a_video_to_stream_ac9768d8'); },
                 filters: [
                     { name: 'Video', extensions: ['mp4', 'm4v', 'webm', 'mkv', 'mov', 'avi', 'ogv', 'ogg', 'ts'] },
                     { name: 'All Files', extensions: ['*'] },
@@ -596,7 +597,7 @@ export function useWatchRoomController() {
             });
             if (filePath) await publishLocalFile(String(filePath));
         } catch (err: any) {
-            toast.error(`Couldn't open the file picker: ${err?.message || err}`);
+            toast.error(uiI18n.t('app.couldn_t_open_the_file_picker_i18n_value_0_c5a8701b', { value0: err?.message || err }));
         }
     }, [publishLocalFile]);
 
@@ -604,7 +605,7 @@ export function useWatchRoomController() {
     const openLibraryPicker = useCallback(async () => {
         const electron = (window as any).electron;
         if (!electron?.getOfflineLibrary) {
-            toast.error('The offline library needs the desktop app');
+            toast.error(uiI18n.t('app.the_offline_library_needs_the_desktop_app_91f5db10'));
             return;
         }
         setShowLibraryPicker(true);
@@ -614,7 +615,7 @@ export function useWatchRoomController() {
             const lib = await electron.getOfflineLibrary();
             setLibrary(Array.isArray(lib) ? lib : []);
         } catch (err: any) {
-            toast.error(`Couldn't read your library: ${err?.message || err}`);
+            toast.error(uiI18n.t('app.couldn_t_read_your_library_i18n_value_0_545516bf', { value0: err?.message || err }));
             setLibrary([]);
         } finally {
             setLoadingLibrary(false);
@@ -782,7 +783,7 @@ export function useWatchRoomController() {
             roomId: roomId!,
             updates: { scheduled_start_at: scheduledTime, is_playing: false } as any
         });
-        toast.info(`Starting in ${seconds} seconds...`);
+        toast.info(uiI18n.t('app.starting_in_i18n_value_0_seconds_c729cf5f', { value0: seconds }));
     };
 
     const handleForceStart = () => {
@@ -790,7 +791,7 @@ export function useWatchRoomController() {
             roomId: roomId!,
             updates: { scheduled_start_at: null, is_playing: true } as any
         });
-        toast.success("Broadcast started!");
+        toast.success(uiI18n.t('app.broadcast_started_1cb8d043'));
     };
 
     const handleToggleReady = () => {
@@ -807,10 +808,10 @@ export function useWatchRoomController() {
                     onSuccess: () => {
                         if (joinedFlagKey) localStorage.setItem(joinedFlagKey, '1');
                         if (user?.id) {
-                            sendMessage.mutate({ roomId: roomId!, message: 'joined the room.', messageType: 'system' });
+                            sendMessage.mutate({ roomId: roomId!, get message() { return uiI18n.t('app.joined_the_room_2a126b9a'); }, messageType: 'system' });
                         }
                     },
-                    onError: (err: any) => toast.error(err?.message || 'Failed to join room'),
+                    onError: (err: any) => toast.error(err?.message || uiI18n.t('app.failed_to_join_room_38e22e72')),
                 }
             );
         }
@@ -823,10 +824,10 @@ export function useWatchRoomController() {
                 setPassword('');
                 if (joinedFlagKey) localStorage.setItem(joinedFlagKey, '1');
                 if (user?.id) {
-                    sendMessage.mutate({ roomId: roomId!, message: 'joined the room.', messageType: 'system' });
+                    sendMessage.mutate({ roomId: roomId!, get message() { return uiI18n.t('app.joined_the_room_2a126b9a'); }, messageType: 'system' });
                 }
             },
-            onError: (err: any) => toast.error(err.message || "Invalid password")
+            onError: (err: any) => toast.error(err.message || uiI18n.t('app.invalid_password_97ff6884'))
         });
     };
     const handleLeave = async () => {
@@ -847,20 +848,20 @@ export function useWatchRoomController() {
                     .update({ is_host: true })
                     .eq('room_id', roomId!)
                     .eq('user_id', nextHost.user_id);
-                await sendMessage.mutateAsync({ roomId: roomId!, message: `Host left. ${nextHost.display_name} is now host.`, messageType: 'system' });
+                await sendMessage.mutateAsync({ roomId: roomId!, get message() { return uiI18n.t('app.host_left_i18n_value_0_is_now_host_8f78555a', { value0: nextHost.display_name }); }, messageType: 'system' });
             }
         }
         if (joinedFlagKey) localStorage.removeItem(joinedFlagKey);
         if (user?.id) {
-            sendMessage.mutate({ roomId: roomId!, message: 'left the room.', messageType: 'system' });
+            sendMessage.mutate({ roomId: roomId!, get message() { return uiI18n.t('app.left_the_room_70506f12'); }, messageType: 'system' });
         }
         leaveRoom.mutate(roomId!, { onSuccess: () => navigate('/isshoni') });
     };
 
     const handleClose = async () => {
-        if (await confirm({ title: 'Close this room?' })) {
+        if (await confirm({ get title() { return uiI18n.t('app.close_this_room_a9c50974'); } })) {
             if (joinedFlagKey) localStorage.removeItem(joinedFlagKey);
-            closeRoom.mutate(roomId!, { onSuccess: () => { toast.success('Room closed'); navigate('/isshoni'); } });
+            closeRoom.mutate(roomId!, { onSuccess: () => { toast.success(uiI18n.t('app.room_closed_36094e9f')); navigate('/isshoni'); } });
         }
     };
 
@@ -869,12 +870,12 @@ export function useWatchRoomController() {
     const handleAdminDelete = async () => {
         if (!isAdmin || !roomId) return;
         if (!(await confirm({
-            title: 'Force-delete this room?',
-            description: 'This permanently removes the room and all its messages, participants, queue, and polls. This cannot be undone.',
+            get title() { return uiI18n.t('app.force_delete_this_room_a0d41440'); },
+            get description() { return uiI18n.t('app.this_permanently_removes_the_room_and_all_its_me_1b24a96a'); },
         }))) return;
         adminDeleteRoom.mutate(roomId, {
-            onSuccess: () => { toast.success('Room deleted'); navigate('/isshoni'); },
-            onError: (e: any) => toast.error(e?.message || 'Failed to delete room'),
+            onSuccess: () => { toast.success(uiI18n.t('app.room_deleted_65fee5da')); navigate('/isshoni'); },
+            onError: (e: any) => toast.error(e?.message || uiI18n.t('app.failed_to_delete_room_dc3c052c')),
         });
     };
     // Header poll maker — same shape as the community composer, wired to room polls.
@@ -882,8 +883,8 @@ export function useWatchRoomController() {
         if (!isHost || !roomId) return;
         const normalizedQuestion = pollQuestion.trim();
         const normalizedOptions = pollChoices.map((c) => c.trim()).filter(Boolean);
-        if (!normalizedQuestion) { toast.error('Add a poll question first'); return; }
-        if (normalizedOptions.length < 2) { toast.error('Add at least two poll options'); return; }
+        if (!normalizedQuestion) { toast.error(uiI18n.t('app.add_a_poll_question_first_5e7c34e8')); return; }
+        if (normalizedOptions.length < 2) { toast.error(uiI18n.t('app.add_at_least_two_poll_options_af35a33b')); return; }
 
         const totalMs = ((pollDuration.days * 24 + pollDuration.hours) * 60 + pollDuration.minutes) * 60 * 1000;
         const endsAt = new Date(Date.now() + (totalMs > 0 ? totalMs : 5 * 60 * 1000)).toISOString();
@@ -892,16 +893,16 @@ export function useWatchRoomController() {
             await createRoomPoll.mutateAsync({ roomId, question: normalizedQuestion, options: normalizedOptions, endsAt });
             // The system message is a nicety — a failure here shouldn't discard a poll that was created.
             try {
-                await sendMessage.mutateAsync({ roomId, message: `New poll: ${normalizedQuestion}`, messageType: 'system' });
+                await sendMessage.mutateAsync({ roomId, get message() { return uiI18n.t('app.new_poll_i18n_value_0_c4eac9f7', { value0: normalizedQuestion }); }, messageType: 'system' });
             } catch { /* non-fatal */ }
 
             setPollQuestion('');
             setPollChoices(['', '']);
             setPollDuration({ days: 0, hours: 0, minutes: 5 });
             setShowPollDialog(false);
-            toast.success('Poll started');
+            toast.success(uiI18n.t('app.poll_started_487e9c4b'));
         } catch (err: any) {
-            toast.error(err?.message || 'Failed to start poll');
+            toast.error(err?.message || uiI18n.t('app.failed_to_start_poll_8eb9b30f'));
         }
     };
 
@@ -915,7 +916,7 @@ export function useWatchRoomController() {
             {
                 onError: (err: any) => {
                     setMessage(text); // restore so the user doesn't lose what they typed
-                    toast.error(err?.message || 'Failed to send message');
+                    toast.error(err?.message || uiI18n.t('app.failed_to_send_message_dd854823'));
                 },
             }
         );
@@ -925,11 +926,11 @@ export function useWatchRoomController() {
         navigator.clipboard.writeText(window.location.href);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
-        toast.success('Link copied!');
+        toast.success(uiI18n.t('app.link_copied_88fe9d21'));
     };
     const handleTransferHost = async (targetUserId: string, displayName: string) => {
         if (!isHost || !roomId || !user || targetUserId === user.id) return;
-        if (!(await confirm({ title: `Transfer host controls to ${displayName}?` }))) return;
+        if (!(await confirm({ get title() { return uiI18n.t('app.transfer_host_controls_to_i18n_value_0_0a644e2f', { value0: displayName }); } }))) return;
 
         setHostTransferTarget(targetUserId);
         try {
@@ -952,13 +953,13 @@ export function useWatchRoomController() {
 
             await sendMessage.mutateAsync({
                 roomId,
-                message: `${displayName} is now the host.`,
+                get message() { return uiI18n.t('app.i18n_value_0_is_now_the_host_bec3a921', { value0: displayName }); },
                 messageType: 'system'
             });
 
-            toast.success(`Host transferred to ${displayName}`);
+            toast.success(uiI18n.t('app.host_transferred_to_i18n_value_0_3a450689', { value0: displayName }));
         } catch (error: any) {
-            toast.error(error?.message || 'Failed to transfer host');
+            toast.error(error?.message || uiI18n.t('app.failed_to_transfer_host_8a13272f'));
         } finally {
             setHostTransferTarget(null);
         }
@@ -968,7 +969,7 @@ export function useWatchRoomController() {
         if (!room) return;
 
         const lines = messages.map((entry) => {
-            const timestamp = new Date(entry.created_at).toLocaleString();
+            const timestamp = new Date(entry.created_at).toLocaleString(uiI18n.language);
             const prefix = entry.message_type === 'system'
                 ? '[SYSTEM]'
                 : `[${entry.display_name}]`;
@@ -985,7 +986,7 @@ export function useWatchRoomController() {
         anchor.click();
         document.body.removeChild(anchor);
         URL.revokeObjectURL(url);
-        toast.success('Chat log exported');
+        toast.success(uiI18n.t('app.chat_log_exported_f7730f0c'));
     };
     const handleQueueCurrentEpisode = async () => {
         if (!isHost || !roomId || !room?.anime_id || room.anime_id === 'custom') return;
@@ -1000,9 +1001,9 @@ export function useWatchRoomController() {
                 episodeNumber: room.episode_number,
                 episodeTitle: room.episode_title,
             });
-            toast.success('Added current episode to queue');
+            toast.success(uiI18n.t('app.added_current_episode_to_queue_47a49a46'));
         } catch (err: any) {
-            toast.error(`Couldn't add to queue: ${err?.message || err}`);
+            toast.error(uiI18n.t('app.couldn_t_add_to_queue_i18n_value_0_eb383ce4', { value0: err?.message || err }));
         }
     };
 
@@ -1034,7 +1035,7 @@ export function useWatchRoomController() {
 
         await sendMessage.mutateAsync({
             roomId,
-            message: `Now queued to play: ${item.anime_title}${item.episode_number ? ` • Episode ${item.episode_number}` : ''}`,
+            get message() { return uiI18n.t('app.now_queued_to_play_i18n_value_0i18n_value_1_f944a3d8', { value0: item.anime_title, value1: item.episode_number ? ` • Episode ${item.episode_number}` : '' }); },
             messageType: 'system',
         });
     };
@@ -1065,7 +1066,7 @@ export function useWatchRoomController() {
                 optionIndex,
             });
         } catch (err: any) {
-            toast.error(err?.message || 'Failed to record your vote');
+            toast.error(err?.message || uiI18n.t('app.failed_to_record_your_vote_ac73fd6a'));
         }
     };
 
@@ -1078,7 +1079,7 @@ export function useWatchRoomController() {
                 messageType: 'reaction',
             },
             {
-                onError: (err: any) => toast.error(err?.message || 'Failed to send reaction'),
+                onError: (err: any) => toast.error(err?.message || uiI18n.t('app.failed_to_send_reaction_6f2c5eec')),
             }
         );
     };
@@ -1086,15 +1087,15 @@ export function useWatchRoomController() {
     // Broadcast status chip — reflects host tunnel state / viewer sync mode.
     // Null-safe: the controller runs before WatchRoomLayout's room-exists guard.
     const broadcastChip = (() => {
-        if (!room) return { label: 'Synced', live: false };
+        if (!room) return { get label() { return uiI18n.t('app.synced_b2ef6af6'); }, live: false };
         if (isHost) {
-            if (isCustomRoom || room.manual_stream_url) return { label: 'Hosting · Custom', live: !!room.is_playing };
-            if (!isDesktopApp) return { label: 'Manual Mode', live: false };
-            if (room.share_active) return { label: 'Broadcasting', live: true };
-            return { label: 'Starting Broadcast', live: false };
+            if (isCustomRoom || room.manual_stream_url) return { get label() { return uiI18n.t('app.hosting_custom_d42774ea'); }, live: !!room.is_playing };
+            if (!isDesktopApp) return { get label() { return uiI18n.t('app.manual_mode_7ed7e6c7'); }, live: false };
+            if (room.share_active) return { get label() { return uiI18n.t('app.broadcasting_ba459229'); }, live: true };
+            return { get label() { return uiI18n.t('app.starting_broadcast_dec24bbb'); }, live: false };
         }
-        if (isViewerOnShare) return { label: 'Watching Host', live: !!room.is_playing };
-        return { label: 'Synced', live: false };
+        if (isViewerOnShare) return { get label() { return uiI18n.t('app.watching_host_cf4dc2c1'); }, live: !!room.is_playing };
+        return { get label() { return uiI18n.t('app.synced_b2ef6af6'); }, live: false };
     })();
     // CustomVideoSourceModal → pick an anime/episode. In 'queue' mode it appends
     // to the watch queue; otherwise it swaps the room's current title (resetting
@@ -1120,11 +1121,11 @@ export function useWatchRoomController() {
                     episodeNumber: ep?.number,
                     episodeTitle: ep?.title,
                 });
-                toast.success(`Queued ${anime.name}${ep?.number ? ` • Episode ${ep.number}` : ''}`);
+                toast.success(uiI18n.t('app.queued_i18n_value_0i18n_value_1_5b305615', { value0: anime.name, value1: ep?.number ? ` • Episode ${ep.number}` : '' }));
                 setShowAnimeSearch(false);
                 setAnimeSearchMode('change-room');
             } catch (err: any) {
-                toast.error(`Couldn't add to queue: ${err?.message || err}`);
+                toast.error(uiI18n.t('app.couldn_t_add_to_queue_i18n_value_0_eb383ce4', { value0: err?.message || err }));
             }
             return;
         }
@@ -1153,11 +1154,11 @@ export function useWatchRoomController() {
                     share_active: false,
                 } as any
             });
-            toast.success(`Now playing ${anime.name}${ep?.number ? ` • Episode ${ep.number}` : ''}`);
+            toast.success(uiI18n.t('app.now_playing_i18n_value_0i18n_value_1_09941cf7', { value0: anime.name, value1: ep?.number ? ` • Episode ${ep.number}` : '' }));
             setShowAnimeSearch(false);
             setAnimeSearchMode('change-room');
         } catch (err: any) {
-            toast.error(`Couldn't change the anime: ${err?.message || err}`);
+            toast.error(uiI18n.t('app.couldn_t_change_the_anime_i18n_value_0_c3372bc6', { value0: err?.message || err }));
         }
     }, [roomId, animeSearchMode, isHost, addQueueItem, updateRoom]);
     return {

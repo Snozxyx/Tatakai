@@ -5,17 +5,19 @@ import {
   Sparkles,
   SlidersHorizontal,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 const BANNER_IMAGE = '/assets/image/content/illustriation.jpg';
 
 const FEATURES = [
-  { icon: Sparkles, label: 'Weekly Spotlights' },
-  { icon: Layers, label: 'Source Picker' },
-  { icon: SlidersHorizontal, label: 'Smart Reader' },
+  { icon: Sparkles, labelKey: 'layout.mangaBannerSpotlights' },
+  { icon: Layers, labelKey: 'layout.mangaBannerSourcePicker' },
+  { icon: SlidersHorizontal, labelKey: 'layout.mangaBannerSmartReader' },
 ] as const;
 
 export function ReleaseV6Banner() {
+  const { t } = useTranslation();
   return (
     <section className="hidden md:block mb-10 md:mb-16">
       <Link
@@ -80,9 +82,9 @@ export function ReleaseV6Banner() {
               <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
               <div className="absolute inset-x-0 bottom-0 p-4">
                 <p className="text-[10px] font-semibold uppercase tracking-widest text-white/60">
-                  Now Reading
+                  {t('layout.mangaBannerNowReading')}
                 </p>
-                <p className="mt-0.5 text-sm font-bold text-white">Chapter 142</p>
+                <p className="mt-0.5 text-sm font-bold text-white">{t('layout.mangaBannerChapter')}</p>
                 <div className="mt-3 h-1 overflow-hidden rounded-full bg-white/15">
                   <div className="h-full w-2/3 rounded-full bg-primary" />
                 </div>
@@ -100,36 +102,35 @@ export function ReleaseV6Banner() {
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-current opacity-75 motion-reduce:animate-none" />
                 <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-current" />
               </span>
-              New
+              {t('layout.mangaBannerNew')}
             </span>
             <BookOpen className="h-3.5 w-3.5" />
-            Tatakai V6 Update
+            {t('layout.mangaBannerUpdate')}
           </div>
 
           {/* Headline */}
           <h2 className="font-display text-3xl font-black leading-[1.05] tracking-tight text-white [text-wrap:balance] sm:text-4xl md:text-5xl lg:text-6xl">
-            Manga Hub{' '}
+            {t('layout.mangaBannerHeadlineA')}{' '}
             <span className="bg-gradient-to-br from-primary via-primary to-primary/50 bg-clip-text text-transparent">
               V6
             </span>{' '}
-            is live.
+            {t('layout.mangaBannerHeadlineB')}
           </h2>
 
           {/* Description */}
           <p className="mt-4 max-w-xl text-sm font-medium leading-relaxed text-white/70 [text-wrap:pretty] sm:text-base md:text-lg">
-            Discover weekly spotlights, pick chapter sources with confidence, and
-            enjoy a completely rebuilt premium reader with smart controls.
+            {t('layout.mangaBannerDesc')}
           </p>
 
           {/* Feature chips */}
           <ul className="mt-6 flex flex-wrap gap-2">
-            {FEATURES.map(({ icon: Icon, label }) => (
+            {FEATURES.map(({ icon: Icon, labelKey }) => (
               <li
-                key={label}
+                key={labelKey}
                 className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/80 backdrop-blur-md"
               >
                 <Icon className="h-3.5 w-3.5 text-primary" />
-                {label}
+                {t(labelKey)}
               </li>
             ))}
           </ul>
@@ -137,7 +138,7 @@ export function ReleaseV6Banner() {
           {/* CTA (visual only, since the whole card is the link) */}
           <div className="mt-8">
             <span className="inline-flex h-12 items-center gap-2.5 rounded-full bg-white pl-7 pr-2 text-sm font-bold text-black shadow-[0_8px_24px_-8px_rgba(255,255,255,0.5)] transition-[background-color,border-color,box-shadow,transform] duration-300 group-hover:shadow-[0_10px_32px_-6px_rgba(255,255,255,0.6)] group-active:scale-[0.97]">
-              Open Manga Hub
+              {t('layout.mangaBannerCta')}
               <span className="flex h-8 w-8 items-center justify-center rounded-full bg-black text-white transition-transform duration-300 group-hover:translate-x-0.5">
                 <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:-rotate-45 motion-reduce:group-hover:rotate-0" />
               </span>

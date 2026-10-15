@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useNavigate } from 'react-router-dom';
 import { Users } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -43,9 +45,10 @@ export function MembersShowcaseWidget({
   onlineUsers,
   onlineUserIds,
   members: roster,
-  title = 'Members',
+  title = uiI18n.t('app.members_1cb449c1'),
   limit = 20,
 }: MembersShowcaseWidgetProps) {
+  useUiTranslation();
   const navigate = useNavigate();
   const scoped = Array.isArray(roster);
   // Shares the feed page's cache key; the result is ignored in scoped mode.
@@ -89,7 +92,7 @@ export function MembersShowcaseWidget({
         {onlineCount > 0 && (
           <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-400">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            <span className="tabular-nums">{onlineCount}</span> online
+            <span className="tabular-nums">{onlineCount}</span> {uiI18n.t('app.online_2dbc2fd2')}
           </span>
         )}
       </div>
@@ -97,7 +100,7 @@ export function MembersShowcaseWidget({
       {/* Grid */}
       <div className="relative z-10 px-4 pb-4">
         {members.length === 0 ? (
-          <p className="px-2 py-6 text-center text-[13px] text-zinc-500">No members to show yet.</p>
+          <p className="px-2 py-6 text-center text-[13px] text-zinc-500">{uiI18n.t('app.no_members_to_show_yet_b701d855')}</p>
         ) : (
           <div className="grid grid-cols-4 gap-3 sm:grid-cols-5">
             {members.map((m) => {

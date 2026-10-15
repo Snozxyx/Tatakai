@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { Helmet } from "react-helmet-async";
 import { Link } from "react-router-dom";
 import {
@@ -40,56 +42,56 @@ const extensionTypes: ExtensionType[] = [
   {
     ecosystem: "Stremio",
     icon: Server,
-    title: "HTTP/JSON streaming addons",
+    get title() { return uiI18n.t('app.http_json_streaming_addons_897cfc6e'); },
     support: "Video sources, request headers, and torrent streams.",
     status: "supported",
   },
   {
     ecosystem: "Stremio",
     icon: Subtitles,
-    title: "Subtitle addons",
+    get title() { return uiI18n.t('app.subtitle_addons_68177305'); },
     support: "Custom subtitles available from the video's subtitle settings.",
     status: "supported",
   },
   {
     ecosystem: "Stremio",
     icon: Library,
-    title: "Catalog, metadata, and stream addons",
+    get title() { return uiI18n.t('app.catalog_metadata_and_stream_addons_c0d88895'); },
     support: "Custom browsing through the + source menu.",
     status: "supported",
   },
   {
     ecosystem: "Seanime",
     icon: Clapperboard,
-    title: "JavaScript / TypeScript streaming providers",
+    get title() { return uiI18n.t('app.javascript_typescript_streaming_providers_a77481dd'); },
     support: "Anime search, episodes, servers, and playback.",
     status: "supported",
   },
   {
     ecosystem: "Seanime",
     icon: BookOpen,
-    title: "JavaScript / TypeScript manga providers",
+    get title() { return uiI18n.t('app.javascript_typescript_manga_providers_cbbd7610'); },
     support: "Manga search, chapters, and reader pages.",
     status: "supported",
   },
   {
     ecosystem: "Seanime",
     icon: Router,
-    title: "JavaScript / TypeScript torrent providers",
+    get title() { return uiI18n.t('app.javascript_typescript_torrent_providers_78f97817'); },
     support: "Torrent search plus magnet and hash resolution.",
     status: "supported",
   },
   {
     ecosystem: "Seanime",
     icon: Puzzle,
-    title: "Compatible custom-source providers",
+    get title() { return uiI18n.t('app.compatible_custom_source_providers_60802a65'); },
     support: "Anime and manga browsing through the + source menu.",
     status: "supported",
   },
   {
     ecosystem: "Seanime Comix",
     icon: Terminal,
-    title: "ChromeDP-based manga providers",
+    get title() { return uiI18n.t('app.chromedp_based_manga_providers_2dfaf246'); },
     support: "Desktop only, using Tatakai's browser host.",
     status: "desktop",
   },
@@ -107,7 +109,7 @@ const faqJsonLd = [
     name: "What extension types does Tatakai support?",
     acceptedAnswer: {
       "@type": "Answer",
-      text: "Tatakai supports Stremio HTTP/JSON streaming, subtitle, catalog, metadata, and stream addons; JavaScript and TypeScript Seanime anime, manga, torrent, and compatible custom-source providers; and desktop-only Seanime Comix ChromeDP manga providers.",
+      get text() { return uiI18n.t('app.tatakai_supports_stremio_http_json_streaming_sub_3520f7b4'); },
     },
   },
   {
@@ -115,7 +117,7 @@ const faqJsonLd = [
     name: "Does Tatakai support Seanime Go extensions?",
     acceptedAnswer: {
       "@type": "Answer",
-      text: "No. Seanime Go extensions, UI/system plugins, and providers requiring unimplemented host APIs are not currently supported.",
+      get text() { return uiI18n.t('app.no_seanime_go_extensions_ui_system_plugins_and_p_e7e55342'); },
     },
   },
   {
@@ -123,35 +125,37 @@ const faqJsonLd = [
     name: "Do all supported extensions work in Tatakai?",
     acceptedAnswer: {
       "@type": "Answer",
-      text: "No. A supported format does not guarantee a working source. Site blocks, outdated provider code, configuration, missing title matches, CORS, and host capabilities can still cause failures.",
+      get text() { return uiI18n.t('app.no_a_supported_format_does_not_guarantee_a_worki_e5a09101'); },
     },
   },
 ];
 
 function StatusBadge({ status }: { status: SupportStatus }) {
+  useUiTranslation();
   if (status === "desktop") {
     return (
       <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/20 bg-amber-400/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-200">
-        <Smartphone className="h-3 w-3" /> Desktop only
+        <Smartphone className="h-3 w-3" /> {uiI18n.t('app.desktop_only_06cea5ef')}
       </span>
     );
   }
 
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-200">
-      <Check className="h-3 w-3" /> Supported
+      <Check className="h-3 w-3" /> {uiI18n.t('app.supported_0bf8509b')}
     </span>
   );
 }
 
 export default function ExtensionSupportPage() {
+  useUiTranslation();
   const isDesktopApp = useIsDesktopApp();
   const isMobile = useIsMobile();
 
   return (
     <>
       <Helmet>
-        <title>Tatakai Extension Support FAQ — Stremio, Seanime & Comix</title>
+        <title>{uiI18n.t('app.tatakai_extension_support_faq_stremio_seanime_co_2462af3e')}</title>
         <meta
           name="description"
           content="See which Stremio, Seanime JavaScript/TypeScript, and Seanime Comix extensions Tatakai supports, including streaming, manga, novels, subtitles, torrents, and custom sources."
@@ -173,8 +177,7 @@ export default function ExtensionSupportPage() {
             "@type": "FAQPage",
             name: "Tatakai Extension Support FAQ",
             url: "https://tatakai.me/faq/extension-support",
-            description:
-              "Current compatibility guide for Stremio, Seanime, and Seanime Comix extensions in Tatakai.",
+            get description() { return uiI18n.t('app.current_compatibility_guide_for_stremio_seanime__d25d4cc0'); },
             mainEntity: faqJsonLd,
           })}
         </script>
@@ -194,30 +197,28 @@ export default function ExtensionSupportPage() {
             to="/welcome"
             className="mb-10 inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
-            <ArrowLeft className="h-4 w-4" /> Back to Welcome
+            <ArrowLeft className="h-4 w-4" /> {uiI18n.t('app.back_to_welcome_ba6df5aa')}
           </Link>
 
           <header className="max-w-3xl">
             <span className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[11px] font-black uppercase tracking-[0.2em] text-primary">
-              <Puzzle className="h-3.5 w-3.5" /> Extension FAQ
+              <Puzzle className="h-3.5 w-3.5" /> {uiI18n.t('app.extension_faq_125f9788')}
             </span>
             <h1 className="mt-5 font-display text-4xl font-black tracking-tight sm:text-6xl">
-              What extensions does Tatakai support?
+              {uiI18n.t('app.what_extensions_does_tatakai_support_15ce2a55')}
             </h1>
             <p className="mt-5 text-base leading-relaxed text-muted-foreground sm:text-lg">
-              Tatakai can connect to several extension ecosystems for anime, manga,
-              novels, subtitles, and streams. This page describes the formats and
-              host APIs that are currently supported.
+              {uiI18n.t('app.tatakai_can_connect_to_several_extension_ecosyst_b42f98b9')}
             </p>
             <div className="mt-6 flex flex-wrap gap-2">
               <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/70">
-                Stremio addons
+                {uiI18n.t('app.stremio_addons_149e1a70')}
               </span>
               <span className="rounded-full border border-primary/25 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary">
-                Seanime JavaScript / TypeScript
+                {uiI18n.t('app.seanime_javascript_typescript_97749f58')}
               </span>
               <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/70">
-                Seanime Comix
+                {uiI18n.t('app.seanime_comix_b8d2be15')}
               </span>
             </div>
           </header>
@@ -226,14 +227,14 @@ export default function ExtensionSupportPage() {
             <div className="mb-6 flex items-end justify-between gap-4">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">
-                  Compatibility matrix
+                  {uiI18n.t('app.compatibility_matrix_dd9e5420')}
                 </p>
                 <h2 id="supported-extension-types" className="mt-2 font-display text-2xl font-bold sm:text-3xl">
-                  Supported extension types
+                  {uiI18n.t('app.supported_extension_types_b0a481a2')}
                 </h2>
               </div>
               <span className="hidden items-center gap-2 text-xs text-muted-foreground sm:flex">
-                <Info className="h-4 w-4" /> Compatibility can vary by provider
+                <Info className="h-4 w-4" /> {uiI18n.t('app.compatibility_can_vary_by_provider_9b76e464')}
               </span>
             </div>
 
@@ -275,7 +276,7 @@ export default function ExtensionSupportPage() {
               <div className="flex items-center gap-3">
                 <ShieldAlert className="h-5 w-5 text-rose-200" />
                 <h2 id="extension-limitations" className="font-display text-xl font-bold">
-                  Not supported right now
+                  {uiI18n.t('app.not_supported_right_now_dc92479c')}
                 </h2>
               </div>
               <ul className="mt-5 space-y-3 text-sm leading-relaxed text-muted-foreground">
@@ -287,27 +288,27 @@ export default function ExtensionSupportPage() {
                 ))}
               </ul>
               <p className="mt-5 border-t border-rose-200/10 pt-4 text-xs leading-relaxed text-muted-foreground/80">
-                Other ChromeDP providers need an individual compatibility check.
+                {uiI18n.t('app.other_chromedp_providers_need_an_individual_comp_f6a29495')}
               </p>
             </article>
 
             <article className="rounded-2xl border border-white/10 bg-white/[0.035] p-6">
               <div className="flex items-center gap-3">
                 <Code2 className="h-5 w-5 text-primary" />
-                <h2 className="font-display text-xl font-bold">Host and troubleshooting notes</h2>
+                <h2 className="font-display text-xl font-bold">{uiI18n.t('app.host_and_troubleshooting_notes_c9e22ea6')}</h2>
               </div>
               <ul className="mt-5 space-y-4 text-sm leading-relaxed text-muted-foreground">
                 <li className="flex gap-3">
                   <Router className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                  <span>Torrents require a torrent-capable host. Mobile uses native transport; browser operation depends on CORS.</span>
+                  <span>{uiI18n.t('app.torrents_require_a_torrent_capable_host_mobile_u_dbb09004')}</span>
                 </li>
                 <li className="flex gap-3">
                   <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                  <span>A supported format does not guarantee a working source. Blocks, outdated provider code, configuration, or missing title matches can still cause failures.</span>
+                  <span>{uiI18n.t('app.a_supported_format_does_not_guarantee_a_working__99070f02')}</span>
                 </li>
                 <li className="flex gap-3">
                   <Terminal className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                  <span>Enable Developer Mode to see each provider's results and errors when diagnosing a source.</span>
+                  <span>{uiI18n.t('app.enable_developer_mode_to_see_each_provider_s_res_0351d250')}</span>
                 </li>
               </ul>
             </article>
@@ -316,17 +317,17 @@ export default function ExtensionSupportPage() {
           <section className="mt-16 rounded-2xl border border-primary/20 bg-primary/[0.06] p-6 sm:p-8">
             <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">Need more detail?</p>
-                <h2 className="mt-2 font-display text-2xl font-bold">Compare Tatakai and Seanime</h2>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">{uiI18n.t('app.need_more_detail_9849d117')}</p>
+                <h2 className="mt-2 font-display text-2xl font-bold">{uiI18n.t('app.compare_tatakai_and_seanime_2d35c600')}</h2>
                 <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-                  Read the honest feature comparison, including extension architecture, playback, community features, and platform differences.
+                  {uiI18n.t('app.read_the_honest_feature_comparison_including_ext_1a6797eb')}
                 </p>
               </div>
               <Link
                 to="/faq/seanime-vs-tatakai"
                 className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-bold text-primary-foreground transition-[background-color,transform] hover:brightness-110 motion-safe:active:scale-[0.97]"
               >
-                Seanime vs Tatakai <ArrowLeft className="h-4 w-4 rotate-180" />
+                {uiI18n.t('app.seanime_vs_tatakai_2432da7c')} <ArrowLeft className="h-4 w-4 rotate-180" />
               </Link>
             </div>
           </section>

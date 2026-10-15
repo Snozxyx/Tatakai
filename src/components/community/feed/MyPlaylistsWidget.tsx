@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Music2, Plus, ArrowRight } from 'lucide-react';
@@ -13,6 +15,7 @@ export interface MyPlaylistsWidgetProps {
 
 /** Batch the first few posters for each visible playlist in one query. */
 function useMyPlaylistCovers(ids: string[]) {
+  useUiTranslation();
   return useQuery({
     queryKey: ['my-playlist-covers', ids],
     queryFn: async () => {
@@ -36,6 +39,7 @@ function useMyPlaylistCovers(ids: string[]) {
 
 /** The current viewer's own playlists, in the ambient right-rail design. */
 export function MyPlaylistsWidget({ className }: MyPlaylistsWidgetProps) {
+  useUiTranslation();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { data: playlists = [], isLoading } = usePlaylists();
@@ -62,7 +66,7 @@ export function MyPlaylistsWidget({ className }: MyPlaylistsWidgetProps) {
             <Music2 className="h-3.5 w-3.5 text-violet-400" />
           </div>
           <span className="text-[11px] font-bold uppercase tracking-widest text-violet-400">
-            My Playlists
+            {uiI18n.t('app.my_playlists_f67e00ef')}
           </span>
         </div>
       </div>
@@ -88,8 +92,8 @@ export function MyPlaylistsWidget({ className }: MyPlaylistsWidgetProps) {
             <span className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-500/10 text-violet-400">
               <Plus className="h-4 w-4" />
             </span>
-            <span className="text-[13px] font-semibold text-zinc-200">Create your first playlist</span>
-            <span className="text-[11px] text-zinc-500">Curate anime into shareable collections.</span>
+            <span className="text-[13px] font-semibold text-zinc-200">{uiI18n.t('app.create_your_first_playlist_2f9f306a')}</span>
+            <span className="text-[11px] text-zinc-500">{uiI18n.t('app.curate_anime_into_shareable_collections_6d1d86e5')}</span>
           </button>
         ) : (
           visible.map((p) => {
@@ -118,7 +122,7 @@ export function MyPlaylistsWidget({ className }: MyPlaylistsWidgetProps) {
                     {p.name}
                   </p>
                   <p className="truncate text-[11px] font-medium text-zinc-500 tabular-nums">
-                    {p.items_count} {p.items_count === 1 ? 'anime' : 'anime'}
+                    {p.items_count} {p.items_count === 1 ? uiI18n.t('app.anime_11a3e059') : uiI18n.t('app.anime_11a3e059')}
                   </p>
                 </div>
               </Link>
@@ -134,7 +138,7 @@ export function MyPlaylistsWidget({ className }: MyPlaylistsWidgetProps) {
             to="/playlists"
             className="flex items-center justify-center gap-1.5 rounded-2xl border border-white/[0.08] bg-black/40 py-2.5 text-[12px] font-bold text-zinc-300 backdrop-blur-xl transition-all hover:border-violet-500/30 hover:text-white"
           >
-            View all playlists <ArrowRight className="h-3.5 w-3.5" />
+            {uiI18n.t('app.view_all_playlists_2605a565')} <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         </div>
       )}

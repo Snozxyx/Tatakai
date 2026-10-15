@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -35,11 +37,11 @@ type Category = 'mention' | 'calendar' | 'announcement' | 'system';
 type Tab = 'all' | Category;
 
 const TABS: Array<{ value: Tab; label: string; icon: React.ElementType }> = [
-  { value: 'all', label: 'All', icon: Bell },
-  { value: 'mention', label: 'Mention', icon: AtSign },
-  { value: 'calendar', label: 'Calendar', icon: CalendarClock },
-  { value: 'announcement', label: 'Announce', icon: Megaphone },
-  { value: 'system', label: 'System', icon: Info },
+  { value: 'all', get label() { return uiI18n.t('app.all_6a720856'); }, icon: Bell },
+  { value: 'mention', get label() { return uiI18n.t('app.mention_51258021'); }, icon: AtSign },
+  { value: 'calendar', get label() { return uiI18n.t('app.calendar_adab5090'); }, icon: CalendarClock },
+  { value: 'announcement', get label() { return uiI18n.t('app.announce_b6e44152'); }, icon: Megaphone },
+  { value: 'system', get label() { return uiI18n.t('app.system_bc0792d8'); }, icon: Info },
 ];
 
 interface FeedItem {
@@ -92,7 +94,7 @@ function relTime(iso: string): string {
   if (h < 24) return `${h}h ago`;
   const d = Math.floor(h / 24);
   if (d < 7) return `${d}d ago`;
-  return new Date(iso).toLocaleDateString();
+  return new Date(iso).toLocaleDateString(uiI18n.language);
 }
 
 function dayBucket(iso: string): 'Today' | 'Yesterday' | 'Earlier' {
@@ -119,6 +121,7 @@ function countdown(airingAtSec: number): string {
 const BUCKET_ORDER: Array<'Today' | 'Yesterday' | 'Earlier'> = ['Today', 'Yesterday', 'Earlier'];
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
+  useUiTranslation();
   return (
     <div className="mb-2 mt-1 px-1 text-[10px] font-black uppercase tracking-wider text-muted-foreground/60">
       {children}
@@ -127,6 +130,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 }
 
 function EmptyState({ icon: Icon, message }: { icon: React.ElementType; message: string }) {
+  useUiTranslation();
   return (
     <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
       <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/[0.06] bg-white/[0.02] text-muted-foreground/50">
@@ -138,6 +142,7 @@ function EmptyState({ icon: Icon, message }: { icon: React.ElementType; message:
 }
 
 function NotificationRow({ item, onClick }: { item: FeedItem; onClick: (item: FeedItem) => void }) {
+  useUiTranslation();
   const { icon: Icon, tint } = iconFor(item.iconType);
   const hasAvatar = !!item.fromAvatar || !!item.fromUsername;
   return (
@@ -179,6 +184,7 @@ function NotificationRow({ item, onClick }: { item: FeedItem; onClick: (item: Fe
 }
 
 function UpcomingCalendar({ onNavigate }: { onNavigate: (link: string) => void }) {
+  useUiTranslation();
   const { data: tracked } = useTrackedShows();
   const anilistIds = useMemo(
     () => (tracked ?? []).map((t) => Number(t.anilist_id)).filter((n) => Number.isFinite(n) && n > 0),
@@ -195,7 +201,7 @@ function UpcomingCalendar({ onNavigate }: { onNavigate: (link: string) => void }
 
   return (
     <div>
-      <SectionLabel>Upcoming · Your calendar</SectionLabel>
+      <SectionLabel>{uiI18n.t('app.upcoming_your_calendar_d1ebb93f')}</SectionLabel>
       <div className="space-y-2">
         {isLoading
           ? Array.from({ length: 2 }).map((_, i) => (
@@ -218,7 +224,7 @@ function UpcomingCalendar({ onNavigate }: { onNavigate: (link: string) => void }
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[13px] font-bold text-white">{m.title}</p>
                   <p className="mt-0.5 text-xs text-muted-foreground/80">
-                    {m.episode != null ? `Ep ${m.episode}` : 'Next episode'}
+                    {m.episode != null ? uiI18n.t('app.ep_i18n_value_0_1a0eea94', { value0: m.episode }) : uiI18n.t('app.next_episode_882f1a46')}
                   </p>
                 </div>
                 <div className="shrink-0 rounded-lg bg-violet-500/15 px-2 py-1 text-[11px] font-bold tabular-nums text-violet-300">
@@ -232,6 +238,7 @@ function UpcomingCalendar({ onNavigate }: { onNavigate: (link: string) => void }
 }
 
 function SentMentionsList({ onNavigate }: { onNavigate: (link: string) => void }) {
+  useUiTranslation();
   const { data: sent, isLoading } = useSentMentions();
 
   if (isLoading) {
@@ -245,7 +252,7 @@ function SentMentionsList({ onNavigate }: { onNavigate: (link: string) => void }
   }
 
   if (!sent || sent.length === 0) {
-    return <EmptyState icon={AtSign} message="You haven't mentioned anyone yet. @mention someone in a comment and it shows up here." />;
+    return <EmptyState icon={AtSign} message={uiI18n.t('app.you_haven_t_mentioned_anyone_yet_mention_someone_6957ff62')} />;
   }
 
   return (
@@ -276,7 +283,7 @@ function SentMentionsList({ onNavigate }: { onNavigate: (link: string) => void }
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-[13px] font-bold text-white">
-                You mentioned <span className="text-sky-400">{names}</span>
+                {uiI18n.t('app.you_mentioned_97bb3b2b')} <span className="text-sky-400">{names}</span>
               </p>
               <p className="mt-0.5 line-clamp-2 text-xs leading-snug text-muted-foreground/80">{m.preview}</p>
               <span className="mt-1 block text-[10px] font-medium text-muted-foreground/50">{relTime(m.created_at)}</span>
@@ -289,6 +296,7 @@ function SentMentionsList({ onNavigate }: { onNavigate: (link: string) => void }
 }
 
 export function NotificationSheet({ open, onOpenChange }: NotificationSheetProps) {
+  useUiTranslation();
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>('all');
   const [mentionView, setMentionView] = useState<'received' | 'sent'>('received');
@@ -406,7 +414,7 @@ export function NotificationSheet({ open, onOpenChange }: NotificationSheetProps
               <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/30 to-primary/5 border border-primary/20 text-primary shadow-[0_0_20px_rgba(var(--primary),0.2)]">
                 <Bell className="h-5 w-5" />
               </div>
-              Notifications
+              {uiI18n.t('app.notifications_753a22b2')}
             </SheetTitle>
             {totalUnread > 0 && (
               <button
@@ -415,12 +423,12 @@ export function NotificationSheet({ open, onOpenChange }: NotificationSheetProps
                 className="flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-[11px] font-bold text-muted-foreground transition-all hover:bg-white/[0.06] hover:text-white"
               >
                 <CheckCheck className="h-3.5 w-3.5" />
-                Mark all
+                {uiI18n.t('app.mark_all_26cd1bb1')}
               </button>
             )}
           </div>
           <p className="mt-1 text-xs font-medium text-muted-foreground/80">
-            {totalUnread > 0 ? `${totalUnread} unread notification${totalUnread === 1 ? '' : 's'}` : 'You are all caught up'}
+            {totalUnread > 0 ? uiI18n.t('app.i18n_value_0_unread_notificationi18n_value_1_c7314901', { value0: totalUnread, value1: totalUnread === 1 ? '' : 's' }) : uiI18n.t('app.you_are_all_caught_up_c0b73100')}
           </p>
         </SheetHeader>
 
@@ -462,7 +470,7 @@ export function NotificationSheet({ open, onOpenChange }: NotificationSheetProps
                         : 'text-muted-foreground hover:text-white',
                     )}
                   >
-                    {v}
+                    {uiI18n.t(({"received":"app.received_38428a69","sent":"app.sent_27e7700f"})[v])}
                   </button>
                 ))}
               </div>
@@ -470,7 +478,7 @@ export function NotificationSheet({ open, onOpenChange }: NotificationSheetProps
                 visible.length > 0 ? (
                   groupedList
                 ) : (
-                  <EmptyState icon={AtSign} message="No mentions yet. When someone @mentions you, it appears here." />
+                  <EmptyState icon={AtSign} message={uiI18n.t('app.no_mentions_yet_when_someone_mentions_you_it_app_aee55ba2')} />
                 )
               ) : (
                 <SentMentionsList onNavigate={handleNavigate} />
@@ -484,7 +492,7 @@ export function NotificationSheet({ open, onOpenChange }: NotificationSheetProps
               ) : (
                 <EmptyState
                   icon={CalendarClock}
-                  message="No airing reminders yet — we'll ping you when a tracked show is about to air."
+                  message={uiI18n.t('app.no_airing_reminders_yet_we_ll_ping_you_when_a_tr_6a255f46')}
                 />
               )}
             </div>
@@ -495,10 +503,10 @@ export function NotificationSheet({ open, onOpenChange }: NotificationSheetProps
               icon={tab === 'announcement' ? Megaphone : Inbox}
               message={
                 tab === 'announcement'
-                  ? 'No announcements right now.'
+                  ? uiI18n.t('app.no_announcements_right_now_1fdd88ea')
                   : tab === 'system'
-                    ? 'Nothing here yet.'
-                    : 'No notifications yet.'
+                    ? uiI18n.t('app.nothing_here_yet_ede1ba2f')
+                    : uiI18n.t('app.no_notifications_yet_5537c608')
               }
             />
           )}

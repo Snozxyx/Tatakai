@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
  * Mobile Downloads UI - Floating panel showing download progress
  */
@@ -7,6 +9,7 @@ import { useMobileDownload } from '@/hooks/media/useMobileDownload';
 import { cn } from '@/lib/utils';
 
 export function MobileDownloadsUI() {
+  useUiTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const { isNative, queue, activeDownloads, cancelDownload, retryDownload } = useMobileDownload();
 
@@ -49,7 +52,7 @@ export function MobileDownloadsUI() {
             <div className="sticky top-0 bg-zinc-900 border-b border-white/10 p-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Download className="w-5 h-5 text-primary" />
-                <span className="font-semibold text-white">Downloads</span>
+                <span className="font-semibold text-white">{uiI18n.t('app.downloads_a862c2b2')}</span>
               </div>
               <button onClick={() => setIsOpen(false)} className="p-2 rounded-full hover:bg-white/10">
                 <X className="w-5 h-5 text-white" />
@@ -87,8 +90,8 @@ export function MobileDownloadsUI() {
                       <p className="text-white font-medium truncate">{item.animeTitle || item.title}</p>
                       <p className="text-zinc-400 text-sm">
                         {item.kind === 'manga'
-                          ? (item.subtitle || 'Chapter')
-                          : (item.subtitle || (item.episode != null ? `Episode ${item.episode}` : 'Episode'))}
+                          ? (item.subtitle || uiI18n.t('app.chapter_46b00590'))
+                          : (item.subtitle || (item.episode != null ? uiI18n.t('app.episode_i18n_value_0_f05acda8', { value0: item.episode }) : uiI18n.t('app.episode_8669aa56')))}
                       </p>
 
                       {/* Progress */}
@@ -101,7 +104,7 @@ export function MobileDownloadsUI() {
                             />
                           </div>
                           <p className="text-xs text-zinc-500 mt-1">
-                            {item.status === 'queued' ? 'Waiting...' : `${item.progress}%`}
+                            {item.status === 'queued' ? 'Waiting...' : uiI18n.t('app.i18n_value_0_cac4fa79', { value0: item.progress })}
                           </p>
                         </div>
                       )}

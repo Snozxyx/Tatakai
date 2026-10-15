@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import React, { memo } from 'react';
 import { motion } from 'framer-motion';
 import {
@@ -56,6 +58,7 @@ export const OverviewHeroStats = memo(function OverviewHeroStats({
   reputationRate = 98.4,
   onStatClick,
 }: OverviewHeroStatsProps) {
+  useUiTranslation();
   const hoursSpent = Number((watchTimeSeconds / 3600).toFixed(1));
   const daysSpent = Number((watchTimeSeconds / 86400).toFixed(1));
   const totalReadingTitles = mangaCount + manhwaCount + comicsCount;
@@ -70,7 +73,7 @@ export const OverviewHeroStats = memo(function OverviewHeroStats({
   const primaryStats = [
     {
       key: 'anime',
-      label: 'Anime Watched',
+      get label() { return uiI18n.t('app.anime_watched_7702ac21'); },
       value: episodesCount,
       suffix: 'eps',
       subtext: `${completedAnimeCount} completed · ${watchingAnimeCount} watching`,
@@ -78,7 +81,7 @@ export const OverviewHeroStats = memo(function OverviewHeroStats({
     },
     {
       key: 'watchtime',
-      label: 'Watch Time',
+      get label() { return uiI18n.t('app.watch_time_c49f058c'); },
       value: hoursSpent,
       decimals: 1,
       suffix: 'hrs',
@@ -87,7 +90,7 @@ export const OverviewHeroStats = memo(function OverviewHeroStats({
     },
     {
       key: 'reading',
-      label: 'Manga & Manhwa',
+      get label() { return uiI18n.t('app.manga_manhwa_3dfc1148'); },
       value: totalChaptersRead > 0 ? totalChaptersRead : totalReadingTitles,
       suffix: totalChaptersRead > 0 ? 'chs' : 'titles',
       subtext: `${mangaCount} Manga · ${manhwaCount} Manhwa`,
@@ -95,7 +98,7 @@ export const OverviewHeroStats = memo(function OverviewHeroStats({
     },
     {
       key: 'reputation',
-      label: 'Reputation',
+      get label() { return uiI18n.t('app.reputation_5f21606b'); },
       value: reputationRate,
       decimals: 1,
       suffix: '%',
@@ -104,7 +107,7 @@ export const OverviewHeroStats = memo(function OverviewHeroStats({
     },
     {
       key: 'community',
-      label: 'Discussions',
+      get label() { return uiI18n.t('app.discussions_0474a6c6'); },
       value: commentCount + forumPostCount,
       suffix: 'actions',
       subtext: `${commentCount} comments · ${forumPostCount} topics`,
@@ -112,7 +115,7 @@ export const OverviewHeroStats = memo(function OverviewHeroStats({
     },
     {
       key: 'streak',
-      label: 'Streak Record',
+      get label() { return uiI18n.t('app.streak_record_76f08e79'); },
       value: streakDays,
       suffix: 'days',
       subtext: `Best streak: ${longestStreak}d`,
@@ -123,10 +126,10 @@ export const OverviewHeroStats = memo(function OverviewHeroStats({
 
   // Secondary detailed micro-metrics bar
   const microDetails = [
-    { label: 'Completion Rate', value: `${completionRate}%`, icon: Percent },
-    { label: 'Active Watch Days', value: `${totalDaysActive || Math.max(streakDays, 1)}d`, icon: Calendar },
-    { label: 'Comic Titles', value: `${comicsCount}`, icon: Film },
-    { label: 'Community Upvotes', value: `${forumUpvotes || Math.max(commentCount * 2, 0)}`, icon: ThumbsUp },
+    { get label() { return uiI18n.t('app.completion_rate_e9022ebd'); }, value: `${completionRate}%`, icon: Percent },
+    { get label() { return uiI18n.t('app.active_watch_days_0e6946ec'); }, value: `${totalDaysActive || Math.max(streakDays, 1)}d`, icon: Calendar },
+    { get label() { return uiI18n.t('app.comic_titles_3cc7552f'); }, value: `${comicsCount}`, icon: Film },
+    { get label() { return uiI18n.t('app.community_upvotes_593032cd'); }, value: `${forumUpvotes || Math.max(commentCount * 2, 0)}`, icon: ThumbsUp },
   ];
 
   const handleKeyDown = (e: React.KeyboardEvent, key: string) => {
@@ -140,7 +143,7 @@ export const OverviewHeroStats = memo(function OverviewHeroStats({
     <GlassPanel 
       className="relative overflow-hidden p-5 sm:p-7 flex flex-col justify-between border-white/[0.04] bg-background/40 backdrop-blur-2xl rounded-2xl"
       role="region" 
-      aria-label="Overview Statistics"
+      aria-label={uiI18n.t('app.overview_statistics_7550582a')}
     >
       {/* Decorative background glow */}
       <div className="absolute -top-12 -right-12 w-48 h-48 bg-[hsl(var(--profile-accent)/0.10)] blur-[70px] rounded-full pointer-events-none" />
@@ -152,11 +155,11 @@ export const OverviewHeroStats = memo(function OverviewHeroStats({
           <div className="flex items-center gap-2 mb-1">
             <Activity className="w-4 h-4 text-primary/80" />
             <h3 className="font-display font-bold text-base sm:text-lg text-foreground tracking-tight">
-              Your Statistics
+              {uiI18n.t('app.your_statistics_babf8bf7')}
             </h3>
           </div>
           <p className="text-xs text-muted-foreground/70">
-            Your lifetime platform activity, milestones, and total interaction summary
+            {uiI18n.t('app.your_lifetime_platform_activity_milestones_and_t_99fd6618')}
           </p>
         </div>
       </div>
@@ -167,7 +170,7 @@ export const OverviewHeroStats = memo(function OverviewHeroStats({
           {primaryStats.map((item, idx) => {
             const Icon = item.icon;
             const isClickable = !!onStatClick;
-            const ariaLabel = `${item.label}: ${item.value} ${item.suffix || ''}. ${item.subtext}`;
+            const ariaLabel = uiI18n.t('app.i18n_value_0_i18n_value_1_i18n_value_2_i18n_valu_44fd5558', { value0: item.label, value1: item.value, value2: item.suffix || '', value3: item.subtext });
 
             return (
               <motion.div
@@ -227,7 +230,7 @@ export const OverviewHeroStats = memo(function OverviewHeroStats({
         {/* ── Granular Detailed Micro-Bar ── */}
         <div 
           className="grid grid-cols-2 sm:grid-cols-4 gap-3 px-4 py-3 rounded-xl bg-black/20 border border-white/[0.03]"
-          aria-label="Additional metric details"
+          aria-label={uiI18n.t('app.additional_metric_details_6a815705')}
         >
           {microDetails.map((detail) => {
             const Icon = detail.icon;
@@ -235,7 +238,7 @@ export const OverviewHeroStats = memo(function OverviewHeroStats({
               <div 
                 key={detail.label} 
                 className="flex items-center gap-2.5"
-                aria-label={`${detail.label}: ${detail.value}`}
+                aria-label={uiI18n.t('app.i18n_value_0_i18n_value_1_b6af3412', { value0: detail.label, value1: detail.value })}
               >
                 <div className="p-1.5 rounded-md bg-white/[0.03] text-muted-foreground/60">
                   <Icon className="w-3.5 h-3.5" aria-hidden="true" />

@@ -1,8 +1,11 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import React from 'react';
 
 interface Point { date: string; count: number }
 
 export function Sparkline({ series, width = 80, height = 28, stroke = 'currentColor' }: { series: Point[] | null | undefined; width?: number; height?: number; stroke?: string }) {
+  useUiTranslation();
   if (!series || series.length === 0) {
     // Render empty placeholder
     return (

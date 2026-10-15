@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { motion } from "framer-motion";
 import { Wrench, Clock, RefreshCw, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -5,6 +7,7 @@ import { Link } from "react-router-dom";
 import { StatusVideoBackground } from "@/components/layout/StatusVideoBackground";
 
 const MaintenancePage = () => {
+  useUiTranslation();
   return (
     <div className="min-h-screen flex items-center justify-center p-4 overflow-hidden relative bg-gradient-to-br from-amber-950/20 via-background to-background">
       <StatusVideoBackground overlayColor="from-amber-500/10 via-background/90 to-background" />
@@ -85,7 +88,7 @@ const MaintenancePage = () => {
           >
             工事中
           </motion.p>
-          <p className="text-xs text-muted-foreground tracking-[0.2em] uppercase">Kōji-chū</p>
+          <p className="text-xs text-muted-foreground tracking-[0.2em] uppercase">{uiI18n.t('app.k_ji_ch_a52cac15')}</p>
         </motion.div>
 
         {/* Message */}
@@ -96,10 +99,10 @@ const MaintenancePage = () => {
           className="space-y-4 mb-8"
         >
           <h1 className="text-3xl md:text-4xl font-display font-bold text-foreground">
-            Under Maintenance
+            {uiI18n.t('app.under_maintenance_5ae6429d')}
           </h1>
           <p className="text-muted-foreground text-lg">
-            We're performing scheduled maintenance to improve your experience. We'll be back shortly!
+            {uiI18n.t('app.we_re_performing_scheduled_maintenance_to_improv_38d8d8ed')}
           </p>
         </motion.div>
 
@@ -126,7 +129,7 @@ const MaintenancePage = () => {
           </div>
           <p className="text-sm text-muted-foreground mt-2 flex items-center justify-center gap-2">
             <span className="inline-block w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-            作業中... Working on it...
+            {uiI18n.t('app.working_on_it_26fbb108')}
           </p>
         </motion.div>
 
@@ -143,7 +146,7 @@ const MaintenancePage = () => {
             className="gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white border-0"
           >
             <RefreshCw className="w-5 h-5" />
-            Try Again
+            {uiI18n.t('app.try_again_cef2fe09')}
           </Button>
           <Button
             asChild
@@ -153,7 +156,7 @@ const MaintenancePage = () => {
           >
             <Link to="/auth">
               <LogIn className="w-5 h-5" />
-              Admin Login
+              {uiI18n.t('app.admin_login_71adefcd')}
             </Link>
           </Button>
         </motion.div>
@@ -166,7 +169,7 @@ const MaintenancePage = () => {
           className="mt-8 text-sm text-muted-foreground"
         >
           <span className="text-amber-500/60 mr-2">予定時間:</span>
-          Estimated completion: ~30 minutes
+          {uiI18n.t('app.estimated_completion_30_minutes_8b97fef9')}
         </motion.p>
       </motion.div>
     </div>

@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Background } from '@/components/layout/Background';
@@ -27,7 +29,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { ArrowLeft, Plus, User, Trash2, Edit, Share2, Heart, Eye, Globe, Lock, Users, UserPlus, Layers, X } from 'lucide-react';
 import { toast } from 'sonner';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from '@/lib/localeFormat';
 import { cn } from '@/lib/utils';
 import { useIsDesktopApp } from '@/hooks/ui/useIsNativeApp';
 
@@ -81,6 +83,7 @@ function getItemDetails(item: any) {
 
 // Main Tier Lists page - list all public tier lists + user's own
 export default function TierListPage() {
+  useUiTranslation();
   const navigate = useNavigate();
   const isDesktopApp = useIsDesktopApp();
   const { user } = useAuth();
@@ -115,15 +118,15 @@ export default function TierListPage() {
               className="rounded-full gap-2 text-muted-foreground hover:text-foreground hover:bg-card/40"
             >
               <ArrowLeft className="w-4 h-4" />
-              <span>Back</span>
+              <span>{uiI18n.t('app.back_b52b36b7')}</span>
             </Button>
           </div>
 
           <div className="mb-8">
             <h1 className="font-display text-3xl md:text-5xl font-extrabold tracking-tight mb-2 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-              {editingTierList ? 'Edit Tier List' : 'Create Tier List'}
+              {editingTierList ? uiI18n.t('app.edit_tier_list_ad3c7aec') : uiI18n.t('app.create_tier_list_ca1d2be5')}
             </h1>
-            <p className="text-muted-foreground text-base">Rank, reorganize, and refine your anime tier lists.</p>
+            <p className="text-muted-foreground text-base">{uiI18n.t('app.rank_reorganize_and_refine_your_anime_tier_lists_002a379c')}</p>
           </div>
 
           <TierListEditor
@@ -152,7 +155,7 @@ export default function TierListPage() {
             className="rounded-full gap-2 text-muted-foreground hover:text-foreground hover:bg-card/40"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Back</span>
+            <span>{uiI18n.t('app.back_b52b36b7')}</span>
           </Button>
         </div>
 
@@ -160,9 +163,9 @@ export default function TierListPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
             <h1 className="font-display text-3xl md:text-5xl font-extrabold tracking-tight mb-2 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-              Tier Lists
+              {uiI18n.t('app.tier_lists_86752701')}
             </h1>
-            <p className="text-muted-foreground text-base">Explore community rankings or publish your own custom tiers.</p>
+            <p className="text-muted-foreground text-base">{uiI18n.t('app.explore_community_rankings_or_publish_your_own_c_73768722')}</p>
           </div>
           {user && (
             <Button 
@@ -170,7 +173,7 @@ export default function TierListPage() {
               className="rounded-full gap-2 px-6 h-11 shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all active:scale-95"
             >
               <Plus className="w-4 h-4" />
-              Create Tier List
+              {uiI18n.t('app.create_tier_list_ca1d2be5')}
             </Button>
           )}
         </div>
@@ -183,7 +186,7 @@ export default function TierListPage() {
                 className="rounded-full px-5 py-2 text-sm gap-2 transition-all data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md"
               >
                 <User className="w-4 h-4" />
-                My Lists
+                {uiI18n.t('app.my_lists_0621c8ef')}
               </TabsTrigger>
             )}
             <TabsTrigger 
@@ -191,7 +194,7 @@ export default function TierListPage() {
               className="rounded-full px-5 py-2 text-sm gap-2 transition-all data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md"
             >
               <Globe className="w-4 h-4" />
-              Community
+              {uiI18n.t('app.community_bfd58ee3')}
             </TabsTrigger>
           </TabsList>
 
@@ -200,20 +203,20 @@ export default function TierListPage() {
               {loadingUser ? (
                 <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-3">
                   <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-                  <span className="text-sm font-medium">Fetching your tier lists...</span>
+                  <span className="text-sm font-medium">{uiI18n.t('app.fetching_your_tier_lists_9ccb13f7')}</span>
                 </div>
               ) : userTierLists.length === 0 ? (
                 <div className="w-full flex flex-col items-center justify-center py-24 px-4 text-center bg-card/10 backdrop-blur-sm border border-dashed border-border/50 rounded-[2rem]">
                   <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4 text-primary">
                     <Layers className="w-8 h-8" />
                   </div>
-                  <h3 className="text-xl font-bold mb-2">No Tier Lists Yet</h3>
+                  <h3 className="text-xl font-bold mb-2">{uiI18n.t('app.no_tier_lists_yet_62a98ee7')}</h3>
                   <p className="text-muted-foreground max-w-sm mb-6 text-sm">
-                    Create custom rankings for your favorite anime, characters, or manga series.
+                    {uiI18n.t('app.create_custom_rankings_for_your_favorite_anime_c_1fae71e6')}
                   </p>
                   <Button onClick={handleCreate} className="rounded-full gap-2 px-6 h-11">
                     <Plus className="w-4 h-4" />
-                    Create Your First Tier List
+                    {uiI18n.t('app.create_your_first_tier_list_6d3ae656')}
                   </Button>
                 </div>
               ) : (
@@ -229,12 +232,12 @@ export default function TierListPage() {
             {loadingPublic ? (
               <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-3">
                 <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-                <span className="text-sm font-medium">Loading community tier lists...</span>
+                <span className="text-sm font-medium">{uiI18n.t('app.loading_community_tier_lists_8806c773')}</span>
               </div>
             ) : (
               <TierListGrid
                 tierLists={publicTierLists}
-                emptyMessage="No community tier lists found."
+                emptyMessage={uiI18n.t('app.no_community_tier_lists_found_3f40e024')}
               />
             )}
           </TabsContent>
@@ -248,6 +251,7 @@ export default function TierListPage() {
 
 // View a single tier list by share code
 export function TierListViewPage() {
+  useUiTranslation();
   const { shareCode } = useParams<{ shareCode: string }>();
   const navigate = useNavigate();
   const isDesktopApp = useIsDesktopApp();
@@ -298,18 +302,18 @@ export function TierListViewPage() {
   const handleShare = () => {
     const url = window.location.href;
     navigator.clipboard.writeText(url);
-    toast.success('Link copied to clipboard!');
+    toast.success(uiI18n.t('app.link_copied_to_clipboard_88574a26'));
   };
 
   const handleDelete = async () => {
-    if (!tierList || !(await confirm({ title: 'Are you sure you want to delete this tier list?', destructive: true }))) return;
+    if (!tierList || !(await confirm({ get title() { return uiI18n.t('app.are_you_sure_you_want_to_delete_this_tier_list_b7b3b88b'); }, destructive: true }))) return;
 
     try {
       await deleteMutation.mutateAsync(tierList.id);
-      toast.success('Tier list deleted');
+      toast.success(uiI18n.t('app.tier_list_deleted_940ae950'));
       navigate('/tierlists');
     } catch {
-      toast.error('Failed to delete tier list');
+      toast.error(uiI18n.t('app.failed_to_delete_tier_list_9b40554c'));
     }
   };
 
@@ -348,7 +352,7 @@ export function TierListViewPage() {
     const { isCharacter, isManga, isNovel, title } = getItemDetails(item);
     
     if (isCharacter || isManga || isNovel) {
-      toast.info('Watch rooms can only be launched for anime entries');
+      toast.info(uiI18n.t('app.watch_rooms_can_only_be_launched_for_anime_entri_9e96cfcc'));
       return;
     }
 
@@ -371,7 +375,7 @@ export function TierListViewPage() {
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="flex flex-col items-center gap-3 text-muted-foreground">
           <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-          <span className="text-sm font-medium">Loading tier list...</span>
+          <span className="text-sm font-medium">{uiI18n.t('app.loading_tier_list_0ac866a4')}</span>
         </div>
       </div>
     );
@@ -384,12 +388,12 @@ export function TierListViewPage() {
           <div className="w-12 h-12 bg-muted/50 rounded-full flex items-center justify-center mx-auto mb-4 text-muted-foreground">
             <Lock className="w-6 h-6" />
           </div>
-          <h2 className="text-xl font-bold mb-2">Tier List Unavailable</h2>
+          <h2 className="text-xl font-bold mb-2">{uiI18n.t('app.tier_list_unavailable_d2335e89')}</h2>
           <p className="text-muted-foreground text-sm mb-6">
-            This tier list might be private or may have been deleted.
+            {uiI18n.t('app.this_tier_list_might_be_private_or_may_have_been_0ff2a8e0')}
           </p>
           <Button onClick={() => navigate('/tierlists')} className="rounded-full px-6 w-full">
-            Browse Tier Lists
+            {uiI18n.t('app.browse_tier_lists_ec0f08c5')}
           </Button>
         </div>
       </div>
@@ -411,15 +415,15 @@ export function TierListViewPage() {
             className="rounded-full gap-2 text-muted-foreground hover:text-foreground hover:bg-card/40"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Back</span>
+            <span>{uiI18n.t('app.back_b52b36b7')}</span>
           </Button>
         </div>
 
         {/* Tier List Card Header */}
         {tierList && (
           <Seo
-            title={tierList.name || (tierList as any).title || 'Tier List'}
-            description={tierList.description || `A tier list by ${tierList.profiles?.display_name || tierList.profiles?.username || 'a Tatakai member'}.`}
+            title={tierList.name || (tierList as any).title || uiI18n.t('app.tier_list_63062d48')}
+            description={tierList.description || uiI18n.t('app.a_tier_list_by_i18n_value_0_11665551', { value0: tierList.profiles?.display_name || tierList.profiles?.username || 'a Tatakai member' })}
             canonicalPath={`/tierlist/${shareCode}`}
             kind="website"
             suffix=" — Tatakai Tier List"
@@ -434,12 +438,12 @@ export function TierListViewPage() {
                 {tierList.is_public ? (
                   <>
                     <Globe className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Public Tier List</span>
+                    <span>{uiI18n.t('app.public_tier_list_9b2bc407')}</span>
                   </>
                 ) : (
                   <>
                     <Lock className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Private Tier List</span>
+                    <span>{uiI18n.t('app.private_tier_list_efd6398f')}</span>
                   </>
                 )}
               </div>
@@ -463,10 +467,10 @@ export function TierListViewPage() {
                   size="sm"
                   onClick={() => setShowCollaboratorsModal(true)}
                   className="rounded-full gap-2 bg-card/30 border-border/50 hover:bg-card/60 backdrop-blur-md relative"
-                  title="Manage Collaborators"
+                  title={uiI18n.t('app.manage_collaborators_6d4b6966')}
                 >
                   <Users className="w-4 h-4 text-primary" />
-                  <span>Collaborators</span>
+                  <span>{uiI18n.t('app.collaborators_6eb695e5')}</span>
                   {collaborators.length > 0 && (
                     <span className="ml-1 px-1.5 py-0.5 rounded-full bg-primary/20 text-primary text-xs font-bold">
                       {collaborators.length}
@@ -482,7 +486,7 @@ export function TierListViewPage() {
                 className="rounded-full gap-2 bg-card/30 border-border/50 hover:bg-card/60 backdrop-blur-md"
               >
                 <Share2 className="w-4 h-4" />
-                <span>Share</span>
+                <span>{uiI18n.t('app.share_09ca55ca')}</span>
               </Button>
 
               {canEdit && (
@@ -493,7 +497,7 @@ export function TierListViewPage() {
                   className="rounded-full gap-2 bg-card/30 border-border/50 hover:bg-card/60 backdrop-blur-md"
                 >
                   <Edit className="w-4 h-4" />
-                  <span>Edit</span>
+                  <span>{uiI18n.t('app.edit_5301648d')}</span>
                 </Button>
               )}
 
@@ -506,7 +510,7 @@ export function TierListViewPage() {
                   className="rounded-full gap-2 bg-rose-500/10 border-rose-500/20 text-rose-400 hover:bg-rose-500/20 hover:text-rose-300 backdrop-blur-md"
                 >
                   <Trash2 className="w-4 h-4" />
-                  <span>Delete</span>
+                  <span>{uiI18n.t('app.delete_f6fdbe48')}</span>
                 </Button>
               )}
             </div>
@@ -527,10 +531,10 @@ export function TierListViewPage() {
                 </Avatar>
                 <div>
                   <p className="font-semibold text-sm group-hover:text-primary transition-colors">
-                    {tierList.profiles.username || tierList.profiles.display_name || 'Anonymous'}
+                    {tierList.profiles.username || tierList.profiles.display_name || uiI18n.t('app.anonymous_9bed5104')}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Created {formatDistanceToNow(new Date(tierList.created_at), { addSuffix: true })}
+                    {uiI18n.t('app.created_accf40c8')} {formatDistanceToNow(new Date(tierList.created_at), { addSuffix: true })}
                   </p>
                 </div>
               </Link>
@@ -538,12 +542,12 @@ export function TierListViewPage() {
               <div className="flex items-center gap-5 text-xs font-medium text-muted-foreground bg-muted/20 px-4 py-2 rounded-full border border-white/5 self-start sm:self-auto">
                 <span className="flex items-center gap-1.5">
                   <Eye className="w-4 h-4" />
-                  {tierList.views_count || 0} views
+                  {tierList.views_count || 0} {uiI18n.t('app.views_81f33187')}
                 </span>
                 <span className="w-1 h-1 rounded-full bg-border" />
                 <span className="flex items-center gap-1.5">
                   <Heart className={cn("w-4 h-4", tierList.user_liked && "text-rose-500 fill-current")} />
-                  {tierList.likes_count || 0} likes
+                  {tierList.likes_count || 0} {uiI18n.t('app.likes_aecba335')}
                 </span>
               </div>
             </div>
@@ -562,7 +566,7 @@ export function TierListViewPage() {
               <div className="flex items-center justify-between pb-3 border-b border-border/30">
                 <div className="flex items-center gap-2">
                   <Users className="w-5 h-5 text-primary" />
-                  <h2 className="font-bold text-lg">Manage Collaborators</h2>
+                  <h2 className="font-bold text-lg">{uiI18n.t('app.manage_collaborators_6d4b6966')}</h2>
                 </div>
                 <Button
                   variant="ghost"
@@ -577,11 +581,11 @@ export function TierListViewPage() {
               {/* Existing Collaborators */}
               <div className="space-y-3">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  Current Collaborators
+                  {uiI18n.t('app.current_collaborators_4db127dd')}
                 </p>
 
                 {collaborators.length === 0 ? (
-                  <p className="text-sm text-muted-foreground italic py-2">No collaborators added yet.</p>
+                  <p className="text-sm text-muted-foreground italic py-2">{uiI18n.t('app.no_collaborators_added_yet_1edbfbf2')}</p>
                 ) : (
                   collaborators.map((collaborator) => {
                     const displayName = collaborator.profile?.display_name || collaborator.profile?.username || collaborator.user_id;
@@ -595,7 +599,7 @@ export function TierListViewPage() {
 
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-semibold truncate">{displayName}</p>
-                          <p className="text-xs text-muted-foreground truncate">@{collaborator.profile?.username || 'unknown'}</p>
+                          <p className="text-xs text-muted-foreground truncate">@{collaborator.profile?.username || uiI18n.t('app.unknown_50d8b4a9')}</p>
                         </div>
 
                         {canManageCollaborators ? (
@@ -605,9 +609,9 @@ export function TierListViewPage() {
                               onChange={(event) => handleUpdateCollaboratorRole(collaborator.id, event.target.value as TierCollaboratorRole)}
                               className="h-8 rounded-full border border-border/60 bg-background/80 px-3 text-xs font-medium focus:ring-1 focus:ring-primary"
                             >
-                              <option value="viewer">viewer</option>
-                              <option value="editor">editor</option>
-                              <option value="owner">owner</option>
+                              <option value="viewer">{uiI18n.t('app.viewer_40b4f25b')}</option>
+                              <option value="editor">{uiI18n.t('app.editor_ab419498')}</option>
+                              <option value="owner">{uiI18n.t('app.owner_579233b2')}</option>
                             </select>
                             <Button
                               variant="ghost"
@@ -634,14 +638,14 @@ export function TierListViewPage() {
                 <div className="pt-4 border-t border-border/30 space-y-3">
                   <div className="flex items-center gap-2 text-sm font-semibold">
                     <UserPlus className="w-4 h-4 text-primary" />
-                    Add New Collaborator
+                    {uiI18n.t('app.add_new_collaborator_6fbcb6c1')}
                   </div>
 
                   <div className="flex gap-2">
                     <Input
                       value={collaboratorSearch}
                       onChange={(event) => setCollaboratorSearch(event.target.value)}
-                      placeholder="Search username or display name..."
+                      placeholder={uiI18n.t('app.search_username_or_display_name_6e1ccde6')}
                       className="rounded-full bg-background/50 border-border/50"
                     />
                     <select
@@ -649,16 +653,16 @@ export function TierListViewPage() {
                       onChange={(event) => setNewCollaboratorRole(event.target.value as TierCollaboratorRole)}
                       className="h-10 rounded-full border border-border/50 bg-background/50 px-3 text-sm font-medium focus:ring-1 focus:ring-primary"
                     >
-                      <option value="viewer">viewer</option>
-                      <option value="editor">editor</option>
-                      <option value="owner">owner</option>
+                      <option value="viewer">{uiI18n.t('app.viewer_40b4f25b')}</option>
+                      <option value="editor">{uiI18n.t('app.editor_ab419498')}</option>
+                      <option value="owner">{uiI18n.t('app.owner_579233b2')}</option>
                     </select>
                   </div>
 
                   {collaboratorSearch.trim().length >= 2 && (
                     <div className="max-h-44 overflow-y-auto rounded-2xl border border-border/50 bg-card/60 backdrop-blur-md divide-y divide-border/30">
                       {collaboratorSearchResults.length === 0 ? (
-                        <p className="text-sm text-muted-foreground p-3.5 text-center">No matching users found.</p>
+                        <p className="text-sm text-muted-foreground p-3.5 text-center">{uiI18n.t('app.no_matching_users_found_0c73523f')}</p>
                       ) : (
                         collaboratorSearchResults.map((profile) => {
                           const displayName = profile.display_name || profile.username || profile.user_id;
@@ -672,11 +676,11 @@ export function TierListViewPage() {
 
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium truncate">{displayName}</p>
-                                <p className="text-xs text-muted-foreground truncate">@{profile.username || 'unknown'}</p>
+                                <p className="text-xs text-muted-foreground truncate">@{profile.username || uiI18n.t('app.unknown_50d8b4a9')}</p>
                               </div>
 
                               <Button size="sm" onClick={() => handleAddCollaborator(profile.user_id)} className="rounded-full px-4 h-8 text-xs">
-                                Add
+                                {uiI18n.t('app.add_61cc55aa')}
                               </Button>
                             </div>
                           );
@@ -743,7 +747,7 @@ export function TierListViewPage() {
                               handleWatchWithFriends(item);
                             }}
                             className="absolute top-1.5 right-1.5 h-7 w-7 rounded-full bg-black/70 backdrop-blur-md border border-white/20 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:bg-primary hover:border-primary shadow-lg"
-                            title="Watch with friends"
+                            title={uiI18n.t('app.watch_with_friends_ecd25342')}
                           >
                             <Users className="w-3.5 h-3.5" />
                           </button>
@@ -754,7 +758,7 @@ export function TierListViewPage() {
 
                   {tierItems.length === 0 && (
                     <div className="flex items-center justify-center w-full h-full text-muted-foreground/40 text-xs font-medium italic">
-                      No items in this tier
+                      {uiI18n.t('app.no_items_in_this_tier_9e3f4676')}
                     </div>
                   )}
                 </div>

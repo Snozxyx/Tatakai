@@ -1,5 +1,7 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMemo, useState } from 'react';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from '@/lib/localeFormat';
 import { Heart, Edit2, Trash2, Save, X, Loader2, Reply } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -54,6 +56,7 @@ export function CommentReplies({
   /** Reply id to transiently highlight (deep-link scroll target). */
   highlightId?: string | null;
 }) {
+  useUiTranslation();
   const { data: replies = [], isLoading } = useReplies(parentId);
   const replierIds = useMemo(
     () => [...new Set(replies.map((r) => r.user_id).filter(Boolean))],
@@ -64,7 +67,7 @@ export function CommentReplies({
   if (isLoading) {
     return (
       <div className="mt-2 flex items-center gap-2 pl-11 text-xs text-muted-foreground">
-        <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading replies…
+        <Loader2 className="h-3.5 w-3.5 animate-spin" /> {uiI18n.t('app.loading_replies_433e72b3')}
       </div>
     );
   }
@@ -118,6 +121,7 @@ function ReplyRow({
   onScreenEpisodeId?: string;
   highlightId?: string | null;
 }) {
+  useUiTranslation();
   const editComment = useEditComment();
   const deleteComment = useDeleteComment();
   const likeComment = useLikeComment();
@@ -219,7 +223,7 @@ function ReplyRow({
       <div className="min-w-0 flex-1">
         <div className="mb-0.5 flex flex-wrap items-center gap-2">
           <span className={cn('text-sm font-semibold truncate', ns.className)} style={ns.style}>
-            {reply.profile?.display_name || 'User'}
+            {reply.profile?.display_name || uiI18n.t('app.user_9f8a2389')}
           </span>
           <RankBadge score={reply.profile?.total_episodes || 0} size="xs" showName={false} />
           <UserBadges badges={badges} size={12} />
@@ -243,10 +247,10 @@ function ReplyRow({
             />
             <div className="flex gap-2">
               <Button size="sm" onClick={saveEdit} disabled={editComment.isPending} className="h-7 gap-1 text-xs">
-                <Save className="h-3 w-3" /> Save
+                <Save className="h-3 w-3" /> {uiI18n.t('app.save_efc007a3')}
               </Button>
               <Button size="sm" variant="ghost" onClick={() => setEditing(false)} className="h-7 gap-1 text-xs">
-                <X className="h-3 w-3" /> Cancel
+                <X className="h-3 w-3" /> {uiI18n.t('app.cancel_77dfd213')}
               </Button>
             </div>
           </div>
@@ -274,7 +278,7 @@ function ReplyRow({
                   onClick={() => setReplying((r) => !r)}
                   className="flex items-center gap-1 rounded-lg px-2 py-0.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all"
                 >
-                  <Reply className="h-3 w-3" /> Reply
+                  <Reply className="h-3 w-3" /> {uiI18n.t('app.reply_6c2bb735')}
                 </button>
               )}
               {isOwn && (
@@ -283,15 +287,15 @@ function ReplyRow({
                     onClick={() => { setDraft(reply.content ?? ''); setEditing(true); }}
                     className="flex items-center gap-1 rounded-lg px-2 py-0.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all"
                   >
-                    <Edit2 className="h-3 w-3" /> Edit
+                    <Edit2 className="h-3 w-3" /> {uiI18n.t('app.edit_5301648d')}
                   </button>
                   <button
                     onClick={async () => {
-                      if (await confirm({ title: 'Delete this reply?', destructive: true })) deleteComment.mutate(reply.id);
+                      if (await confirm({ get title() { return uiI18n.t('app.delete_this_reply_100e8d03'); }, destructive: true })) deleteComment.mutate(reply.id);
                     }}
                     className="flex items-center gap-1 rounded-lg px-2 py-0.5 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all"
                   >
-                    <Trash2 className="h-3 w-3" /> Delete
+                    <Trash2 className="h-3 w-3" /> {uiI18n.t('app.delete_f6fdbe48')}
                   </button>
                 </>
               )}
@@ -310,7 +314,7 @@ function ReplyRow({
                   submitting={addComment.isPending}
                   onSubmit={submitReply}
                   onCancel={() => setReplying(false)}
-                  placeholder={`Reply to ${reply.profile?.display_name || 'this comment'}…`}
+                  placeholder={uiI18n.t('app.reply_to_i18n_value_0_89f8191b', { value0: reply.profile?.display_name || 'this comment' })}
                 />
               </div>
             )}

@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useQuery } from '@tanstack/react-query';
 
 /**
@@ -56,7 +58,7 @@ async function fetchAiringWindow(startSec: number, endSec: number): Promise<Airi
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({ query: QUERY, variables: { start: startSec, end: endSec, page }, forceUpstream: true }),
     });
-    if (!res.ok) throw new Error(`AniList request failed (${res.status})`);
+    if (!res.ok) throw new Error(uiI18n.t('app.anilist_request_failed_i18n_value_0_9455a5b4', { value0: res.status }));
     const json = await res.json();
     const p = json?.data?.Page;
     const schedules: any[] = p?.airingSchedules ?? [];
@@ -87,6 +89,7 @@ async function fetchAiringWindow(startSec: number, endSec: number): Promise<Airi
  * (a Date at local midnight). Cached per week.
  */
 export function useAiringSchedule(weekStart: Date) {
+  useUiTranslation();
   const startSec = Math.floor(weekStart.getTime() / 1000);
   const endSec = startSec + 7 * 24 * 60 * 60;
 

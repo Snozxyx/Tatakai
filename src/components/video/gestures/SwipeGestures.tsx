@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 
 interface SwipeGesturesProps {
   onSwipeUp?: (delta: number) => void;
@@ -15,6 +16,7 @@ export function SwipeGestures({
   onSwipeRight,
   children,
 }: SwipeGesturesProps) {
+  const { t } = useTranslation();
   const [gestureType, setGestureType] = useState<"brightness" | "volume" | "seek" | null>(null);
   const [gestureValue, setGestureValue] = useState(0);
   const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
@@ -101,19 +103,19 @@ export function SwipeGestures({
           <div className="bg-black/70 backdrop-blur-sm rounded-xl px-6 py-3 text-white text-sm font-bold flex flex-col items-center gap-1">
             {gestureType === "brightness" && (
               <>
-                <span className="text-xs text-white/60">Brightness</span>
+                <span className="text-xs text-white/60">{t('player.gestureBrightness')}</span>
                 <span className="text-2xl">{Math.round(50 + gestureValue * 0.5)}%</span>
               </>
             )}
             {gestureType === "volume" && (
               <>
-                <span className="text-xs text-white/60">Volume</span>
+                <span className="text-xs text-white/60">{t('player.gestureVolume')}</span>
                 <span className="text-2xl">{Math.round(50 + gestureValue * 0.5)}%</span>
               </>
             )}
             {gestureType === "seek" && (
               <>
-                <span className="text-xs text-white/60">Seek</span>
+                <span className="text-xs text-white/60">{t('player.gestureSeek')}</span>
                 <span className="text-2xl">{gestureValue > 0 ? "+" : ""}{Math.round(gestureValue * 10)}s</span>
               </>
             )}

@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -53,11 +55,11 @@ export interface NovelReaderSettings {
 }
 
 export const NOVEL_FONT_PRESETS: Array<{ key: string; label: string; stack: string }> = [
-  { key: 'default', label: 'Default', stack: `Inter, system-ui, -apple-system, "Segoe UI", sans-serif` },
-  { key: 'sans', label: 'Sans', stack: `"Source Sans 3", Inter, system-ui, sans-serif` },
-  { key: 'georgia', label: 'Georgia', stack: `Georgia, "Times New Roman", serif` },
-  { key: 'lora', label: 'Lora', stack: `Lora, Georgia, serif` },
-  { key: 'dyslexic', label: 'Dyslexic', stack: `"OpenDyslexic", "Comic Sans MS", Verdana, sans-serif` },
+  { key: 'default', get label() { return uiI18n.t('app.default_808d7dca'); }, stack: `Inter, system-ui, -apple-system, "Segoe UI", sans-serif` },
+  { key: 'sans', get label() { return uiI18n.t('app.sans_c1ccf83e'); }, stack: `"Source Sans 3", Inter, system-ui, sans-serif` },
+  { key: 'georgia', get label() { return uiI18n.t('app.georgia_9113c6c0'); }, stack: `Georgia, "Times New Roman", serif` },
+  { key: 'lora', get label() { return uiI18n.t('app.lora_dbdc021e'); }, stack: `Lora, Georgia, serif` },
+  { key: 'dyslexic', get label() { return uiI18n.t('app.dyslexic_532333b2'); }, stack: `"OpenDyslexic", "Comic Sans MS", Verdana, sans-serif` },
 ];
 
 const DEFAULT_SETTINGS: NovelReaderSettings = {
@@ -153,6 +155,7 @@ export function resolveFontStack(font: string, customFonts: Array<{ name: string
 }
 
 export function useNovelReaderSettings() {
+  useUiTranslation();
   const { user, profile } = useAuth();
   const [settings, setSettings] = useState<NovelReaderSettings>(() => loadFromStorage());
   const [customFonts, setCustomFonts] = useState<Array<{ name: string; family: string }>>([]);

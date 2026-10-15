@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 
 interface LongPressSpeedProps {
   onLongPressStart: () => void;
@@ -7,6 +8,7 @@ interface LongPressSpeedProps {
 }
 
 export function LongPressSpeed({ onLongPressStart, onLongPressEnd, children }: LongPressSpeedProps) {
+  const { t } = useTranslation();
   const [isActive, setIsActive] = useState(false);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isLongPressRef = useRef(false);
@@ -63,7 +65,7 @@ export function LongPressSpeed({ onLongPressStart, onLongPressEnd, children }: L
       {isActive && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 pointer-events-none">
           <div className="bg-primary/90 backdrop-blur-sm rounded-full px-4 py-1.5 text-white text-xs font-bold shadow-lg animate-pulse">
-            2x Speed
+            {t('player.doubleSpeed')}
           </div>
         </div>
       )}

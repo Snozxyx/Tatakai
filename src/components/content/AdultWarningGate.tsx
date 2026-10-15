@@ -1,5 +1,8 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { ShieldAlert } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 
 export interface AdultWarningGateProps {
@@ -14,11 +17,13 @@ export interface AdultWarningGateProps {
 
 export function AdultWarningGate({
   title,
-  mediaLabel = 'title',
+  mediaLabel = uiI18n.t('app.title_3c6de1b7'),
   onBack,
   onContinue,
   onAlwaysShow,
 }: AdultWarningGateProps) {
+  useUiTranslation();
+  const { t } = useTranslation();
   return (
     <div className="flex w-full items-center justify-center p-4 py-12 md:py-24">
       <motion.div 
@@ -29,18 +34,18 @@ export function AdultWarningGate({
       >
         {/* Full-bleed Header Image */}
         <div className="relative h-32 w-full md:h-40">
-          <img
-            src={`${import.meta.env.BASE_URL}assets/image/content/manga18+.jpg`}
-            alt="18+ Content Banner"
-            className="h-full w-full object-cover"
-          />
+            <img
+              src={`${import.meta.env.BASE_URL}assets/image/content/manga18+.jpg`}
+              alt={t('discover.matureBannerAlt')}
+              className="h-full w-full object-cover"
+            />
           <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/60 to-black/20" />
           
           {/* Badge */}
           <div className="absolute bottom-4 left-0 flex w-full justify-center">
             <div className="flex items-center gap-1.5 rounded-full border border-rose-500/30 bg-rose-500/10 px-3 py-1 text-[11px] font-bold uppercase tracking-widest text-rose-400 backdrop-blur-md">
               <ShieldAlert className="h-3.5 w-3.5" />
-              18+ Mature Content
+              {t('discover.matureBadge')}
             </div>
           </div>
         </div>
@@ -48,16 +53,16 @@ export function AdultWarningGate({
         {/* Content Body */}
         <div className="px-6 pb-8 pt-6 text-center md:px-8">
           <h1 className="font-display text-2xl font-bold tracking-tight text-white md:text-3xl">
-            Sensitive Content
+            {t('discover.sensitiveContent')}
           </h1>
           <p className="mx-auto mt-3 max-w-[320px] text-[15px] leading-relaxed text-muted-foreground/90">
-            This {mediaLabel} is marked as mature. Please proceed only if you are comfortable viewing 18+ material.
+            {t('discover.matureWarning', { mediaLabel })}
           </p>
 
           {/* Title Box */}
           <div className="mx-auto mt-5 inline-flex max-w-full items-center justify-center rounded-xl border border-white/5 bg-white/[0.02] px-4 py-2.5">
             <span className="truncate text-sm font-semibold text-white/90">
-              {title || 'Unknown Title'}
+              {title || t('discover.unknownTitle')}
             </span>
           </div>
 
@@ -68,13 +73,13 @@ export function AdultWarningGate({
               onClick={onBack} 
               className="w-full sm:w-32 rounded-full font-semibold hover:bg-white/5"
             >
-              Go Back
+              {t('common.back')}
             </Button>
             <Button 
               onClick={onContinue} 
               className="w-full sm:w-auto rounded-full bg-rose-600 hover:bg-rose-700 text-white font-bold transition-all active:scale-95 px-8"
             >
-              Continue
+              {t('common.confirm')}
             </Button>
           </div>
 
@@ -85,7 +90,7 @@ export function AdultWarningGate({
               className="group text-[13px] font-medium text-muted-foreground transition-colors hover:text-white"
             >
               <span className="underline decoration-white/30 underline-offset-4 transition-colors group-hover:decoration-white">
-                Always show mature media
+                {t('discover.alwaysShowMature')}
               </span>
             </button>
           </div>

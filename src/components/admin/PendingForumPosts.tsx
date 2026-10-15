@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState } from 'react';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Button } from '@/components/ui/button';
@@ -5,12 +7,13 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { usePendingForumPosts, useApproveForumPost, useRejectForumPost } from '@/hooks/community/useForum';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from '@/lib/localeFormat';
 import { Search, CheckCircle, XCircle, Image as ImageIcon, Eye, User, AlertTriangle } from 'lucide-react';
 import { getProxiedImageUrl } from '@/lib/api';
 import { useToast } from '@/hooks/ui/use-toast';
 
 export function PendingForumPosts() {
+  useUiTranslation();
   const [searchTerm, setSearchTerm] = useState('');
   const { data: posts, isLoading } = usePendingForumPosts();
   const approvePost = useApproveForumPost();
@@ -20,18 +23,18 @@ export function PendingForumPosts() {
   const handleApprove = async (postId: string) => {
     try {
       await approvePost.mutateAsync({ postId });
-      toast({ title: 'Post approved successfully' });
+      toast({ get title() { return uiI18n.t('app.post_approved_successfully_00637a0c'); } });
     } catch (error) {
-      toast({ title: 'Failed to approve post', variant: 'destructive' });
+      toast({ get title() { return uiI18n.t('app.failed_to_approve_post_96ba3ceb'); }, variant: 'destructive' });
     }
   };
 
   const handleReject = async (postId: string) => {
     try {
       await rejectPost.mutateAsync({ postId });
-      toast({ title: 'Post rejected and deleted' });
+      toast({ get title() { return uiI18n.t('app.post_rejected_and_deleted_fb5005c5'); } });
     } catch (error) {
-      toast({ title: 'Failed to reject post', variant: 'destructive' });
+      toast({ get title() { return uiI18n.t('app.failed_to_reject_post_30bc4004'); }, variant: 'destructive' });
     }
   };
 
@@ -49,20 +52,20 @@ export function PendingForumPosts() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-white">Pending Forum Posts</h2>
+          <h2 className="text-2xl font-bold text-white">{uiI18n.t('app.pending_forum_posts_88849904')}</h2>
           <p className="text-sm text-gray-400 mt-1">
-            Review and approve forum posts with images
+            {uiI18n.t('app.review_and_approve_forum_posts_with_images_e54e6049')}
           </p>
         </div>
         <Badge variant="secondary" className="text-lg px-4 py-2">
-          {filteredPosts?.length || 0} Pending
+          {filteredPosts?.length || 0} {uiI18n.t('app.pending_96f608c1')}
         </Badge>
       </div>
 
       <div className="relative">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
         <Input
-          placeholder="Search by title, content, or user..."
+          placeholder={uiI18n.t('app.search_by_title_content_or_user_2e05420d')}
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-gray-400"
@@ -71,7 +74,7 @@ export function PendingForumPosts() {
 
       {isLoading ? (
         <GlassPanel className="p-8 text-center">
-          <p className="text-gray-400">Loading pending posts...</p>
+          <p className="text-gray-400">{uiI18n.t('app.loading_pending_posts_de30214e')}</p>
         </GlassPanel>
       ) : filteredPosts && filteredPosts.length > 0 ? (
         <div className="grid gap-6">
@@ -94,10 +97,10 @@ export function PendingForumPosts() {
                     </Avatar>
                     <div>
                       <p className="font-medium text-white">
-                        {post.profiles?.display_name || post.profiles?.username || 'Unknown User'}
+                        {post.profiles?.display_name || post.profiles?.username || uiI18n.t('app.unknown_user_3511814c')}
                       </p>
                       <p className="text-sm text-gray-400">
-                        @{post.profiles?.username || 'unknown'} •{' '}
+                        @{post.profiles?.username || uiI18n.t('app.unknown_50d8b4a9')} •{' '}
                         {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
                       </p>
                     </div>
@@ -110,13 +113,13 @@ export function PendingForumPosts() {
                     {post.is_spoiler && (
                       <Badge variant="destructive" className="gap-1">
                         <AlertTriangle className="w-3 h-3" />
-                        Spoiler
+                        {uiI18n.t('app.spoiler_875786ee')}
                       </Badge>
                     )}
                     {post.image_url && (
                       <Badge variant="secondary" className="gap-1">
                         <ImageIcon className="w-3 h-3" />
-                        Image
+                        {uiI18n.t('app.image_50e19fda')}
                       </Badge>
                     )}
                   </div>
@@ -133,7 +136,7 @@ export function PendingForumPosts() {
                   <div className="rounded-lg overflow-hidden border border-white/10">
                     <img
                       src={post.image_url}
-                      alt="Post image"
+                      alt={uiI18n.t('app.post_image_60174630')}
                       className="w-full max-h-96 object-contain bg-black/20"
                     />
                   </div>
@@ -147,7 +150,7 @@ export function PendingForumPosts() {
                     className="gap-2 bg-green-600 hover:bg-green-700"
                   >
                     <CheckCircle className="w-4 h-4" />
-                    Approve
+                    {uiI18n.t('app.approve_7b2c7f14')}
                   </Button>
                   <Button
                     onClick={() => handleReject(post.id)}
@@ -156,7 +159,7 @@ export function PendingForumPosts() {
                     className="gap-2"
                   >
                     <XCircle className="w-4 h-4" />
-                    Reject
+                    {uiI18n.t('app.reject_2b03b592')}
                   </Button>
                   <Button
                     onClick={() => window.open(`/community/forum/${post.id}`, '_blank')}
@@ -164,7 +167,7 @@ export function PendingForumPosts() {
                     className="gap-2 ml-auto"
                   >
                     <Eye className="w-4 h-4" />
-                    Preview
+                    {uiI18n.t('app.preview_f1fbb2b4')}
                   </Button>
                 </div>
               </div>
@@ -175,7 +178,7 @@ export function PendingForumPosts() {
         <GlassPanel className="p-8 text-center">
           <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-4" />
           <p className="text-gray-400">
-            {searchTerm ? 'No pending posts match your search' : 'All caught up! No posts pending approval.'}
+            {searchTerm ? uiI18n.t('app.no_pending_posts_match_your_search_ed2251db') : uiI18n.t('app.all_caught_up_no_posts_pending_approval_27739d2a')}
           </p>
         </GlassPanel>
       )}

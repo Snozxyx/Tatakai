@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -28,6 +30,7 @@ export interface Suggestion {
 
 // Fetch user's own suggestions
 export function useUserSuggestions() {
+  useUiTranslation();
   const { user } = useAuth();
 
   return useQuery<Suggestion[]>({
@@ -50,6 +53,7 @@ export function useUserSuggestions() {
 
 // Fetch all suggestions (admin and moderator)
 export function useAllSuggestions() {
+  useUiTranslation();
   const { isAdmin, isModerator } = useAuth();
 
   return useQuery<Suggestion[]>({
@@ -84,6 +88,7 @@ export function useAllSuggestions() {
 
 // Create suggestion
 export function useCreateSuggestion() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
@@ -94,7 +99,7 @@ export function useCreateSuggestion() {
       category: Suggestion['category'];
       image_url?: string;
     }) => {
-      if (!user) throw new Error('Must be logged in');
+      if (!user) throw new Error(uiI18n.t('app.must_be_logged_in_9cf435d8'));
 
       const { data, error } = await supabase
         .from('user_suggestions')
@@ -126,16 +131,17 @@ export function useCreateSuggestion() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user_suggestions'] });
-      toast.success('Suggestion submitted successfully!');
+      toast.success(uiI18n.t('app.suggestion_submitted_successfully_fd77f3a2'));
     },
     onError: () => {
-      toast.error('Failed to submit suggestion');
+      toast.error(uiI18n.t('app.failed_to_submit_suggestion_75b3eeb9'));
     },
   });
 }
 
 // Update suggestion (user can only update pending, admin can update any)
 export function useUpdateSuggestion() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
@@ -151,16 +157,17 @@ export function useUpdateSuggestion() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user_suggestions'] });
       queryClient.invalidateQueries({ queryKey: ['all_suggestions'] });
-      toast.success('Suggestion updated');
+      toast.success(uiI18n.t('app.suggestion_updated_dcc673f9'));
     },
     onError: () => {
-      toast.error('Failed to update suggestion');
+      toast.error(uiI18n.t('app.failed_to_update_suggestion_32fde31b'));
     },
   });
 }
 
 // Delete suggestion
 export function useDeleteSuggestion() {
+  useUiTranslation();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -175,16 +182,17 @@ export function useDeleteSuggestion() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user_suggestions'] });
       queryClient.invalidateQueries({ queryKey: ['all_suggestions'] });
-      toast.success('Suggestion deleted');
+      toast.success(uiI18n.t('app.suggestion_deleted_03961a2a'));
     },
     onError: () => {
-      toast.error('Failed to delete suggestion');
+      toast.error(uiI18n.t('app.failed_to_delete_suggestion_1946fb23'));
     },
   });
 }
 
 // Admin/Moderator: Update suggestion status
 export function useReviewSuggestion() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user, isAdmin, isModerator } = useAuth();
 
@@ -200,7 +208,7 @@ export function useReviewSuggestion() {
       priority?: Suggestion['priority'];
       adminNotes?: string;
     }) => {
-      if (!user || (!isAdmin && !isModerator)) throw new Error('Admin or moderator access required');
+      if (!user || (!isAdmin && !isModerator)) throw new Error(uiI18n.t('app.admin_or_moderator_access_required_2b533dec'));
 
       const { error } = await supabase
         .from('user_suggestions')
@@ -226,10 +234,10 @@ export function useReviewSuggestion() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['all_suggestions'] });
       queryClient.invalidateQueries({ queryKey: ['admin_logs'] });
-      toast.success('Suggestion reviewed');
+      toast.success(uiI18n.t('app.suggestion_reviewed_9130f70e'));
     },
     onError: () => {
-      toast.error('Failed to review suggestion');
+      toast.error(uiI18n.t('app.failed_to_review_suggestion_1f90ea43'));
     },
   });
 }

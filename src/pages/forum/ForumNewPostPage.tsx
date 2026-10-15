@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Sidebar } from '@/components/layout/Sidebar';
@@ -24,6 +26,7 @@ import {
 } from '@/components/ui/select';
 
 export default function ForumNewPostPage() {
+  useUiTranslation();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -53,13 +56,13 @@ export default function ForumNewPostPage() {
   const acceptImageFile = (file: File) => {
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      toast({ title: 'Please select an image file', variant: 'destructive' });
+      toast({ get title() { return uiI18n.t('app.please_select_an_image_file_b1d184e9'); }, variant: 'destructive' });
       return;
     }
 
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      toast({ title: 'Image must be less than 5MB', variant: 'destructive' });
+      toast({ get title() { return uiI18n.t('app.image_must_be_less_than_5mb_7b2cdf22'); }, variant: 'destructive' });
       return;
     }
 
@@ -87,7 +90,7 @@ export default function ForumNewPostPage() {
     e.preventDefault();
 
     if (!title.trim() || !content.trim()) {
-      toast({ title: 'Please fill in all required fields', variant: 'destructive' });
+      toast({ get title() { return uiI18n.t('app.please_fill_in_all_required_fields_47aab3e1'); }, variant: 'destructive' });
       return;
     }
 
@@ -113,18 +116,18 @@ export default function ForumNewPostPage() {
 
       if (imageUrl) {
         toast({
-          title: 'Post submitted for approval',
-          description: 'Posts with images require admin approval before they appear publicly.'
+          get title() { return uiI18n.t('app.post_submitted_for_approval_4ce5da04'); },
+          get description() { return uiI18n.t('app.posts_with_images_require_admin_approval_before__5d603138'); }
         });
         navigate('/community');
       } else {
-        toast({ title: 'Post created successfully!' });
+        toast({ get title() { return uiI18n.t('app.post_created_successfully_6b635b6c'); } });
         navigate(`/community/forum/${post.id}`);
       }
     } catch (error) {
       console.error('Failed to create post:', error);
       toast({
-        title: 'Failed to create post',
+        get title() { return uiI18n.t('app.failed_to_create_post_3350fd70'); },
         description: error instanceof Error ? error.message : 'Unknown error',
         variant: 'destructive'
       });
@@ -135,15 +138,15 @@ export default function ForumNewPostPage() {
   };
 
   const flairOptions = [
-    { value: 'Discussion', label: 'Discussion', icon: MessageCircle },
-    { value: 'Question', label: 'Question', icon: HelpCircle },
-    { value: 'Recommendation', label: 'Recommendation', icon: Star },
-    { value: 'Review', label: 'Review', icon: FileText },
-    { value: 'News', label: 'News', icon: Newspaper },
-    { value: 'Meme', label: 'Meme', icon: Laugh },
-    { value: 'Fanart', label: 'Fanart', icon: Palette },
-    { value: 'Theory', label: 'Theory', icon: Lightbulb },
-    { value: 'Episode Discussion', label: 'Episode Discussion', icon: Tv },
+    { value: 'Discussion', get label() { return uiI18n.t('app.discussion_8fb937b6'); }, icon: MessageCircle },
+    { value: 'Question', get label() { return uiI18n.t('app.question_002ff598'); }, icon: HelpCircle },
+    { value: 'Recommendation', get label() { return uiI18n.t('app.recommendation_6422fcc9'); }, icon: Star },
+    { value: 'Review', get label() { return uiI18n.t('app.review_e29a79fe'); }, icon: FileText },
+    { value: 'News', get label() { return uiI18n.t('app.news_34c808d0'); }, icon: Newspaper },
+    { value: 'Meme', get label() { return uiI18n.t('app.meme_13cc8e2d'); }, icon: Laugh },
+    { value: 'Fanart', get label() { return uiI18n.t('app.fanart_004ade9d'); }, icon: Palette },
+    { value: 'Theory', get label() { return uiI18n.t('app.theory_5b1e898f'); }, icon: Lightbulb },
+    { value: 'Episode Discussion', get label() { return uiI18n.t('app.episode_discussion_249b4ba5'); }, icon: Tv },
   ];
 
   return (
@@ -155,20 +158,20 @@ export default function ForumNewPostPage() {
           {/* Back button */}
           <Button variant="ghost" onClick={() => navigate('/community')} className="mb-6 gap-2">
             <ArrowLeft className="w-4 h-4" />
-            Back to Community
+            {uiI18n.t('app.back_to_community_58498a50')}
           </Button>
 
           {/* Form */}
           <GlassPanel className="p-6 md:p-8">
-            <h1 className="text-3xl font-bold mb-6">Create a Post</h1>
+            <h1 className="text-3xl font-bold mb-6">{uiI18n.t('app.create_a_post_b4596254')}</h1>
 
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Flair */}
               <div className="space-y-2">
-                <Label htmlFor="flair">Flair (Optional)</Label>
+                <Label htmlFor="flair">{uiI18n.t('app.flair_optional_ccaaa5f9')}</Label>
                 <Select value={flair} onValueChange={setFlair}>
                   <SelectTrigger id="flair" className="bg-muted/30">
-                    <SelectValue placeholder="Select a flair (optional)" />
+                    <SelectValue placeholder={uiI18n.t('app.select_a_flair_optional_216c5cb6')} />
                   </SelectTrigger>
                   <SelectContent>
                     {flairOptions.map((option) => {
@@ -189,13 +192,13 @@ export default function ForumNewPostPage() {
               {/* Title */}
               <div className="space-y-2">
                 <Label htmlFor="title">
-                  Title <span className="text-destructive">*</span>
+                  {uiI18n.t('app.title_768e0c1c')} <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   id="title"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="What's your post about?"
+                  placeholder={uiI18n.t('app.what_s_your_post_about_1c563898')}
                   className="bg-muted/30"
                   maxLength={300}
                   required
@@ -206,13 +209,13 @@ export default function ForumNewPostPage() {
               {/* Content */}
               <div className="space-y-2">
                 <Label htmlFor="content">
-                  Content <span className="text-destructive">*</span>
+                  {uiI18n.t('app.content_4f9be057')} <span className="text-destructive">*</span>
                 </Label>
                 <Textarea
                   id="content"
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
-                  placeholder="Share your thoughts, ask a question, or start a discussion..."
+                  placeholder={uiI18n.t('app.share_your_thoughts_ask_a_question_or_start_a_di_2d3e5d56')}
                   className="min-h-[300px] bg-muted/30"
                   maxLength={10000}
                   required
@@ -222,12 +225,12 @@ export default function ForumNewPostPage() {
 
               {/* Image Upload */}
               <div className="space-y-2">
-                <Label htmlFor="image">Image (Optional)</Label>
+                <Label htmlFor="image">{uiI18n.t('app.image_optional_b9e38d9e')}</Label>
                 {imagePreview ? (
                   <div className="relative group">
                     <img
                       src={imagePreview}
-                      alt="Preview"
+                      alt={uiI18n.t('app.preview_f1fbb2b4')}
                       className="w-full max-h-96 object-contain rounded-lg border border-white/10"
                     />
                     <Button
@@ -267,10 +270,10 @@ export default function ForumNewPostPage() {
                     <div className="flex flex-col items-center justify-center pt-5 pb-6">
                       <Upload className="w-10 h-10 mb-3 text-muted-foreground" />
                       <p className="mb-2 text-sm text-muted-foreground">
-                        <span className="font-semibold">Click to upload</span> or drag and drop
+                        <span className="font-semibold">{uiI18n.t('app.click_to_upload_c77c363d')}</span> {uiI18n.t('app.or_drag_and_drop_c0471bb3')}
                       </p>
-                      <p className="text-xs text-muted-foreground">PNG, JPG, GIF up to 5MB</p>
-                      <p className="text-xs text-orange-500 mt-2">⚠ Posts with images require admin approval</p>
+                      <p className="text-xs text-muted-foreground">{uiI18n.t('app.png_jpg_gif_up_to_5mb_5aed03df')}</p>
+                      <p className="text-xs text-orange-500 mt-2">{uiI18n.t('app.posts_with_images_require_admin_approval_108eacff')}</p>
                     </div>
                     <input
                       id="image-upload"
@@ -289,10 +292,10 @@ export default function ForumNewPostPage() {
                   <AlertTriangle className="w-5 h-5 text-orange-500" />
                   <div>
                     <Label htmlFor="spoiler" className="cursor-pointer">
-                      Mark as Spoiler
+                      {uiI18n.t('app.mark_as_spoiler_4b3b21c8')}
                     </Label>
                     <p className="text-xs text-muted-foreground">
-                      Hide content that might spoil the experience for others
+                      {uiI18n.t('app.hide_content_that_might_spoil_the_experience_for_b10678a6')}
                     </p>
                   </div>
                 </div>
@@ -307,10 +310,10 @@ export default function ForumNewPostPage() {
                   className="gap-2"
                 >
                   <Send className="w-4 h-4" />
-                  {uploadingImage ? 'Uploading Image...' : isSubmitting ? 'Posting...' : 'Post'}
+                  {uploadingImage ? uiI18n.t('app.uploading_image_5a7826fa') : isSubmitting ? 'Posting...' : uiI18n.t('app.post_7858ac3f')}
                 </Button>
                 <Button type="button" variant="ghost" onClick={() => navigate('/community')}>
-                  Cancel
+                  {uiI18n.t('app.cancel_77dfd213')}
                 </Button>
               </div>
             </form>
@@ -318,14 +321,14 @@ export default function ForumNewPostPage() {
 
           {/* Guidelines */}
           <GlassPanel className="mt-6 p-6">
-            <h3 className="font-bold mb-3">Community Guidelines</h3>
+            <h3 className="font-bold mb-3">{uiI18n.t('app.community_guidelines_75343669')}</h3>
             <ul className="text-sm text-muted-foreground space-y-2">
-              <li>• Be respectful and kind to others</li>
-              <li>• No spam, self-promotion, or advertisements</li>
-              <li>• Mark spoilers appropriately</li>
-              <li>• Stay on topic and contribute meaningfully</li>
-              <li>• No illegal content or piracy links</li>
-              <li>• Posts with images require admin approval before appearing publicly</li>
+              <li>{uiI18n.t('app.be_respectful_and_kind_to_others_6767c1ed')}</li>
+              <li>{uiI18n.t('app.no_spam_self_promotion_or_advertisements_20c5912e')}</li>
+              <li>{uiI18n.t('app.mark_spoilers_appropriately_ac75dca6')}</li>
+              <li>{uiI18n.t('app.stay_on_topic_and_contribute_meaningfully_a5e19fe4')}</li>
+              <li>{uiI18n.t('app.no_illegal_content_or_piracy_links_73113341')}</li>
+              <li>{uiI18n.t('app.posts_with_images_require_admin_approval_before__ef72ed50')}</li>
             </ul>
           </GlassPanel>
         </div>

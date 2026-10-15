@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
  * Trending board (docs/Plans.md §2 "Trending Page"), rebuilt in the discover
  * design language of docs/image-8.png: a board hero with the fanned top seven,
@@ -82,42 +84,38 @@ interface BoardFrame extends PillOption<TimeFrame> {
 const TIME_FRAMES: ReadonlyArray<BoardFrame> = [
   {
     id: 'today',
-    label: 'Today',
+    get label() { return uiI18n.t('app.today_24345a14'); },
     icon: <Clock className="h-3.5 w-3.5" />,
     eyebrow: 'Right now',
-    heading: 'Trending today',
-    description:
-      'What the community started watching in the last 24 hours. It moves fast, so this order rarely survives the day.',
+    get heading() { return uiI18n.t('app.trending_today_1ea3fa93'); },
+    get description() { return uiI18n.t('app.what_the_community_started_watching_in_the_last__3ae00616'); },
     viewsLabel: 'views today',
   },
   {
     id: 'week',
-    label: 'This week',
+    get label() { return uiI18n.t('app.this_week_7b72883e'); },
     icon: <TrendingUp className="h-3.5 w-3.5" />,
     eyebrow: 'This week',
-    heading: 'Popular this week',
-    description:
-      "Tatakai's most watched titles over the last seven days, ranked gold, silver and bronze.",
+    get heading() { return uiI18n.t('app.popular_this_week_c0b5556d'); },
+    get description() { return uiI18n.t('app.tatakai_s_most_watched_titles_over_the_last_seve_0c886633'); },
     viewsLabel: 'views this week',
   },
   {
     id: 'month',
-    label: 'This month',
+    get label() { return uiI18n.t('app.this_month_1b478533'); },
     icon: <Flame className="h-3.5 w-3.5" />,
     eyebrow: 'This month',
-    heading: "The month's heat",
-    description:
-      'Thirty days of watch activity, so a strong finale still shows up long after its own week has passed.',
+    get heading() { return uiI18n.t('app.the_month_s_heat_d3f583c8'); },
+    get description() { return uiI18n.t('app.thirty_days_of_watch_activity_so_a_strong_finale_502cfbbb'); },
     viewsLabel: 'views this month',
   },
   {
     id: 'all',
-    label: 'All time',
+    get label() { return uiI18n.t('app.all_time_dbad49d8'); },
     icon: <Sparkles className="h-3.5 w-3.5" />,
     eyebrow: 'All time',
-    heading: 'Most watched ever',
-    description:
-      'Every view ever recorded here, with no time window at all. Slow to move, and the closest thing to a canon.',
+    get heading() { return uiI18n.t('app.most_watched_ever_128d8fa4'); },
+    get description() { return uiI18n.t('app.every_view_ever_recorded_here_with_no_time_windo_693b8d13'); },
     viewsLabel: 'total views',
   },
 ];
@@ -171,6 +169,7 @@ interface MetricEntry {
 }
 
 export default function TrendingPage() {
+  useUiTranslation();
   const [timeFrame, setTimeFrame] = useState<TimeFrame>('week');
   const [showExtendedDiscover, setShowExtendedDiscover] = useState(false);
   const isDesktopApp = useIsDesktopApp();
@@ -322,7 +321,7 @@ export default function TrendingPage() {
   const aniListToCard = useCallback(
     (media: AniListMedia): AnimeCard => {
       const title =
-        media?.title?.english || media?.title?.romaji || media?.title?.native || `AniList #${media.id}`;
+        media?.title?.english || media?.title?.romaji || media?.title?.native || uiI18n.t('app.anilist_i18n_value_0_66482db8', { value0: media.id });
       const malId = toPositiveInt(media?.idMal);
       const anilistId = toPositiveInt(media?.id);
       const fallbackExternalId = buildExternalAnimeRouteId(malId, anilistId);
@@ -431,7 +430,7 @@ export default function TrendingPage() {
         .slice(0, 12)
         .map((media, index) => ({
           item: animeCardToPosterItem(aniListToCard(media), index),
-          metric: `${media.favourites?.toLocaleString() ?? '—'} favorites`,
+          metric: `${media.favourites?.toLocaleString(uiI18n.language) ?? '—'} favorites`,
         })),
     [aniListFavorites, aniListToCard, showAdult],
   );
@@ -465,14 +464,14 @@ export default function TrendingPage() {
             // accepts an updater function, and that extra candidate makes TS
             // infer the pill group's id type as bare `string`.
             onChange={(id) => setTimeFrame(id)}
-            label="Timeframe"
+            label={uiI18n.t('app.timeframe_85decb73')}
           />
         </BoardHero>
 
         <section className="mt-12">
           <SectionHeading
             eyebrow="The full board"
-            title={hasInternalData ? 'Ranked by watch time' : 'Ranked by popularity'}
+            title={hasInternalData ? uiI18n.t('app.ranked_by_watch_time_c8eedd00') : uiI18n.t('app.ranked_by_popularity_89329771')}
             meta={
               rest.length > 0
                 ? `Ranks ${rest[0].rank}–${rest[rest.length - 1].rank}`
@@ -485,14 +484,14 @@ export default function TrendingPage() {
           ) : board.length === 0 ? (
             <div className="mt-6 flex flex-col items-center gap-2 rounded-3xl border border-white/[0.07] bg-white/[0.02] py-20 text-center">
               <Flame className="h-7 w-7 text-white/25" />
-              <p className="text-base font-bold text-white/70">Nothing is trending yet</p>
+              <p className="text-base font-bold text-white/70">{uiI18n.t('app.nothing_is_trending_yet_42accacc')}</p>
               <p className="max-w-sm text-sm text-white/40">
-                This window has no recorded views. Try a longer timeframe.
+                {uiI18n.t('app.this_window_has_no_recorded_views_try_a_longer_t_a0f0bb5e')}
               </p>
             </div>
           ) : rest.length === 0 ? (
             <p className="mt-6 text-sm text-white/40">
-              The whole board fits on the podium above.
+              {uiI18n.t('app.the_whole_board_fits_on_the_podium_above_4e79118f')}
             </p>
           ) : (
             <div className={cn(POSTER_GRID_CLASS, 'mt-6')}>
@@ -516,7 +515,7 @@ export default function TrendingPage() {
         <section className="mt-14">
           <SectionHeading
             eyebrow="Beyond Tatakai"
-            title="Global trending pulse"
+            title={uiI18n.t('app.global_trending_pulse_941fb085')}
             meta="From AniList"
           />
           {!showExtendedDiscover || loadingAniListTrending ? (
@@ -538,11 +537,11 @@ export default function TrendingPage() {
         <section className="mt-14">
           <SectionHeading
             eyebrow="Most loved"
-            title="Fan favorites"
+            title={uiI18n.t('app.fan_favorites_c94fbc02')}
             action={
               <span className="inline-flex items-center gap-1.5 text-xs font-medium text-white/40">
                 <Heart className="h-3.5 w-3.5 text-destructive/80" />
-                All-time AniList favorites
+                {uiI18n.t('app.all_time_anilist_favorites_714e1f6f')}
               </span>
             }
           />
@@ -564,7 +563,7 @@ export default function TrendingPage() {
 
         <div className="mt-14">
           <MangaTrendingSection
-            title="Trending manga & manhwa"
+            title={uiI18n.t('app.trending_manga_manhwa_42cc803d')}
             defaultTab="manga"
             showTabs
             limit={18}
@@ -573,7 +572,7 @@ export default function TrendingPage() {
 
         <div className="mt-14">
           <NovelTrendingSection
-            title="Trending light novels"
+            title={uiI18n.t('app.trending_light_novels_d730dfb3')}
             defaultTab="trending"
             showTabs
             limit={18}
@@ -594,10 +593,11 @@ function PulseFooter({
   views: number;
   series?: { date: string; count: number }[];
 }) {
+  useUiTranslation();
   return (
     <div className="mt-3 hidden md:block">
       <div className="flex items-center justify-between">
-        <span className="text-[10px] font-bold uppercase tracking-widest text-white/35">Pulse</span>
+        <span className="text-[10px] font-bold uppercase tracking-widest text-white/35">{uiI18n.t('app.pulse_b3cc660b')}</span>
         <span className="text-[10px] font-bold tabular-nums text-primary">
           {formatViewCount(views)}
         </span>
@@ -611,6 +611,7 @@ function PulseFooter({
 
 /** The ordering metric under an AniList card, so the sort order is legible. */
 function MetricFooter({ label }: { label: string }) {
+  useUiTranslation();
   return (
     <p className="mt-1.5 text-[11px] font-bold uppercase tracking-widest text-white/35">{label}</p>
   );

@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { memo, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Sparkles, Loader2, Compass } from 'lucide-react';
@@ -16,6 +18,7 @@ const MAX_MOBILE_SECTIONS = 12;
 const CARDS_PER_SECTION = 8;
 
 const MobileCard = memo(function MobileCard({ anime }: { anime: any }) {
+  useUiTranslation();
   const navigate = useNavigate();
 
   const routeId = buildPreferredAnimeRouteId({
@@ -70,7 +73,7 @@ const MobileCard = memo(function MobileCard({ anime }: { anime: any }) {
         <div data-mobile-poster-image className="relative aspect-[2/3]">
           <img
             src={getHighQualityPoster(anime.poster || '', anime.anilistId)}
-            alt={anime.name || 'Anime'}
+            alt={anime.name || uiI18n.t('app.anime_f1b32a19')}
             className="h-full w-full object-cover"
             loading="lazy"
             decoding="async"
@@ -91,9 +94,9 @@ const MobileCard = memo(function MobileCard({ anime }: { anime: any }) {
           <div className="absolute bottom-0 left-0 right-0 p-2.5">
             <h4 data-mobile-poster-title className="line-clamp-2 text-[13px] font-bold leading-tight text-white">{anime.name}</h4>
             <div className="mt-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/70">
-              <span className="rounded-md bg-black/50 border border-white/10 px-1.5 py-0.5">SUB {anime.episodes?.sub || 0}</span>
+              <span className="rounded-md bg-black/50 border border-white/10 px-1.5 py-0.5">{uiI18n.t('app.sub_49b60b33')} {anime.episodes?.sub || 0}</span>
               {(anime.episodes?.dub || 0) > 0 && (
-                <span className="rounded-md bg-black/50 border border-white/10 px-1.5 py-0.5">DUB {anime.episodes?.dub || 0}</span>
+                <span className="rounded-md bg-black/50 border border-white/10 px-1.5 py-0.5">{uiI18n.t('app.dub_ea4a371e')} {anime.episodes?.dub || 0}</span>
               )}
             </div>
           </div>
@@ -104,6 +107,7 @@ const MobileCard = memo(function MobileCard({ anime }: { anime: any }) {
 });
 
 export function MobileInfiniteHomeSections() {
+  useUiTranslation();
   const {
     data,
     fetchNextPage,
@@ -136,10 +140,10 @@ export function MobileInfiniteHomeSections() {
 
     return {
       id: 'mobile-fallback-discover',
-      title: 'Discover Picks',
+      get title() { return uiI18n.t('app.discover_picks_fd9c0292'); },
       animes: deduped,
     };
-  }, [homeData?.latestEpisodeAnimes, homeData?.mostPopularAnimes]);
+  }, [homeData?.latestEpisodeAnimes, homeData?.mostPopularAnimes, uiI18n.language]);
 
   const visibleSections = sections.length > 0 ? sections : fallbackSection ? [fallbackSection] : [];
   const canLoadMore = hasNextPage && !reachedCap;
@@ -183,8 +187,8 @@ export function MobileInfiniteHomeSections() {
             <Sparkles className="h-5 w-5 text-primary" />
           </div>
           <div className="min-w-0">
-            <h2 className="font-display text-xl font-black tracking-tight text-white truncate">Discover More</h2>
-            <p className="text-xs text-muted-foreground truncate">Infinite picks, tuned for mobile</p>
+            <h2 className="font-display text-xl font-black tracking-tight text-white truncate">{uiI18n.t('app.discover_more_cab73e96')}</h2>
+            <p className="text-xs text-muted-foreground truncate">{uiI18n.t('app.infinite_picks_tuned_for_mobile_db4e2575')}</p>
           </div>
         </div>
       </div>
@@ -200,7 +204,7 @@ export function MobileInfiniteHomeSections() {
       {error && (
         <div className="px-1">
           <GlassPanel className="border-red-500/30 bg-red-500/10 p-5 text-center">
-            <p className="mb-3 text-sm font-semibold text-white">Discover feed failed to load</p>
+            <p className="mb-3 text-sm font-semibold text-white">{uiI18n.t('app.discover_feed_failed_to_load_795fbe6e')}</p>
             <Button
               onClick={() => {
                 bootstrapAttemptsRef.current = 0;
@@ -209,7 +213,7 @@ export function MobileInfiniteHomeSections() {
               variant="outline"
               className="rounded-xl border-red-400/40 bg-red-500/10 text-xs font-bold uppercase tracking-widest"
             >
-              Retry
+              {uiI18n.t('app.retry_9f5cd8a2')}
             </Button>
           </GlassPanel>
         </div>
@@ -232,13 +236,13 @@ export function MobileInfiniteHomeSections() {
       {!isLoading && visibleSections.length === 0 && !error && (
         <div className="px-1">
           <GlassPanel className="p-5 text-center">
-            <p className="mb-3 text-sm text-muted-foreground">No discover cards available yet</p>
+            <p className="mb-3 text-sm text-muted-foreground">{uiI18n.t('app.no_discover_cards_available_yet_ae871038')}</p>
             <Button
               onClick={() => void fetchNextPage()}
               variant="outline"
               className="rounded-xl text-xs font-bold uppercase tracking-widest"
             >
-              Load Discover Feed
+              {uiI18n.t('app.load_discover_feed_ec694832')}
             </Button>
           </GlassPanel>
         </div>
@@ -247,7 +251,7 @@ export function MobileInfiniteHomeSections() {
       <div ref={loadMoreRef} className="px-1">
         {isFetchingNextPage ? (
           <div className="flex items-center justify-center gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.03] py-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin text-primary" /> Loading more
+            <Loader2 className="h-4 w-4 animate-spin text-primary" /> {uiI18n.t('app.loading_more_e61e2ab8')}
           </div>
         ) : canLoadMore ? (
           <Button
@@ -255,7 +259,7 @@ export function MobileInfiniteHomeSections() {
             variant="outline"
             className="w-full rounded-2xl border-white/15 bg-white/5 text-xs font-black uppercase tracking-widest"
           >
-            Load More
+            {uiI18n.t('app.load_more_9ecde875')}
           </Button>
         ) : null}
       </div>

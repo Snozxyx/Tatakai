@@ -1,3 +1,5 @@
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
+import uiI18n from '@/lib/uiI18n';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { fetchGenreAnimes, AnimeCard } from '@/lib/api';
 import { fetchAniListDiscover, type AniListSearchFilters } from '@/lib/externalIntegrations';
@@ -69,7 +71,7 @@ function toAniListGenre(genre: string): string {
 }
 
 function toAnimeCardFromAniList(media: any): AnimeCard {
-  const title = media?.title?.english || media?.title?.romaji || media?.title?.native || 'Unknown title';
+  const title = media?.title?.english || media?.title?.romaji || media?.title?.native || uiI18n.t('app.unknown_title_bceca39d');
   const episodeCount = Number(media?.episodes) || 0;
   return {
     id: media?.tatakaiId || String(media.id),
@@ -186,6 +188,7 @@ async function fetchGenreSection(config: typeof SECTION_CONFIGS[0], pageSeed: nu
 
 // Hook for infinite scrolling home sections
 export function useInfiniteHomeSections() {
+  useUiTranslation();
   const sectionBatchSize =
     typeof window !== 'undefined' && window.innerWidth < 768
       ? MOBILE_SECTION_BATCH_SIZE

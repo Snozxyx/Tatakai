@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -67,6 +69,7 @@ export function useComments(
   entityId: string | undefined,
   episodeId?: string,
 ) {
+  useUiTranslation();
   const { user } = useAuth();
 
   return useQuery({
@@ -152,6 +155,7 @@ export function useComments(
 }
 
 export function useReplies(parentId: string | undefined) {
+  useUiTranslation();
   const { user } = useAuth();
 
   return useQuery({
@@ -219,6 +223,7 @@ export function useReplies(parentId: string | undefined) {
 }
 
 export function useAddComment() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
@@ -266,7 +271,7 @@ export function useAddComment() {
         cleanEmbeds.length === 0 &&
         !hasPoll
       ) {
-        throw new Error('Comment cannot be empty');
+        throw new Error(uiI18n.t('app.comment_cannot_be_empty_c3cfbe26'));
       }
 
       // Resolve @mentions to auth user ids so the notify_on_comment() trigger can
@@ -373,7 +378,7 @@ export function useAddComment() {
       if (variables.parentId) {
         queryClient.invalidateQueries({ queryKey: ['replies', variables.parentId] });
       }
-      toast.success('Comment posted');
+      toast.success(uiI18n.t('app.comment_posted_cd8476cf'));
 
       // Notify Discord comment channel (detailed)
       notifyComment({
@@ -394,7 +399,7 @@ export function useAddComment() {
       if (context?.previous !== undefined && context?.targetKey) {
         queryClient.setQueryData(context.targetKey, context.previous);
       }
-      toast.error(ugcErrorMessage(error) || error.message || 'Failed to post comment');
+      toast.error(ugcErrorMessage(error) || error.message || uiI18n.t('app.failed_to_post_comment_9008b631'));
     },
   });
 }
@@ -425,6 +430,7 @@ async function softDeleteComment(commentId: string) {
 }
 
 export function useDeleteComment() {
+  useUiTranslation();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -434,10 +440,10 @@ export function useDeleteComment() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['comments'] });
       queryClient.invalidateQueries({ queryKey: ['replies'] });
-      toast.success('Comment deleted');
+      toast.success(uiI18n.t('app.comment_deleted_ff337dce'));
     },
     onError: () => {
-      toast.error('Failed to delete comment');
+      toast.error(uiI18n.t('app.failed_to_delete_comment_39118d67'));
     },
   });
 }
@@ -448,6 +454,7 @@ export function useDeleteComment() {
  * after the fact (the composer only adds on create).
  */
 export function useEditComment() {
+  useUiTranslation();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -494,12 +501,13 @@ export function useEditComment() {
       queryClient.invalidateQueries({ queryKey: ['replies'] });
     },
     onError: (error: Error) => {
-      toast.error(error.message || 'Failed to update comment');
+      toast.error(error.message || uiI18n.t('app.failed_to_update_comment_b68da6a4'));
     },
   });
 }
 
 export function useLikeComment() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
@@ -533,12 +541,13 @@ export function useLikeComment() {
 
 // Pin/Unpin comment (admin only)
 export function usePinComment() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
   return useMutation({
     mutationFn: async ({ commentId, isPinned, isAdmin }: { commentId: string; isPinned: boolean; isAdmin: boolean }) => {
-      if (!user || !isAdmin) throw new Error('Admin access required');
+      if (!user || !isAdmin) throw new Error(uiI18n.t('app.admin_access_required_737b16b6'));
 
       const { error } = await supabase
         .from('comments')
@@ -561,10 +570,10 @@ export function usePinComment() {
       queryClient.invalidateQueries({ queryKey: ['comments'] });
       queryClient.invalidateQueries({ queryKey: ['replies'] });
       queryClient.invalidateQueries({ queryKey: ['admin_logs'] });
-      toast.success('Comment pin status updated');
+      toast.success(uiI18n.t('app.comment_pin_status_updated_04e76a4c'));
     },
     onError: () => {
-      toast.error('Failed to update comment pin status');
+      toast.error(uiI18n.t('app.failed_to_update_comment_pin_status_4f7ae2f5'));
     },
   });
 }

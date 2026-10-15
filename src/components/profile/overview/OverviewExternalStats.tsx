@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { memo } from 'react';
 import { motion } from 'framer-motion';
 import { ExternalLink, Clock, Play, BookOpen, Star, Tv } from 'lucide-react';
@@ -15,18 +17,19 @@ const PROVIDER_META: Record<
   ExternalStats['provider'],
   { label: string; accent: string; dot: string }
 > = {
-  anilist: { label: 'AniList', accent: 'text-[#02A9FF]', dot: 'bg-[#02A9FF]' },
-  mal: { label: 'MyAnimeList', accent: 'text-[#2E51A2]', dot: 'bg-[#2E51A2]' },
+  anilist: { get label() { return uiI18n.t('app.anilist_c03a6787'); }, accent: 'text-[#02A9FF]', dot: 'bg-[#02A9FF]' },
+  mal: { get label() { return uiI18n.t('app.myanimelist_be786904'); }, accent: 'text-[#2E51A2]', dot: 'bg-[#2E51A2]' },
 };
 
 function ProviderCard({ data }: { data: ExternalStats }) {
+  useUiTranslation();
   const meta = PROVIDER_META[data.provider];
 
   const tiles = [
-    { key: 'count', label: 'Anime', value: data.anime.count, suffix: 'titles', icon: Tv },
-    { key: 'eps', label: 'Episodes', value: data.anime.episodesWatched, suffix: 'eps', icon: Play },
-    { key: 'days', label: 'Days Watched', value: data.anime.daysWatched, suffix: 'd', decimals: 1, icon: Clock },
-    { key: 'score', label: 'Mean Score', value: data.anime.meanScore, suffix: '', decimals: data.anime.meanScore % 1 ? 2 : 0, icon: Star },
+    { key: 'count', get label() { return uiI18n.t('app.anime_f1b32a19'); }, value: data.anime.count, suffix: 'titles', icon: Tv },
+    { key: 'eps', get label() { return uiI18n.t('app.episodes_49d641ba'); }, value: data.anime.episodesWatched, suffix: 'eps', icon: Play },
+    { key: 'days', get label() { return uiI18n.t('app.days_watched_b2b2b763'); }, value: data.anime.daysWatched, suffix: 'd', decimals: 1, icon: Clock },
+    { key: 'score', get label() { return uiI18n.t('app.mean_score_4729b833'); }, value: data.anime.meanScore, suffix: '', decimals: data.anime.meanScore % 1 ? 2 : 0, icon: Star },
   ];
 
   return (
@@ -46,7 +49,7 @@ function ProviderCard({ data }: { data: ExternalStats }) {
             target="_blank"
             rel="noopener noreferrer"
             className="text-muted-foreground/50 hover:text-foreground transition-colors"
-            aria-label={`Open ${meta.label} profile`}
+            aria-label={uiI18n.t('app.open_i18n_value_0_profile_0c33b11f', { value0: meta.label })}
           >
             <ExternalLink className="w-3.5 h-3.5" />
           </a>
@@ -83,11 +86,11 @@ function ProviderCard({ data }: { data: ExternalStats }) {
 
       {/* Status breakdown */}
       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground/70">
-        {data.anime.watching ? <span>{data.anime.watching} watching</span> : null}
-        {data.anime.completed ? <span>{data.anime.completed} completed</span> : null}
-        {data.anime.planning ? <span>{data.anime.planning} planned</span> : null}
-        {data.anime.paused ? <span>{data.anime.paused} on hold</span> : null}
-        {data.anime.dropped ? <span>{data.anime.dropped} dropped</span> : null}
+        {data.anime.watching ? <span>{data.anime.watching} {uiI18n.t('app.watching_874e70e6')}</span> : null}
+        {data.anime.completed ? <span>{data.anime.completed} {uiI18n.t('app.completed_231e564d')}</span> : null}
+        {data.anime.planning ? <span>{data.anime.planning} {uiI18n.t('app.planned_80e61027')}</span> : null}
+        {data.anime.paused ? <span>{data.anime.paused} {uiI18n.t('app.on_hold_062be345')}</span> : null}
+        {data.anime.dropped ? <span>{data.anime.dropped} {uiI18n.t('app.dropped_ad3f9aa5')}</span> : null}
       </div>
 
       {/* Manga (AniList only) */}
@@ -96,9 +99,9 @@ function ProviderCard({ data }: { data: ExternalStats }) {
           <BookOpen className="w-4 h-4 text-muted-foreground/50" aria-hidden="true" />
           <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-foreground/80">
             <span className="font-semibold">{data.manga.count}</span>
-            <span className="text-muted-foreground/60">manga · {data.manga.chaptersRead} chapters</span>
+            <span className="text-muted-foreground/60">{uiI18n.t('app.manga_f8dd8a9e')} {data.manga.chaptersRead} {uiI18n.t('app.chapters_1fb03542')}</span>
             {data.manga.meanScore ? (
-              <span className="text-muted-foreground/60">score {data.manga.meanScore}</span>
+              <span className="text-muted-foreground/60">{uiI18n.t('app.score_75ebcb36')} {data.manga.meanScore}</span>
             ) : null}
           </div>
         </div>
@@ -125,6 +128,7 @@ export const OverviewExternalStats = memo(function OverviewExternalStats({
   stats,
   isLoading = false,
 }: OverviewExternalStatsProps) {
+  useUiTranslation();
   // Nothing connected and nothing loading — render nothing.
   if (!isLoading && stats.length === 0) return null;
 
@@ -132,7 +136,7 @@ export const OverviewExternalStats = memo(function OverviewExternalStats({
     <GlassPanel
       className="relative overflow-hidden p-5 sm:p-7 border-white/[0.04] bg-background/40 backdrop-blur-2xl rounded-2xl"
       role="region"
-      aria-label="Linked tracker statistics"
+      aria-label={uiI18n.t('app.linked_tracker_statistics_c5cc086b')}
     >
       <div className="absolute -top-12 -right-12 w-48 h-48 bg-[#02A9FF]/10 blur-[70px] rounded-full pointer-events-none" />
 
@@ -140,11 +144,11 @@ export const OverviewExternalStats = memo(function OverviewExternalStats({
         <div className="flex items-center gap-2 mb-1">
           <ExternalLink className="w-4 h-4 text-primary/80" />
           <h3 className="font-display font-bold text-base sm:text-lg text-foreground tracking-tight">
-            Tracker Statistics
+            {uiI18n.t('app.tracker_statistics_12166c40')}
           </h3>
         </div>
         <p className="text-xs text-muted-foreground/70">
-          Live stats pulled from your linked AniList and MyAnimeList accounts
+          {uiI18n.t('app.live_stats_pulled_from_your_linked_anilist_and_m_54171e56')}
         </p>
       </div>
 

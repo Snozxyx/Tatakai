@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
  * src/hooks/user/useIntegrationSync.ts
  *
@@ -54,11 +56,12 @@ const LAST_SYNC_KEY = (integration: string, mediaType: string) =>
 async function getBearerHeader(): Promise<Record<string, string>> {
   const { data: { session } } = await supabase.auth.getSession();
   const token = session?.access_token;
-  if (!token) throw new Error('Not authenticated');
+  if (!token) throw new Error(uiI18n.t('app.not_authenticated_0c91acba'));
   return { Authorization: `Bearer ${token}` };
 }
 
 export function useIntegrationSync() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const [state, setState] = useState<SyncState>({
     isLoadingPreview: false,
@@ -95,7 +98,7 @@ export function useIntegrationSync() {
       });
 
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: 'Preview failed' }));
+        const err = await res.json().catch(() => ({ get message() { return uiI18n.t('app.preview_failed_d7f2768c'); } }));
         throw new Error(err.message || err.error || 'Preview failed');
       }
 
@@ -126,7 +129,7 @@ export function useIntegrationSync() {
       });
 
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: 'Preview failed' }));
+        const err = await res.json().catch(() => ({ get message() { return uiI18n.t('app.preview_failed_d7f2768c'); } }));
         throw new Error(err.message || err.error || 'Preview failed');
       }
 
@@ -158,7 +161,7 @@ export function useIntegrationSync() {
       });
 
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: 'Apply failed' }));
+        const err = await res.json().catch(() => ({ get message() { return uiI18n.t('app.apply_failed_94b61451'); } }));
         throw new Error(err.message || err.error || 'Apply failed');
       }
 

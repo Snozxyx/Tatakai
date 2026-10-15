@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { GlassPanel } from '@/components/ui/GlassPanel';
@@ -33,6 +35,7 @@ function StatCard({
   label: string;
   value: string | number;
 }) {
+  useUiTranslation();
   return (
     <GlassPanel className="p-5 border-white/10 flex items-center gap-4">
       <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
@@ -49,11 +52,12 @@ function StatCard({
 }
 
 function SectionError({ onRetry }: { onRetry: () => void }) {
+  useUiTranslation();
   return (
     <GlassPanel className="p-10 text-center border-destructive/20 bg-destructive/5">
       <XCircle className="w-8 h-8 text-destructive/50 mx-auto mb-3" />
       <p className="text-sm font-medium text-destructive mb-4">
-        Failed to load data
+        {uiI18n.t('app.failed_to_load_data_2208840e')}
       </p>
       <Button
         variant="outline"
@@ -62,13 +66,14 @@ function SectionError({ onRetry }: { onRetry: () => void }) {
         className="gap-2 border-destructive/30 hover:bg-destructive/10 text-destructive"
       >
         <RefreshCw className="w-4 h-4" />
-        Retry
+        {uiI18n.t('app.retry_9f5cd8a2')}
       </Button>
     </GlassPanel>
   );
 }
 
 function SectionLoader() {
+  useUiTranslation();
   return (
     <div className="flex items-center justify-center py-16">
       <Loader2 className="w-8 h-8 animate-spin text-primary opacity-50" />
@@ -85,6 +90,7 @@ function SectionLoader() {
 // remain. watch_sessions / playback_telemetry are untouched — shared elsewhere.
 // ---------------------------------------------------------------------------
 function StreamingSection() {
+  useUiTranslation();
   const {
     data,
     isLoading,
@@ -133,13 +139,13 @@ function StreamingSection() {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <StatCard
           icon={<PlayCircle className="w-5 h-5" />}
-          label="Total Sessions"
-          value={data.totalSessions.toLocaleString()}
+          label={uiI18n.t('app.total_sessions_9fed2b67')}
+          value={data.totalSessions.toLocaleString(uiI18n.language)}
         />
         <StatCard
           icon={<Users className="w-5 h-5" />}
-          label="Peak Concurrent Viewers"
-          value={data.peakConcurrent.toLocaleString()}
+          label={uiI18n.t('app.peak_concurrent_viewers_d13911ae')}
+          value={data.peakConcurrent.toLocaleString(uiI18n.language)}
         />
       </div>
 
@@ -147,7 +153,7 @@ function StreamingSection() {
       <GlassPanel className="p-5 border-white/10">
         <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
           <BarChart2 className="w-4 h-4 text-primary" />
-          Stream Duration Distribution
+          {uiI18n.t('app.stream_duration_distribution_b9ef7562')}
         </h3>
         <div className="space-y-3">
           {data.durationBuckets.map((bucket) => {
@@ -162,7 +168,7 @@ function StreamingSection() {
                     {bucket.label}
                   </span>
                   <span className="font-semibold tabular-nums">
-                    {bucket.count.toLocaleString()}
+                    {bucket.count.toLocaleString(uiI18n.language)}
                   </span>
                 </div>
                 <div className="h-2 rounded-full bg-white/5 overflow-hidden">
@@ -184,13 +190,14 @@ function StreamingSection() {
 // Main component
 // ---------------------------------------------------------------------------
 export function StreamingAnalyticsPanel() {
+  useUiTranslation();
   return (
     <div className="space-y-10">
       {/* Streaming Analytics section */}
       <section className="space-y-4">
         <h2 className="text-xl font-bold flex items-center gap-2">
           <PlayCircle className="w-6 h-6 text-primary" />
-          Streaming Analytics
+          {uiI18n.t('app.streaming_analytics_74339abb')}
         </h2>
         <StreamingSection />
       </section>

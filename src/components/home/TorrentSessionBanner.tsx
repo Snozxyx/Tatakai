@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
  * The desktop-only "active torrent sessions" row on the home page.
  *
@@ -39,6 +41,7 @@ function formatSpeed(bytesPerSecond?: number): string {
 }
 
 export function TorrentSessionBanner() {
+  useUiTranslation();
   const navigate = useNavigate();
   const confirm = useConfirm();
   const isDesktop = useIsDesktopApp();
@@ -92,13 +95,13 @@ export function TorrentSessionBanner() {
   };
 
   const clearAll = async () => {
-    if (!(await confirm({ title: 'Stop all active torrents and clear the session history?', destructive: true }))) return;
+    if (!(await confirm({ get title() { return uiI18n.t('app.stop_all_active_torrents_and_clear_the_session_h_f85898b2'); }, destructive: true }))) return;
     clearLocalTorrentSessionHistory();
     setSessions([]);
     setActiveSessions({});
     if ((window as any).tatakaiRuntime?.clearAllTorrentData) {
       await (window as any).tatakaiRuntime.clearAllTorrentData();
-      toast.success('All torrent data cleared');
+      toast.success(uiI18n.t('app.all_torrent_data_cleared_adc6d55b'));
     }
   };
 
@@ -112,7 +115,7 @@ export function TorrentSessionBanner() {
     <section className="mb-12 space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <SectionHeading
         eyebrow="Downloads"
-        title="Torrent Sessions"
+        title={uiI18n.t('app.torrent_sessions_5c0441ba')}
         action={
           <Button
             variant="ghost"
@@ -121,10 +124,10 @@ export function TorrentSessionBanner() {
             className="group gap-2 rounded-full text-xs font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
           >
             <Trash2 className="h-3.5 w-3.5 transition-transform group-hover:scale-110" />
-            Clear all
+            {uiI18n.t('app.clear_all_c043160a')}
             {activeCount > 0 && (
               <span className="ml-1 inline-flex items-center rounded-full bg-destructive/15 px-2 py-0.5 text-[10px] font-bold text-destructive">
-                {activeCount} live
+                {activeCount} {uiI18n.t('app.live_98aadb37')}
               </span>
             )}
           </Button>
@@ -135,7 +138,7 @@ export function TorrentSessionBanner() {
         {sessions.map((session) => {
           const stats = activeSessions[session.sessionId];
           const isActive = Boolean(stats);
-          const title = session.animeName || session.torrentName || 'Unknown torrent';
+          const title = session.animeName || session.torrentName || uiI18n.t('app.unknown_torrent_ce98986e');
           const href = `/watch/${
             session.animeId || `torrent-${session.sessionId}`
           }?sessionId=${session.sessionId}&torrent=true`;
@@ -150,19 +153,19 @@ export function TorrentSessionBanner() {
                 isActive ? (
                   <span className="flex items-center gap-1.5 font-medium text-emerald-400">
                     <Activity className="h-3 w-3 animate-pulse" />
-                    Downloading
+                    {uiI18n.t('app.downloading_9b4592f9')}
                   </span>
                 ) : (
                   <span className="flex items-center gap-1.5 text-white/50">
                     <PauseCircle className="h-3 w-3" />
-                    Session paused
+                    {uiI18n.t('app.session_paused_ce8f7fe9')}
                   </span>
                 )
               }
               secondaryMeta={
                 <span className="inline-flex items-center gap-1.5 text-white/40">
                   <Clock className="h-3 w-3" />
-                  {new Date(session.startedAt).toLocaleDateString(undefined, {
+                  {new Date(session.startedAt).toLocaleDateString(uiI18n.language, {
                     month: 'short',
                     day: 'numeric'
                   })}
@@ -179,7 +182,7 @@ export function TorrentSessionBanner() {
               }
               footer={
                 <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-white/40 transition-colors group-hover:text-white/70">
-                  {isActive ? 'Open Player' : 'Resume Session'}
+                  {isActive ? uiI18n.t('app.open_player_e7fbbba5') : uiI18n.t('app.resume_session_47f9c757')}
                   <ArrowRight className="h-3 w-3" />
                 </div>
               }

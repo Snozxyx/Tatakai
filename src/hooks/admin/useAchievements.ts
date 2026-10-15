@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -19,18 +21,18 @@ export interface AchievementDef {
 }
 
 export const ACHIEVEMENTS: AchievementDef[] = [
-  { id: 'filler-watcher', title: 'Filler Watcher', description: 'Watch your very first episode', rank: 1 },
-  { id: 'genin', title: 'Genin', description: 'Watch 5 episodes — the journey begins', rank: 2 },
-  { id: 'chunin', title: 'Chunin', description: 'Reach 10 episodes watched', rank: 3 },
-  { id: 'week-warrior', title: 'Jonin', description: 'Maintain a 7-day watch streak', rank: 4 },
-  { id: 'plus-ultra', title: 'Plus Ultra', description: 'Watch 35 episodes — go beyond!', rank: 5 },
-  { id: 'pro-hero', title: 'Pro Hero', description: "Watch 50 episodes — you're a hero", rank: 6 },
-  { id: 'soul-reaper', title: 'Soul Reaper', description: 'Explore 25 different anime series', rank: 7 },
-  { id: 'bankai', title: 'Bankai', description: 'Reach 100 total episodes watched', rank: 8 },
-  { id: 'survey-corps', title: 'Survey Corps', description: 'Explore 50 different anime series', rank: 9 },
-  { id: 'month-legend', title: 'Titan Shifter', description: 'Maintain a 30-day watch streak', rank: 10 },
-  { id: 'demon-slayer', title: 'Demon Slayer', description: 'Accumulate 5000+ watch minutes', rank: 11 },
-  { id: 'hashira', title: 'Hashira', description: 'Watch 600 total episodes — a true Pillar', rank: 12 },
+  { id: 'filler-watcher', get title() { return uiI18n.t('app.filler_watcher_0e1c3113'); }, get description() { return uiI18n.t('app.watch_your_very_first_episode_4b56fb89'); }, rank: 1 },
+  { id: 'genin', get title() { return uiI18n.t('app.genin_2413cc6b'); }, get description() { return uiI18n.t('app.watch_5_episodes_the_journey_begins_83941e08'); }, rank: 2 },
+  { id: 'chunin', get title() { return uiI18n.t('app.chunin_b4f5c7c2'); }, get description() { return uiI18n.t('app.reach_10_episodes_watched_26030e87'); }, rank: 3 },
+  { id: 'week-warrior', get title() { return uiI18n.t('app.jonin_47d17d37'); }, get description() { return uiI18n.t('app.maintain_a_7_day_watch_streak_b15b426b'); }, rank: 4 },
+  { id: 'plus-ultra', get title() { return uiI18n.t('app.plus_ultra_6132df1c'); }, get description() { return uiI18n.t('app.watch_35_episodes_go_beyond_f518153d'); }, rank: 5 },
+  { id: 'pro-hero', get title() { return uiI18n.t('app.pro_hero_127d94b4'); }, get description() { return uiI18n.t('app.watch_50_episodes_you_re_a_hero_e2077666'); }, rank: 6 },
+  { id: 'soul-reaper', get title() { return uiI18n.t('app.soul_reaper_989e2cc9'); }, get description() { return uiI18n.t('app.explore_25_different_anime_series_f8659885'); }, rank: 7 },
+  { id: 'bankai', get title() { return uiI18n.t('app.bankai_364abdb8'); }, get description() { return uiI18n.t('app.reach_100_total_episodes_watched_d67ae764'); }, rank: 8 },
+  { id: 'survey-corps', get title() { return uiI18n.t('app.survey_corps_facfd0c9'); }, get description() { return uiI18n.t('app.explore_50_different_anime_series_0361332e'); }, rank: 9 },
+  { id: 'month-legend', get title() { return uiI18n.t('app.titan_shifter_cba657eb'); }, get description() { return uiI18n.t('app.maintain_a_30_day_watch_streak_c0f24734'); }, rank: 10 },
+  { id: 'demon-slayer', get title() { return uiI18n.t('app.demon_slayer_08007ef2'); }, get description() { return uiI18n.t('app.accumulate_5000_watch_minutes_cd286bd7'); }, rank: 11 },
+  { id: 'hashira', get title() { return uiI18n.t('app.hashira_c094eb38'); }, get description() { return uiI18n.t('app.watch_600_total_episodes_a_true_pillar_0346bf9b'); }, rank: 12 },
 ];
 
 export interface UserAchievementRow {
@@ -41,6 +43,7 @@ export interface UserAchievementRow {
 
 /** A user's manually-granted achievements. Fail-soft to [] if table absent. */
 export function useUserAchievements(userId: string | undefined) {
+  useUiTranslation();
   return useQuery({
     queryKey: ['admin_user_achievements', userId],
     enabled: !!userId,
@@ -57,6 +60,7 @@ export function useUserAchievements(userId: string | undefined) {
 
 /** Grant (upsert) one achievement to a user, actor = current admin. */
 export function useGrantAchievement() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { profile } = useAuth();
   return useMutation({
@@ -78,6 +82,7 @@ export function useGrantAchievement() {
 
 /** Revoke a manually-granted achievement from a user. */
 export function useRevokeAchievement() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (args: { userId: string; achievementId: string }) => {

@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useQuery } from '@tanstack/react-query';
 
 /**
@@ -50,7 +52,7 @@ async function fetchNextAiring(ids: number[]): Promise<Record<number, NextAiring
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({ query: QUERY, variables: { ids: chunk }, forceUpstream: true }),
     });
-    if (!res.ok) throw new Error(`AniList request failed (${res.status})`);
+    if (!res.ok) throw new Error(uiI18n.t('app.anilist_request_failed_i18n_value_0_9455a5b4', { value0: res.status }));
     const json = await res.json();
     const media: any[] = json?.data?.Page?.media ?? [];
     for (const m of media) {
@@ -76,6 +78,7 @@ async function fetchNextAiring(ids: number[]): Promise<Record<number, NextAiring
  * the query stays disabled (and returns `{}`) when there are no ids to fetch.
  */
 export function useNextAiringEpisodes(anilistIds: number[]) {
+  useUiTranslation();
   const ids = Array.from(new Set(anilistIds.filter((n) => Number.isFinite(n) && n > 0))).sort(
     (a, b) => a - b,
   );

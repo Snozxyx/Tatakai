@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -85,6 +87,7 @@ export function tallyPoll(
 
 /** Fetch a single post's poll with tallied results (standalone / post detail). */
 export function usePostPoll(postId: string | undefined) {
+  useUiTranslation();
   const { user } = useAuth();
 
   return useQuery({
@@ -117,6 +120,7 @@ export function usePostPoll(postId: string | undefined) {
 
 /** Attach a poll to a post the user just created. */
 export function useCreatePostPoll() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
@@ -132,7 +136,7 @@ export function useCreatePostPoll() {
       options: PollOption[];
       endsAt?: string | null;
     }) => {
-      if (!user) throw new Error('Must be logged in');
+      if (!user) throw new Error(uiI18n.t('app.must_be_logged_in_9cf435d8'));
 
       const db = supabase as any;
       const { data, error } = await db
@@ -159,6 +163,7 @@ export function useCreatePostPoll() {
 
 /** Cast or change a vote on a post poll. */
 export function useVotePostPoll() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
@@ -171,7 +176,7 @@ export function useVotePostPoll() {
       pollId: string;
       optionIndex: number;
     }) => {
-      if (!user) throw new Error('Must be logged in');
+      if (!user) throw new Error(uiI18n.t('app.must_be_logged_in_9cf435d8'));
 
       const db = supabase as any;
       const { error } = await db

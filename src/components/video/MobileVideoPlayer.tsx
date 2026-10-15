@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { ExternalPlayerButton } from './controls/ExternalPlayerButton';
 import { uploadSubtitle, fetchSubtitle, decodeSubtitle } from '@/core/player/subtitle-service';
 import { usePlaybackCoordinator } from '@/core/player/usePlaybackCoordinator';
@@ -25,6 +27,7 @@ import {
 } from "lucide-react";
 import Hls from "hls.js";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 import { useVideoSettings } from "@/hooks/media/useVideoSettings";
 import { useAniskip } from "@/hooks/media/useAniskip";
 import { mergeSkipSegments } from "@/core/player/skip-segments";
@@ -216,10 +219,12 @@ export function MobileVideoPlayer({
   sourceType,
   torrentUrl,
 }: MobileVideoPlayerProps) {
+  useUiTranslation();
   const [uploadedSubtitles, setUploadedSubtitles] = useState<Array<{ url: string; lang: string; label?: string }>>([]);
   const uploadedUrls = useRef<string[]>([]);
   const subtitleUploadInput = useRef<HTMLInputElement>(null);
   const subtitles = useMemo(() => [...providedSubtitles, ...uploadedSubtitles], [providedSubtitles, uploadedSubtitles]);
+  const { t } = useTranslation();
   useEffect(() => () => { uploadedUrls.current.forEach(url => URL.revokeObjectURL(url)); }, []);
   const videoRef = useRef<HTMLVideoElement>(null);
   const { coordinator: playbackCoordinator, report: reportProgress } = usePlaybackCoordinator({
@@ -467,7 +472,7 @@ export function MobileVideoPlayer({
     setActiveSkip(null);
     // Mobile feedback for the auto-skip toggle (Settings → Video → Skip intro).
     void triggerHaptic('success');
-    toast.success('Skipped intro', { id: 'mobile-autoskip', duration: 1800 });
+    toast.success(uiI18n.t('app.skipped_intro_a0ffacf1'), { id: 'mobile-autoskip', duration: 1800 });
   }, [activeSkip, settings.autoSkipIntro]);
 
   // Keep screen awake while playing
@@ -575,7 +580,7 @@ export function MobileVideoPlayer({
     if (!Number.isFinite(minutes) || minutes <= 0) return;
     const id = window.setTimeout(() => {
       videoRef.current?.pause();
-      toast.info('Sleep timer: playback paused.');
+      toast.info(uiI18n.t('app.sleep_timer_playback_paused_b2acc06a'));
     }, minutes * 60 * 1000);
     return () => window.clearTimeout(id);
   }, [settings.sleepTimer, sourceUrlKey]);
@@ -1773,7 +1778,7 @@ export function MobileVideoPlayer({
         if (!blob) return;
         
         // Create filename with timestamp and episode info
-        const timestamp = new Date().toLocaleString('en-US', { 
+        const timestamp = new Date().toLocaleString(uiI18n.language, {
           year: 'numeric', 
           month: '2-digit', 
           day: '2-digit',
@@ -1793,11 +1798,11 @@ export function MobileVideoPlayer({
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
         
-        toast.success(`Screenshot saved: ${filename}`);
+        toast.success(t('player.screenshotSaved', { filename }));
       }, 'image/png');
     } catch (err) {
       console.error('Screenshot failed:', err);
-      toast.error('Failed to create screenshot');
+      toast.error(t('player.screenshotFailed'));
     }
   };
 
@@ -1821,21 +1826,21 @@ export function MobileVideoPlayer({
               className="flex items-center gap-2 px-6 py-3 bg-primary rounded-xl text-white text-lg"
             >
               <RefreshCw className="w-5 h-5" />
-              Retry
+              {t('common.retry')}
             </button>
             <button
               onClick={() => window.location.reload()}
               className="flex items-center gap-2 px-6 py-3 bg-white/10 rounded-xl text-white text-lg"
             >
               <RefreshCw className="w-5 h-5" />
-              Refresh
+              {t('player.refreshPage')}
             </button>
             {onServerSwitch && (
               <button
                 onClick={onServerSwitch}
                 className="px-6 py-3 bg-white/10 rounded-xl text-white text-lg"
               >
-                Switch Server
+                {t('player.switchServer')}
               </button>
             )}
           </div>
@@ -1955,11 +1960,11 @@ export function MobileVideoPlayer({
         <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/20">
           <button
             onClick={() => { setIsLocked(false); setShowControls(true); }}
-            aria-label="Unlock player"
+            aria-label={t('migration.unlock')}
             className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-black/70 border border-white/20"
           >
             <Unlock className="w-7 h-7 text-white" />
-            <span className="text-white text-sm">Tap to unlock</span>
+            <span className="text-white text-sm">{t('migration.tapUnlock')}</span>
           </button>
         </div>
       )}
@@ -1974,7 +1979,7 @@ export function MobileVideoPlayer({
                 {onBack && (
                   <button
                     onClick={onBack}
-                    aria-label="Back to anime"
+                    aria-label={t('migration.backAnime')}
                     className="p-2.5 rounded-full bg-white/10 backdrop-blur-md active:bg-white/20 border border-white/10"
                   >
                     <ChevronLeft className="w-6 h-6 text-white" />
@@ -1985,21 +1990,21 @@ export function MobileVideoPlayer({
                     {animeName}
                   </h3>
                   <p className="text-white/80 text-xs truncate">
-                    Episode {episodeNumber} {episodeTitle ? `• ${episodeTitle}` : ''}
+                    {t('header.episode', { number: episodeNumber })} {episodeTitle ? uiI18n.t('app.i18n_value_0_723b674d', { value0: episodeTitle }) : ''}
                   </p>
                 </div>
               </div>
               
               <div className="flex items-center gap-2">
                 {videoZoom > 1.01 && (
-                  <button aria-label="Reset video zoom" onClick={() => setVideoZoom(1)} className="px-3 rounded-full bg-white/10 text-white text-sm tabular-nums">
+                  <button aria-label={t('migration.resetZoom')} onClick={() => setVideoZoom(1)} className="px-3 rounded-full bg-white/10 text-white text-sm tabular-nums">
                     {videoZoom.toFixed(1)}×
                   </button>
                 )}
                 {/* Lock button */}
                 <button
                   onClick={() => { clearPendingTap(); setIsLocked(true);  setShowControls(true); setDoubleTapSide(null); }}
-                  aria-label="Lock player"
+                  aria-label={t('migration.lock')}
                   className="p-2.5 rounded-full bg-white/10 backdrop-blur-md active:bg-white/20 border border-white/10"
                 >
                   <Lock className="w-5 h-5 text-white" />
@@ -2013,7 +2018,7 @@ export function MobileVideoPlayer({
             {/* Skip Back */}
             <button
               onClick={() => seek(currentTime - 10)}
-              aria-label="Rewind 10 seconds"
+              aria-label={t('migration.rewind')}
               className="p-3 rounded-full bg-white/10 backdrop-blur-md active:bg-white/20 border border-white/10"
             >
               <SkipBack className="w-7 h-7 text-white drop-shadow-lg" />
@@ -2022,7 +2027,7 @@ export function MobileVideoPlayer({
             {/* Play/Pause */}
             <button
               onClick={togglePlay}
-              aria-label={isPlaying ? 'Pause' : 'Play'}
+              aria-label={isPlaying ? t('player.pause') : t('player.play')}
               className="p-5 rounded-full bg-primary backdrop-blur-md active:scale-95 transition-transform shadow-2xl border-2 border-white/20"
             >
               {isPlaying ? (
@@ -2035,7 +2040,7 @@ export function MobileVideoPlayer({
             {/* Skip Forward */}
             <button
               onClick={() => seek(currentTime + 10)}
-              aria-label="Forward 10 seconds"
+              aria-label={t('migration.forward')}
               className="p-3 rounded-full bg-white/10 backdrop-blur-md active:bg-white/20 border border-white/10"
             >
               <SkipForward className="w-7 h-7 text-white drop-shadow-lg" />
@@ -2048,7 +2053,7 @@ export function MobileVideoPlayer({
               onClick={skipIntro}
               className="mobile-player-skip absolute right-[max(1rem,env(safe-area-inset-right))] bottom-32 px-4 py-2 bg-white/95 rounded-xl text-black font-bold text-sm shadow-lg active:scale-95 transition-transform"
             >
-              Skip {activeSkip.type === 'op' || activeSkip.type === 'mixed-op' ? 'Intro' : activeSkip.type === 'recap' ? 'Recap' : 'Outro'}
+              {activeSkip.type === 'recap' ? t('player.skipRecap') : activeSkip.type === 'ed' ? t('player.skipOutro') : t('player.skipIntro')}
             </button>
           )}
 
@@ -2057,7 +2062,7 @@ export function MobileVideoPlayer({
             {/* Progress Bar */}
             <input
               type="range"
-              aria-label="Seek video"
+              aria-label={t('migration.seek')}
               min={0}
               max={Number.isFinite(duration) && duration > 0 ? duration : 0}
               step={0.1}
@@ -2078,7 +2083,7 @@ export function MobileVideoPlayer({
                 <button
                   type="button"
                   onClick={() => { setSettingsTab('subtitles'); setShowFullSettings(true); }}
-                  aria-label="Subtitle settings"
+                  aria-label={t('migration.subtitleSettings')}
                   className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 border border-white/10"
                 >
                   <Subtitles className="h-5 w-5 text-white" />
@@ -2087,11 +2092,11 @@ export function MobileVideoPlayer({
                 {/* Settings — full desktop-parity sheet, bottom-sheet on mobile */}
                 {nativeMobile && <ExternalPlayerButton videoRef={videoRef} externalPlayerPath={null} currentSourceUrl={currentSource?.url}
                   isPlaying={isPlaying} animeName={animeName} episodeNumber={episodeNumber} onSaveProgress={() => playbackCoordinator.flush()} headers={headers} subtitles={subtitles} />}
-                  <input ref={subtitleUploadInput} type="file" accept=".srt,.ass,.ssa,.vtt" className="sr-only" aria-label="Upload subtitle file" onChange={async event => {
+                  <input ref={subtitleUploadInput} type="file" accept=".srt,.ass,.ssa,.vtt" className="sr-only" aria-label={t('migration.uploadSubtitle')} onChange={async event => {
                     const file = event.target.files?.[0]; if (!file) return;
                     const input = event.currentTarget;
                     try { const sub = await uploadSubtitle(file); uploadedUrls.current.push(sub.url); setUploadedSubtitles(previous => [...previous, sub]); }
-                    catch (error) { toast.error(error instanceof Error ? error.message : 'Subtitle upload failed'); }
+                    catch (error) { toast.error(error instanceof Error ? error.message : t('migration.subtitleFailed')); }
                     input.value = '';
                   }} />
                 <button
@@ -2099,7 +2104,7 @@ export function MobileVideoPlayer({
                     setSettingsTab('playback');
                     setShowFullSettings(true);
                   }}
-                  aria-label="Player settings"
+                  aria-label={t('migration.playerSettings')}
                   className="p-2.5 rounded-full bg-white/10 backdrop-blur-md active:scale-95 transition-transform border border-white/10"
                 >
                   <Settings className="w-5 h-5 text-white" />
@@ -2108,7 +2113,7 @@ export function MobileVideoPlayer({
                 {/* Fullscreen */}
                 <button
                   onClick={toggleFullscreen}
-                  aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+                  aria-label={isFullscreen ? t('migration.exitFullscreen') : t('migration.fullscreen')}
                   data-player-fullscreen={isFullscreen ? 'active' : undefined}
                   className="p-2.5 rounded-full bg-white/10 backdrop-blur-md active:scale-95 transition-transform border border-white/10"
                 >
@@ -2122,9 +2127,9 @@ export function MobileVideoPlayer({
                 {/* Screenshot */}
                 <button
                   onClick={handleScreenshot}
-                  aria-label="Take screenshot"
+                  aria-label={t('migration.screenshot')}
                   className="p-2.5 rounded-full bg-white/10 backdrop-blur-md active:scale-95 transition-transform border border-white/10"
-                  title="Take Screenshot"
+                  title={t('player.takeScreenshot')}
                 >
                   <Camera className="w-5 h-5 text-white" />
                 </button>

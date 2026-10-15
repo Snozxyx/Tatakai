@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useRef } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -35,6 +37,7 @@ interface AvatarPickerSheetProps {
 }
 
 export function AvatarPickerSheet({ type, trigger, currentImage, overlayClassName, contentClassName }: AvatarPickerSheetProps) {
+  useUiTranslation();
   const { user } = useAuth();
   const reduceMotion = useReducedMotion();
   const [open, setOpen] = useState(false);
@@ -75,16 +78,16 @@ export function AvatarPickerSheet({ type, trigger, currentImage, overlayClassNam
   };
 
   const handleUpload = async (file: File) => {
-    if (!user) { toast.error('Sign in first'); return; }
+    if (!user) { toast.error(uiI18n.t('app.sign_in_first_77a74f57')); return; }
     try { validateProfileImage(file); }
     catch (e) { toast.error((e as Error).message); return; }
     setUploading(true);
     try {
       const { url } = await uploadUserMedia(file, user.id, type);
       setSelectedImage(url);
-      toast.success('Uploaded — press Apply to save');
+      toast.success(uiI18n.t('app.uploaded_press_apply_to_save_ed69251b'));
     } catch (e: any) {
-      toast.error(e?.message || 'Upload failed');
+      toast.error(e?.message || uiI18n.t('app.upload_failed_ad0d0603'));
     } finally {
       setUploading(false);
     }
@@ -94,11 +97,11 @@ export function AvatarPickerSheet({ type, trigger, currentImage, overlayClassNam
     if (!selectedImage) return;
     try {
       await updateMutation.mutateAsync(selectedImage);
-      toast.success(`${type === 'avatar' ? 'Avatar' : 'Banner'} updated!`);
+      toast.success(uiI18n.t('app.i18n_value_0_updated_b3756d3c', { value0: type === 'avatar' ? 'Avatar' : 'Banner' }));
       setOpen(false);
       setSelectedImage(null);
     } catch {
-      toast.error(`Failed to update ${type}`);
+      toast.error(uiI18n.t('app.failed_to_update_i18n_value_0_1e7464e4', { value0: type }));
     }
   };
 
@@ -130,7 +133,7 @@ export function AvatarPickerSheet({ type, trigger, currentImage, overlayClassNam
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/30 to-primary/5 border border-primary/20 text-primary shadow-[0_0_20px_rgba(var(--primary),0.2)]">
               <Sparkles className="h-5 w-5" />
             </div>
-            Choose {type === 'avatar' ? 'Identity' : 'Cover'}
+            {uiI18n.t('app.choose_78b7c9f6')} {type === 'avatar' ? uiI18n.t('app.identity_7e5a975b') : uiI18n.t('app.cover_8b656a5d')}
           </SheetTitle>
         </SheetHeader>
 
@@ -146,16 +149,16 @@ export function AvatarPickerSheet({ type, trigger, currentImage, overlayClassNam
                 <div className="h-24 w-24 shrink-0 overflow-hidden rounded-full bg-background ring-[6px] ring-background/50 border border-white/10 shadow-2xl backdrop-blur-md">
                   <div className="h-full w-full bg-black/40">
                     {previewImage ? (
-                      <img src={previewImage} alt="preview" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                      <img src={previewImage} alt={uiI18n.t('app.preview_1aa787fe')} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center text-muted-foreground/50"><ImageIcon className="h-8 w-8" /></div>
                     )}
                   </div>
                 </div>
                 <div className="flex flex-col">
-                  <h4 className="text-sm font-bold text-white mb-1">Avatar Preview</h4>
+                  <h4 className="text-sm font-bold text-white mb-1">{uiI18n.t('app.avatar_preview_f4b1e7ac')}</h4>
                   <p className="text-xs font-medium text-muted-foreground/80 leading-relaxed">
-                    {selectedImage ? 'Looking good! Press Apply to save your new identity.' : 'Pick from gallery, search, or upload a custom image.'}
+                    {selectedImage ? uiI18n.t('app.looking_good_press_apply_to_save_your_new_identi_3c953023') : uiI18n.t('app.pick_from_gallery_search_or_upload_a_custom_imag_2f65e20b')}
                   </p>
                 </div>
               </div>
@@ -163,14 +166,14 @@ export function AvatarPickerSheet({ type, trigger, currentImage, overlayClassNam
               <div className="relative z-10">
                 <div className="aspect-[21/9] w-full overflow-hidden rounded-2xl bg-black/40 ring-1 ring-white/10 shadow-2xl">
                   {previewImage ? (
-                    <img src={previewImage} alt="preview" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                    <img src={previewImage} alt={uiI18n.t('app.preview_1aa787fe')} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-muted-foreground/50"><ImageIcon className="h-8 w-8" /></div>
                   )}
                 </div>
                 <div className="mt-4 text-center">
-                  <h4 className="text-sm font-bold text-white mb-0.5">Banner Preview</h4>
-                  <p className="text-xs font-medium text-muted-foreground/80">{selectedImage ? 'Ready to apply.' : 'Select a cinematic cover.'}</p>
+                  <h4 className="text-sm font-bold text-white mb-0.5">{uiI18n.t('app.banner_preview_ae8f9a3d')}</h4>
+                  <p className="text-xs font-medium text-muted-foreground/80">{selectedImage ? uiI18n.t('app.ready_to_apply_32cce23b') : uiI18n.t('app.select_a_cinematic_cover_efa75876')}</p>
                 </div>
               </div>
             )}
@@ -179,29 +182,29 @@ export function AvatarPickerSheet({ type, trigger, currentImage, overlayClassNam
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
             <TabsList className="grid h-14 w-full grid-cols-4 rounded-full border border-white/[0.08] bg-white/[0.03] p-1.5 shadow-xl backdrop-blur-md mb-6">
               <TabsTrigger value="gallery" className="flex items-center gap-1.5 rounded-full text-[11px] sm:text-xs font-bold data-[state=active]:shadow-[0_0_20px_rgba(var(--primary),0.3)] transition-all">
-                <ImageIcon className="h-3.5 w-3.5" /> Gallery
+                <ImageIcon className="h-3.5 w-3.5" /> {uiI18n.t('app.gallery_9c30a348')}
               </TabsTrigger>
               {type === 'avatar' ? (
                 <>
                   <TabsTrigger value="gif" className="flex items-center gap-1.5 rounded-full text-[11px] sm:text-xs font-bold data-[state=active]:shadow-[0_0_20px_rgba(var(--primary),0.3)] transition-all">
-                    <Film className="h-3.5 w-3.5" /> GIF
+                    <Film className="h-3.5 w-3.5" /> {uiI18n.t('app.gif_758f6c93')}
                   </TabsTrigger>
                   <TabsTrigger value="search" className="flex items-center gap-1.5 rounded-full text-[11px] sm:text-xs font-bold data-[state=active]:shadow-[0_0_20px_rgba(var(--primary),0.3)] transition-all">
-                    <Search className="h-3.5 w-3.5" /> Search
+                    <Search className="h-3.5 w-3.5" /> {uiI18n.t('app.search_bce06414')}
                   </TabsTrigger>
                 </>
               ) : (
                 <>
                   <TabsTrigger value="anilist" className="flex items-center gap-1.5 rounded-full text-[11px] sm:text-xs font-bold data-[state=active]:shadow-[0_0_20px_rgba(var(--primary),0.3)] transition-all">
-                    <Clapperboard className="h-3.5 w-3.5" /> AniList
+                    <Clapperboard className="h-3.5 w-3.5" /> {uiI18n.t('app.anilist_c03a6787')}
                   </TabsTrigger>
                   <TabsTrigger value="landscape" className="flex items-center gap-1.5 rounded-full text-[11px] sm:text-xs font-bold data-[state=active]:shadow-[0_0_20px_rgba(var(--primary),0.3)] transition-all">
-                    <Images className="h-3.5 w-3.5" /> Art
+                    <Images className="h-3.5 w-3.5" /> {uiI18n.t('app.art_308e17d2')}
                   </TabsTrigger>
                 </>
               )}
               <TabsTrigger value="upload" className="flex items-center gap-1.5 rounded-full text-[11px] sm:text-xs font-bold data-[state=active]:shadow-[0_0_20px_rgba(var(--primary),0.3)] transition-all">
-                <Upload className="h-3.5 w-3.5" /> Upload
+                <Upload className="h-3.5 w-3.5" /> {uiI18n.t('app.upload_8bdf057f')}
               </TabsTrigger>
             </TabsList>
 
@@ -220,12 +223,12 @@ export function AvatarPickerSheet({ type, trigger, currentImage, overlayClassNam
                           : 'border-white/[0.08] bg-white/[0.03] text-muted-foreground hover:bg-white/[0.08] hover:text-white',
                       )}
                     >
-                      {g}
+                      {uiI18n.t(({"any":"app.any_c5fe0200","male":"app.male_030ef4a5","female":"app.female_96a1a08d"})[g])}
                     </button>
                   ))}
                   <div className="flex-1" />
                   <Button variant="ghost" size="sm" onClick={() => refetchGallery()} disabled={isGalleryLoading} className="rounded-full hover:bg-white/10 text-xs font-bold px-4">
-                    <RefreshCw className={cn('mr-2 h-3.5 w-3.5', isGalleryLoading && 'animate-spin')} /> Refresh
+                    <RefreshCw className={cn('mr-2 h-3.5 w-3.5', isGalleryLoading && 'animate-spin')} /> {uiI18n.t('app.refresh_56e3badc')}
                   </Button>
                 </div>
               )}
@@ -238,8 +241,8 @@ export function AvatarPickerSheet({ type, trigger, currentImage, overlayClassNam
                 </div>
               ) : !galleryImages?.length ? (
                 <div className="space-y-3 py-6 text-center text-sm text-muted-foreground" role="status">
-                  <p>{type === 'avatar' && profileGalleryError ? 'Could not load avatars.' : 'No images available for this selection.'}</p>
-                  <Button variant="outline" onClick={() => refetchGallery()}>Retry gallery</Button>
+                  <p>{type === 'avatar' && profileGalleryError ? uiI18n.t('app.could_not_load_avatars_f5eb20a0') : uiI18n.t('app.no_images_available_for_this_selection_cc652b8d')}</p>
+                  <Button variant="outline" onClick={() => refetchGallery()}>{uiI18n.t('app.retry_gallery_4921eaef')}</Button>
                 </div>
               ) : (
                 <div className={cn('grid gap-4', type === 'avatar' ? 'grid-cols-3 sm:grid-cols-4' : 'grid-cols-2')}>
@@ -286,10 +289,10 @@ export function AvatarPickerSheet({ type, trigger, currentImage, overlayClassNam
             {type === 'avatar' && (
               <TabsContent value="gif" className="space-y-6 focus-visible:outline-none">
                 <div className="flex items-center gap-2">
-                  <p className="text-xs font-medium text-muted-foreground/70">Animated anime reactions</p>
+                  <p className="text-xs font-medium text-muted-foreground/70">{uiI18n.t('app.animated_anime_reactions_a7aeba08')}</p>
                   <div className="flex-1" />
                   <Button variant="ghost" size="sm" onClick={() => refetchGifs()} disabled={loadingGifs} className="rounded-full hover:bg-white/10 text-xs font-bold px-4">
-                    <RefreshCw className={cn('mr-2 h-3.5 w-3.5', loadingGifs && 'animate-spin')} /> Shuffle
+                    <RefreshCw className={cn('mr-2 h-3.5 w-3.5', loadingGifs && 'animate-spin')} /> {uiI18n.t('app.shuffle_5b772b7b')}
                   </Button>
                 </div>
                 {loadingGifs ? (
@@ -351,7 +354,7 @@ export function AvatarPickerSheet({ type, trigger, currentImage, overlayClassNam
                 <div className="group relative shadow-lg rounded-full">
                   <Search className="absolute left-5 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-primary" />
                   <Input
-                    placeholder="Search an anime (e.g. Jujutsu Kaisen)"
+                    placeholder={uiI18n.t('app.search_an_anime_e_g_jujutsu_kaisen_5a5c4ee1')}
                     value={bannerQuery}
                     onChange={(e) => setBannerQuery(e.target.value)}
                     className="h-14 rounded-full border-white/[0.08] bg-white/[0.03] pl-14 text-sm font-medium transition-all focus:ring-2 focus:ring-primary/50 shadow-inner backdrop-blur-md"
@@ -401,8 +404,8 @@ export function AvatarPickerSheet({ type, trigger, currentImage, overlayClassNam
                 {bannerQuery.length > 1 && !loadingMedia && (!mediaResults || mediaResults.length === 0) && (
                   <div className="flex flex-col items-center justify-center rounded-[2rem] border border-dashed border-white/10 bg-white/[0.02] py-12 text-muted-foreground backdrop-blur-sm">
                     <Info className="mb-3 h-10 w-10 opacity-20" />
-                    <p className="text-sm font-bold">No banners found for "{bannerQuery}"</p>
-                    <p className="text-xs text-muted-foreground/60 mt-1">Not every title has a banner image.</p>
+                    <p className="text-sm font-bold">{uiI18n.t('app.no_banners_found_for_37022ec2')}{bannerQuery}"</p>
+                    <p className="text-xs text-muted-foreground/60 mt-1">{uiI18n.t('app.not_every_title_has_a_banner_image_5ca80934')}</p>
                   </div>
                 )}
               </TabsContent>
@@ -412,10 +415,10 @@ export function AvatarPickerSheet({ type, trigger, currentImage, overlayClassNam
             {type === 'banner' && (
               <TabsContent value="landscape" className="space-y-6 focus-visible:outline-none">
                 <div className="flex items-center gap-2">
-                  <p className="text-xs font-medium text-muted-foreground/70">Decorative wide art</p>
+                  <p className="text-xs font-medium text-muted-foreground/70">{uiI18n.t('app.decorative_wide_art_b356e3cd')}</p>
                   <div className="flex-1" />
                   <Button variant="ghost" size="sm" onClick={() => refetchLandscape()} disabled={loadingLandscape} className="rounded-full hover:bg-white/10 text-xs font-bold px-4">
-                    <RefreshCw className={cn('mr-2 h-3.5 w-3.5', loadingLandscape && 'animate-spin')} /> Refresh
+                    <RefreshCw className={cn('mr-2 h-3.5 w-3.5', loadingLandscape && 'animate-spin')} /> {uiI18n.t('app.refresh_56e3badc')}
                   </Button>
                 </div>
                 {loadingLandscape ? (
@@ -470,7 +473,7 @@ export function AvatarPickerSheet({ type, trigger, currentImage, overlayClassNam
               <div className="group relative shadow-lg rounded-full">
                 <Search className="absolute left-5 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-primary" />
                 <Input
-                  placeholder="Search a character (e.g. Gojo Satoru)"
+                  placeholder={uiI18n.t('app.search_a_character_e_g_gojo_satoru_0c0e5a34')}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="h-14 rounded-full border-white/[0.08] bg-white/[0.03] pl-14 text-sm font-medium transition-all focus:ring-2 focus:ring-primary/50 shadow-inner backdrop-blur-md"
@@ -526,7 +529,7 @@ export function AvatarPickerSheet({ type, trigger, currentImage, overlayClassNam
               {searchQuery.length > 0 && !loadingSearch && (!searchResults || searchResults.length === 0) && (
                 <div className="flex flex-col items-center justify-center rounded-[2rem] border border-dashed border-white/10 bg-white/[0.02] py-16 text-muted-foreground backdrop-blur-sm">
                   <Info className="mb-4 h-12 w-12 opacity-20" />
-                  <p className="text-sm font-bold">No characters found for "{searchQuery}"</p>
+                  <p className="text-sm font-bold">{uiI18n.t('app.no_characters_found_for_8e6cd0d9')}{searchQuery}"</p>
                 </div>
               )}
             </TabsContent>
@@ -547,8 +550,8 @@ export function AvatarPickerSheet({ type, trigger, currentImage, overlayClassNam
                   </div>
                 )}
                 <div className="text-center">
-                  <p className="font-bold text-sm text-foreground/90 mb-1">Click to upload image</p>
-                  <p className="text-xs font-medium text-muted-foreground/60">PNG, JPG, GIF, WebP · Up to 8MB</p>
+                  <p className="font-bold text-sm text-foreground/90 mb-1">{uiI18n.t('app.click_to_upload_image_0ad9a792')}</p>
+                  <p className="text-xs font-medium text-muted-foreground/60">{uiI18n.t('app.png_jpg_gif_webp_up_to_8mb_6867367a')}</p>
                 </div>
               </button>
               <input
@@ -565,7 +568,7 @@ export function AvatarPickerSheet({ type, trigger, currentImage, overlayClassNam
 
               <div className="flex items-center gap-4 px-2">
                 <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/50">or paste url</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/50">{uiI18n.t('app.or_paste_url_77b4af31')}</span>
                 <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
               </div>
 
@@ -574,9 +577,9 @@ export function AvatarPickerSheet({ type, trigger, currentImage, overlayClassNam
                 onSubmit={(e) => {
                   e.preventDefault();
                   const url = urlInput.trim();
-                  if (!/^https?:\/\//i.test(url)) { toast.error('Enter a valid image URL'); return; }
+                  if (!/^https?:\/\//i.test(url)) { toast.error(uiI18n.t('app.enter_a_valid_image_url_12d17700')); return; }
                   setSelectedImage(url);
-                  toast.success('Loaded — press Apply to save');
+                  toast.success(uiI18n.t('app.loaded_press_apply_to_save_52cebd03'));
                 }}
               >
                 <div className="relative flex-1 shadow-lg rounded-full">
@@ -589,7 +592,7 @@ export function AvatarPickerSheet({ type, trigger, currentImage, overlayClassNam
                   />
                 </div>
                 <Button type="submit" variant="secondary" className="rounded-full h-12 px-6 font-bold shadow-lg bg-white/10 hover:bg-white/20 border border-white/10">
-                  Use URL
+                  {uiI18n.t('app.use_url_07a99974')}
                 </Button>
               </form>
             </TabsContent>
@@ -599,7 +602,7 @@ export function AvatarPickerSheet({ type, trigger, currentImage, overlayClassNam
         {/* ── Sticky Footer ── */}
         <div className="relative z-20 flex shrink-0 justify-end gap-3 border-t border-white/[0.08] bg-background/60 p-5 backdrop-blur-2xl">
           <Button variant="ghost" onClick={() => setOpen(false)} className="h-12 rounded-full px-6 font-bold hover:bg-white/10">
-            Cancel
+            {uiI18n.t('app.cancel_77dfd213')}
           </Button>
           <Button
             onClick={handleSelect}
@@ -607,7 +610,7 @@ export function AvatarPickerSheet({ type, trigger, currentImage, overlayClassNam
             className="h-12 rounded-full px-8 text-sm font-black uppercase tracking-widest shadow-[0_0_20px_rgba(var(--primary),0.3)] transition-all hover:scale-105"
           >
             {updateMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-            Apply
+            {uiI18n.t('app.apply_cfea419c')}
           </Button>
         </div>
       </SheetContent>

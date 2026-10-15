@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
  * SourcePanel.tsx
  * Renders playback sources grouped by dub language.
@@ -7,6 +9,8 @@
  */
 
 import { useState, useCallback } from "react";
+import { useTranslation } from "react-i18next";
+import i18n from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import {
   Tooltip,
@@ -85,7 +89,6 @@ const LANGUAGE_PRIORITY: Record<string, number> = {
 };
 
 const UNKNOWN_CODE = "unknown";
-const UNKNOWN_LABEL = "Unknown";
 
 /**
  * Groups an array of CategorizedSource objects by dubLanguageCode.
@@ -112,7 +115,7 @@ export function groupSourcesByDubLanguage(
 
   return [...groups.entries()]
     .map(([code, srcs]) => ({
-      language: code === UNKNOWN_CODE ? UNKNOWN_LABEL : (srcs[0].dubLanguage || UNKNOWN_LABEL),
+      language: code === UNKNOWN_CODE ? i18n.t('watch.unknown') : (srcs[0].dubLanguage || i18n.t('watch.unknown')),
       languageCode: code,
       sources: srcs,
     }))
@@ -155,6 +158,8 @@ export function SourcePanel({
   selectedSourceKey,
   onSelectSource,
 }: SourcePanelProps) {
+  useUiTranslation();
+  const { t } = useTranslation();
   const nonTorrent = sources.filter((s) => s.type !== "torrent");
   const torrentSources = sources.filter((s) => s.type === "torrent");
 
@@ -164,7 +169,7 @@ export function SourcePanel({
   if (streamGroups.length === 0 && torrentGroups.length === 0) {
     return (
       <div className="text-sm text-muted-foreground py-2">
-        No sources available.
+        {t('watch.noSources')}
       </div>
     );
   }
@@ -185,7 +190,7 @@ export function SourcePanel({
           <div className="space-y-4">
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold uppercase tracking-wider text-green-400">
-                Torrent
+                {t('torrent.sourcesTitle')}
               </span>
               <div className="flex-1 h-px bg-green-400/30" />
             </div>
@@ -219,6 +224,8 @@ function DubLanguageGroupSection({
   selectedSourceKey,
   onSelectSource,
 }: DubLanguageGroupSectionProps) {
+  useUiTranslation();
+  const { t } = useTranslation();
   return (
     <div className="space-y-2">
       {/* Section header */}
@@ -228,7 +235,7 @@ function DubLanguageGroupSection({
         </span>
         <div className="flex-1 h-px bg-border" />
         <span className="text-xs text-muted-foreground">
-          {group.sources.length} {group.sources.length === 1 ? "source" : "sources"}
+          {t('watch.sourceCount', { count: group.sources.length })}
         </span>
       </div>
 
@@ -262,18 +269,18 @@ const SOURCE_TYPE_STYLES: Record<
 > = {
   hls: {
     bg: "bg-muted/60",
-    text: "text-muted-foreground",
-    label: "HLS",
+    get text() { return uiI18n.t('app.text_muted_foreground_bfa60319'); },
+    get label() { return uiI18n.t('app.hls_63d70cec'); },
   },
   embed: {
     bg: "bg-primary/20",
-    text: "text-primary",
-    label: "Embed",
+    get text() { return uiI18n.t('app.text_primary_20aaf08a'); },
+    get label() { return uiI18n.t('app.embed_ad02e14e'); },
   },
   torrent: {
     bg: "bg-green-500/20",
-    text: "text-green-400",
-    label: "Torrent",
+    get text() { return uiI18n.t('app.text_green_400_d21e44fb'); },
+    get label() { return uiI18n.t('app.torrent_4d15a5de'); },
   },
 };
 
@@ -286,6 +293,7 @@ interface SourceTypeBadgeProps {
 }
 
 function SourceTypeBadge({ type }: SourceTypeBadgeProps) {
+  useUiTranslation();
   const styles = SOURCE_TYPE_STYLES[type];
   return (
     <span
@@ -317,6 +325,8 @@ interface SourceHoverTooltipProps {
  * - Dismisses immediately on mouse-leave (Radix default behaviour).
  */
 function SourceHoverTooltip({ source, children }: SourceHoverTooltipProps) {
+  useUiTranslation();
+  const { t } = useTranslation();
   // Lazy peer data state — only used for torrent sources
   const [peerData, setPeerData] = useState<{ seeders: number | null; leechers: number | null } | null>(null);
   const [peerFetched, setPeerFetched] = useState(false);
@@ -370,34 +380,34 @@ function SourceHoverTooltip({ source, children }: SourceHoverTooltipProps) {
         <div className="space-y-1 p-0.5 text-xs">
           {/* Language */}
           <div className="flex items-center justify-between gap-3">
-            <span className="text-muted-foreground">Language</span>
-            <span className="font-medium">{source.dubLanguage || "Unknown"}</span>
+            <span className="text-muted-foreground">{t('watch.sourceLanguage')}</span>
+            <span className="font-medium">{source.dubLanguage || t('watch.unknown')}</span>
           </div>
 
           {/* Source type */}
           <div className="flex items-center justify-between gap-3">
-            <span className="text-muted-foreground">Type</span>
+            <span className="text-muted-foreground">{t('anime.type')}</span>
             <SourceTypeBadge type={source.type} />
           </div>
 
           {/* Quality */}
           {source.quality && (
             <div className="flex items-center justify-between gap-3">
-              <span className="text-muted-foreground">Quality</span>
+              <span className="text-muted-foreground">{t('player.quality')}</span>
               <span className="font-medium">{source.quality}</span>
             </div>
           )}
 
           {/* Provider */}
           <div className="flex items-center justify-between gap-3">
-            <span className="text-muted-foreground">Provider</span>
+            <span className="text-muted-foreground">{t('watch.sourceProvider')}</span>
             <span className="font-medium truncate max-w-[120px]">{source.providerName}</span>
           </div>
 
           {/* Group name (torrent release group) */}
           {source.groupName && (
             <div className="flex items-center justify-between gap-3">
-              <span className="text-muted-foreground">Group</span>
+              <span className="text-muted-foreground">{t('watch.sourceGroup')}</span>
               <span className="font-medium truncate max-w-[120px]">{source.groupName}</span>
             </div>
           )}
@@ -407,17 +417,17 @@ function SourceHoverTooltip({ source, children }: SourceHoverTooltipProps) {
             <>
               <div className="my-1 h-px bg-border" />
               {peersPending ? (
-                <div className="text-muted-foreground italic">Fetching peers…</div>
+                <div className="text-muted-foreground italic">{t('watch.fetchingPeers')}</div>
               ) : (
                 <>
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-muted-foreground">Seeders</span>
+                    <span className="text-muted-foreground">{t('watch.sourceSeeders')}</span>
                     <span className="font-medium text-green-400">
                       {effectiveSeeders != null ? effectiveSeeders : "—"}
                     </span>
                   </div>
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-muted-foreground">Leechers</span>
+                    <span className="text-muted-foreground">{t('watch.sourceLeechers')}</span>
                     <span className="font-medium text-yellow-400">
                       {effectiveLeechers != null ? effectiveLeechers : "—"}
                     </span>
@@ -443,6 +453,7 @@ interface SourceCardWithTooltipProps {
 }
 
 function SourceCardWithTooltip({ source, isSelected, onSelect }: SourceCardWithTooltipProps) {
+  useUiTranslation();
   return (
     <SourceHoverTooltip source={source}>
       <SourceCard source={source} isSelected={isSelected} onSelect={onSelect} />
@@ -461,6 +472,7 @@ interface SourceCardProps {
 }
 
 function SourceCard({ source, isSelected, onSelect }: SourceCardProps) {
+  useUiTranslation();
   const typeStyles = SOURCE_TYPE_STYLES[source.type];
 
   return (
@@ -475,7 +487,7 @@ function SourceCard({ source, isSelected, onSelect }: SourceCardProps) {
           : cn(typeStyles.bg, typeStyles.text, "hover:brightness-110")
       )}
       aria-pressed={isSelected}
-      title={`${source.providerName} — ${source.quality} (${source.type.toUpperCase()})`}
+      title={uiI18n.t('app.i18n_value_0_i18n_value_1_i18n_value_2_feb96b5b', { value0: source.providerName, value1: source.quality, value2: source.type.toUpperCase() })}
     >
       <span className="truncate max-w-[120px]">{source.sourceName || source.providerName}</span>
       {source.quality && (

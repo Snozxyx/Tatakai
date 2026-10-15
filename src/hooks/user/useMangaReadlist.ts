@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -255,6 +257,7 @@ const removeLocalMangaReadlist = (mangaId: string) => {
 };
 
 export function useMangaReadlist(statuses: MangaReadlistStatus[] = EXPLICIT_READLIST_STATUSES) {
+  useUiTranslation();
   const { user } = useAuth();
   const statusFilter = normalizeStatusList(statuses);
   const statusKey = statusFilter.join('|');
@@ -285,6 +288,7 @@ export function useMangaReadlist(statuses: MangaReadlistStatus[] = EXPLICIT_READ
 }
 
 export function useMangaContinueReading(limit: number = 6) {
+  useUiTranslation();
   const { user } = useAuth();
 
   return useQuery({
@@ -340,6 +344,7 @@ export function useMangaContinueReading(limit: number = 6) {
 }
 
 export function useMangaReadlistItem(mangaId: string | undefined) {
+  useUiTranslation();
   const { user } = useAuth();
 
   return useQuery({
@@ -370,6 +375,7 @@ export function useMangaReadlistItem(mangaId: string | undefined) {
 }
 
 export function useUpsertMangaReadlist() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user, profile } = useAuth();
 
@@ -378,9 +384,9 @@ export function useUpsertMangaReadlist() {
       const mangaId = String(input.mangaId || '').trim();
       const mangaTitle = String(input.mangaTitle || '').trim();
 
-      if (!mangaId) throw new Error('Missing manga id');
-      if (!mangaTitle) throw new Error('Missing manga title');
-      if (!user) throw new Error('Please sign in to manage your manga readlist');
+      if (!mangaId) throw new Error(uiI18n.t('app.missing_manga_id_9db3e13a'));
+      if (!mangaTitle) throw new Error(uiI18n.t('app.missing_manga_title_97baa3da'));
+      if (!user) throw new Error(uiI18n.t('app.please_sign_in_to_manage_your_manga_readlist_25d9084d'));
 
       const inferredIds = extractExternalIdsFromMangaId(mangaId);
       const malId = toPositiveIntOrNull(input.malId ?? inferredIds.malId);
@@ -488,19 +494,20 @@ export function useUpsertMangaReadlist() {
       }
     },
     onError: (error: any) => {
-      toast.error(`Failed to update readlist: ${error?.message || 'Unknown error'}`);
+      toast.error(uiI18n.t('app.failed_to_update_readlist_i18n_value_0_940376bc', { value0: error?.message || 'Unknown error' }));
     },
   });
 }
 
 export function useRemoveFromMangaReadlist() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
   return useMutation({
     mutationFn: async ({ mangaId, silentToast = false }: { mangaId: string; silentToast?: boolean }) => {
-      if (!mangaId) throw new Error('Missing manga id');
-      if (!user) throw new Error('Please sign in to manage your manga readlist');
+      if (!mangaId) throw new Error(uiI18n.t('app.missing_manga_id_9db3e13a'));
+      if (!user) throw new Error(uiI18n.t('app.please_sign_in_to_manage_your_manga_readlist_25d9084d'));
 
       const { error } = await supabase
         .from('manga_readlist')
@@ -523,16 +530,17 @@ export function useRemoveFromMangaReadlist() {
       queryClient.invalidateQueries({ queryKey: ['manga-readlist-item'] });
       queryClient.invalidateQueries({ queryKey: ['manga-continue-reading'] });
       if (!variables.silentToast) {
-        toast.success('Removed from readlist');
+        toast.success(uiI18n.t('app.removed_from_readlist_1f9d4cd1'));
       }
     },
     onError: (error: any) => {
-      toast.error(`Failed to remove from readlist: ${error?.message || 'Unknown error'}`);
+      toast.error(uiI18n.t('app.failed_to_remove_from_readlist_i18n_value_0_d376f393', { value0: error?.message || 'Unknown error' }));
     },
   });
 }
 
 export function useSaveMangaReadingProgress() {
+  useUiTranslation();
   const { user, profile } = useAuth();
   const queryClient = useQueryClient();
 
@@ -542,7 +550,7 @@ export function useSaveMangaReadingProgress() {
       const mangaTitle = String(input.mangaTitle || '').trim();
 
       if (!mangaId || !mangaTitle) {
-        throw new Error('Missing manga progress context');
+        throw new Error(uiI18n.t('app.missing_manga_progress_context_87215873'));
       }
 
       // Offline/guest writes were dropped (`return null`), so progress made on
@@ -697,6 +705,7 @@ export function usePublicMangaReadlist(
   showWatchlist: boolean = true,
   statuses: MangaReadlistStatus[] = EXPLICIT_READLIST_STATUSES,
 ) {
+  useUiTranslation();
   const statusFilter = normalizeStatusList(statuses);
   const statusKey = statusFilter.join('|');
 
@@ -760,6 +769,7 @@ function sumChaptersByFormat(rows: MangaReadlistItem[]): ReadingTrackTotals {
 
 /** Reading-track chapter totals for the signed-in user (all statuses). */
 export function useReadingTrackTotals() {
+  useUiTranslation();
   const { user } = useAuth();
 
   return useQuery({
@@ -791,6 +801,7 @@ export function usePublicReadingTrackTotals(
   isPublic: boolean,
   showWatchlist: boolean = true,
 ) {
+  useUiTranslation();
   return useQuery({
     queryKey: ['public-reading-track-totals', userId],
     queryFn: async (): Promise<ReadingTrackTotals> => {

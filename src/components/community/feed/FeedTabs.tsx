@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 
 import { cn } from '@/lib/utils';
 import { motion, useReducedMotion } from 'framer-motion';
@@ -5,10 +7,10 @@ import { motion, useReducedMotion } from 'framer-motion';
 export type CommunityTab = 'foryou' | 'following' | 'news' | 'schedule';
 
 const TABS: { value: CommunityTab; label: string }[] = [
-  { value: 'foryou', label: 'For you' },
-  { value: 'following', label: 'Following' },
-  { value: 'news', label: 'News' },
-  { value: 'schedule', label: 'Schedule' },
+  { value: 'foryou', get label() { return uiI18n.t('app.for_you_7e13d94a'); } },
+  { value: 'following', get label() { return uiI18n.t('app.following_90eeb100'); } },
+  { value: 'news', get label() { return uiI18n.t('app.news_34c808d0'); } },
+  { value: 'schedule', get label() { return uiI18n.t('app.schedule_0a8adac9'); } },
 ];
 
 /**
@@ -22,6 +24,7 @@ export function FeedTabs({
   value: CommunityTab;
   onChange: (tab: CommunityTab) => void;
 }) {
+  useUiTranslation();
   // Spring-driven pill/line slides are skipped for reduced-motion users —
   // the active state renders identically, without the animation.
   const reduce = useReducedMotion();

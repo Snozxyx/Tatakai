@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
  * SourceTypeBadge
  *
@@ -15,11 +17,12 @@ interface SourceTypeBadgeProps {
 }
 
 export function SourceTypeBadge({ isM3U8, isEmbed, sourceType }: SourceTypeBadgeProps) {
+  useUiTranslation();
   // Priority 1 — HLS (req 2.6.4)
   if (isM3U8 || sourceType === "hls") {
     return (
       <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-zinc-800 text-zinc-400">
-        HLS
+        {uiI18n.t('app.hls_63d70cec')}
       </span>
     );
   }
@@ -34,7 +37,7 @@ export function SourceTypeBadge({ isM3U8, isEmbed, sourceType }: SourceTypeBadge
           color: "var(--accent)",
         }}
       >
-        Embed
+        {uiI18n.t('app.embed_ad02e14e')}
       </span>
     );
   }
@@ -43,7 +46,7 @@ export function SourceTypeBadge({ isM3U8, isEmbed, sourceType }: SourceTypeBadge
   if (sourceType === "torrent") {
     return (
       <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-green-900/30 text-green-400">
-        Torrent
+        {uiI18n.t('app.torrent_4d15a5de')}
       </span>
     );
   }

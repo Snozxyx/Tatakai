@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -107,6 +109,7 @@ const removeLocal = (characterId: string) => {
 
 /** List a user's favorite characters. Defaults to the signed-in user. */
 export function useCharacterFavorites(userId?: string) {
+  useUiTranslation();
   const { user } = useAuth();
   const targetId = userId || user?.id;
 
@@ -136,6 +139,7 @@ export function useCharacterFavorites(userId?: string) {
 
 /** Whether the current user has favorited a given character. */
 export function useIsCharacterFavorited(characterId?: string) {
+  useUiTranslation();
   const { user } = useAuth();
 
   return useQuery({
@@ -165,6 +169,7 @@ export function useIsCharacterFavorited(characterId?: string) {
 
 /** Toggle a character favorite on/off for the current user. */
 export function useToggleCharacterFavorite() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
@@ -172,9 +177,9 @@ export function useToggleCharacterFavorite() {
     mutationFn: async (input: ToggleCharacterFavoriteInput) => {
       const characterId = String(input.characterId || '').trim();
       const characterName = String(input.characterName || '').trim();
-      if (!characterId) throw new Error('Missing character id');
-      if (!characterName) throw new Error('Missing character name');
-      if (!user) throw new Error('Please sign in to favorite characters');
+      if (!characterId) throw new Error(uiI18n.t('app.missing_character_id_1d6575af'));
+      if (!characterName) throw new Error(uiI18n.t('app.missing_character_name_6af2a495'));
+      if (!user) throw new Error(uiI18n.t('app.please_sign_in_to_favorite_characters_a5fd8e51'));
 
       // Is it already favorited?
       const { data: existing, error: readErr } = await supabase
@@ -227,10 +232,10 @@ export function useToggleCharacterFavorite() {
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['character-favorites'] });
       queryClient.invalidateQueries({ queryKey: ['character-favorite'] });
-      toast.success(result.favorited ? 'Added to favorites' : 'Removed from favorites');
+      toast.success(result.favorited ? uiI18n.t('app.added_to_favorites_2f1e3bed') : uiI18n.t('app.removed_from_favorites_c259d919'));
     },
     onError: (error: any) => {
-      toast.error(error?.message || 'Failed to update favorites');
+      toast.error(error?.message || uiI18n.t('app.failed_to_update_favorites_4e36d4c5'));
     },
   });
 }

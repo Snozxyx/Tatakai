@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Wifi, RefreshCw, HardDrive, ArrowRight, ArrowLeft, WifiOff, CloudOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -36,20 +38,21 @@ const VIDEO_SOURCES = [
 // Text variations for the right side
 const TEXT_VARIATIONS = [
   {
-    title: "Stay Connected",
+    get title() { return uiI18n.t('app.stay_connected_a7362436'); },
     desc: "Your anime journey awaits. Check your connection and dive back into endless stories."
   },
   {
-    title: "Offline? No Worries",
+    get title() { return uiI18n.t('app.offline_no_worries_ab2958f6'); },
     desc: "Download your favorites and watch them anytime, anywhere - even without internet."
   },
   {
-    title: "Connection Lost",
+    get title() { return uiI18n.t('app.connection_lost_fda45ced'); },
     desc: "The anime world is just a reconnection away. Your watchlist is waiting for you."
   },
 ];
 
 export default function NoInternetPage({ isNative = false }: NoInternetPageProps) {
+  useUiTranslation();
   const navigate = useNavigate();
   const [isRetrying, setIsRetrying] = useState(false);
   const isElectron = typeof window !== 'undefined' && !!(window as any).electron;
@@ -74,11 +77,9 @@ export default function NoInternetPage({ isNative = false }: NoInternetPageProps
     // In Electron the TitleBar is 32px (pt-8). Use fixed positioning to cover
     // the entire viewport below the title bar, ignoring any sidebar offset.
     <div
-      className={`flex flex-col lg:flex-row bg-background ${
-        isElectron
+      className={`flex flex-col lg:flex-row bg-background ${isElectron
           ? 'fixed inset-0 top-8 z-[100]'
-          : 'min-h-screen'
-      }`}
+          : 'min-h-screen'}`}
     >
       {/* Left Side - Main Glass Card with opaque background */}
       <div className="w-full lg:w-1/2 min-h-screen bg-background flex flex-col justify-center items-center p-6 lg:p-12 relative">
@@ -88,7 +89,7 @@ export default function NoInternetPage({ isNative = false }: NoInternetPageProps
           className="absolute top-6 left-6 flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors group"
         >
           <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-          <span className="text-sm font-medium">Back to Home</span>
+          <span className="text-sm font-medium">{uiI18n.t('app.back_to_home_ce7472d6')}</span>
         </button>
 
         <motion.div
@@ -101,9 +102,9 @@ export default function NoInternetPage({ isNative = false }: NoInternetPageProps
           <div className="mb-10">
             <div className="flex items-center gap-3 mb-8">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-lg overflow-hidden">
-                <img src={`${import.meta.env.BASE_URL}assets/logo/tatakai-logo-square.png`} alt="Tatakai logo" className="w-full h-full object-cover" />
+                <img src={`${import.meta.env.BASE_URL}assets/logo/tatakai-logo-square.png`} alt={uiI18n.t('app.tatakai_logo_290743b0')} className="w-full h-full object-cover" />
               </div>
-              <h1 className="font-display text-3xl font-bold gradient-text">Tatakai</h1>
+              <h1 className="font-display text-3xl font-bold gradient-text">{uiI18n.t('app.tatakai_28bda6bd')}</h1>
             </div>
           </div>
 
@@ -143,12 +144,12 @@ export default function NoInternetPage({ isNative = false }: NoInternetPageProps
             className="mb-10"
           >
             <h2 className="text-2xl lg:text-3xl font-bold text-foreground mb-3">
-              No Internet Connection
+              {uiI18n.t('app.no_internet_connection_54996194')}
             </h2>
             <p className="text-muted-foreground text-base leading-relaxed">
               {isNative
-                ? "You're currently offline. Don't worry - your downloaded anime is still available in the offline library."
-                : "We couldn't connect to the server. Please check your internet connection and try again."
+                ? uiI18n.t('app.you_re_currently_offline_don_t_worry_your_downlo_3abdf9a3')
+                : uiI18n.t('app.we_couldn_t_connect_to_the_server_please_check_y_4ce5661c')
               }
             </p>
           </motion.div>
@@ -188,7 +189,7 @@ export default function NoInternetPage({ isNative = false }: NoInternetPageProps
                     className="flex items-center gap-2"
                   >
                     <RefreshCw className="w-4 h-4" />
-                    <span>Try Again</span>
+                    <span>{uiI18n.t('app.try_again_cef2fe09')}</span>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -203,7 +204,7 @@ export default function NoInternetPage({ isNative = false }: NoInternetPageProps
                 onClick={() => navigate('/downloads')}
               >
                 <HardDrive className="w-4 h-4 mr-2 text-muted-foreground group-hover:text-foreground transition-colors" />
-                Go to Offline Library
+                {uiI18n.t('app.go_to_offline_library_a386365a')}
                 <ArrowRight className="w-4 h-4 ml-auto text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
               </Button>
             )}
@@ -218,7 +219,7 @@ export default function NoInternetPage({ isNative = false }: NoInternetPageProps
           >
             <div className="h-2 w-2 rounded-full bg-destructive animate-pulse" />
             <span className="text-sm text-muted-foreground">
-              Network Unavailable
+              {uiI18n.t('app.network_unavailable_878aa4cd')}
             </span>
           </motion.div>
         </motion.div>

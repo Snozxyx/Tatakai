@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import * as React from 'react';
 import { createContext, useCallback, useContext, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -31,15 +33,16 @@ type EnsureAgreed = () => Promise<boolean>;
 const CommunityRulesGateContext = createContext<EnsureAgreed | null>(null);
 
 const RULES_SUMMARY: { title: string; body: string }[] = [
-  { title: 'Be respectful', body: 'Disagree with the take, not the person. No insults, harassment, or telling anyone to harm themselves.' },
-  { title: 'No hate speech', body: 'Slurs and attacks on race, religion, gender, sexuality, disability, or nationality are not allowed anywhere.' },
-  { title: 'Keep it safe for work', body: 'NSFW stays behind the 18+ gate; avatars and usernames stay SFW everywhere. Sexualizing minors is an instant permanent ban.' },
-  { title: 'Tag your spoilers', body: 'Use the spoiler tag for anything ahead of where someone might be.' },
-  { title: 'No spam or advertising', body: 'No copy-paste flooding, AI-generated posts, rep farming, or promoting other sites.' },
-  { title: 'Play fair', body: 'One person, one account. No vote manipulation, and respect privacy — doxxing is an instant permanent ban.' },
+  { get title() { return uiI18n.t('app.be_respectful_c53e6434'); }, get body() { return uiI18n.t('app.disagree_with_the_take_not_the_person_no_insults_1636b367'); } },
+  { get title() { return uiI18n.t('app.no_hate_speech_556adf87'); }, get body() { return uiI18n.t('app.slurs_and_attacks_on_race_religion_gender_sexual_6ba95107'); } },
+  { get title() { return uiI18n.t('app.keep_it_safe_for_work_88f88689'); }, get body() { return uiI18n.t('app.nsfw_stays_behind_the_18_gate_avatars_and_userna_a1cf1500'); } },
+  { get title() { return uiI18n.t('app.tag_your_spoilers_e5e456e2'); }, get body() { return uiI18n.t('app.use_the_spoiler_tag_for_anything_ahead_of_where__ee930056'); } },
+  { get title() { return uiI18n.t('app.no_spam_or_advertising_43f9978d'); }, get body() { return uiI18n.t('app.no_copy_paste_flooding_ai_generated_posts_rep_fa_6a7db715'); } },
+  { get title() { return uiI18n.t('app.play_fair_83b37f64'); }, get body() { return uiI18n.t('app.one_person_one_account_no_vote_manipulation_and__a25f0f3e'); } },
 ];
 
 export function CommunityRulesGateProvider({ children }: { children: React.ReactNode }) {
+  useUiTranslation();
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const resolverRef = useRef<((v: boolean) => void) | null>(null);
@@ -72,10 +75,10 @@ export function CommunityRulesGateProvider({ children }: { children: React.React
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <ScrollText className="w-5 h-5 text-primary" />
-              Before you post
+              {uiI18n.t('app.before_you_post_bd41b8ea')}
             </DialogTitle>
             <DialogDescription>
-              Tatakai is community-driven. Please agree to the Community Guidelines before your first post or comment. In short: be cordial, and this never comes up.
+              {uiI18n.t('app.tatakai_is_community_driven_please_agree_to_the__4c5c0d4f')}
             </DialogDescription>
           </DialogHeader>
           <ul className="space-y-3 py-1">
@@ -90,15 +93,15 @@ export function CommunityRulesGateProvider({ children }: { children: React.React
             ))}
           </ul>
           <p className="text-xs text-muted-foreground">
-            Read the full{' '}
+            {uiI18n.t('app.read_the_full_7ed3904f')}{' '}
             <Link to="/community-guidelines" className="text-primary hover:underline" onClick={() => settle(false)}>
-              Community Guidelines
+              {uiI18n.t('app.community_guidelines_75343669')}
             </Link>
-            . Moderators may remove content, restrict features, or ban accounts for violations.
+            {uiI18n.t('app.moderators_may_remove_content_restrict_features__c338b669')}
           </p>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => settle(false)}>Not now</Button>
-            <Button onClick={handleAgree}>I agree</Button>
+            <Button variant="ghost" onClick={() => settle(false)}>{uiI18n.t('app.not_now_e4571490')}</Button>
+            <Button onClick={handleAgree}>{uiI18n.t('app.i_agree_6a151a67')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -112,6 +115,7 @@ export function CommunityRulesGateProvider({ children }: { children: React.React
  * provider isn't mounted so posting is never hard-blocked by a mount bug.
  */
 export function useCommunityRulesGate(): EnsureAgreed {
+  useUiTranslation();
   const ctx = useContext(CommunityRulesGateContext);
   return ctx ?? (() => Promise.resolve(true));
 }

@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useIsMobile } from '@/hooks/ui/use-mobile';
@@ -56,6 +58,7 @@ export function OverviewInteractiveCharts({
   reputationRate = 98.5,
   history = [],
 }: OverviewInteractiveChartsProps) {
+  useUiTranslation();
   const [activeView, setActiveView] = useState<ChartView>('distribution');
   // Recharts entrance animations (~1s of JS-driven SVG churn per chart) jank
   // phones — render the final frame immediately on mobile.
@@ -109,6 +112,7 @@ export function OverviewInteractiveCharts({
 
   // Custom Glass Tooltip
   const CustomTooltip = ({ active, payload, label }: any) => {
+  useUiTranslation();
     if (active && payload && payload.length) {
       return (
         <div className="rounded-xl border border-white/[0.08] bg-background/80 p-3 shadow-2xl backdrop-blur-2xl">
@@ -119,7 +123,7 @@ export function OverviewInteractiveCharts({
                 className="w-2 h-2 rounded-full"
                 style={{ backgroundColor: entry.color || entry.payload?.fill || entry.fill }}
               />
-              <span className="text-muted-foreground/70">{entry.name || 'Count'}:</span>
+              <span className="text-muted-foreground/70">{entry.name || uiI18n.t('app.count_66e12969')}:</span>
               <span className="font-semibold text-foreground font-mono">
                 {entry.value} {entry.unit || ''}
               </span>
@@ -144,11 +148,11 @@ export function OverviewInteractiveCharts({
           <div className="flex items-center gap-2 mb-1">
             <Activity className="w-4 h-4 text-primary/80" />
             <h3 className="font-display font-bold text-base sm:text-lg text-foreground tracking-tight">
-              Analytics Overview
+              {uiI18n.t('app.analytics_overview_36307b68')}
             </h3>
           </div>
           <p className="text-xs text-muted-foreground/70">
-            Media distribution, consumption velocity, and interaction stats
+            {uiI18n.t('app.media_distribution_consumption_velocity_and_inte_d29d02a4')}
           </p>
         </div>
 
@@ -164,7 +168,7 @@ export function OverviewInteractiveCharts({
             )}
           >
             <PieIcon className="w-3.5 h-3.5" />
-            <span>Distribution</span>
+            <span>{uiI18n.t('app.distribution_1d3c457c')}</span>
           </button>
 
           <button
@@ -177,7 +181,7 @@ export function OverviewInteractiveCharts({
             )}
           >
             <TrendingUp className="w-3.5 h-3.5" />
-            <span>Trends</span>
+            <span>{uiI18n.t('app.trends_716f3fa8')}</span>
           </button>
 
           <button
@@ -190,7 +194,7 @@ export function OverviewInteractiveCharts({
             )}
           >
             <Layers className="w-3.5 h-3.5" />
-            <span>Community</span>
+            <span>{uiI18n.t('app.community_bfd58ee3')}</span>
           </button>
         </div>
       </div>
@@ -234,12 +238,12 @@ export function OverviewInteractiveCharts({
                 {/* Center Donut Label */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                   <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-                    Total
+                    {uiI18n.t('app.total_b25928c6')}
                   </span>
                   <span className="font-display font-bold text-2xl text-foreground my-0.5">
                     {totalTitles}
                   </span>
-                  <span className="text-[10px] text-muted-foreground/50 font-medium">Titles</span>
+                  <span className="text-[10px] text-muted-foreground/50 font-medium">{uiI18n.t('app.titles_a116f725')}</span>
                 </div>
               </div>
 

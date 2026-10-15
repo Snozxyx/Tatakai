@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { getRankTier, getRankImageUrl, getRankClassForRank } from '@/lib/rankUtils';
 import { cn } from '@/lib/utils';
 
@@ -11,10 +13,10 @@ interface RankBadgeProps {
 }
 
 const SIZE_CONFIG = {
-  xs: { img: 'w-4 h-4',   text: 'text-[10px]', gap: 'gap-1' },
-  sm: { img: 'w-5 h-5',   text: 'text-xs',     gap: 'gap-1' },
-  md: { img: 'w-8 h-8',   text: 'text-sm',     gap: 'gap-1.5' },
-  lg: { img: 'w-12 h-12', text: 'text-base',   gap: 'gap-2' },
+  xs: { img: 'w-4 h-4',   get text() { return uiI18n.t('app.text_10px_1dc571a3'); }, gap: 'gap-1' },
+  sm: { img: 'w-5 h-5',   get text() { return uiI18n.t('app.text_xs_359090c2'); },     gap: 'gap-1' },
+  md: { img: 'w-8 h-8',   get text() { return uiI18n.t('app.text_sm_fc7473ca'); },     gap: 'gap-1.5' },
+  lg: { img: 'w-12 h-12', get text() { return uiI18n.t('app.text_base_4ee73492'); },   gap: 'gap-2' },
 };
 
 export function RankBadge({
@@ -24,6 +26,7 @@ export function RankBadge({
   showName = true,
   className,
 }: RankBadgeProps) {
+  useUiTranslation();
   const tier = getRankTier(score);
   const { img, text, gap } = SIZE_CONFIG[size];
   const rankClass = getRankClassForRank(tier.rank);

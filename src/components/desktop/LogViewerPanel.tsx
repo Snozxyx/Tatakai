@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { RefreshCw, X } from 'lucide-react';
@@ -67,6 +69,7 @@ function levelBg(level?: LogLevel): string {
  * Requirements: 8.1
  */
 export function LogViewerPanel({ onClose }: LogViewerPanelProps) {
+  useUiTranslation();
   const [lines, setLines] = useState<Array<LogEntry & { _raw: string }>>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -76,7 +79,7 @@ export function LogViewerPanel({ onClose }: LogViewerPanelProps) {
   const fetchLogs = useCallback(async () => {
     const electron = (window as any).electron;
     if (!electron?.logTail) {
-      setError('logTail IPC not available — is this a desktop build?');
+      setError(uiI18n.t('app.logtail_ipc_not_available_is_this_a_desktop_buil_ac290967'));
       return;
     }
     setLoading(true);
@@ -110,7 +113,7 @@ export function LogViewerPanel({ onClose }: LogViewerPanelProps) {
   return (
     <div
       role="dialog"
-      aria-label="Log Viewer"
+      aria-label={uiI18n.t('app.log_viewer_05a3ad26')}
       style={{
         display: 'flex',
         flexDirection: 'column',
@@ -137,13 +140,13 @@ export function LogViewerPanel({ onClose }: LogViewerPanelProps) {
         }}
       >
         <span style={{ fontWeight: 600, fontSize: 13, letterSpacing: '0.02em' }}>
-          Application Logs
+          {uiI18n.t('app.application_logs_cdd2f56a')}
         </span>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <button
             onClick={fetchLogs}
             disabled={loading}
-            aria-label="Refresh logs"
+            aria-label={uiI18n.t('app.refresh_logs_f970c362')}
             style={{
               background: 'none',
               border: '1px solid rgba(255,255,255,0.15)',
@@ -162,12 +165,12 @@ export function LogViewerPanel({ onClose }: LogViewerPanelProps) {
               size={12}
               style={{ animation: loading ? 'spin 1s linear infinite' : undefined }}
             />
-            Refresh
+            {uiI18n.t('app.refresh_56e3badc')}
           </button>
           {onClose && (
             <button
               onClick={onClose}
-              aria-label="Close log viewer"
+              aria-label={uiI18n.t('app.close_log_viewer_9587d4f0')}
               style={{
                 background: 'none',
                 border: 'none',
@@ -187,13 +190,13 @@ export function LogViewerPanel({ onClose }: LogViewerPanelProps) {
       {error ? (
         <div style={{ padding: 16, color: '#f87171' }}>{error}</div>
       ) : lines.length === 0 && !loading ? (
-        <div style={{ padding: 16, color: 'rgba(255,255,255,0.4)' }}>No log entries found.</div>
+        <div style={{ padding: 16, color: 'rgba(255,255,255,0.4)' }}>{uiI18n.t('app.no_log_entries_found_3fdc1c5e')}</div>
       ) : (
         <div
           ref={parentRef}
           style={{ flex: 1, overflow: 'auto' }}
           aria-live="polite"
-          aria-label="Log entries"
+          aria-label={uiI18n.t('app.log_entries_412c8c55')}
         >
           <div
             style={{

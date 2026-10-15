@@ -1,4 +1,7 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { memo, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Play, Zap } from "lucide-react";
@@ -25,6 +28,8 @@ function resolveCardAnilistId(anime: AnimeCard): number | null {
 }
 
 function LatestEpisodeCard({ anime }: { anime: AnimeCard }) {
+  useUiTranslation();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const anilistId = resolveCardAnilistId(anime);
 
@@ -71,7 +76,7 @@ function LatestEpisodeCard({ anime }: { anime: AnimeCard }) {
         <div className="relative aspect-video w-full overflow-hidden bg-white/[0.04]">
           <img
             src={thumb}
-            alt={epTitle ? `Episode ${epNumber}: ${epTitle}` : anime.name}
+            alt={epTitle ? uiI18n.t('app.episode_i18n_value_0_i18n_value_1_ea088a33', { value0: epNumber, value1: epTitle }) : anime.name}
             loading="lazy"
             decoding="async"
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
@@ -86,7 +91,7 @@ function LatestEpisodeCard({ anime }: { anime: AnimeCard }) {
 
           {epNumber != null && (
             <span className="absolute left-2 top-2 rounded-md bg-black/70 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-white backdrop-blur-sm">
-              EP {epNumber}
+              {t('migration.episodeShort')} {epNumber}
             </span>
           )}
 
@@ -119,17 +124,17 @@ function LatestEpisodeCard({ anime }: { anime: AnimeCard }) {
             </h4>
             <div className="mt-1 flex items-center gap-1.5 text-[11px] text-white/50">
               {epNumber != null && (
-                <span className="font-semibold text-white/70">Episode {epNumber}</span>
+                <span className="font-semibold text-white/70">{t('anime.episode')} {epNumber}</span>
               )}
               {anime.type && <span className="truncate">• {anime.type}</span>}
             </div>
             <div className="mt-1.5 flex flex-wrap gap-1.5">
               <span className="inline-flex items-center gap-1 rounded bg-white/[0.08] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white/70">
-                Sub <span className="tabular-nums text-white/40">{anime.episodes.sub}</span>
+                {t('anime.sub')} <span className="tabular-nums text-white/40">{anime.episodes.sub}</span>
               </span>
               {anime.episodes.dub > 0 && (
                 <span className="inline-flex items-center gap-1 rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">
-                  Dub <span className="tabular-nums text-primary/60">{anime.episodes.dub}</span>
+                  {t('anime.dub')} <span className="tabular-nums text-primary/60">{anime.episodes.dub}</span>
                 </span>
               )}
             </div>
@@ -141,6 +146,8 @@ function LatestEpisodeCard({ anime }: { anime: AnimeCard }) {
 }
 
 export const LatestEpisodes = memo(function LatestEpisodes({ animes }: LatestEpisodesProps) {
+  useUiTranslation();
+  const { t } = useTranslation();
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const scroll = (direction: "left" | "right") => {
@@ -159,19 +166,19 @@ export const LatestEpisodes = memo(function LatestEpisodes({ animes }: LatestEpi
     <section className="mb-10 md:mb-12 space-y-4 md:space-y-5" style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 260px' }}>
       <HomeSectionHeading
         icon={<Zap className="w-5 h-5 text-amber" />}
-        title="Latest Episodes"
+        title={t('discover.latestEpisodes')}
         action={
           <div className="hidden md:flex items-center gap-2">
             <button
               onClick={() => scroll("left")}
-              aria-label="Scroll left"
+              aria-label={t('discover.scrollLeft')}
               className="flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.02] text-white/60 transition-colors hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
             <button
               onClick={() => scroll("right")}
-              aria-label="Scroll right"
+              aria-label={t('discover.scrollRight')}
               className="flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.02] text-white/60 transition-colors hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
             >
               <ChevronRight className="h-4 w-4" />

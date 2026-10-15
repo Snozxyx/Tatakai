@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
@@ -18,6 +20,7 @@ function atScrollTop(target: Element): boolean {
 
 /** Refresh data in place, preserving navigation and local state. */
 export function MobilePullToRefresh() {
+  useUiTranslation();
   const nativeMobile = useIsMobileApp(), phone = useIsPhone(), desktop = useIsDesktopApp();
   const location = useLocation(), client = useQueryClient();
   const [pull, setPull] = useState(0), [refreshing, setRefreshing] = useState(false);
@@ -29,10 +32,10 @@ export function MobilePullToRefresh() {
     if (busy.current) return;
     busy.current = true; setRefreshing(true); setPull(0);
     try {
-      if (!navigator.onLine) throw new Error('Offline');
+      if (!navigator.onLine) throw new Error(uiI18n.t('app.offline_e01fa717'));
       await client.invalidateQueries({ refetchType: 'active' }, { throwOnError: true });
-      toast.success('Page refreshed');
-    } catch { toast.error('Could not refresh. Check your connection and try again.'); }
+      toast.success(uiI18n.t('app.page_refreshed_fcc72580'));
+    } catch { toast.error(uiI18n.t('app.could_not_refresh_check_your_connection_and_try__f3b031db')); }
     finally { busy.current = false; setRefreshing(false); }
   }
 
@@ -72,11 +75,11 @@ export function MobilePullToRefresh() {
 
   if (!enabled) return null;
   return <>
-    <Button variant="outline" disabled={refreshing} onClick={() => void refresh()} className="sr-only focus:not-sr-only focus:fixed focus:right-4 focus:top-16 focus:z-50">Refresh page</Button>
+    <Button variant="outline" disabled={refreshing} onClick={() => void refresh()} className="sr-only focus:not-sr-only focus:fixed focus:right-4 focus:top-16 focus:z-50">{uiI18n.t('app.refresh_page_4651e844')}</Button>
     {(pull > 6 || refreshing) && <div role="status" aria-live="polite" className="pointer-events-none fixed inset-x-0 top-[calc(env(safe-area-inset-top)+0.5rem)] z-40 flex justify-center" style={{ transform: `translateY(${refreshing ? 32 : pull / 2}px)` }}>
       <div className="flex items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-sm text-foreground shadow-md">
         {refreshing ? <Loader2 aria-hidden="true" className="size-4 animate-spin motion-reduce:animate-none"/> : <RefreshCw aria-hidden="true" className="size-4"/>}
-        <span>{refreshing ? 'Refreshing…' : pull >= REFRESH_PULL_THRESHOLD ? 'Release to refresh' : 'Pull to refresh'}</span>
+        <span>{refreshing ? uiI18n.t('app.refreshing_96141178') : pull >= REFRESH_PULL_THRESHOLD ? uiI18n.t('app.release_to_refresh_086a304e') : uiI18n.t('app.pull_to_refresh_62182173')}</span>
       </div>
     </div>}
   </>;

@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useId } from 'react';
 import { useMotionPreference } from '@/hooks/ui/useMotionPreference';
 import { AVATAR_DECORATIONS, type AvatarDecorationKey } from '@/lib/profileCosmetics';
@@ -6,6 +8,7 @@ interface AvatarDecorationProps { decoration: AvatarDecorationKey; }
 
 /** Vector jewelry sits outside the portrait. Each instance owns its gradient IDs. */
 export function AvatarDecoration({ decoration }: AvatarDecorationProps) {
+  useUiTranslation();
   const id = useId().replace(/:/g, '');
   const reduced = useMotionPreference();
   const design = AVATAR_DECORATIONS.find(item => item.key === decoration);
@@ -92,9 +95,11 @@ export function AvatarDecoration({ decoration }: AvatarDecorationProps) {
 }
 
 function Star({ size }: { size: number }) {
+  useUiTranslation();
   return <path d={`M 0 ${-size} Q ${size*0.2} ${-size*0.2} ${size} 0 Q ${size*0.2} ${size*0.2} 0 ${size} Q ${-size*0.2} ${size*0.2} ${-size} 0 Q ${-size*0.2} ${-size*0.2} 0 ${-size} Z`} />;
 }
 
 function Flower({ size }: { size: number }) {
+  useUiTranslation();
   return <><g fillOpacity="0.9">{[0,72,144,216,288].map(rotation=><ellipse key={rotation} cx="0" cy={-size*0.45} rx={size*0.38} ry={size*0.62} transform={`rotate(${rotation})`} />)}</g><circle r={size*0.2} fill="#fff4dd" stroke="none" /></>;
 }

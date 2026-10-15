@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 // BulkBanToolbar — Requirements 11.1–11.6
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
@@ -17,6 +19,7 @@ interface BulkBanToolbarProps {
 }
 
 export function BulkBanToolbar({ selectedUsers, onComplete }: BulkBanToolbarProps) {
+  useUiTranslation();
   const [showDialog, setShowDialog] = useState(false);
   const [reason, setReason] = useState('');
   const [durationPreset, setDurationPreset] = useState<'permanent' | '7d' | '30d' | 'custom'>('permanent');
@@ -71,10 +74,10 @@ export function BulkBanToolbar({ selectedUsers, onComplete }: BulkBanToolbarProp
     setCustomDays('');
 
     const successCount = selectedUsers.length - failedUsers.length;
-    toast.success(`Banned ${successCount} user${successCount !== 1 ? 's' : ''} successfully`, { duration: 5000 });
+    toast.success(uiI18n.t('app.banned_i18n_value_0_useri18n_value_1_successfull_1ec145c9', { value0: successCount, value1: successCount !== 1 ? 's' : '' }), { duration: 5000 });
 
     if (failedUsers.length > 0) {
-      toast.error(`Failed to ban: ${failedUsers.join(', ')}`, { duration: 0 });
+      toast.error(uiI18n.t('app.failed_to_ban_i18n_value_0_e01f7fe4', { value0: failedUsers.join(', ') }), { duration: 0 });
     }
 
     onComplete();
@@ -84,9 +87,9 @@ export function BulkBanToolbar({ selectedUsers, onComplete }: BulkBanToolbarProp
     <>
       {/* Toolbar */}
       <div className="flex items-center gap-3 p-3 rounded-xl bg-primary/10 border border-primary/20 mb-4">
-        <span className="text-sm font-medium text-primary">{selectedUsers.length} user{selectedUsers.length !== 1 ? 's' : ''} selected</span>
+        <span className="text-sm font-medium text-primary">{selectedUsers.length} {uiI18n.t('app.user_12dea96f')}{selectedUsers.length !== 1 ? 's' : ''} {uiI18n.t('app.selected_835f3b50')}</span>
         <Button size="sm" variant="destructive" onClick={() => setShowDialog(true)} className="gap-1.5 text-xs ml-auto">
-          <Ban className="w-3.5 h-3.5" /> Bulk Ban
+          <Ban className="w-3.5 h-3.5" /> {uiI18n.t('app.bulk_ban_ff98057a')}
         </Button>
       </div>
 
@@ -96,7 +99,7 @@ export function BulkBanToolbar({ selectedUsers, onComplete }: BulkBanToolbarProp
           <GlassPanel className="w-full max-w-md p-6 border-white/20 space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-base font-bold flex items-center gap-2">
-                <Ban className="w-5 h-5 text-destructive" /> Bulk Ban {selectedUsers.length} Users
+                <Ban className="w-5 h-5 text-destructive" /> {uiI18n.t('app.bulk_ban_ff98057a')} {selectedUsers.length} {uiI18n.t('app.users_57f2b181')}
               </h3>
               <Button variant="ghost" size="sm" onClick={() => !processing && setShowDialog(false)} className="w-7 h-7 p-0">
                 <X className="w-4 h-4" />
@@ -106,7 +109,7 @@ export function BulkBanToolbar({ selectedUsers, onComplete }: BulkBanToolbarProp
             {processing ? (
               <div className="space-y-3 text-center py-4">
                 <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto" />
-                <p className="text-sm font-medium">Processing {progress} of {selectedUsers.length}</p>
+                <p className="text-sm font-medium">{uiI18n.t('app.processing_e63451d3')} {progress} {uiI18n.t('app.of_de04fa0e')} {selectedUsers.length}</p>
                 <div className="h-2 rounded-full bg-white/10 overflow-hidden">
                   <div className="h-full bg-primary transition-all duration-300 rounded-full" style={{ width: `${(progress / selectedUsers.length) * 100}%` }} />
                 </div>
@@ -114,31 +117,31 @@ export function BulkBanToolbar({ selectedUsers, onComplete }: BulkBanToolbarProp
             ) : (
               <>
                 <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Shared Reason *</label>
+                  <label className="text-xs text-muted-foreground font-medium uppercase tracking-wide">{uiI18n.t('app.shared_reason_807a9076')}</label>
                   <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3} maxLength={500}
-                    placeholder="Reason for banning all selected users…"
+                    placeholder={uiI18n.t('app.reason_for_banning_all_selected_users_42b8c4e4')}
                     className="w-full bg-white/5 border border-white/10 rounded px-3 py-1.5 text-sm text-white placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary resize-none" />
                   <p className="text-xs text-muted-foreground/50 text-right">{reason.length}/500</p>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Duration</label>
+                  <label className="text-xs text-muted-foreground font-medium uppercase tracking-wide">{uiI18n.t('app.duration_1370004d')}</label>
                   <select value={durationPreset} onChange={(e) => setDurationPreset(e.target.value as any)}
                     className="w-full bg-white/5 border border-white/10 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary">
-                    <option value="permanent">Permanent</option>
-                    <option value="7d">7 days</option>
-                    <option value="30d">30 days</option>
-                    <option value="custom">Custom (1–365 days)</option>
+                    <option value="permanent">{uiI18n.t('app.permanent_af0fa7cd')}</option>
+                    <option value="7d">{uiI18n.t('app.7_days_0a8dd6ad')}</option>
+                    <option value="30d">{uiI18n.t('app.30_days_7d4278a8')}</option>
+                    <option value="custom">{uiI18n.t('app.custom_1_365_days_f0c1147c')}</option>
                   </select>
                   {durationPreset === 'custom' && (
                     <input type="number" value={customDays} onChange={(e) => setCustomDays(e.target.value)} min={1} max={365}
-                      placeholder="Days (1–365)" className="w-full mt-2 bg-white/5 border border-white/10 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary" />
+                      placeholder={uiI18n.t('app.days_1_365_6cbc317d')} className="w-full mt-2 bg-white/5 border border-white/10 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary" />
                   )}
                 </div>
                 <div className="flex items-center gap-2 pt-1">
                   <Button onClick={handleBulkBan} disabled={!formValid} className="gap-1.5 bg-destructive hover:bg-destructive/90 flex-1">
-                    <Ban className="w-3.5 h-3.5" /> Ban {selectedUsers.length} Users
+                    <Ban className="w-3.5 h-3.5" /> {uiI18n.t('app.ban_bfa1bfbf')} {selectedUsers.length} {uiI18n.t('app.users_57f2b181')}
                   </Button>
-                  <Button variant="ghost" onClick={() => setShowDialog(false)} className="text-muted-foreground">Cancel</Button>
+                  <Button variant="ghost" onClick={() => setShowDialog(false)} className="text-muted-foreground">{uiI18n.t('app.cancel_77dfd213')}</Button>
                 </div>
               </>
             )}

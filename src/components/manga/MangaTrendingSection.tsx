@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
  * The manga/manhwa block on the v6 surfaces — the trending page, the
  * recommendations page and collections (docs/Plans.md §2 — "Cards (improve
@@ -47,9 +49,9 @@ interface MangaTrendingSectionProps {
 }
 
 const TABS: ReadonlyArray<PillOption<MangaTab>> = [
-  { id: 'manga', label: 'Manga', icon: <TrendingUp className="h-3.5 w-3.5" /> },
-  { id: 'manhwa', label: 'Manhwa', icon: <BookOpen className="h-3.5 w-3.5" /> },
-  { id: 'latest', label: 'New Chapters', icon: <Clock className="h-3.5 w-3.5" /> },
+  { id: 'manga', get label() { return uiI18n.t('app.manga_87db0f99'); }, icon: <TrendingUp className="h-3.5 w-3.5" /> },
+  { id: 'manhwa', get label() { return uiI18n.t('app.manhwa_8251bcf8'); }, icon: <BookOpen className="h-3.5 w-3.5" /> },
+  { id: 'latest', get label() { return uiI18n.t('app.new_chapters_3d65ee5d'); }, icon: <Clock className="h-3.5 w-3.5" /> },
 ];
 
 /** The line under the heading, so the tabs are not the only label. */
@@ -63,12 +65,13 @@ const DESCRIPTION: Record<MangaTab, string> = {
 const RANKED: Record<MangaTab, boolean> = { manga: true, manhwa: true, latest: false };
 
 export function MangaTrendingSection({
-  title = 'Trending manga & manhwa',
+  title = uiI18n.t('app.trending_manga_manhwa_42cc803d'),
   defaultTab = 'manga',
   limit = 18,
   showTabs = true,
   className,
 }: MangaTrendingSectionProps) {
+  useUiTranslation();
   const [activeTab, setActiveTab] = useState<MangaTab>(defaultTab);
 
   /**
@@ -123,7 +126,7 @@ export function MangaTrendingSection({
             to="/manga"
             className="group inline-flex items-center gap-1 text-xs font-bold uppercase tracking-widest text-white/45 transition-colors hover:text-white"
           >
-            View all
+            {uiI18n.t('app.view_all_931e1a4b')}
             <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
           </Link>
         }
@@ -137,7 +140,7 @@ export function MangaTrendingSection({
             // Wrapped rather than passed as the setter: `SetStateAction` also
             // accepts an updater, and that widens the pill group's id to `string`.
             onChange={(id) => setActiveTab(id)}
-            label="Manga chart"
+            label={uiI18n.t('app.manga_chart_abc7bedb')}
           />
         )}
         <p className="text-xs font-medium text-white/40">{DESCRIPTION[activeTab]}</p>
@@ -148,9 +151,9 @@ export function MangaTrendingSection({
       ) : items.length === 0 ? (
         <div className="mt-6 flex flex-col items-center gap-2 rounded-3xl border border-white/[0.07] bg-white/[0.02] py-16 text-center">
           <BookOpen className="h-7 w-7 text-white/25" />
-          <p className="text-base font-bold text-white/70">No titles on this chart</p>
+          <p className="text-base font-bold text-white/70">{uiI18n.t('app.no_titles_on_this_chart_77eee095')}</p>
           <p className="max-w-sm text-sm text-white/40">
-            The manga charts could not be reached. Try again in a moment.
+            {uiI18n.t('app.the_manga_charts_could_not_be_reached_try_again__ebcdddd6')}
           </p>
         </div>
       ) : (

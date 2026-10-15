@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useEffect, useMemo } from 'react';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Button } from '@/components/ui/button';
@@ -38,6 +40,7 @@ function saveAcknowledgedIds(ids: Set<string>): void {
  * Requirements: 3.2, 3.3, 3.4, 3.7
  */
 export function CrashReportPanel() {
+  useUiTranslation();
   const [liveCrashes, setLiveCrashes] = useState<CrashReport[]>([]);
   const [saveErrors, setSaveErrors] = useState<Set<string>>(new Set());
   const [acknowledgedIds, setAcknowledgedIds] = useState<Set<string>>(() => loadAcknowledgedIds());
@@ -98,7 +101,7 @@ export function CrashReportPanel() {
 
   const formatDate = (isoDate: string): string => {
     try {
-      return new Date(isoDate).toLocaleString(undefined, {
+      return new Date(isoDate).toLocaleString(uiI18n.language, {
         dateStyle: 'medium',
         timeStyle: 'short',
       });
@@ -114,15 +117,15 @@ export function CrashReportPanel() {
         <div>
           <h2 className="text-2xl font-bold text-white flex items-center gap-2">
             <ShieldAlert className="w-6 h-6 text-red-400" />
-            Crash Reports
+            {uiI18n.t('app.crash_reports_b31c7ef2')}
           </h2>
           <p className="text-sm text-gray-400 mt-1">
-            Desktop crash metadata — persisted reports plus crashes forwarded this session
+            {uiI18n.t('app.desktop_crash_metadata_persisted_reports_plus_cr_86d1cf51')}
           </p>
         </div>
         {displayedCrashes.length > 0 && (
           <span className="text-sm text-gray-400">
-            {displayedCrashes.length} report{displayedCrashes.length !== 1 ? 's' : ''}
+            {displayedCrashes.length} {uiI18n.t('app.report_a27297bd')}{displayedCrashes.length !== 1 ? 's' : ''}
           </span>
         )}
       </div>
@@ -131,7 +134,7 @@ export function CrashReportPanel() {
       {displayedCrashes.length === 0 ? (
         <GlassPanel className="p-12 text-center">
           <CheckCircle className="w-12 h-12 text-green-500/60 mx-auto mb-4" />
-          <p className="text-gray-400 text-sm">No crash reports on record</p>
+          <p className="text-gray-400 text-sm">{uiI18n.t('app.no_crash_reports_on_record_0d604eb9')}</p>
         </GlassPanel>
       ) : (
         <GlassPanel className="divide-y divide-white/10">
@@ -148,22 +151,22 @@ export function CrashReportPanel() {
                     <AlertTriangle className="w-5 h-5 text-orange-400 mt-0.5 flex-shrink-0" />
                     <div className="min-w-0 space-y-1">
                       <p className="text-sm font-mono text-white break-all">
-                        <span className="text-gray-500 text-xs mr-1">ID</span>
+                        <span className="text-gray-500 text-xs mr-1">{uiI18n.t('app.id_89f89c02')}</span>
                         {report.id}
                       </p>
                       <p className="text-xs text-gray-400">
-                        <span className="text-gray-500 mr-1">Date</span>
+                        <span className="text-gray-500 mr-1">{uiI18n.t('app.date_eb9a4bc1')}</span>
                         {formatDate(report.date)}
                       </p>
                       {report.path && (
                         <p className="text-xs text-gray-400 break-all">
-                          <span className="text-gray-500 mr-1">Path</span>
+                          <span className="text-gray-500 mr-1">{uiI18n.t('app.path_519e3913')}</span>
                           <span className="font-mono">{report.path}</span>
                         </p>
                       )}
                       {(report.app_version || report.platform) && (
                         <p className="text-xs text-gray-400 break-all">
-                          <span className="text-gray-500 mr-1">Build</span>
+                          <span className="text-gray-500 mr-1">{uiI18n.t('app.build_bbd80cf7')}</span>
                           <span className="font-mono">
                             {[report.app_version, report.platform && report.arch
                               ? `${report.platform}/${report.arch}`
@@ -175,7 +178,7 @@ export function CrashReportPanel() {
                         </p>
                       )}
                       <span className="inline-block text-[10px] uppercase tracking-wider text-gray-500">
-                        {report.source === 'live' ? 'this session' : 'persisted'}
+                        {report.source === 'live' ? uiI18n.t('app.this_session_b10421a4') : uiI18n.t('app.persisted_9c9c2851')}
                       </span>
                     </div>
                   </div>
@@ -185,8 +188,8 @@ export function CrashReportPanel() {
                     {hasSaveError && (
                       <span
                         className="text-red-400"
-                        title="Could not save acknowledgment"
-                        aria-label="Could not save acknowledgment"
+                        title={uiI18n.t('app.could_not_save_acknowledgment_d88591a8')}
+                        aria-label={uiI18n.t('app.could_not_save_acknowledgment_d88591a8')}
                       >
                         <AlertTriangle className="w-4 h-4" />
                       </span>
@@ -198,7 +201,7 @@ export function CrashReportPanel() {
                       onClick={() => handleAcknowledge(report.id)}
                     >
                       <CheckCircle className="w-3.5 h-3.5" />
-                      Acknowledge
+                      {uiI18n.t('app.acknowledge_9beb96da')}
                     </Button>
                   </div>
                 </div>
@@ -206,7 +209,7 @@ export function CrashReportPanel() {
                 {/* Inline save error message */}
                 {hasSaveError && (
                   <p className="mt-2 ml-8 text-xs text-red-400">
-                    Could not save acknowledgment — storage may be full. The report will reappear on next load.
+                    {uiI18n.t('app.could_not_save_acknowledgment_storage_may_be_ful_9ede3577')}
                   </p>
                 )}
               </div>

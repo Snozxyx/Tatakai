@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState, memo } from 'react';
 import { Play, Star } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -32,6 +34,7 @@ interface MemoizedAnimeCardProps {
 }
 
 const MemoizedAnimeCard = memo(({ anime, isUltraLite, blurhashEnabled, measureRef, onClick }: MemoizedAnimeCardProps) => {
+  useUiTranslation();
   const posterSrc = getHighQualityPoster(anime.poster, anime.anilistId);
   const routeAnimeId = buildPreferredAnimeRouteId({
     id: anime.id,
@@ -97,8 +100,8 @@ const MemoizedAnimeCard = memo(({ anime, isUltraLite, blurhashEnabled, measureRe
             {anime.name}
           </h4>
           <div className="flex gap-2 mt-1 text-xs text-muted-foreground">
-            {anime.episodes?.sub && <span>SUB {anime.episodes.sub}</span>}
-            {anime.episodes?.dub > 0 && <span>• DUB {anime.episodes.dub}</span>}
+            {anime.episodes?.sub && <span>{uiI18n.t('app.sub_49b60b33')} {anime.episodes.sub}</span>}
+            {anime.episodes?.dub > 0 && <span>{uiI18n.t('app.dub_78aca15c')} {anime.episodes.dub}</span>}
           </div>
         </div>
       </div>
@@ -110,6 +113,7 @@ const MemoizedAnimeCard = memo(({ anime, isUltraLite, blurhashEnabled, measureRe
 MemoizedAnimeCard.displayName = 'MemoizedAnimeCard';
 
 export function VirtualAnimeGrid({ animes, title, icon, compact = false }: VirtualAnimeGridProps) {
+  useUiTranslation();
   const navigate = useNavigate();
   const { isUltraLite } = useTheme();
   const blurhashEnabled = useFeatureFlag(FeatureFlag.BLURHASH_IMAGES);

@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import React, { memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -54,11 +56,11 @@ const THEME_COLORS = {
 type ThemeColor = keyof typeof THEME_COLORS;
 
 const STATUS_LABELS: Record<string, { label: string; color: string; bg: string; icon: React.ElementType }> = {
-  watching: { label: 'Watching', color: 'text-sky-400', bg: 'bg-sky-400/20', icon: Eye },
-  completed: { label: 'Completed', color: 'text-emerald-400', bg: 'bg-emerald-400/20', icon: CheckCircle },
-  plan_to_watch: { label: 'Plan', color: 'text-amber-400', bg: 'bg-amber-400/20', icon: Clock },
-  on_hold: { label: 'On Hold', color: 'text-orange-400', bg: 'bg-orange-400/20', icon: Pause },
-  dropped: { label: 'Dropped', color: 'text-rose-400', bg: 'bg-rose-400/20', icon: XCircle },
+  watching: { get label() { return uiI18n.t('app.watching_96d9e027'); }, color: 'text-sky-400', bg: 'bg-sky-400/20', icon: Eye },
+  completed: { get label() { return uiI18n.t('app.completed_1798b3ba'); }, color: 'text-emerald-400', bg: 'bg-emerald-400/20', icon: CheckCircle },
+  plan_to_watch: { get label() { return uiI18n.t('app.plan_ae2f98a0'); }, color: 'text-amber-400', bg: 'bg-amber-400/20', icon: Clock },
+  on_hold: { get label() { return uiI18n.t('app.on_hold_73fd29ee'); }, color: 'text-orange-400', bg: 'bg-orange-400/20', icon: Pause },
+  dropped: { get label() { return uiI18n.t('app.dropped_8cf622d3'); }, color: 'text-rose-400', bg: 'bg-rose-400/20', icon: XCircle },
 };
 
 const FALLBACK_STATUS = STATUS_LABELS.plan_to_watch;
@@ -84,6 +86,7 @@ export const OverviewWidgetsRail = memo(function OverviewWidgetsRail({
   mangaReadlist = [],
   onNavigateTab,
 }: OverviewWidgetsRailProps) {
+  useUiTranslation();
   const navigate = useNavigate();
   const { data: resolvedManga, isLoading: mangaLoading } = useResolvedMangaReadlist(mangaReadlist);
 
@@ -97,7 +100,7 @@ export const OverviewWidgetsRail = memo(function OverviewWidgetsRail({
     >
       {/* ── Watchlist Widget ── */}
       <Widget
-        title="Watchlist"
+        title={uiI18n.t('app.watchlist_48a616d9')}
         count={`${watchlist.length} titles`}
         icon={<List className="w-4 h-4" />}
         color="rose"
@@ -127,7 +130,7 @@ export const OverviewWidgetsRail = memo(function OverviewWidgetsRail({
 
       {/* ── Manga & Manhwa Widget ── */}
       <Widget
-        title="Manga & Manhwa"
+        title={uiI18n.t('app.manga_manhwa_3dfc1148')}
         count={mangaLoading ? 'Loading titles…' : `${resolvedManga.length} titles`}
         icon={<BookOpen className="w-4 h-4" />}
         color="amber"
@@ -149,7 +152,7 @@ export const OverviewWidgetsRail = memo(function OverviewWidgetsRail({
               item.last_chapter_number != null && (Number(item.last_chapter_number) > 0 || item.last_chapter_key) ? (
                 <>
                   <BookOpen className="w-3 h-3" />
-                  Ch. {item.last_chapter_number}
+                  {uiI18n.t('app.ch_d8dbf726')} {item.last_chapter_number}
                 </>
               ) : undefined
             }
@@ -160,7 +163,7 @@ export const OverviewWidgetsRail = memo(function OverviewWidgetsRail({
 
       {/* ── Recent History Widget ── */}
       <Widget
-        title="Recent History"
+        title={uiI18n.t('app.recent_history_a57d6e12')}
         count={`${history.length} watched`}
         icon={<History className="w-4 h-4" />}
         color="sky"
@@ -179,7 +182,7 @@ export const OverviewWidgetsRail = memo(function OverviewWidgetsRail({
               item.episode_number != null ? (
                 <>
                   <Play className="w-2.5 h-2.5" fill="currentColor" />
-                  Ep. {item.episode_number}
+                  {uiI18n.t('app.ep_4528a637')} {item.episode_number}
                 </>
               ) : undefined
             }
@@ -205,6 +208,7 @@ interface WidgetProps {
 }
 
 function Widget({ title, count, icon, color, onMore, children }: WidgetProps) {
+  useUiTranslation();
   const theme = THEME_COLORS[color];
 
   return (
@@ -253,10 +257,10 @@ function Widget({ title, count, icon, color, onMore, children }: WidgetProps) {
               <ArrowRight className="w-5 h-5 transition-transform duration-300 group-hover:translate-x-0.5" />
             </div>
             <span className={cn('text-xs font-bold text-foreground transition-colors', theme.hoverText)}>
-              See More
+              {uiI18n.t('app.see_more_8e80d180')}
             </span>
             <span className="text-[10px] text-muted-foreground/50 mt-1">
-              in {title} tab
+              {uiI18n.t('app.in_af10ef20')} {title} {uiI18n.t('app.tab_e9746021')}
             </span>
           </div>
         </div>
@@ -275,6 +279,7 @@ interface MediaProps {
 }
 
 function Media({ onClick, image, title, color, badge, badgeClass }: MediaProps) {
+  useUiTranslation();
   const theme = THEME_COLORS[color];
 
   return (

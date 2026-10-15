@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { TATAKAI_API_URL, withClientHeaders, unwrapApiData } from '@/lib/api/api-client';
@@ -24,13 +26,14 @@ export interface UpdateContentInput {
 }
 
 export function useUpdateContent() {
+  useUiTranslation();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({ id, fields, reason }: UpdateContentInput) => {
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData.session?.access_token;
-      if (!token) throw new Error('You must be signed in as an admin to edit content.');
+      if (!token) throw new Error(uiI18n.t('app.you_must_be_signed_in_as_an_admin_to_edit_conten_e3da8132'));
 
       const res = await fetch(`${TATAKAI_API_URL}/admin/content/${encodeURIComponent(id)}`, {
         method: 'PATCH',

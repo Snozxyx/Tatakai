@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -42,6 +44,7 @@ function computeAutoUnlocked(
 
 // ── Component ─────────────────────────────────────────────────────────────
 export function AchievementManager() {
+  useUiTranslation();
   const [search, setSearch] = useState('');
   const [selectedUser, setSelectedUser] = useState<{ user_id: string; display_name: string; username: string; avatar_url: string | null } | null>(null);
   const [note, setNote] = useState('');
@@ -119,7 +122,7 @@ export function AchievementManager() {
     <div className="space-y-6">
       <div className="flex items-center gap-2">
         <Trophy className="w-5 h-5 text-amber-400" />
-        <h2 className="text-lg font-bold font-display">Achievement Manager</h2>
+        <h2 className="text-lg font-bold font-display">{uiI18n.t('app.achievement_manager_30ba511f')}</h2>
       </div>
 
       {/* User search */}
@@ -128,7 +131,7 @@ export function AchievementManager() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             className="pl-9"
-            placeholder="Search user by name or @username…"
+            placeholder={uiI18n.t('app.search_user_by_name_or_username_b2c44b88')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -172,10 +175,10 @@ export function AchievementManager() {
               <div className="text-xs text-muted-foreground">@{selectedUser.username}</div>
               {watchStats && (
                 <div className="flex flex-wrap gap-2 mt-1">
-                  <Badge variant="secondary">{watchStats.totalEpisodes} eps</Badge>
-                  <Badge variant="secondary">{watchStats.uniqueAnime} anime</Badge>
-                  <Badge variant="secondary">{watchStats.totalMinutes} min</Badge>
-                  <Badge variant="secondary">{watchStats.longestStreak}d streak</Badge>
+                  <Badge variant="secondary">{watchStats.totalEpisodes} {uiI18n.t('app.eps_85962fc8')}</Badge>
+                  <Badge variant="secondary">{watchStats.uniqueAnime} {uiI18n.t('app.anime_11a3e059')}</Badge>
+                  <Badge variant="secondary">{watchStats.totalMinutes} {uiI18n.t('app.min_b6c935d4')}</Badge>
+                  <Badge variant="secondary">{watchStats.longestStreak}{uiI18n.t('app.d_streak_a6fb5b84')}</Badge>
                 </div>
               )}
             </div>
@@ -187,11 +190,11 @@ export function AchievementManager() {
           {/* Note field */}
           <GlassPanel className="p-4">
             <label className="text-xs font-medium text-muted-foreground mb-1 block">
-              Grant note (optional, attached to next grant)
+              {uiI18n.t('app.grant_note_optional_attached_to_next_grant_4b78a1c7')}
             </label>
             <Textarea
               rows={2}
-              placeholder="e.g. Granted as part of season 1 event"
+              placeholder={uiI18n.t('app.e_g_granted_as_part_of_season_1_event_412fe9a2')}
               value={note}
               onChange={(e) => setNote(e.target.value)}
             />
@@ -216,10 +219,10 @@ export function AchievementManager() {
                   {/* Status badge */}
                   <div className="absolute top-2 left-2">
                     {isAuto && (
-                      <Badge variant="secondary" className="text-[9px] px-1 py-0">auto</Badge>
+                      <Badge variant="secondary" className="text-[9px] px-1 py-0">{uiI18n.t('app.auto_0d612c12')}</Badge>
                     )}
                     {isManual && !isAuto && (
-                      <Badge variant="default" className="text-[9px] px-1 py-0 bg-amber-500/80">admin</Badge>
+                      <Badge variant="default" className="text-[9px] px-1 py-0 bg-amber-500/80">{uiI18n.t('app.admin_d033e22a')}</Badge>
                     )}
                   </div>
 
@@ -253,14 +256,14 @@ export function AchievementManager() {
                           grantMutation.mutate(
                             { userId: selectedUser.user_id, achievementId: a.id, note },
                             {
-                              onSuccess: () => { toast.success('Achievement granted'); setNote(''); },
+                              onSuccess: () => { toast.success(uiI18n.t('app.achievement_granted_973bee70')); setNote(''); },
                               onError: (e: any) => toast.error('Grant failed: ' + e.message),
                             },
                           )
                         }
                       >
                         <CheckCircle className="w-3 h-3 mr-1" />
-                        Grant
+                        {uiI18n.t('app.grant_c02329c4')}
                       </Button>
                     )}
                     {isManual && (
@@ -273,14 +276,14 @@ export function AchievementManager() {
                           revokeMutation.mutate(
                             { userId: selectedUser.user_id, achievementId: a.id },
                             {
-                              onSuccess: () => toast.success('Achievement revoked'),
+                              onSuccess: () => toast.success(uiI18n.t('app.achievement_revoked_5e297126')),
                               onError: (e: any) => toast.error('Revoke failed: ' + e.message),
                             },
                           )
                         }
                       >
                         <Lock className="w-3 h-3 mr-1" />
-                        Revoke
+                        {uiI18n.t('app.revoke_0be72075')}
                       </Button>
                     )}
                   </div>

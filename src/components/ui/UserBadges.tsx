@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -52,6 +54,7 @@ function BadgeShell({
   label: string;
   children: React.ReactNode;
 }) {
+  useUiTranslation();
   if (interactive) {
     return (
       <button type="button" onClick={onOpen} className={className} style={style} aria-label={label}>
@@ -81,6 +84,7 @@ export function UserBadges({
   userStats,
   interactive = true,
 }: UserBadgesProps) {
+  useUiTranslation();
   const [selectedBadge, setSelectedBadge] = useState<BadgeDef | null>(null);
   if (!badges || badges.length === 0) return null;
 
@@ -96,7 +100,7 @@ export function UserBadges({
       <div
         className={cn('inline-flex items-center gap-1.5 align-middle select-none', className)}
         role="group"
-        aria-label="User badges"
+        aria-label={uiI18n.t('app.user_badges_79033086')}
       >
         {shown.map((badge) => {
           const rarity = RARITY_STYLES[badge.rarity];
@@ -125,7 +129,7 @@ export function UserBadges({
                     isFeatured && 'ring-[1.5px] shadow-[0_0_0_1px_rgba(0,0,0,0.6),0_4px_16px_-4px_rgba(0,0,0,0.7)]'
                   )}
                   style={{ width: containerSize, height: containerSize }}
-                  label={`${badge.label} badge (${rarity.label})${tierData ? ` - ${tierData.name}` : ''}`}
+                  label={uiI18n.t('app.i18n_value_0_badge_i18n_value_1_i18n_value_2_f4c1fb3e', { value0: badge.label, value1: rarity.label, value2: tierData ? ` - ${tierData.name}` : '' })}
                 >
                   {/* Top gloss — static premium highlight */}
                   <span
@@ -206,7 +210,7 @@ export function UserBadges({
                     <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] px-2.5 py-2">
                       <div className="flex items-center justify-between text-[10px]">
                         <span className="font-bold text-foreground/90">{tierData.name}</span>
-                        <span className="text-muted-foreground/60 tabular-nums">Tier {tier + 1}/{badge.tiers!.length}</span>
+                        <span className="text-muted-foreground/60 tabular-nums">{uiI18n.t('app.tier_5bd44ebe')} {tier + 1}/{badge.tiers!.length}</span>
                       </div>
                       <p className="text-[10px] text-muted-foreground/75 mt-0.5 leading-snug">
                         {tierData.description}
@@ -214,7 +218,7 @@ export function UserBadges({
                       {nextTier && badge.metricKey && userStats && (
                         <div className="mt-2 space-y-1">
                           <div className="flex items-center justify-between text-[9px] text-muted-foreground/60">
-                            <span>Next: {nextTier.name}</span>
+                            <span>{uiI18n.t('app.next_69a52c6d')} {nextTier.name}</span>
                             <span className="tabular-nums">{userStats[badge.metricKey]}/{nextTier.threshold}</span>
                           </div>
                           <div className="h-1 bg-black/50 rounded-full overflow-hidden border border-white/[0.04]">
@@ -243,7 +247,7 @@ export function UserBadges({
                   {/* Unlocking / How-to-earn rule */}
                   {badge.rule && (
                     <div className="pt-2 border-t border-white/[0.06] flex items-start gap-1.5 text-[10px] text-muted-foreground/70">
-                      <span className="font-semibold text-foreground/60 shrink-0">How to earn:</span>
+                      <span className="font-semibold text-foreground/60 shrink-0">{uiI18n.t('app.how_to_earn_a737a7d0')}</span>
                       <span>{badge.rule}</span>
                     </div>
                   )}
@@ -251,7 +255,7 @@ export function UserBadges({
                   {isFeatured && (
                     <div className="pt-2 border-t border-white/[0.06] flex items-center gap-1.5 text-[10px] font-semibold text-foreground/70">
                       <span className="h-1.5 w-1.5 rounded-full bg-white/80" />
-                      Featured Badge
+                      {uiI18n.t('app.featured_badge_5a25680b')}
                     </div>
                   )}
                 </div>
@@ -269,14 +273,14 @@ export function UserBadges({
                 onOpen={() => {}}
                 className="inline-flex items-center justify-center rounded-full bg-white/[0.04] hover:bg-white/[0.08] ring-1 ring-white/10 text-[10px] font-bold text-muted-foreground transition-colors duration-150 shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-white/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
                 style={{ width: size + 10, height: size + 10 }}
-                label={`${overflow} more badges`}
+                label={uiI18n.t('app.i18n_value_0_more_badges_71f394b1', { value0: overflow })}
               >
                 +{overflow}
               </BadgeShell>
             </TooltipTrigger>
 
             <TooltipContent side="top" className="p-2.5 max-w-[200px] rounded-xl bg-[#0b0b0d]/95 border border-white/10 shadow-xl">
-              <p className="text-[11px] font-semibold text-foreground mb-1">Additional Badges:</p>
+              <p className="text-[11px] font-semibold text-foreground mb-1">{uiI18n.t('app.additional_badges_c5e510b0')}</p>
               <ul className="text-[10px] text-muted-foreground space-y-0.5">
                 {remaining.map((b) => (
                   <li key={b.key} className="truncate">• {b.label}</li>
@@ -313,7 +317,7 @@ export function UserBadges({
                 <DialogClose asChild>
                   <button
                     type="button"
-                    aria-label="Close badge details"
+                    aria-label={uiI18n.t('app.close_badge_details_d410b5b2')}
                     onClick={() => { void triggerHaptic('tap'); setSelectedBadge(null); }}
                     className="absolute left-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-black/50 text-white/80 shadow-lg backdrop-blur-md transition-colors hover:bg-black/70 hover:text-white"
                   >
@@ -327,14 +331,14 @@ export function UserBadges({
                   </div>
                   <DialogTitle className="pt-2 text-sm font-semibold text-muted-foreground">{selectedBadge.label}</DialogTitle>
                   <div className={cn('text-2xl font-bold tracking-tight', rarity.text, tierData?.effectClass)}>{tierData?.name || rarity.label}</div>
-                  <DialogDescription className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/70">{rarity.label} rarity</DialogDescription>
+                  <DialogDescription className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/70">{rarity.label} {uiI18n.t('app.rarity_f147fc3f')}</DialogDescription>
                 </DialogHeader>
                 <div className="relative z-10 space-y-4 p-5">
                   <p className="text-sm leading-relaxed text-foreground/85">{selectedBadge.description}</p>
                   {tierData && nextTier && (
                     <section className="space-y-2 border-t border-white/[0.06] pt-4">
                       <div className="flex justify-between text-xs">
-                        <span className="font-semibold">Next level: {nextTier.name}</span>
+                        <span className="font-semibold">{uiI18n.t('app.next_level_3a1cfc72')} {nextTier.name}</span>
                         <span className="text-muted-foreground tabular-nums">{metricValue ?? tierData.threshold}/{nextTier.threshold}</span>
                       </div>
                       <Progress value={metricValue == null ? 0 : progress} className="h-1.5" />
@@ -347,13 +351,13 @@ export function UserBadges({
                           <div key={badgeTier.name} className={cn('min-w-0 rounded-xl border px-1 py-2 text-center', index <= tier ? 'border-white/10 bg-white/[0.04] text-foreground' : 'border-white/[0.04] text-muted-foreground/50')}>
                             <img src={selectedBadge.image} alt="" className={cn('mx-auto h-7 w-7 object-contain', index > tier && 'grayscale opacity-40')} />
                             <div className={cn('mt-1 truncate text-[10px] font-bold', badgeTier.effectClass)}>{badgeTier.name}</div>
-                            <div className="mt-0.5 text-[9px] tabular-nums">{badgeTier.threshold} required</div>
+                            <div className="mt-0.5 text-[9px] tabular-nums">{badgeTier.threshold} {uiI18n.t('app.required_1a77d416')}</div>
                           </div>
                         ))}
                       </div>
                     </section>
                   )}
-                  {selectedBadge.rule && <p className="border-t border-white/[0.06] pt-3 text-xs text-muted-foreground"><span className="font-semibold text-foreground/70">How to earn:</span> {selectedBadge.rule}</p>}
+                  {selectedBadge.rule && <p className="border-t border-white/[0.06] pt-3 text-xs text-muted-foreground"><span className="font-semibold text-foreground/70">{uiI18n.t('app.how_to_earn_a737a7d0')}</span> {selectedBadge.rule}</p>}
                 </div>
               </div>
             </DialogContent>

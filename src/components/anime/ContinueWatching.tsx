@@ -1,6 +1,9 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useEffect, memo } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { ArrowRight, Clock, History, Play } from 'lucide-react';
 
 import {
@@ -14,18 +17,19 @@ import { fetchAniZipMapping } from '@/lib/mapping/anizip';
 import { HomeSectionHeading } from '@/components/home/HomeSectionHeading';
 import { Peekable } from '@/components/media/MediaQuickPeek';
 import { peekFromAnime } from '@/components/media/quickPeekStore';
+import i18n from '@/lib/i18n';
 
 function formatTimeLeft(remainingSeconds: number) {
-  if (remainingSeconds <= 0) return 'Almost finished';
+  if (remainingSeconds <= 0) return i18n.t('discover.almostFinished');
 
   const minutes = Math.ceil(remainingSeconds / 60);
 
-  if (minutes < 60) return `${minutes}m left`;
+  if (minutes < 60) return i18n.t('discover.minutesLeft', { count: minutes });
 
   const hours = Math.floor(minutes / 60);
   const remainingMinutes = minutes % 60;
 
-  return `${hours}h${remainingMinutes ? ` ${remainingMinutes}m` : ''} left`;
+  return i18n.t('discover.hoursLeft', { hours, minutes: remainingMinutes });
 }
 
 function resolveAnilistId(animeId: string, rawAnilist?: number | null): number | null {
@@ -40,6 +44,8 @@ function resolveAnilistId(animeId: string, rawAnilist?: number | null): number |
 type ContinueItem = NonNullable<ReturnType<typeof useContinueWatching>['data']>[number];
 
 const ContinueCard = memo(function ContinueCard({ item }: { item: ContinueItem }) {
+  useUiTranslation();
+  const { t } = useTranslation();
   const progressSeconds = Math.max(0, Number(item.progress_seconds) || 0);
   const durationSeconds = Math.max(0, Number(item.duration_seconds) || 0);
   const percent =
@@ -84,7 +90,7 @@ const ContinueCard = memo(function ContinueCard({ item }: { item: ContinueItem }
     >
       <Link
         to={`/watch/${encodeURIComponent(item.episode_id)}?t=${Math.floor(progressSeconds)}`}
-        aria-label={`Resume ${item.anime_name}, episode ${item.episode_number}${percent !== null ? `, ${percent}% watched` : ''}`}
+        aria-label={percent !== null ? t('discover.resumeLabelWithPercent', { name: item.anime_name, episode: item.episode_number, percent }) : t('discover.resumeLabel', { name: item.anime_name, episode: item.episode_number })}
         data-mobile-poster-card
         className="group flex w-full flex-col overflow-hidden rounded-2xl border border-white/[0.07] bg-white/[0.02] transition-all duration-300 hover:border-primary/40 hover:bg-white/[0.04] hover:shadow-[0_0_28px_-10px_hsl(var(--primary)/0.5)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-[0.99]"
       >
@@ -92,7 +98,7 @@ const ContinueCard = memo(function ContinueCard({ item }: { item: ContinueItem }
         <div className="relative aspect-video w-full overflow-hidden bg-white/[0.04]">
           <img
             src={thumb}
-            alt={epTitle ? `Episode ${item.episode_number}: ${epTitle}` : `${item.anime_name} episode ${item.episode_number}`}
+            alt={epTitle ? t('migration.episodeTitle', { number: item.episode_number, title: epTitle }) : t('migration.animeEpisode', { name: item.anime_name, number: item.episode_number })}
             loading="lazy"
             decoding="async"
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
@@ -106,7 +112,7 @@ const ContinueCard = memo(function ContinueCard({ item }: { item: ContinueItem }
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
 
           <span className="absolute left-2 top-2 rounded-md bg-black/70 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-white backdrop-blur-sm">
-            EP {item.episode_number}
+            {t('migration.episodeShort')} {item.episode_number}
           </span>
           {timeLeft && (
             <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-black/70 px-2 py-1 text-[10px] font-bold text-white/85 backdrop-blur-sm">
@@ -152,15 +158,15 @@ const ContinueCard = memo(function ContinueCard({ item }: { item: ContinueItem }
             </h3>
             <div className="mt-0.5 flex items-center justify-between gap-2 text-[11px] text-white/50">
               <span className="truncate">
-                Episode {item.episode_number}
-                {epTitle ? ` • ${epTitle}` : ''}
+                {t('anime.episode')} {item.episode_number}
+                {epTitle ? uiI18n.t('app.i18n_value_0_723b674d', { value0: epTitle }) : ''}
               </span>
               {percent !== null && (
                 <span className="shrink-0 tabular-nums font-bold text-white/60">{percent}%</span>
               )}
             </div>
             <span className="mt-1.5 inline-flex items-center gap-1 text-xs font-semibold text-primary">
-              Resume
+              {t('discover.resume')}
               <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
             </span>
           </div>
@@ -178,6 +184,8 @@ const ContinueCard = memo(function ContinueCard({ item }: { item: ContinueItem }
 });
 
 export function ContinueWatching() {
+  useUiTranslation();
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { data: items, isLoading } = useContinueWatching();
 
@@ -191,20 +199,20 @@ export function ContinueWatching() {
     <section className="mb-12" aria-labelledby="continue-watching-heading">
       <HomeSectionHeading
         icon={<Clock className="w-5 h-5 text-primary" />}
-        title={<span id="continue-watching-heading">Continue Watching</span>}
-        subtitle={`${items.length} ${items.length === 1 ? 'series' : 'series'} in progress`}
+        title={<span id="continue-watching-heading">{t('discover.continueWatching')}</span>}
+        subtitle={t('migration.seriesInProgress', { count: items.length })}
         action={
           <div className="flex items-center gap-3 shrink-0">
             <p className="hidden text-xs text-muted-foreground sm:block">
-              Pick up where you left off
+              {t('discover.pickUpWhereLeftOff')}
             </p>
             <Link
               to="/profile?tab=history"
               className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-card px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:border-foreground/20 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-              aria-label="View full watch history"
+              aria-label={t('discover.viewFullHistory')}
             >
               <History className="h-3.5 w-3.5" aria-hidden="true" />
-              History
+              {t('nav.history')}
             </Link>
           </div>
         }

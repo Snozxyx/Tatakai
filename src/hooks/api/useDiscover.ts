@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
  * Data for the redesigned discover surface (docs/Plans.md §2 "Genre Page",
  * design docs/image-8.png).
@@ -37,9 +39,9 @@ const SORT_BY: Record<DiscoverSort, NonNullable<SearchFilters['sortBy']>> = {
 };
 
 export const DISCOVER_SORTS: ReadonlyArray<{ id: DiscoverSort; label: string }> = [
-  { id: 'for-you', label: 'For you' },
-  { id: 'top-rated', label: 'Top rated' },
-  { id: 'newest', label: 'Newest' },
+  { id: 'for-you', get label() { return uiI18n.t('app.for_you_7e13d94a'); } },
+  { id: 'top-rated', get label() { return uiI18n.t('app.top_rated_fa405956'); } },
+  { id: 'newest', get label() { return uiI18n.t('app.newest_d0442824'); } },
   { id: 'a-z', label: 'A–Z' },
 ];
 
@@ -95,6 +97,7 @@ export interface DiscoverQuery {
 }
 
 export function useDiscoverMedia({ genre, sort = 'for-you', year = null, page = 1 }: DiscoverQuery) {
+  useUiTranslation();
   const resolvedGenre = resolveGenreSlug(genre);
   const { settings } = useContentSafetySettings();
   const showAdult = settings.showAdultEverywhere;
@@ -202,38 +205,35 @@ export const RANKED_BOARDS: ReadonlyArray<RankedBoard> = [
   {
     id: 'popular',
     eyebrow: 'This week',
-    heading: 'Popular worldwide',
-    description:
-      "This week's most watched across the anime community — ranked gold, silver, and bronze. Handpicked heat from around the globe.",
-    cta: { label: 'See the board', to: '/trending' },
+    get heading() { return uiI18n.t('app.popular_worldwide_b0f24f2d'); },
+    get description() { return uiI18n.t('app.this_week_s_most_watched_across_the_anime_commun_ec5cb2ae'); },
+    cta: { get label() { return uiI18n.t('app.see_the_board_33295d16'); }, to: '/trending' },
   },
   {
     id: 'trending',
     eyebrow: 'Right now',
-    heading: 'Trending today',
-    description:
-      'What everyone started watching in the last few hours. Moves fast, so the order here rarely survives the day.',
-    cta: { label: 'See what’s moving', to: '/trending' },
+    get heading() { return uiI18n.t('app.trending_today_1ea3fa93'); },
+    get description() { return uiI18n.t('app.what_everyone_started_watching_in_the_last_few_h_34323fbf'); },
+    cta: { get label() { return uiI18n.t('app.see_what_s_moving_7a9a8bd7'); }, to: '/trending' },
   },
   {
     id: 'top_rated',
     eyebrow: 'All time',
-    heading: 'Highest rated',
-    description:
-      'The best-scored anime ever indexed, by community average. No recency bias, no seasonal noise — just the ceiling.',
-    cta: { label: 'See the rankings', to: '/trending' },
+    get heading() { return uiI18n.t('app.highest_rated_4710d12c'); },
+    get description() { return uiI18n.t('app.the_best_scored_anime_ever_indexed_by_community__2477d90a'); },
+    cta: { get label() { return uiI18n.t('app.see_the_rankings_07559f71'); }, to: '/trending' },
   },
   {
     id: 'seasonal',
     eyebrow: 'This season',
-    heading: 'Airing now',
-    description:
-      'Everything currently on air, ordered by how much of the community is keeping up with it week to week.',
-    cta: { label: 'See the season', to: '/trending' },
+    get heading() { return uiI18n.t('app.airing_now_ee610954'); },
+    get description() { return uiI18n.t('app.everything_currently_on_air_ordered_by_how_much__6039b47e'); },
+    cta: { get label() { return uiI18n.t('app.see_the_season_84aff349'); }, to: '/trending' },
   },
 ];
 
 export function useRankedBoard(board: FeedType) {
+  useUiTranslation();
   const { settings } = useContentSafetySettings();
   const showAdult = settings.showAdultEverywhere;
   return useQuery<ContentFeed>({
@@ -255,6 +255,7 @@ export function useRankedBoard(board: FeedType) {
  * grid below is what the visitor actually came for.
  */
 export function usePrefetchRankedBoard() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   return useCallback(
     (board: FeedType) => {

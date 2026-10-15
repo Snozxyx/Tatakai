@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
  * The fanned, ranked poster rail in the discover hero (docs/image-8.png).
  *
@@ -60,6 +62,7 @@ function railStyle(index: number) {
 }
 
 export function RankedPosterRail({ items, isLoading, className }: RankedPosterRailProps) {
+  useUiTranslation();
   const shown = items.slice(0, RAIL_LENGTH);
   const showSkeleton = isLoading && shown.length === 0;
 
@@ -90,7 +93,7 @@ export function RankedPosterRail({ items, isLoading, className }: RankedPosterRa
             key={item.key}
             to={item.href}
             title={item.title}
-            aria-label={`#${rank} ${item.title}`}
+            aria-label={uiI18n.t('app.i18n_value_0_i18n_value_1_5763abf1', { value0: rank, value1: item.title })}
             className="group relative shrink-0 transition-transform duration-300 hover:z-20 hover:-translate-y-2 focus-visible:z-20 focus-visible:-translate-y-2 focus-visible:outline-none"
             style={style}
           >

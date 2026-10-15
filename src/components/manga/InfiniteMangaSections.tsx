@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMemo, useRef, useCallback, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -13,6 +15,7 @@ import { Link } from 'react-router-dom';
 import { HomeSectionHeading } from '@/components/home/HomeSectionHeading';
 
 function SectionSkeleton({ layout }: { layout: SectionLayout }) {
+  useUiTranslation();
   return (
     <div className="mb-16 animate-pulse">
       <div className="flex items-center justify-between mb-6 px-2">
@@ -38,6 +41,7 @@ function SectionSkeleton({ layout }: { layout: SectionLayout }) {
 }
 
 function SectionContent({ section, isMobile }: { section: MangaSection; isMobile: boolean }) {
+  useUiTranslation();
   const scrollRef = useRef<HTMLDivElement>(null);
   const {
     items: sectionItems,
@@ -71,14 +75,14 @@ function SectionContent({ section, isMobile }: { section: MangaSection; isMobile
             <button
               onClick={() => scroll('left')}
               className="absolute -left-3.5 top-[40%] -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/80 border border-white/15 text-white/90 shadow-xl backdrop-blur-md flex items-center justify-center opacity-0 group-hover/section:opacity-100 hover:scale-110 hover:bg-black transition-all"
-              aria-label="Scroll left"
+              aria-label={uiI18n.t('app.scroll_left_2c9e5a60')}
             >
               <ChevronLeft className="w-5 h-5" />
             </button>
             <button
               onClick={() => scroll('right')}
               className="absolute -right-3.5 top-[40%] -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/80 border border-white/15 text-white/90 shadow-xl backdrop-blur-md flex items-center justify-center opacity-0 group-hover/section:opacity-100 hover:scale-110 hover:bg-black transition-all"
-              aria-label="Scroll right"
+              aria-label={uiI18n.t('app.scroll_right_2994b49c')}
             >
               <ChevronRight className="w-5 h-5" />
             </button>
@@ -105,7 +109,7 @@ function SectionContent({ section, isMobile }: { section: MangaSection; isMobile
           {/* Poster-size "Show more" card to the genre page */}
           <Link
             to={genreUrl}
-            aria-label={`Show more ${section.genre}`}
+            aria-label={uiI18n.t('app.show_more_i18n_value_0_959378b5', { value0: section.genre })}
             className="media-card-rail-item"
           >
             <span className="flex aspect-[2/3] w-full flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-white/15 bg-white/[0.02] transition-colors hover:border-primary/50 hover:bg-primary/[0.06]">
@@ -113,7 +117,7 @@ function SectionContent({ section, isMobile }: { section: MangaSection; isMobile
                 <Plus className="h-6 w-6" />
               </span>
               <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Show more
+                {uiI18n.t('app.show_more_25911d48')}
               </span>
             </span>
             <span className="mt-2.5 block px-0.5 text-sm font-bold leading-snug text-white/45">
@@ -136,7 +140,7 @@ function SectionContent({ section, isMobile }: { section: MangaSection; isMobile
                   onClick={() => loadMore()}
                   className="text-xs font-bold text-muted-foreground hover:text-foreground"
                 >
-                  Load more
+                  {uiI18n.t('app.load_more_dfe60ca9')}
                 </Button>
               )}
             </div>
@@ -148,6 +152,7 @@ function SectionContent({ section, isMobile }: { section: MangaSection; isMobile
 }
 
 export function InfiniteMangaSections() {
+  useUiTranslation();
   const isMobile = window.innerWidth < 768;
   const { settings } = useContentSafetySettings();
 
@@ -206,8 +211,8 @@ export function InfiniteMangaSections() {
   if (status === 'error') {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
-        <p className="text-muted-foreground">Failed to load more sections.</p>
-        <Button onClick={() => fetchNextPage()} variant="outline">Try Again</Button>
+        <p className="text-muted-foreground">{uiI18n.t('app.failed_to_load_more_sections_406937e6')}</p>
+        <Button onClick={() => fetchNextPage()} variant="outline">{uiI18n.t('app.try_again_cef2fe09')}</Button>
       </div>
     );
   }
@@ -226,13 +231,13 @@ export function InfiniteMangaSections() {
               <HomeSectionHeading
                 icon={section.icon ? <section.icon className="w-5 h-5 text-primary" /> : undefined}
                 title={section.title}
-                subtitle={`Curated ${section.genre}`}
+                subtitle={uiI18n.t('app.curated_i18n_value_0_22a0cb63', { value0: section.genre })}
                 action={
                   <Link
                     to={genreUrl}
                     className="inline-flex items-center gap-1.5 text-xs font-bold text-primary hover:text-primary/80 transition-colors uppercase tracking-wider self-start sm:self-center px-3.5 py-1.5 rounded-full bg-primary/10 border border-primary/20 hover:bg-primary/15 shrink-0"
                   >
-                    <span>Explore all {section.genre}</span>
+                    <span>{uiI18n.t('app.explore_all_a47b25b9')} {section.genre}</span>
                     <ArrowRight className="w-3.5 h-3.5" />
                   </Link>
                 }
@@ -248,9 +253,9 @@ export function InfiniteMangaSections() {
         {isFetchingNextPage ? (
           <Loader2 className="w-8 h-8 text-primary animate-spin" />
         ) : hasNextPage ? (
-          <div className="text-muted-foreground/50 text-sm font-medium">Scroll for more</div>
+          <div className="text-muted-foreground/50 text-sm font-medium">{uiI18n.t('app.scroll_for_more_f7f1bb4e')}</div>
         ) : (
-          <div className="text-muted-foreground/50 text-sm font-medium">You've reached the end</div>
+          <div className="text-muted-foreground/50 text-sm font-medium">{uiI18n.t('app.you_ve_reached_the_end_2fa88e43')}</div>
         )}
       </div>
     </div>

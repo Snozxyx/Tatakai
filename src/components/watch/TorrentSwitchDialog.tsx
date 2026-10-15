@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
  * TorrentSwitchDialog
  *
@@ -28,6 +30,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Scale, HardDrive, PlayCircle, Info, Users, TriangleAlert } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import {
   getTorrentRegionPolicy,
   TORRENT_UNIVERSAL_NOTES,
@@ -78,21 +81,21 @@ interface TorrentSwitchDialogProps {
   onConfirm: (source: TorrentSwitchSource) => void;
 }
 
-const LEVEL_STYLES: Record<TorrentEnforcementLevel, { label: string; className: string }> = {
+const LEVEL_STYLES: Record<TorrentEnforcementLevel, { labelKey: string; className: string }> = {
   high: {
-    label: "Actively enforced",
+    labelKey: "torrent.switch.levelHigh",
     className: "bg-red-500/10 text-red-400 border-red-500/30",
   },
   moderate: {
-    label: "Enforced",
+    labelKey: "torrent.switch.levelModerate",
     className: "bg-amber-500/10 text-amber-400 border-amber-500/30",
   },
   "personal-use-tolerated": {
-    label: "Sharing is the risk",
+    labelKey: "torrent.switch.levelTolerated",
     className: "bg-sky-500/10 text-sky-400 border-sky-500/30",
   },
   unknown: {
-    label: "Region unknown",
+    labelKey: "torrent.switch.levelUnknown",
     className: "bg-muted text-muted-foreground border-white/10",
   },
 };
@@ -118,6 +121,8 @@ export function TorrentSwitchDialog({
   onCancel,
   onConfirm,
 }: TorrentSwitchDialogProps) {
+  useUiTranslation();
+  const { t } = useTranslation();
   // The browser locale cannot change without a reload, so this is resolved once
   // rather than on every render of a dialog that stays mounted.
   const policy = useMemo(() => getTorrentRegionPolicy(), []);
@@ -130,10 +135,10 @@ export function TorrentSwitchDialog({
   const fullTitle =
     String(source?.torrentTitle || "").trim() ||
     [trimmed(animeTitle), trimmed(episodeLabel)].filter(Boolean).join(" — ") ||
-    "Untitled release";
+    t('torrent.switch.untitledRelease');
 
   const providerLabel =
-    String(source?.providerName || source?.server || source?.providerKey || "").trim() || "Unknown provider";
+    String(source?.providerName || source?.server || source?.providerKey || "").trim() || t('torrent.switch.unknownProvider');
 
   const seeders = numberOrNull(source?.seeders);
   const leechers = numberOrNull(source?.leechers);
@@ -146,23 +151,24 @@ export function TorrentSwitchDialog({
       if (text) rows.push({ label, value: text });
     };
 
-    push("Provider", providerLabel);
-    push("Release group", source?.releaseGroup);
-    push("Quality", source?.quality);
-    push("Size", source?.fileSize);
-    push("Container", source?.fileFormat);
-    push("Video codec", source?.codec);
-    push("Audio", source?.audio || source?.audioLanguage);
-    push("Language", source?.languageLabel || source?.language);
-    push("Subtitles", source?.subtitleType);
-    push("Episodes in release", source?.episodeRange);
-    push("Seeders", seeders);
-    push("Leechers", leechers);
-    push("Peers", peers);
-    push("Trackers in magnet", trackers > 0 ? trackers : null);
-    push("Info hash", infoHash);
+    push(t('torrent.switch.fieldProvider'), providerLabel);
+    push(t('torrent.switch.fieldReleaseGroup'), source?.releaseGroup);
+    push(t('torrent.switch.fieldQuality'), source?.quality);
+    push(t('torrent.switch.fieldSize'), source?.fileSize);
+    push(t('torrent.switch.fieldContainer'), source?.fileFormat);
+    push(t('torrent.switch.fieldVideoCodec'), source?.codec);
+    push(t('torrent.switch.fieldAudio'), source?.audio || source?.audioLanguage);
+    push(t('torrent.switch.fieldLanguage'), source?.languageLabel || source?.language);
+    push(t('torrent.switch.fieldSubtitles'), source?.subtitleType);
+    push(t('torrent.switch.fieldEpisodesInRelease'), source?.episodeRange);
+    push(t('torrent.switch.fieldSeeders'), seeders);
+    push(t('torrent.switch.fieldLeechers'), leechers);
+    push(t('torrent.switch.fieldPeers'), peers);
+    push(t('torrent.switch.fieldTrackers'), trackers > 0 ? trackers : null);
+    push(t('torrent.switch.fieldInfoHash'), infoHash);
     return rows;
   }, [
+    t,
     providerLabel,
     source?.releaseGroup,
     source?.quality,
@@ -180,7 +186,7 @@ export function TorrentSwitchDialog({
     peers,
     trackers,
     infoHash,
-  ]);
+  , uiI18n.language]);
 
   const levelStyle = LEVEL_STYLES[policy.level];
   const zeroSeeders = seeders === 0;
@@ -192,25 +198,24 @@ export function TorrentSwitchDialog({
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
             <TriangleAlert className="h-5 w-5 text-amber-400" />
-            Switch to a torrent source?
+            {t('torrent.switch.title')}
           </AlertDialogTitle>
           <AlertDialogDescription>
-            This leaves the hosted stream and joins a peer-to-peer swarm. Read the notes below — the
-            things it changes are not visible from the player.
+            {t('torrent.switch.description')}
           </AlertDialogDescription>
         </AlertDialogHeader>
 
         {/* ── What you are about to download ─────────────────────────────── */}
         <section className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
           <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-            Release
+            {t('torrent.switch.release')}
           </div>
           <p className="mt-1 break-words font-mono text-xs leading-relaxed text-foreground" title={fullTitle}>
             {fullTitle}
           </p>
           {(animeTitle || episodeLabel) && (
             <p className="mt-1 text-[11px] text-muted-foreground">
-              Selected for {[animeTitle, episodeLabel].filter(Boolean).join(" · ")}
+              {t('torrent.switch.selectedFor', { selection: [animeTitle, episodeLabel].filter(Boolean).join(" · ") })}
             </p>
           )}
           {source?.notes && (
@@ -222,7 +227,7 @@ export function TorrentSwitchDialog({
         {detailRows.length > 0 && (
           <section className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
             <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-              <Users className="h-3 w-3" /> Source details
+              <Users className="h-3 w-3" /> {t('torrent.switch.sourceDetails')}
             </div>
             <dl className="grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2">
               {detailRows.map((row) => (
@@ -234,8 +239,7 @@ export function TorrentSwitchDialog({
             </dl>
             {zeroSeeders && (
               <p className="mt-2 rounded-md bg-red-500/10 px-2 py-1 text-[11px] text-red-400">
-                The indexer reports no seeders. Counts are often stale so it may still start, but if
-                no peer has the data it will never play.
+                {t('torrent.switch.zeroSeeders')}
               </p>
             )}
           </section>
@@ -245,10 +249,10 @@ export function TorrentSwitchDialog({
         <section className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
           <div className="mb-2 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-              <Scale className="h-3 w-3" /> Where you appear to be: {policy.regionName}
+              <Scale className="h-3 w-3" /> {t('torrent.switch.regionLine', { region: policy.regionName })}
             </div>
             <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${levelStyle.className}`}>
-              {levelStyle.label}
+              {t(levelStyle.labelKey)}
             </span>
           </div>
           <p className="text-xs font-semibold">{policy.headline}</p>
@@ -264,8 +268,7 @@ export function TorrentSwitchDialog({
           <p className="mt-2 flex gap-1.5 text-[10px] leading-relaxed text-muted-foreground/80">
             <Info className="mt-[1px] h-3 w-3 shrink-0" />
             <span>
-              General information, not legal advice. The region above is guessed from your language
-              settings, not your location, and enforcement practices change.
+              {t('torrent.switch.legalNote')}
             </span>
           </p>
         </section>
@@ -273,23 +276,25 @@ export function TorrentSwitchDialog({
         {/* ── Storage ────────────────────────────────────────────────────── */}
         <section className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
           <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-            <HardDrive className="h-3 w-3" /> Storage
+            <HardDrive className="h-3 w-3" /> {t('torrent.switch.storage')}
           </div>
           <ul className="space-y-1 text-[11px] leading-relaxed text-muted-foreground">
             <li>
-              The whole file is written to disk, not streamed and discarded
-              {source?.fileSize ? ` — this release reports ${String(source.fileSize)}.` : "."}
-              {" "}A season pack downloads in full even when you only watch one episode.
+              {source?.fileSize
+                ? t('torrent.switch.storageWritesFileSized', { size: String(source.fileSize) })
+                : t('torrent.switch.storageWritesFile')}{" "}
+              {t('torrent.switch.storageSeasonPack')}
             </li>
             {downloadPath && (
               <li className="break-all">
-                Saved under <span className="font-mono text-foreground/80">{downloadPath}</span>
+                {t('torrent.switch.savedUnder')}{" "}
+                <span className="font-mono text-foreground/80">{downloadPath}</span>
               </li>
             )}
             <li>
               {optimizeStorage
-                ? "Storage optimisation is on, so finished data is cleaned up automatically under your cache limits."
-                : "Storage optimisation is off, so downloaded data stays until you remove it in Settings → Torrent."}
+                ? t('torrent.switch.optimizeOn')
+                : t('torrent.switch.optimizeOff')}
             </li>
           </ul>
         </section>
@@ -297,28 +302,28 @@ export function TorrentSwitchDialog({
         {/* ── Playback ───────────────────────────────────────────────────── */}
         <section className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
           <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-            <PlayCircle className="h-3 w-3" /> Playback
+            <PlayCircle className="h-3 w-3" /> {t('torrent.switch.playback')}
           </div>
           <ul className="space-y-1 text-[11px] leading-relaxed text-muted-foreground">
-            <li>Playback starts only once metadata resolves and peers are found — usually seconds, sometimes never.</li>
-            <li>Seeking is limited to what has downloaded, so the timeline stays locked until the file is complete and verified.</li>
-            <li>Subtitles and audio tracks come from inside the release, so they may differ from the hosted stream.</li>
+            <li>{t('torrent.switch.playbackMetadata')}</li>
+            <li>{t('torrent.switch.playbackSeeking')}</li>
+            <li>{t('torrent.switch.playbackTracks')}</li>
             {!canPlayTorrent && (
-              <li className="text-amber-400">Torrent playback needs the Tatakai desktop or mobile app — a web browser cannot start a session.</li>
+              <li className="text-amber-400">{t('migration.torrentSwitchNote')}</li>
             )}
             {!hasMagnet && (
-              <li className="text-amber-400">This source has no magnet link, so there is nothing to start.</li>
+              <li className="text-amber-400">{t('torrent.switch.playbackNoMagnet')}</li>
             )}
           </ul>
         </section>
 
         <AlertDialogFooter>
-          <AlertDialogCancel onClick={onCancel}>Keep current source</AlertDialogCancel>
+          <AlertDialogCancel onClick={onCancel}>{t('torrent.switch.keepSource')}</AlertDialogCancel>
           <AlertDialogAction
             disabled={!canConfirm}
             onClick={() => { if (source && canConfirm) onConfirm(source); }}
           >
-            I understand — start torrent
+            {t('torrent.switch.confirmStart')}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

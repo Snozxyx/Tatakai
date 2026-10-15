@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import {
   PostMediaEmbed,
   PostPlaylistEmbed,
@@ -14,6 +16,7 @@ import type { CommentEmbed } from '@/lib/commentEmbeds';
  * and behaves like a feed post. Renders nothing when a comment has neither.
  */
 export function CommentEmbeds({ embeds, poll }: { embeds?: CommentEmbed[]; poll?: CommentPoll | null }) {
+  useUiTranslation();
   const hasEmbeds = !!embeds && embeds.length > 0;
   if (!hasEmbeds && !poll) return null;
 
@@ -26,6 +29,7 @@ export function CommentEmbeds({ embeds, poll }: { embeds?: CommentEmbed[]; poll?
 }
 
 function CommentEmbedCard({ embed }: { embed: CommentEmbed }) {
+  useUiTranslation();
   switch (embed.kind) {
     case 'media':
       return <PostMediaEmbed id={embed.id} name={embed.name} poster={embed.poster} type={embed.mediaType} variant="card" />;
@@ -42,6 +46,7 @@ function CommentEmbedCard({ embed }: { embed: CommentEmbed }) {
 
 /** Interactive poll attached to a comment (mirror of feed PostPollCard). */
 function CommentPollCard({ poll }: { poll: CommentPoll }) {
+  useUiTranslation();
   const vote = useVoteCommentPoll();
   return (
     <div className="rounded-2xl border border-white/[0.05] bg-white/[0.015] p-4">

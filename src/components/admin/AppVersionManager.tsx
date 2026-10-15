@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useEffect } from 'react';
 import { useAppConfig, AppConfigKey } from '@/hooks/ui/useAppConfig';
 import { GlassPanel } from '@/components/ui/GlassPanel';
@@ -8,6 +10,7 @@ import { Smartphone, AlertTriangle, Save, RefreshCw } from 'lucide-react';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 
 export function AppVersionManager() {
+  useUiTranslation();
     const { data: config, isLoading, updateConfig, getConfigValue } = useAppConfig();
     const confirm = useConfirm();
 
@@ -32,7 +35,7 @@ export function AppVersionManager() {
     };
 
     const handleForceUpdate = async () => {
-        if (await confirm({ title: `Are you sure you want to force all users to update to version ${__APP_VERSION__}? This will set the minimum supported version to ${__APP_VERSION__}.`, destructive: true })) {
+        if (await confirm({ get title() { return uiI18n.t('app.are_you_sure_you_want_to_force_all_users_to_upda_d338d94b', { value0: __APP_VERSION__, value1: __APP_VERSION__ }); }, destructive: true })) {
             updateConfig.mutate({ key: 'min_supported_version', value: __APP_VERSION__ });
             updateConfig.mutate({ key: 'latest_version', value: __APP_VERSION__ });
             setMinVersion(__APP_VERSION__);
@@ -52,7 +55,7 @@ export function AppVersionManager() {
         <div className="space-y-6">
             <div className="flex items-center gap-2 mb-4">
                 <Smartphone className="w-5 h-5 text-primary" />
-                <h3 className="font-display text-lg font-semibold">Mobile App Updates</h3>
+                <h3 className="font-display text-lg font-semibold">{uiI18n.t('app.mobile_app_updates_18415522')}</h3>
             </div>
 
             <div className="grid gap-6 md:grid-cols-2">
@@ -61,12 +64,12 @@ export function AppVersionManager() {
                     <div className="p-4 rounded-xl bg-muted/20 border border-white/5 space-y-4">
                         <h4 className="font-medium flex items-center gap-2 text-sm">
                             <RefreshCw className="w-4 h-4 text-secondary" />
-                            Version Control
+                            {uiI18n.t('app.version_control_57bdb60b')}
                         </h4>
 
                         <div className="space-y-3">
                             <div className="grid gap-2">
-                                <Label htmlFor="latest_version">Latest Version (Current: {__APP_VERSION__})</Label>
+                                <Label htmlFor="latest_version">{uiI18n.t('app.latest_version_current_348485c1')} {__APP_VERSION__})</Label>
                                 <div className="flex gap-2">
                                     <Input
                                         id="latest_version"
@@ -85,7 +88,7 @@ export function AppVersionManager() {
                             </div>
 
                             <div className="grid gap-2">
-                                <Label htmlFor="min_version" className="text-destructive">Minimum Supported Version</Label>
+                                <Label htmlFor="min_version" className="text-destructive">{uiI18n.t('app.minimum_supported_version_aaddabf9')}</Label>
                                 <div className="flex gap-2">
                                     <Input
                                         id="min_version"
@@ -104,7 +107,7 @@ export function AppVersionManager() {
                                     </Button>
                                 </div>
                                 <p className="text-xs text-muted-foreground">
-                                    Users with versions lower than this will be forced to update.
+                                    {uiI18n.t('app.users_with_versions_lower_than_this_will_be_forc_dfa7f34d')}
                                 </p>
                             </div>
                         </div>
@@ -117,7 +120,7 @@ export function AppVersionManager() {
                                 disabled={updateConfig.isPending}
                             >
                                 <AlertTriangle className="w-4 h-4" />
-                                Force Update to Current ({__APP_VERSION__})
+                                {uiI18n.t('app.force_update_to_current_24ba02d8')}{__APP_VERSION__})
                             </Button>
                         </div>
                     </div>
@@ -128,12 +131,12 @@ export function AppVersionManager() {
                     <div className="p-4 rounded-xl bg-muted/20 border border-white/5 space-y-4">
                         <h4 className="font-medium flex items-center gap-2 text-sm">
                             <Smartphone className="w-4 h-4 text-blue-400" />
-                            Update Configuration
+                            {uiI18n.t('app.update_configuration_c67695c4')}
                         </h4>
 
                         <div className="space-y-3">
                             <div className="grid gap-2">
-                                <Label htmlFor="download_url">Android Download URL</Label>
+                                <Label htmlFor="download_url">{uiI18n.t('app.android_download_url_0eaf3743')}</Label>
                                 <div className="flex gap-2">
                                     <Input
                                         id="download_url"
@@ -152,13 +155,13 @@ export function AppVersionManager() {
                             </div>
 
                             <div className="grid gap-2">
-                                <Label htmlFor="update_message">Update Message</Label>
+                                <Label htmlFor="update_message">{uiI18n.t('app.update_message_2d2dab5a')}</Label>
                                 <div className="flex gap-2">
                                     <Input
                                         id="update_message"
                                         value={updateMessage}
                                         onChange={(e) => setUpdateMessage(e.target.value)}
-                                        placeholder="Message shown to users..."
+                                        placeholder={uiI18n.t('app.message_shown_to_users_ce635228')}
                                     />
                                     <Button
                                         size="sm"

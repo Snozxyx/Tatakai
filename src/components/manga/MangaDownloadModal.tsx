@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Download, X, CheckCircle2, Circle, FolderOpen, Loader2, Play, BookOpen, AlertCircle, ChevronLeft, ArrowRight, Server, Languages } from 'lucide-react';
@@ -55,6 +57,7 @@ interface DownloadableRow {
 export const MangaDownloadModal = ({
   isOpen, onClose, chapters, anilistId, title, posterUrl, kind,
 }: MangaDownloadModalProps) => {
+  useUiTranslation();
   const { isEnabled, downloadStates, enqueueAll } = useMangaDownload();
   const [step, setStep] = useState<'series' | 'chapters' | 'server'>('series');
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -82,12 +85,12 @@ export const MangaDownloadModal = ({
       const srcs = sortedSources(ch);
       if (!srcs.length) continue;
       const [best, ...rest] = srcs;
-      const numLabel = ch.chapterNumber != null ? `Ch. ${ch.chapterNumber}` : 'Chapter';
-      const volLabel = ch.volume != null ? `Vol ${ch.volume} · ` : '';
+      const numLabel = ch.chapterNumber != null ? uiI18n.t('app.ch_i18n_value_0_4d827531', { value0: ch.chapterNumber }) : uiI18n.t('app.chapter_46b00590');
+      const volLabel = ch.volume != null ? uiI18n.t('app.vol_i18n_value_0_6d33019c', { value0: ch.volume }) : '';
       out.push({
         key: best.chapterKey,
         jobId: mangaJobId(anilistId, best.chapterKey),
-        label: `${volLabel}${numLabel}`,
+        get label() { return uiI18n.t('app.i18n_value_0i18n_value_1_bb0b4be1', { value0: volLabel, value1: numLabel }); },
         subtitle: ch.chapterTitle || undefined,
         chapterNumber: ch.chapterNumber,
         payload: {
@@ -109,7 +112,7 @@ export const MangaDownloadModal = ({
       });
     }
     return out;
-  }, [chapters, anilistId]);
+  }, [chapters, anilistId, uiI18n.language]);
 
   // Distinct languages across all rows (primary + alternatives).
   const languageOptions = useMemo(() => {
@@ -250,14 +253,14 @@ export const MangaDownloadModal = ({
       );
       if (res.ok) {
         void triggerHaptic('success');
-        toast.success(`Queued ${picked.length} chapter${picked.length > 1 ? 's' : ''} for download`);
+        toast.success(uiI18n.t('app.queued_i18n_value_0_chapteri18n_value_1_for_down_66c5f130', { value0: picked.length, value1: picked.length > 1 ? 's' : '' }));
       } else if (res.reason === 'not_desktop') {
-        toast.error('Manga downloads require the Tatakai desktop app');
+        toast.error(uiI18n.t('app.manga_downloads_require_the_tatakai_desktop_app_d118a3a8'));
       } else if (res.reason === 'feature_disabled') {
-        toast.error('Manga downloads are disabled');
+        toast.error(uiI18n.t('app.manga_downloads_are_disabled_bf3620ce'));
       } else {
         void triggerHaptic('error');
-        toast.error('Failed to queue downloads', {
+        toast.error(uiI18n.t('app.failed_to_queue_downloads_5dede8a9'), {
           description: typeof res.error === 'string' ? res.error : undefined,
         });
       }
@@ -279,7 +282,7 @@ export const MangaDownloadModal = ({
           <div className="flex items-center justify-between">
             <h2 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
               <Download className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
-              Download chapters
+              {uiI18n.t('app.download_chapters_e331c213')}
             </h2>
             <button onClick={onClose} className="p-2 rounded-full hover:bg-white/10 transition-colors">
               <X className="w-5 h-5" />
@@ -289,12 +292,12 @@ export const MangaDownloadModal = ({
           {!isEnabled && (
             <div className="flex items-center gap-2 rounded-xl bg-amber-500/10 border border-amber-500/30 p-3 text-xs text-amber-200">
               <AlertCircle className="w-4 h-4 flex-shrink-0" />
-              Manga downloads require the Tatakai native app.
+              {uiI18n.t('app.manga_downloads_require_the_tatakai_native_app_64649b5c')}
             </div>
           )}
 
           {rows.length === 0 ? null : (
-            <div className="flex items-center gap-2 px-0.5" aria-label="Download steps">
+            <div className="flex items-center gap-2 px-0.5" aria-label={uiI18n.t('app.download_steps_5d85107f')}>
               {(['series', 'chapters', 'server'] as const).map((s, i) => (
                 <div key={s} className="flex items-center gap-2">
                   {i > 0 && <div className="h-px w-6 bg-white/15" />}
@@ -310,7 +313,7 @@ export const MangaDownloadModal = ({
                     <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] ${step === s ? 'bg-primary text-white' : 'bg-white/10'}`}>
                       {i + 1}
                     </span>
-                    {s === 'series' ? 'Series' : s === 'chapters' ? 'Chapters' : 'Server'}
+                    {s === 'series' ? uiI18n.t('app.series_40c20d94') : s === 'chapters' ? uiI18n.t('app.chapters_034e2733') : uiI18n.t('app.server_cb0cb170')}
                   </button>
                 </div>
               ))}
@@ -321,30 +324,30 @@ export const MangaDownloadModal = ({
             <div className="space-y-4">
               <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-3">
                 {posterUrl ? (
-                  <img src={posterUrl} alt={`${title} poster`} className="h-24 w-16 shrink-0 rounded-xl object-cover shadow-md" loading="lazy" />
+                  <img src={posterUrl} alt={uiI18n.t('app.i18n_value_0_poster_9f90b803', { value0: title })} className="h-24 w-16 shrink-0 rounded-xl object-cover shadow-md" loading="lazy" />
                 ) : (
                   <span className="flex h-24 w-16 shrink-0 items-center justify-center rounded-xl bg-primary/15"><BookOpen className="h-7 w-7 text-primary" /></span>
                 )}
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-base font-bold">{title}</p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    {rows.length} chapter{rows.length === 1 ? '' : 's'} available{kind ? ` · ${kind}` : ''}
+                    {rows.length} {uiI18n.t('app.chapter_09d4c7f1')}{rows.length === 1 ? '' : 's'} {uiI18n.t('app.available_7b231a50')}{kind ? uiI18n.t('app.i18n_value_0_92e4cd32', { value0: kind }) : ''}
                   </p>
                   <div className="mt-1.5 flex items-center text-[11px] text-muted-foreground">
                     <FolderOpen className="mr-1 h-3 w-3 shrink-0" />
-                    <span className="truncate">{downloadPath || 'Default library folder'}</span>
+                    <span className="truncate">{downloadPath || uiI18n.t('app.default_library_folder_b2162e83')}</span>
                   </div>
                 </div>
               </div>
               <p className="px-1 text-xs text-muted-foreground">
-                Pick the chapters to save for offline reading in the next step — each row shows its provider and language.
+                {uiI18n.t('app.pick_the_chapters_to_save_for_offline_reading_in_3388c0ed')}
               </p>
               <Button
                 onClick={() => { void triggerHaptic('tap'); setStep('chapters'); }}
                 disabled={rows.length === 0 || !isEnabled}
                 className="w-full h-12 rounded-xl font-bold"
               >
-                <span className="flex items-center">Choose chapters <ArrowRight className="ml-2 h-4 w-4" /></span>
+                <span className="flex items-center">{uiI18n.t('app.choose_chapters_79b201fa')} <ArrowRight className="ml-2 h-4 w-4" /></span>
               </Button>
             </div>
           ) : null}
@@ -352,30 +355,30 @@ export const MangaDownloadModal = ({
             rows.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center space-y-3">
               <BookOpen className="w-10 h-10 text-muted-foreground opacity-30" />
-              <p className="text-muted-foreground text-sm">No downloadable chapters found.</p>
+              <p className="text-muted-foreground text-sm">{uiI18n.t('app.no_downloadable_chapters_found_39e4420f')}</p>
             </div>
             ) : (
             <>
               {/* Back to series */}
               <div className="flex items-center px-0.5">
                 <Button variant="ghost" size="sm" onClick={() => { void triggerHaptic('tap'); setStep('series'); }} className="h-7 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground">
-                  <ChevronLeft className="h-3.5 w-3.5" /> Series
+                  <ChevronLeft className="h-3.5 w-3.5" /> {uiI18n.t('app.series_40c20d94')}
                 </Button>
               </div>
               {/* Selection controls */}
               <div className="flex items-center justify-between px-0.5">
                 <span className="text-xs text-muted-foreground">
-                  {selected.size > 0 ? `${selected.size}/${rows.length} selected` : 'Select chapters to download'}
+                  {selected.size > 0 ? uiI18n.t('app.i18n_value_0_i18n_value_1_selected_040cc29a', { value0: selected.size, value1: rows.length }) : uiI18n.t('app.select_chapters_to_download_69942c39')}
                 </span>
                 <Button variant="ghost" size="sm" onClick={selectAll} className="text-primary hover:text-primary/80 text-xs h-7 px-2">
-                  {selected.size === rows.length ? 'Deselect all' : 'Select all'}
+                  {selected.size === rows.length ? uiI18n.t('app.deselect_all_85cce1e1') : uiI18n.t('app.select_all_913afff1')}
                 </Button>
               </div>
 
               {/* Range picker */}
               <div className="flex items-end gap-2 rounded-xl bg-white/[0.03] border border-white/10 p-3">
                 <div className="flex-1">
-                  <label className="text-[11px] text-muted-foreground block mb-1">From ch.</label>
+                  <label className="text-[11px] text-muted-foreground block mb-1">{uiI18n.t('app.from_ch_0be7f41a')}</label>
                   <Input
                     type="number" inputMode="decimal" value={rangeFrom}
                     onChange={(e) => setRangeFrom(e.target.value)}
@@ -383,7 +386,7 @@ export const MangaDownloadModal = ({
                   />
                 </div>
                 <div className="flex-1">
-                  <label className="text-[11px] text-muted-foreground block mb-1">To ch.</label>
+                  <label className="text-[11px] text-muted-foreground block mb-1">{uiI18n.t('app.to_ch_4662bf74')}</label>
                   <Input
                     type="number" inputMode="decimal" value={rangeTo}
                     onChange={(e) => setRangeTo(e.target.value)}
@@ -391,7 +394,7 @@ export const MangaDownloadModal = ({
                   />
                 </div>
                 <Button variant="outline" size="sm" onClick={applyRange} className="h-9">
-                  Add range
+                  {uiI18n.t('app.add_range_9915bb34')}
                 </Button>
               </div>
 
@@ -406,9 +409,7 @@ export const MangaDownloadModal = ({
                       <div
                         key={r.key}
                         onClick={() => !busy && toggle(r.key)}
-                        className={`flex items-center justify-between p-2 sm:p-2.5 rounded-lg border transition-colors cursor-pointer ${
-                          isSelected ? 'bg-primary/10 border-primary/30' : 'bg-white/[0.02] border-transparent hover:border-white/10'
-                        }`}
+                        className={`flex items-center justify-between p-2 sm:p-2.5 rounded-lg border transition-colors cursor-pointer ${isSelected ? 'bg-primary/10 border-primary/30' : 'bg-white/[0.02] border-transparent hover:border-white/10'}`}
                       >
                         <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
                           {isSelected
@@ -429,7 +430,7 @@ export const MangaDownloadModal = ({
                                 </Badge>
                               )}
                               {(r.payload.alternatives?.length || 0) > 0 && (
-                                <span className="text-[10px] text-muted-foreground">+{r.payload.alternatives!.length} source{(r.payload.alternatives!.length > 1) ? 's' : ''}</span>
+                                <span className="text-[10px] text-muted-foreground">+{r.payload.alternatives!.length} {uiI18n.t('app.source_828d338a')}{(r.payload.alternatives!.length > 1) ? 's' : ''}</span>
                               )}
                             </span>
                           </div>
@@ -438,7 +439,7 @@ export const MangaDownloadModal = ({
                           <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
                             {state.status === 'downloading' && (
                               <div className="text-right">
-                                <span className="text-[10px] sm:text-xs font-mono text-primary">{state.progress > 0 ? `${state.progress.toFixed(0)}%` : '...'}</span>
+                                <span className="text-[10px] sm:text-xs font-mono text-primary">{state.progress > 0 ? uiI18n.t('app.i18n_value_0_cac4fa79', { value0: state.progress.toFixed(0) }) : '...'}</span>
                                 <div className="w-12 sm:w-20 h-1 bg-muted rounded-full overflow-hidden mt-1">
                                   <div className="h-full bg-primary transition-[width] duration-300" style={{ width: `${state.progress}%` }} />
                                 </div>
@@ -457,7 +458,7 @@ export const MangaDownloadModal = ({
 
               <div className="flex items-center text-[10px] sm:text-xs text-muted-foreground px-1">
                 <FolderOpen className="w-3 h-3 flex-shrink-0 mr-1" />
-                <span className="truncate">{downloadPath || 'Default library folder'}</span>
+                <span className="truncate">{downloadPath || uiI18n.t('app.default_library_folder_b2162e83')}</span>
               </div>
 
               <Button
@@ -466,7 +467,7 @@ export const MangaDownloadModal = ({
                 className="sticky bottom-[max(0px,env(safe-area-inset-bottom))] z-20 w-full h-14 sm:h-16 rounded-xl sm:rounded-2xl font-bold glow-primary flex-col gap-0.5 shadow-[0_-18px_36px_hsl(var(--background))]"
               >
                 <span className="flex items-center text-base sm:text-lg">
-                  {selected.size > 0 ? `Continue with ${selected.size} chapter${selected.size > 1 ? 's' : ''}` : 'Select chapters'}
+                  {selected.size > 0 ? uiI18n.t('app.continue_with_i18n_value_0_chapteri18n_value_1_59377dc2', { value0: selected.size, value1: selected.size > 1 ? 's' : '' }) : uiI18n.t('app.select_chapters_19028c57')}
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </span>
               </Button>
@@ -478,7 +479,7 @@ export const MangaDownloadModal = ({
               {/* Back to chapters */}
               <div className="flex items-center px-0.5">
                 <Button variant="ghost" size="sm" onClick={() => { void triggerHaptic('tap'); setStep('chapters'); }} className="h-7 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground">
-                  <ChevronLeft className="h-3.5 w-3.5" /> Chapters
+                  <ChevronLeft className="h-3.5 w-3.5" /> {uiI18n.t('app.chapters_034e2733')}
                 </Button>
               </div>
 
@@ -486,7 +487,7 @@ export const MangaDownloadModal = ({
               <div className="space-y-3">
                 <div className="space-y-2">
                   <p className="px-0.5 text-xs font-semibold flex items-center gap-1.5">
-                    <Languages className="h-3.5 w-3.5 text-muted-foreground" /> Language
+                    <Languages className="h-3.5 w-3.5 text-muted-foreground" /> {uiI18n.t('app.language_89b86ab0')}
                   </p>
                   <div className="flex flex-wrap gap-2 px-0.5">
                     <button
@@ -494,7 +495,7 @@ export const MangaDownloadModal = ({
                       onClick={() => { void triggerHaptic('select'); setPreferredLanguage('auto'); }}
                       className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${preferredLanguage === 'auto' ? 'bg-primary text-white border-primary' : 'bg-white/5 border-white/10 hover:border-white/20'}`}
                     >
-                      Auto
+                      {uiI18n.t('app.auto_c614ba7c')}
                     </button>
                     {languageOptions.map((o) => (
                       <button
@@ -510,10 +511,10 @@ export const MangaDownloadModal = ({
                 </div>
                 <div className="space-y-2">
                   <p className="px-0.5 text-xs font-semibold flex items-center gap-1.5">
-                    <Server className="h-3.5 w-3.5 text-muted-foreground" /> Scanlator / source
+                    <Server className="h-3.5 w-3.5 text-muted-foreground" /> {uiI18n.t('app.scanlator_source_22a5093c')}
                   </p>
                   <p className="px-0.5 text-[11px] text-muted-foreground -mt-1">
-                    Downloads try this source first and fall back automatically.
+                    {uiI18n.t('app.downloads_try_this_source_first_and_fall_back_au_79bec956')}
                   </p>
                   <div className="grid grid-cols-1 gap-1.5">
                     <button
@@ -525,9 +526,9 @@ export const MangaDownloadModal = ({
                         {preferredSourceKey === 'auto'
                           ? <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
                           : <Circle className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
-                        <span className="text-sm font-semibold">Auto</span>
+                        <span className="text-sm font-semibold">{uiI18n.t('app.auto_c614ba7c')}</span>
                       </span>
-                      <span className="text-[11px] text-muted-foreground">Best source per chapter</span>
+                      <span className="text-[11px] text-muted-foreground">{uiI18n.t('app.best_source_per_chapter_fb6eefe7')}</span>
                     </button>
                     {sourceOptions.map((o) => (
                       <button
@@ -545,7 +546,7 @@ export const MangaDownloadModal = ({
                             {o.scanlator && <span className="block truncate text-[11px] text-muted-foreground">{o.provider}</span>}
                           </span>
                         </span>
-                        <span className="shrink-0 text-[11px] text-muted-foreground">{o.count} chapter{o.count === 1 ? '' : 's'}</span>
+                        <span className="shrink-0 text-[11px] text-muted-foreground">{o.count} {uiI18n.t('app.chapter_09d4c7f1')}{o.count === 1 ? '' : 's'}</span>
                       </button>
                     ))}
                   </div>
@@ -554,7 +555,7 @@ export const MangaDownloadModal = ({
 
               <div className="flex items-center text-[10px] sm:text-xs text-muted-foreground px-1">
                 <FolderOpen className="w-3 h-3 flex-shrink-0 mr-1" />
-                <span className="truncate">{downloadPath || 'Default library folder'}</span>
+                <span className="truncate">{downloadPath || uiI18n.t('app.default_library_folder_b2162e83')}</span>
               </div>
 
               <Button
@@ -563,11 +564,11 @@ export const MangaDownloadModal = ({
                 className="sticky bottom-[max(0px,env(safe-area-inset-bottom))] z-20 w-full h-14 sm:h-16 rounded-xl sm:rounded-2xl font-bold glow-primary flex-col gap-0.5 shadow-[0_-18px_36px_hsl(var(--background))]"
               >
                 {isStarting ? (
-                  <span className="flex items-center text-base sm:text-lg"><Loader2 className="w-5 h-5 mr-2 animate-spin" />Queuing…</span>
+                  <span className="flex items-center text-base sm:text-lg"><Loader2 className="w-5 h-5 mr-2 animate-spin" />{uiI18n.t('app.queuing_90d650a9')}</span>
                 ) : (
                   <span className="flex items-center text-base sm:text-lg">
                     <Play className="w-4 h-4 mr-2 fill-current" />
-                    {selected.size > 0 ? `Download ${selected.size} chapter${selected.size > 1 ? 's' : ''}` : 'Select chapters'}
+                    {selected.size > 0 ? uiI18n.t('app.download_i18n_value_0_chapteri18n_value_1_adbf567c', { value0: selected.size, value1: selected.size > 1 ? 's' : '' }) : uiI18n.t('app.select_chapters_19028c57')}
                   </span>
                 )}
               </Button>

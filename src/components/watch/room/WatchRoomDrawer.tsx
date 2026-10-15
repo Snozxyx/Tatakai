@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { MessageSquare, ListOrdered, BarChart3, Users, X } from 'lucide-react';
@@ -9,6 +11,7 @@ import { ViewersPanel } from './panels/ViewersPanel';
 
 /** iOS segmented tab shell + the four panels. Shared by the desktop and mobile drawer shells. */
 function DrawerBody() {
+  useUiTranslation();
     const { sideTab, setSideTab, queueItems, activePoll, participants } = useWatchRoomContext();
     
     return (
@@ -20,7 +23,7 @@ function DrawerBody() {
                     className="relative flex items-center justify-center gap-1.5 rounded-xl py-2 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-muted-foreground transition-all duration-300 data-[state=active]:bg-[hsl(var(--isshoni-accent)/0.15)] data-[state=active]:text-[hsl(var(--isshoni-accent))] data-[state=active]:shadow-[0_0_10px_hsl(var(--isshoni-accent)/0.1)]"
                 >
                     <MessageSquare className="h-3.5 w-3.5" />
-                    <span className="hidden sm:inline">Chat</span>
+                    <span className="hidden sm:inline">{uiI18n.t('app.chat_2ced57f1')}</span>
                 </TabsTrigger>
                 
                 <TabsTrigger 
@@ -28,7 +31,7 @@ function DrawerBody() {
                     className="relative flex items-center justify-center gap-1.5 rounded-xl py-2 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-muted-foreground transition-all duration-300 data-[state=active]:bg-[hsl(var(--isshoni-accent)/0.15)] data-[state=active]:text-[hsl(var(--isshoni-accent))] data-[state=active]:shadow-[0_0_10px_hsl(var(--isshoni-accent)/0.1)]"
                 >
                     <ListOrdered className="h-3.5 w-3.5" />
-                    <span className="hidden sm:inline">Queue</span>
+                    <span className="hidden sm:inline">{uiI18n.t('app.queue_d325fcd9')}</span>
                     {queueItems.length > 0 && (
                         <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[hsl(var(--isshoni-accent))] text-[9px] font-bold text-black shadow-md">
                             {queueItems.length}
@@ -41,7 +44,7 @@ function DrawerBody() {
                     className="relative flex items-center justify-center gap-1.5 rounded-xl py-2 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-muted-foreground transition-all duration-300 data-[state=active]:bg-[hsl(var(--isshoni-accent)/0.15)] data-[state=active]:text-[hsl(var(--isshoni-accent))] data-[state=active]:shadow-[0_0_10px_hsl(var(--isshoni-accent)/0.1)]"
                 >
                     <BarChart3 className="h-3.5 w-3.5" />
-                    <span className="hidden sm:inline">Polls</span>
+                    <span className="hidden sm:inline">{uiI18n.t('app.polls_db34e415')}</span>
                     {activePoll && (
                         <span className="absolute top-1 right-2 lg:right-3 h-2 w-2 rounded-full bg-[hsl(var(--isshoni-accent))] animate-pulse shadow-[0_0_8px_hsl(var(--isshoni-accent))]" />
                     )}
@@ -71,6 +74,7 @@ function DrawerBody() {
 
 /** Slide-over drawer: an in-flow width-animated column on lg+, a full-width overlay on mobile. */
 export function WatchRoomDrawer() {
+  useUiTranslation();
     const { showDrawer, setShowDrawer } = useWatchRoomContext();
 
     return (
@@ -116,12 +120,12 @@ export function WatchRoomDrawer() {
                         >
                             {/* Mobile Header (Prevents X button from covering tabs) */}
                             <div className="flex shrink-0 items-center justify-between border-b border-white/[0.05] bg-black/20 px-4 py-3">
-                                <span className="text-xs font-bold uppercase tracking-widest text-foreground/80">Room Panel</span>
+                                <span className="text-xs font-bold uppercase tracking-widest text-foreground/80">{uiI18n.t('app.room_panel_ac42306b')}</span>
                                 <button 
                                     type="button" 
                                     onClick={() => setShowDrawer(false)} 
                                     className="rounded-full bg-white/5 p-2 text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--isshoni-accent))] active:scale-95" 
-                                    aria-label="Close panel"
+                                    aria-label={uiI18n.t('app.close_panel_fa0b7b3a')}
                                 >
                                     <X className="h-4 w-4" />
                                 </button>

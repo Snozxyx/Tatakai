@@ -16,13 +16,26 @@ import { initReactI18next } from 'react-i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
 
 import en from '@/locales/en.json';
+import es from '@/locales/es.json';
 import ja from '@/locales/ja.json';
+import { installLocaleFetchPatch, setActiveAppLanguage } from '@/lib/api/localeHeaders';
 
 export const supportedLanguages = [
   { code: 'en', label: 'English' },
+  { code: 'es', label: 'Español' },
+  { code: 'ja', label: '日本語' },
 ] as const;
 
 export type SupportedLanguageCode = (typeof supportedLanguages)[number]['code'];
+
+export const SUPPORTED_LANGUAGE_CODES: readonly string[] = supportedLanguages.map((l) => l.code);
+
+export function isSupportedLanguageCode(value: unknown): value is SupportedLanguageCode {
+  return (
+    typeof value === 'string' &&
+    (SUPPORTED_LANGUAGE_CODES as readonly string[]).includes(value)
+  );
+}
 
 i18n
   .use(LanguageDetector)
@@ -30,8 +43,15 @@ i18n
   .init({
     resources: {
       en: { translation: en },
+      es: { translation: es },
       ja: { translation: ja },
     },
+    supportedLngs: ['en', 'es', 'ja'],
+    // `es-419` (Latin-American Spanish, the Chromium/Electron default in much
+    // of LATAM) has no dedicated catalog — map it (and any other regional
+    // variant) onto its base language instead of falling through to English.
+    nonExplicitSupportedLngs: true,
+    load: 'languageOnly',
     fallbackLng: 'en',
     interpolation: {
       escapeValue: false, // React already escapes
@@ -40,8 +60,24 @@ i18n
       // Order matters — first match wins
       order: ['localStorage', 'navigator'],
       lookupLocalStorage: 'tatakai:lang',
-      caches: ['localStorage'],
+      // Manual choices are persisted by useAppLanguage. Caching detector results
+      // would turn “follow device” into a fixed language on the next launch.
+      caches: [],
     },
   });
+
+// Keep <html lang> in sync for screen readers, spellcheck, and formatters.
+const syncDocumentLanguage = (lng: string) => {
+  const base = String(lng || 'en').split('-')[0].toLowerCase() || 'en';
+  setActiveAppLanguage(base);
+  if (typeof document === 'undefined') return;
+  document.documentElement?.setAttribute?.('lang', base);
+};
+
+if (typeof window !== 'undefined') {
+  syncDocumentLanguage(i18n.language || 'en');
+  i18n.on('languageChanged', syncDocumentLanguage);
+  installLocaleFetchPatch();
+}
 
 export default i18n;

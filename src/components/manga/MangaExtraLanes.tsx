@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { memo } from "react";
 import { useQueries } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
@@ -23,32 +25,32 @@ type LaneDef = {
 const LANES: LaneDef[] = [
   {
     id: "recent-popular",
-    title: "Most Recent Popular",
-    subtitle: "Trending across manga right now",
+    get title() { return uiI18n.t('app.most_recent_popular_570e36f0'); },
+    get subtitle() { return uiI18n.t('app.trending_across_manga_right_now_f467ddc2'); },
     icon: <Flame className="h-5 w-5 text-orange" />,
     sort: "TRENDING_DESC",
     exploreTo: "/manga/discover?sort=trending",
   },
   {
     id: "most-follows",
-    title: "Most Follows",
-    subtitle: "The most followed series",
+    get title() { return uiI18n.t('app.most_follows_4a2a2f86'); },
+    get subtitle() { return uiI18n.t('app.the_most_followed_series_45f87fb3'); },
     icon: <Heart className="h-5 w-5 text-destructive fill-destructive" />,
     sort: "FAVOURITES_DESC",
     exploreTo: "/manga/discover?sort=popularity",
   },
   {
     id: "new-comics",
-    title: "New Comics",
-    subtitle: "Fresh series that just started",
+    get title() { return uiI18n.t('app.new_comics_70383c42'); },
+    get subtitle() { return uiI18n.t('app.fresh_series_that_just_started_1c388cee'); },
     icon: <Sparkles className="h-5 w-5 text-amber" />,
     sort: "START_DATE_DESC",
     exploreTo: "/manga/discover?sort=latestUpdate",
   },
   {
     id: "latest-updates",
-    title: "Latest Updates",
-    subtitle: "New chapters just dropped",
+    get title() { return uiI18n.t('app.latest_updates_75797ca3'); },
+    get subtitle() { return uiI18n.t('app.new_chapters_just_dropped_2ba54aac'); },
     icon: <Clock className="h-5 w-5 text-primary" />,
     mode: "new-chap",
     exploreTo: "/manga/discover?sort=latestUpdate",
@@ -80,6 +82,7 @@ function toCard(item: MangaSearchItem): UnifiedMediaCardProps["item"] | null {
 }
 
 export const MangaExtraLanes = memo(function MangaExtraLanes() {
+  useUiTranslation();
   const { settings } = useContentSafetySettings();
   const canShowAdult = settings.showAdultEverywhere;
 
@@ -143,7 +146,7 @@ export const MangaExtraLanes = memo(function MangaExtraLanes() {
                 ))}
                 <Link
                   to={lane.exploreTo}
-                  aria-label={`Show more ${lane.title}`}
+                  aria-label={uiI18n.t('app.show_more_i18n_value_0_959378b5', { value0: lane.title })}
                   className="media-card-rail-item"
                 >
                   <span className="flex aspect-[2/3] w-full flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-white/15 bg-white/[0.02] transition-colors hover:border-primary/50 hover:bg-primary/[0.06]">
@@ -151,7 +154,7 @@ export const MangaExtraLanes = memo(function MangaExtraLanes() {
                       <Plus className="h-6 w-6" />
                     </span>
                     <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                      Show more
+                      {uiI18n.t('app.show_more_25911d48')}
                     </span>
                   </span>
                   <span className="mt-2.5 block px-0.5 text-sm font-bold leading-snug text-white/45">

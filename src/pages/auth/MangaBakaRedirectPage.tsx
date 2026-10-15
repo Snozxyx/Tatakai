@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { exchangeMangaBakaCode, clearMangaBakaPendingMarker, clearMangaBakaOAuthStorage, getMangaBakaAuthUrl, isMangaBakaLoginPendingFresh } from '@/lib/mangabaka';
@@ -17,6 +19,7 @@ function safeReadMangabakaRedirect(): string | null {
 }
 
 export default function MangaBakaRedirectPage() {
+  useUiTranslation();
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const { refreshProfile, isLoading: authLoading, user } = useAuth();
@@ -48,7 +51,7 @@ export default function MangaBakaRedirectPage() {
             if (isNativeOAuthApp()) {
                 const url = await getMangaBakaAuthUrl(getWebMangabakaRedirectUri(), buildDesktopOAuthState());
                 if (await openOAuthInBrowser(url)) {
-                    toast.info('Complete the MangaBaka login in your browser, then return to the app.');
+                    toast.info(uiI18n.t('app.complete_the_mangabaka_login_in_your_browser_the_b9d344fb'));
                     return;
                 }
                 window.location.href = url;
@@ -56,7 +59,7 @@ export default function MangaBakaRedirectPage() {
             }
             window.location.href = await getMangaBakaAuthUrl();
         } catch (e) {
-            toast.error(e instanceof Error ? e.message : 'Could not restart MangaBaka login.');
+            toast.error(e instanceof Error ? e.message : uiI18n.t('app.could_not_restart_mangabaka_login_326481f7'));
             setIsRetrying(false);
         }
     };
@@ -88,38 +91,38 @@ export default function MangaBakaRedirectPage() {
                 ? `${errorParam} — the MangaBaka app must list the sent URI (${sentRedirect || 'unknown'}) on its own line in the redirect URIs.`
                 : errorParam;
             setError(hint);
-            toast.error(`MangaBaka Error: ${errorParam}`);
+            toast.error(uiI18n.t('app.mangabaka_error_i18n_value_0_3154738e', { value0: errorParam }));
             return;
         }
 
         if (!code) {
             setStatus('error');
-            setError('No authorization code found');
+            setError(uiI18n.t('app.no_authorization_code_found_42a7c6ac'));
             return;
         }
 
         const completeAuth = async () => {
             try {
-                if (!user) throw new Error('Sign in to Tatakai before linking MangaBaka.');
+                if (!user) throw new Error(uiI18n.t('app.sign_in_to_tatakai_before_linking_mangabaka_73a124cf'));
                 // Validate CSRF state BEFORE marking the single-use code as consumed.
                 const expectedState = localStorage.getItem('mangabaka_oauth_state');
                 if (!stateParam) {
-                    throw new Error('MangaBaka did not return a login session (missing state). Please reconnect MangaBaka again.');
+                    throw new Error(uiI18n.t('app.mangabaka_did_not_return_a_login_session_missing_42dc1cc6'));
                 }
                 if (!expectedState) {
-                    throw new Error('This browser did not start this MangaBaka login (no login session found here). If you approved MangaBaka in a different browser, a private window, or after clearing site data, restart the login in THIS browser and approve it here.');
+                    throw new Error(uiI18n.t('app.this_browser_did_not_start_this_mangabaka_login__5869cacc'));
                 }
                 if (stateParam !== expectedState) {
                     if (isMangaBakaLoginPendingFresh()) {
-                        throw new Error('This MangaBaka login link is stale — a newer login was started. Only the newest MangaBaka tab can complete. Finish that tab, or discard it and start a fresh login.');
+                        throw new Error(uiI18n.t('app.this_mangabaka_login_link_is_stale_a_newer_login_33179569'));
                     }
-                    throw new Error('This MangaBaka login does not match the one this browser started (stale or double login). Please start a fresh login and approve only the newest MangaBaka tab.');
+                    throw new Error(uiI18n.t('app.this_mangabaka_login_does_not_match_the_one_this_b1b637d4'));
                 }
                 // Authorization codes are single-use: guard against double-run.
                 const usedKey = `mangabaka_exchange_used:${code}`;
                 try {
                     if (sessionStorage.getItem(usedKey) === '1') {
-                        throw new Error('This MangaBaka login link was already used — authorization codes are single-use. Start a fresh login from Settings → Integrations.');
+                        throw new Error(uiI18n.t('app.this_mangabaka_login_link_was_already_used_autho_505beea7'));
                     }
                     sessionStorage.setItem(usedKey, '1');
                 } catch (e) {
@@ -129,7 +132,7 @@ export default function MangaBakaRedirectPage() {
                 await exchangeMangaBakaCode(code);
                 await refreshProfile();
                 setStatus('success');
-                toast.success('Successfully linked MangaBaka!');
+                toast.success(uiI18n.t('app.successfully_linked_mangabaka_79ec7746'));
                 setTimeout(() => navigate('/profile'), 2000);
             } catch (err: unknown) {
                 console.error('MangaBaka Exchange Error:', err);
@@ -144,7 +147,7 @@ export default function MangaBakaRedirectPage() {
                     ? `${raw} — in the MangaBaka app settings, list the sent URI (${sentRedirect || 'unknown'}) on its own line in the redirect URIs, then reconnect from Settings → Integrations.`
                     : raw;
                 setError(hinted);
-                toast.error('Failed to link MangaBaka');
+                toast.error(uiI18n.t('app.failed_to_link_mangabaka_c71c6462'));
             }
         };
 
@@ -158,12 +161,12 @@ export default function MangaBakaRedirectPage() {
                     <>
                         <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto" />
                         <h1 className="text-2xl font-bold">
-                            {status === 'forwarding' ? 'Returning to the app...' : 'Linking MangaBaka...'}
+                            {status === 'forwarding' ? uiI18n.t('app.returning_to_the_app_2c0175f0') : uiI18n.t('app.linking_mangabaka_4fcf9c95')}
                         </h1>
                         <p className="text-muted-foreground">
                             {status === 'forwarding'
-                                ? 'Login approved. Opening the Tatakai app to finish linking.'
-                                : 'Please wait while we complete the authentication process.'}
+                                ? uiI18n.t('app.login_approved_opening_the_tatakai_app_to_finish_5d72e6f1')
+                                : uiI18n.t('app.please_wait_while_we_complete_the_authentication_290e801e')}
                         </p>
                         {status === 'forwarding' && (
                             <a
@@ -171,7 +174,7 @@ export default function MangaBakaRedirectPage() {
                                 className="inline-flex items-center gap-2 mt-2 px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
                             >
                                 <ExternalLink className="w-4 h-4" />
-                                Open Tatakai app
+                                {uiI18n.t('app.open_tatakai_app_026da312')}
                             </a>
                         )}
                     </>
@@ -180,15 +183,15 @@ export default function MangaBakaRedirectPage() {
                 {status === 'success' && (
                     <>
                         <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto" />
-                        <h1 className="text-2xl font-bold">Success!</h1>
-                        <p className="text-muted-foreground">Your MangaBaka account has been linked. Redirecting you back to your profile...</p>
+                        <h1 className="text-2xl font-bold">{uiI18n.t('app.success_7ce01f63')}</h1>
+                        <p className="text-muted-foreground">{uiI18n.t('app.your_mangabaka_account_has_been_linked_redirecti_390d74c2')}</p>
                     </>
                 )}
 
                 {status === 'error' && (
                     <>
                         <AlertCircle className="w-12 h-12 text-destructive mx-auto" />
-                        <h1 className="text-2xl font-bold">Authentication Failed</h1>
+                        <h1 className="text-2xl font-bold">{uiI18n.t('app.authentication_failed_ed3b12fb')}</h1>
                         <p className="text-destructive font-medium">{error}</p>
                         <div className="mt-4 flex flex-col sm:flex-row items-center justify-center gap-3">
                             <button
@@ -196,13 +199,13 @@ export default function MangaBakaRedirectPage() {
                                 disabled={isRetrying}
                                 className="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-wait"
                             >
-                                {isRetrying ? 'Restarting…' : 'Reconnect MangaBaka'}
+                                {isRetrying ? uiI18n.t('app.restarting_b86eee16') : uiI18n.t('app.reconnect_mangabaka_237c7435')}
                             </button>
                             <button
                                 onClick={() => navigate('/profile')}
                                 className="px-6 py-2 rounded-lg border border-white/10 bg-white/5 text-muted-foreground hover:text-foreground hover:bg-white/10 transition-colors"
                             >
-                                Back to Profile
+                                {uiI18n.t('app.back_to_profile_a8586e20')}
                             </button>
                         </div>
                     </>

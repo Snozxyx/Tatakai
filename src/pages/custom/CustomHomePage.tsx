@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
  * Custom-source home page (`/x/:namespace/:sourceId`).
  *
@@ -10,6 +12,7 @@
 
 import { useMemo, useState } from "react";
 import { Search, Loader2, X, ArrowLeft, SlidersHorizontal } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Background } from "@/components/layout/Background";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
@@ -46,6 +49,7 @@ function toUnifiedCustomCard(
 }
 
 function CardGrid({ cards }: { cards: UnifiedMediaCardProps["item"][] }) {
+  useUiTranslation();
   return (
     <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-6">
       {cards.map((item) => (
@@ -56,6 +60,8 @@ function CardGrid({ cards }: { cards: UnifiedMediaCardProps["item"][] }) {
 }
 
 export default function CustomHomePage() {
+  useUiTranslation();
+  const { t } = useTranslation();
   const isNative = useIsNativeApp();
   const isDesktopApp = useIsDesktopApp();
   const isMobile = useIsMobile();
@@ -151,14 +157,14 @@ export default function CustomHomePage() {
           type="button"
           onClick={() => navigate('/extensions')}
           className="mb-4 inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-white/15 px-3 py-2 text-sm font-semibold active:scale-95 hover:bg-white/10"
-          aria-label="Back to extensions"
+          aria-label={t('migration.backExtensions')}
         >
-          <ArrowLeft className="h-4 w-4" /> Extensions
+          <ArrowLeft className="h-4 w-4" /> {t('settings.categories.extensions.label')}
         </button>
 
         <div className="mb-8 mt-2 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="font-display text-3xl font-black tracking-tight">{source?.name || "Custom source"}</h1>
+            <h1 className="font-display text-3xl font-black tracking-tight">{source?.name || t('discover.customSourceFallback')}</h1>
             {source?.description ? (
               <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{source.description}</p>
             ) : null}
@@ -176,7 +182,7 @@ export default function CustomHomePage() {
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search…"
+                  placeholder={t('common.search')}
                   className="w-56 rounded-xl border border-white/15 bg-white/5 py-2 pl-9 pr-8 text-sm outline-none focus:border-primary/60"
                 />
                 {submitted ? (
@@ -184,7 +190,7 @@ export default function CustomHomePage() {
                     type="button"
                     onClick={clearAll}
                     className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    aria-label="Clear search"
+                    aria-label={t('discover.clearSearch')}
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -201,10 +207,10 @@ export default function CustomHomePage() {
                     ? "border-primary/60 bg-primary/20 text-foreground"
                     : "border-white/15 bg-white/5 text-muted-foreground hover:bg-white/10",
                 )}
-                aria-label="Toggle filters"
+                aria-label={t('migration.toggleFilters')}
               >
                 <SlidersHorizontal className="h-4 w-4" />
-                Filters
+                {t('migration.filters')}
                 {hasActiveFilters ? (
                   <span className="rounded-md bg-primary/40 px-1.5 py-0.5 text-[11px]">
                     {activeTags.length + Object.keys(filters).filter((k) => k !== "tags" && filters[k]).length}
@@ -227,7 +233,7 @@ export default function CustomHomePage() {
                       onChange={(e) => setGroup(group.key, e.target.value)}
                       className="min-w-[9rem] rounded-lg border border-white/15 bg-background/80 px-2.5 py-1.5 text-sm font-medium text-foreground outline-none focus:border-primary/60"
                     >
-                      <option value="">Any</option>
+                      <option value="">{t('migration.any')}</option>
                       {group.options.map((opt) => (
                         <option key={opt.value} value={opt.value}>
                           {opt.label}
@@ -241,7 +247,7 @@ export default function CustomHomePage() {
 
             {schemaTags.length > 0 ? (
               <div>
-                <div className="mb-2 text-xs font-semibold text-muted-foreground">Tags</div>
+                <div className="mb-2 text-xs font-semibold text-muted-foreground">{t('migration.tags')}</div>
                 <div className="flex flex-wrap gap-2">
                   {(showAllTags ? schemaTags : schemaTags.slice(0, 24)).map((tag) => {
                     const active = activeTags.includes(tag);
@@ -267,7 +273,7 @@ export default function CustomHomePage() {
                       onClick={() => setShowAllTags((v) => !v)}
                       className="rounded-full border border-dashed border-white/20 px-3 py-1 text-xs font-medium text-muted-foreground hover:bg-white/10"
                     >
-                      {showAllTags ? "Show less" : `+${schemaTags.length - 24} more`}
+                      {showAllTags ? t('comments.showLess') : uiI18n.t('app.i18n_value_0_more_f2150f35', { value0: schemaTags.length - 24 })}
                     </button>
                   ) : null}
                 </div>
@@ -281,7 +287,7 @@ export default function CustomHomePage() {
                   onClick={clearFilters}
                   className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-white/10"
                 >
-                  <X className="h-3.5 w-3.5" /> Clear filters
+                  <X className="h-3.5 w-3.5" /> {t('migration.clearFilters')}
                 </button>
               </div>
             ) : null}
@@ -291,7 +297,7 @@ export default function CustomHomePage() {
         {resultsMode ? (
           <section className="mb-10">
             <h3 className="mb-6 px-2 font-display text-xl font-semibold tracking-tight">
-              {submitted ? `Results for “${submitted}”` : "Filtered results"}
+              {submitted ? uiI18n.t('app.results_for_i18n_value_0_f5bc8a09', { value0: submitted }) : t('migration.filteredResults')}
             </h3>
             {searching ? (
               <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-6">
@@ -304,7 +310,7 @@ export default function CustomHomePage() {
             ) : (
               <GlassPanel className="border border-white/10 p-6">
                 <p className="text-sm text-muted-foreground">
-                  {submitted ? `No results for “${submitted}”.` : "No results for the selected filters."}
+                  {submitted ? uiI18n.t('app.no_results_for_i18n_value_0_4f62353d', { value0: submitted }) : t('migration.noFilteredResults')}
                 </p>
               </GlassPanel>
             )}
@@ -336,9 +342,9 @@ export default function CustomHomePage() {
         ) : (
           <GlassPanel className="border border-white/10 p-8 text-center">
             <Loader2 className="mx-auto mb-3 h-6 w-6 animate-spin text-muted-foreground" />
-            <h2 className="text-lg font-bold">Nothing here yet</h2>
+            <h2 className="text-lg font-bold">{t('discover.nothingHere')}</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              This source returned no home content. Try searching, or check that the extension is running.
+              {t('discover.nothingHereDesc')}
             </p>
           </GlassPanel>
         )}

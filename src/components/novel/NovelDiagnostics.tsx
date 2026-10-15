@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
  * NovelDiagnostics — "why are there no chapters?" as a checklist, not a
  * console hunt. Probes each layer of the novel pipeline and says exactly
@@ -67,18 +69,18 @@ async function runNovelDiagnostics(anilistId?: number | null, title?: string): P
   if (mobile) {
     const namespaces = mobile.listNamespaces();
     const toko = namespaces.find((ns: any) => ns.namespace === 'toko');
-    rows.push({ label: 'Extension host', status: 'ok', detail: 'Running on this device through the native mobile runtime.' });
-    rows.push({ label: 'Toko namespace', status: toko ? 'ok' : 'fail', detail: toko ? 'Mounted with the novel capability.' : 'Toko is not installed. Install it from Extensions.' });
+    rows.push({ get label() { return uiI18n.t('app.extension_host_a0ddc6ec'); }, status: 'ok', get detail() { return uiI18n.t('app.running_on_this_device_through_the_native_mobile_ebd2a78f'); } });
+    rows.push({ get label() { return uiI18n.t('app.toko_namespace_6199bcfb'); }, status: toko ? 'ok' : 'fail', detail: toko ? 'Mounted with the novel capability.' : 'Toko is not installed. Install it from Extensions.' });
     if (toko) {
       try {
         const result = await mobile.novelDiagnostics('toko', { anilistId, title });
         raw.providerStatus = result.diagnostics;
         const count = Array.isArray(result.results) ? result.results.length : 0;
-        rows.push({ label: 'Chapter matching', status: count ? 'ok' : 'warn', detail: `${count} chapters after automatic title search.` });
-        for (const provider of result.diagnostics || []) rows.push({ label: `Provider: ${provider.provider}`, status: provider.status === 'ok' ? 'ok' : provider.status === 'error' ? 'fail' : 'warn', detail: provider.error || `${provider.resultCount || 0} chapters (${provider.status}).` });
+        rows.push({ get label() { return uiI18n.t('app.chapter_matching_552bfdab'); }, status: count ? 'ok' : 'warn', get detail() { return uiI18n.t('app.i18n_value_0_chapters_after_automatic_title_sear_f536e54d', { value0: count }); } });
+        for (const provider of result.diagnostics || []) rows.push({ get label() { return uiI18n.t('app.provider_i18n_value_0_5830a4c6', { value0: provider.provider }); }, status: provider.status === 'ok' ? 'ok' : provider.status === 'error' ? 'fail' : 'warn', detail: provider.error || `${provider.resultCount || 0} chapters (${provider.status}).` });
         fix.push(count ? 'Refresh the chapter list to load these results.' : 'Check the provider results above for access failures or titles that did not match.');
       } catch (error) {
-        rows.push({ label: 'Chapter matching', status: 'fail', detail: (error as Error).message });
+        rows.push({ get label() { return uiI18n.t('app.chapter_matching_552bfdab'); }, status: 'fail', detail: (error as Error).message });
         fix.push('Update Toko in Extensions and retry.');
       }
     } else fix.push('Install Toko from Extensions.');
@@ -100,16 +102,16 @@ async function runNovelDiagnostics(anilistId?: number | null, title?: string): P
   const live = probes.find((p) => p.status === 200 && (p.body as { ok?: boolean } | null)?.ok);
   if (!live) {
     rows.push({
-      label: 'Extension host',
+      get label() { return uiI18n.t('app.extension_host_a0ddc6ec'); },
       status: 'fail',
-      detail: 'Nothing answers on ports 8099–8102. The desktop app (or its extension host) is not running.',
+      get detail() { return uiI18n.t('app.nothing_answers_on_ports_8099_8102_the_desktop_a_93bbf80e'); },
     });
     fix.push('Start (or restart) the Tatakai desktop app — it serves the extension host on port 8099.');
   } else {
     rows.push({
-      label: 'Extension host',
+      get label() { return uiI18n.t('app.extension_host_a0ddc6ec'); },
       status: 'ok',
-      detail: `Live on port ${live.port} (${(live.body as { service?: string })?.service ?? 'unknown service'}).`,
+      get detail() { return uiI18n.t('app.live_on_port_i18n_value_0_i18n_value_1_e9ca9e8d', { value0: live.port, value1: (live.body as { service?: string })?.service ?? 'unknown service' }); },
     });
   }
 
@@ -124,12 +126,12 @@ async function runNovelDiagnostics(anilistId?: number | null, title?: string): P
   }));
   const toko = namespaces.find((n) => n.namespace === 'toko');
   if (!live) {
-    rows.push({ label: 'Toko namespace', status: 'unknown', detail: 'Skipped — host is down.' });
+    rows.push({ get label() { return uiI18n.t('app.toko_namespace_6199bcfb'); }, status: 'unknown', get detail() { return uiI18n.t('app.skipped_host_is_down_885dcd85'); } });
   } else if (!toko) {
     rows.push({
-      label: 'Toko namespace',
+      get label() { return uiI18n.t('app.toko_namespace_6199bcfb'); },
       status: 'fail',
-      detail: `Host is up but exposes: ${namespaces.map((n) => n.namespace).join(', ') || '(none)'}. Toko is not installed or failed to load.`,
+      get detail() { return uiI18n.t('app.host_is_up_but_exposes_i18n_value_0_toko_is_not__e7e7a019', { value0: namespaces.map((n) => n.namespace).join(', ') || '(none)' }); },
     });
     fix.push('Open Extensions → install (or re-install) the official Toko extension.');
   } else {
@@ -140,15 +142,15 @@ async function runNovelDiagnostics(anilistId?: number | null, title?: string): P
     raw.toko = { routes, capabilities: caps };
     if (hasNovelRoutes && hasNovelCap) {
       rows.push({
-        label: 'Toko namespace',
+        get label() { return uiI18n.t('app.toko_namespace_6199bcfb'); },
         status: 'ok',
-        detail: `Mounted with novel routes (${routes.length} routes) and the "novel" capability.`,
+        get detail() { return uiI18n.t('app.mounted_with_novel_routes_i18n_value_0_routes_an_06fba457', { value0: routes.length }); },
       });
     } else {
       rows.push({
-        label: 'Toko namespace',
+        get label() { return uiI18n.t('app.toko_namespace_6199bcfb'); },
         status: 'fail',
-        detail: `Mounted but stale: routes [${routes.join(', ') || 'none'}], capabilities [${caps.join(', ') || 'none'}]. Novel routes are missing — this host predates novel support.`,
+        get detail() { return uiI18n.t('app.mounted_but_stale_routes_i18n_value_0_capabiliti_3d620a81', { value0: routes.join(', ') || 'none', value1: caps.join(', ') || 'none' }); },
       });
       fix.push('Restart the desktop app so the new extension host (with novel/chapters + novel/content) loads.');
     }
@@ -166,7 +168,7 @@ async function runNovelDiagnostics(anilistId?: number | null, title?: string): P
     raw.routeProbe = { status: probe.status, body: probe.body };
     if (probe.status === 404) {
       rows.push({
-        label: 'Route handlers',
+        get label() { return uiI18n.t('app.route_handlers_d988d658'); },
         status: 'fail',
         detail:
           String((probe.body as { error?: string })?.error || '').includes('untrusted')
@@ -181,23 +183,22 @@ async function runNovelDiagnostics(anilistId?: number | null, title?: string): P
       raw.providerStatus = body.providerStatus;
       if (count > 0) {
         rows.push({
-          label: 'Route handlers',
+          get label() { return uiI18n.t('app.route_handlers_d988d658'); },
           status: 'ok',
-          detail: `Live — this title resolves ${count} chapter rows via: ${providers.join(', ') || 'unknown'}.`,
+          get detail() { return uiI18n.t('app.live_this_title_resolves_i18n_value_0_chapter_ro_dd2c2c79', { value0: count, value1: providers.join(', ') || 'unknown' }); },
         });
       } else {
         rows.push({
-          label: 'Route handlers',
+          get label() { return uiI18n.t('app.route_handlers_d988d658'); },
           status: 'warn',
-          detail:
-            'Live, but this title maps to zero chapters right now. The providers answered with nothing mappable — try another translator or title.',
+          get detail() { return uiI18n.t('app.live_but_this_title_maps_to_zero_chapters_right__343e82d7'); },
         });
       }
     } else {
       rows.push({
-        label: 'Route handlers',
+        get label() { return uiI18n.t('app.route_handlers_d988d658'); },
         status: 'warn',
-        detail: `Probe returned HTTP ${probe.status} — the host may still be starting. Re-run in a few seconds.`,
+        get detail() { return uiI18n.t('app.probe_returned_http_i18n_value_0_the_host_may_st_a54a50d1', { value0: probe.status }); },
       });
     }
   }
@@ -227,15 +228,15 @@ async function runNovelDiagnostics(anilistId?: number | null, title?: string): P
   );
   if (!w.electron?.listInstalledExtensions) {
     rows.push({
-      label: 'Installed Toko bundle',
+      get label() { return uiI18n.t('app.installed_toko_bundle_466eaa24'); },
       status: 'unknown',
-      detail: 'Not on desktop (web/mobile) — bundle checks only apply to the desktop app.',
+      get detail() { return uiI18n.t('app.not_on_desktop_web_mobile_bundle_checks_only_app_70c04f64'); },
     });
   } else if (!tokoRow) {
     rows.push({
-      label: 'Installed Toko bundle',
+      get label() { return uiI18n.t('app.installed_toko_bundle_466eaa24'); },
       status: 'fail',
-      detail: 'Toko is not in the installed-extension list.',
+      get detail() { return uiI18n.t('app.toko_is_not_in_the_installed_extension_list_53dc44d1'); },
     });
     fix.push('Install Toko from the Extensions hub (or sideload toko.kai from the repo).');
   } else {
@@ -245,15 +246,15 @@ async function runNovelDiagnostics(anilistId?: number | null, title?: string): P
     const isFresh = fresh && (Number(fresh[1]) > 4 || (Number(fresh[1]) === 4 && Number(fresh[2]) >= 3));
     if (isFresh && novelCap) {
       rows.push({
-        label: 'Installed Toko bundle',
+        get label() { return uiI18n.t('app.installed_toko_bundle_466eaa24'); },
         status: 'ok',
-        detail: `v${version} with the "novel" capability.`,
+        get detail() { return uiI18n.t('app.vi18n_value_0_with_the_novel_capability_0b7f60eb', { value0: version }); },
       });
     } else {
       rows.push({
-        label: 'Installed Toko bundle',
+        get label() { return uiI18n.t('app.installed_toko_bundle_466eaa24'); },
         status: 'fail',
-        detail: `v${version}${novelCap ? '' : ' without the "novel" capability'} — novel support needs Toko ≥ 4.3.0.`,
+        get detail() { return uiI18n.t('app.vi18n_value_0i18n_value_1_novel_support_needs_to_e1043a60', { value0: version, value1: novelCap ? '' : ' without the "novel" capability' }); },
       });
       fix.push('Update Toko to ≥ 4.3.0 in the Extensions hub (or sideload the fresh toko.kai), then restart the app.');
     }
@@ -262,7 +263,7 @@ async function runNovelDiagnostics(anilistId?: number | null, title?: string): P
   // ── 4. Providers inside the bundle ────────────────────────────────
   if (Array.isArray(raw.providerStatus) && raw.providerStatus.length > 0) {
     for (const provider of raw.providerStatus as Array<{ provider: string; status: string; resultCount?: number; error?: string }>) {
-      rows.push({ label: `Provider: ${provider.provider}`, status: provider.status === 'ok' ? 'ok' : provider.status === 'error' || provider.status === 'timeout' ? 'fail' : 'warn', detail: provider.error || `${provider.resultCount || 0} chapters after automatic title search (${provider.status}).` });
+      rows.push({ get label() { return uiI18n.t('app.provider_i18n_value_0_5830a4c6', { value0: provider.provider }); }, status: provider.status === 'ok' ? 'ok' : provider.status === 'error' || provider.status === 'timeout' ? 'fail' : 'warn', detail: provider.error || `${provider.resultCount || 0} chapters after automatic title search (${provider.status}).` });
     }
   } else if (w.electron?.invokeExtension && tokoRow) {
     try {
@@ -274,36 +275,36 @@ async function runNovelDiagnostics(anilistId?: number | null, title?: string): P
       raw.bundleProviders = names;
       if (names.length > 0) {
         rows.push({
-          label: 'Novel providers',
+          get label() { return uiI18n.t('app.novel_providers_26f64ef9'); },
           status: 'ok',
-          detail: `${names.length} provider${names.length === 1 ? '' : 's'} reported by the installed bundle: ${names.join(', ')}.`,
+          get detail() { return uiI18n.t('app.i18n_value_0_provideri18n_value_1_reported_by_th_ae58f2e0', { value0: names.length, value1: names.length === 1 ? '' : 's', value2: names.join(', ') }); },
         });
       } else if (names.length === 0) {
         rows.push({
-          label: 'Novel providers',
+          get label() { return uiI18n.t('app.novel_providers_26f64ef9'); },
           status: 'warn',
-          detail: 'The bundle did not answer listProviders — it may still be loading. Retry in a few seconds.',
+          get detail() { return uiI18n.t('app.the_bundle_did_not_answer_listproviders_it_may_s_468996b0'); },
         });
       } else {
         rows.push({
-          label: 'Novel providers',
+          get label() { return uiI18n.t('app.novel_providers_26f64ef9'); },
           status: 'fail',
-          detail: 'The bundle returned an empty provider list.',
+          get detail() { return uiI18n.t('app.the_bundle_returned_an_empty_provider_list_9bcf3cd2'); },
         });
         fix.push('Restart or update Toko, then run diagnostics again.');
       }
     } catch {
       rows.push({
-        label: 'Novel providers',
+        get label() { return uiI18n.t('app.novel_providers_26f64ef9'); },
         status: 'warn',
         detail: 'Could not query the bundle (worker busy or still loading).',
       });
     }
   } else {
     rows.push({
-      label: 'Novel providers',
+      get label() { return uiI18n.t('app.novel_providers_26f64ef9'); },
       status: 'unknown',
-      detail: 'The HTTP host did not return provider diagnostics. Update Toko and retry; desktop IPC is optional.',
+      get detail() { return uiI18n.t('app.the_http_host_did_not_return_provider_diagnostic_55b017df'); },
     });
   }
 
@@ -325,6 +326,7 @@ const STATUS_STYLE: Record<CheckStatus, { icon: typeof CheckCircle2; className: 
 };
 
 export function NovelDiagnostics({ anilistId, title }: { anilistId?: number | null; title?: string }) {
+  useUiTranslation();
   const { enabled: isDeveloperMode } = useDeveloperMode();
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -357,7 +359,7 @@ export function NovelDiagnostics({ anilistId, title }: { anilistId?: number | nu
       >
         <span className="flex items-center gap-2 text-sm font-black">
           <Activity className="h-4 w-4 text-primary" />
-          No chapters? Run diagnostics
+          {uiI18n.t('app.no_chapters_run_diagnostics_0e70eda5')}
         </span>
         <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', open && 'rotate-180')} />
       </button>
@@ -366,16 +368,16 @@ export function NovelDiagnostics({ anilistId, title }: { anilistId?: number | nu
         <div className="mt-3">
           {query.isPending ? (
             <p className="flex items-center gap-2 text-xs text-muted-foreground">
-              <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Probing extension host, bundle and providers…
+              <RefreshCw className="h-3.5 w-3.5 animate-spin" /> {uiI18n.t('app.probing_extension_host_bundle_and_providers_31c7bbb1')}
             </p>
           ) : query.isError || !query.data ? (
             <div className="flex items-center justify-between gap-2">
-              <p className="text-xs text-muted-foreground">Diagnostics failed to run.</p>
+              <p className="text-xs text-muted-foreground">{uiI18n.t('app.diagnostics_failed_to_run_0b171bf3')}</p>
               <button
                 onClick={() => void query.refetch()}
                 className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-bold hover:bg-white/10"
               >
-                Retry
+                {uiI18n.t('app.retry_9f5cd8a2')}
               </button>
             </div>
           ) : (
@@ -398,7 +400,7 @@ export function NovelDiagnostics({ anilistId, title }: { anilistId?: number | nu
 
               {query.data.fix.length > 0 && (
                 <div className="mt-3 rounded-xl border border-primary/25 bg-primary/[0.06] p-3">
-                  <p className="text-[11px] font-black uppercase tracking-wider text-primary">What to do</p>
+                  <p className="text-[11px] font-black uppercase tracking-wider text-primary">{uiI18n.t('app.what_to_do_779b1d58')}</p>
                   <ol className="mt-1.5 space-y-1">
                     {query.data.fix.map((step, i) => (
                       <li key={i} className="text-xs leading-relaxed text-foreground/90">
@@ -415,14 +417,14 @@ export function NovelDiagnostics({ anilistId, title }: { anilistId?: number | nu
                   className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-bold hover:bg-white/10"
                 >
                   <Copy className="h-3.5 w-3.5" />
-                  {copied ? 'Copied!' : 'Copy report'}
+                  {copied ? uiI18n.t('app.copied_b7c3ca0e') : uiI18n.t('app.copy_report_4ed2589d')}
                 </button>
                 <button
                   onClick={() => void query.refetch()}
                   className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-bold hover:bg-white/10"
                 >
                   <RefreshCw className="h-3.5 w-3.5" />
-                  Re-run
+                  {uiI18n.t('app.re_run_a7c77b2d')}
                 </button>
               </div>
             </>

@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import {
   createContext,
   useCallback,
@@ -10,6 +12,7 @@ import {
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 import { ChevronLeft, ChevronRight, Download, ExternalLink, Loader2, Minus, Plus, Save, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { uploadUserMedia } from '@/lib/userMedia';
@@ -30,6 +33,7 @@ const LightboxContext = createContext<LightboxContextValue | null>(null);
 
 /** Access the app-level image viewer. Safe no-op if no provider is mounted. */
 export function useLightbox(): LightboxContextValue {
+  useUiTranslation();
   return useContext(LightboxContext) ?? { open: () => {} };
 }
 
@@ -77,6 +81,7 @@ function filenameFor(url: string): string {
  * navigation, download and save-to-your-images.
  */
 export function LightboxProvider({ children }: { children: React.ReactNode }) {
+  useUiTranslation();
   const [images, setImages] = useState<LightboxImage[]>([]);
   const [index, setIndex] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
@@ -126,7 +131,9 @@ function LightboxViewer({
   onIndexChange: (i: number) => void;
   onOpenChange: (open: boolean) => void;
 }) {
+  useUiTranslation();
   const { user } = useAuth();
+  const { t: translate } = useTranslation();
   const queryClient = useQueryClient();
   const containerRef = useRef<HTMLDivElement>(null);
   const panning = useRef<{ id: number; startX: number; startY: number; ox: number; oy: number } | null>(null);
@@ -204,11 +211,11 @@ function LightboxViewer({
 
   const download = async () => {
     if (!current || busy) return;
-    if (!isFetchSafe(current.url)) { toast.error("This image host isn't allowed for download"); return; }
+    if (!isFetchSafe(current.url)) { toast.error(translate('media.viewer.hostNotAllowedDownload')); return; }
     setBusy('download');
     try {
       const res = await fetch(current.url);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw new Error(uiI18n.t('app.http_i18n_value_0_63a176f2', { value0: res.status }));
       const blob = await res.blob();
       const obj = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -219,7 +226,7 @@ function LightboxViewer({
       a.remove();
       URL.revokeObjectURL(obj);
     } catch (err) {
-      toast.error('Download failed', { description: err instanceof Error ? err.message : undefined });
+      toast.error(translate('media.viewer.downloadFailed'), { description: err instanceof Error ? err.message : undefined });
     } finally {
       setBusy(null);
     }
@@ -227,20 +234,20 @@ function LightboxViewer({
 
   const save = async () => {
     if (!current || busy) return;
-    if (!user) { toast.error('Sign in to save images'); return; }
-    if (!isFetchSafe(current.url)) { toast.error("This image host isn't allowed for saving"); return; }
+    if (!user) { toast.error(translate('media.viewer.signInToSave')); return; }
+    if (!isFetchSafe(current.url)) { toast.error(translate('media.viewer.hostNotAllowedSave')); return; }
     setBusy('save');
     try {
       const res = await fetch(current.url);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw new Error(uiI18n.t('app.http_i18n_value_0_63a176f2', { value0: res.status }));
       const blob = await res.blob();
       const ext = (blob.type.split('/')[1] || 'png').replace(/[^a-z0-9]/gi, '') || 'png';
       const file = new File([blob], `saved-${Date.now()}.${ext}`, { type: blob.type || 'image/png' });
       await uploadUserMedia(file, user.id, 'forum_image');
       queryClient.invalidateQueries({ queryKey: ['user-media', user.id] });
-      toast.success('Saved to your images');
+      toast.success(translate('media.viewer.savedToImages'));
     } catch (err) {
-      toast.error('Save failed', { description: err instanceof Error ? err.message : undefined });
+      toast.error(translate('media.viewer.saveFailed'), { description: err instanceof Error ? err.message : undefined });
     } finally {
       setBusy(null);
     }
@@ -266,23 +273,23 @@ function LightboxViewer({
         <DialogPrimitive.Content
           onKeyDown={handleKeyDown}
           onWheel={handleWheel}
-          aria-label="Image viewer"
+          aria-label={translate('media.viewer.title')}
           className="fixed inset-0 z-[70] flex flex-col outline-none focus:outline-none [.desktop-app_&]:pt-8"
         >
-          <DialogPrimitive.Title className="sr-only">Image viewer</DialogPrimitive.Title>
+          <DialogPrimitive.Title className="sr-only">{translate('media.viewer.title')}</DialogPrimitive.Title>
 
           {/* Top bar: counter + tools */}
           <div className="relative z-10 flex items-center justify-between gap-3 p-3 md:p-4">
             <span className="rounded-full bg-black/40 px-3 py-1 text-xs font-semibold tabular-nums text-white/80">
-              {multiple ? `${index + 1} / ${images.length}` : ''}
+              {multiple ? uiI18n.t('app.i18n_value_0_i18n_value_1_68ff458e', { value0: index + 1, value1: images.length }) : ''}
             </span>
             <div className="flex items-center gap-1.5">
-              <ToolBtn icon={Minus} label="Zoom out" onClick={() => zoomBy(1 / 1.4)} disabled={t.scale <= MIN_SCALE} />
-              <ToolBtn icon={Plus} label="Zoom in" onClick={() => zoomBy(1.4)} disabled={t.scale >= MAX_SCALE} />
-              <ToolBtn icon={busy === 'download' ? Loader2 : Download} label="Download" onClick={download} disabled={!!busy} />
-              <ToolBtn icon={ExternalLink} label="Open in new tab" onClick={openExternal} />
-              {user && <ToolBtn icon={busy === 'save' ? Loader2 : Save} label="Save to your images" onClick={save} disabled={!!busy} />}
-              <ToolBtn icon={X} label="Close" onClick={() => onOpenChange(false)} />
+              <ToolBtn icon={Minus} label={translate('media.viewer.zoomOut')} onClick={() => zoomBy(1 / 1.4)} disabled={t.scale <= MIN_SCALE} />
+              <ToolBtn icon={Plus} label={translate('media.viewer.zoomIn')} onClick={() => zoomBy(1.4)} disabled={t.scale >= MAX_SCALE} />
+              <ToolBtn icon={busy === 'download' ? Loader2 : Download} label={translate('media.viewer.download')} onClick={download} disabled={!!busy} />
+              <ToolBtn icon={ExternalLink} label={translate('media.viewer.openNewTab')} onClick={openExternal} />
+              {user && <ToolBtn icon={busy === 'save' ? Loader2 : Save} label={translate('media.viewer.saveToImages')} onClick={save} disabled={!!busy} />}
+              <ToolBtn icon={X} label={translate('common.close')} onClick={() => onOpenChange(false)} />
             </div>
           </div>
 
@@ -315,7 +322,7 @@ function LightboxViewer({
               <>
                 <button
                   type="button"
-                  aria-label="Previous image"
+                  aria-label={translate('media.viewer.previousImage')}
                   onClick={(e) => { e.stopPropagation(); goTo(index - 1); }}
                   className="absolute left-3 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white transition-colors hover:bg-black/60"
                 >
@@ -323,7 +330,7 @@ function LightboxViewer({
                 </button>
                 <button
                   type="button"
-                  aria-label="Next image"
+                  aria-label={translate('media.viewer.nextImage')}
                   onClick={(e) => { e.stopPropagation(); goTo(index + 1); }}
                   className="absolute right-3 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white transition-colors hover:bg-black/60"
                 >

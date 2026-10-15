@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -15,6 +17,7 @@ function slugify(s: string) {
 }
 
 export function CreateCommunityDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+  useUiTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
   const createCommunity = useCreateCommunity();
@@ -37,7 +40,7 @@ export function CreateCommunityDialog({ open, onOpenChange }: { open: boolean; o
   const pickImage = (e: React.ChangeEvent<HTMLInputElement>, set: (v: { file: File; preview: string } | null) => void) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) return toast.error('Image must be under 5MB');
+    if (file.size > 5 * 1024 * 1024) return toast.error(uiI18n.t('app.image_must_be_under_5mb_5b768c5f'));
     const reader = new FileReader();
     reader.onloadend = () => set({ file, preview: reader.result as string });
     reader.readAsDataURL(file);
@@ -51,18 +54,18 @@ export function CreateCommunityDialog({ open, onOpenChange }: { open: boolean; o
   };
 
   const submit = async () => {
-    if (!name.trim() || !slug.trim()) return toast.error('Name and slug are required');
+    if (!name.trim() || !slug.trim()) return toast.error(uiI18n.t('app.name_and_slug_are_required_723fc5c6'));
     setSubmitting(true);
     try {
       const icon_url = icon ? await upload(icon.file, 'icon') : undefined;
       const banner_url = banner ? await upload(banner.file, 'banner') : undefined;
       const created = await createCommunity.mutateAsync({ name: name.trim(), slug: slug.trim(), description: description.trim() || undefined, icon_url, banner_url });
-      toast.success('Community created');
+      toast.success(uiI18n.t('app.community_created_805d84f7'));
       onOpenChange(false);
       setName(''); setSlug(''); setSlugEdited(false); setDescription(''); setIcon(null); setBanner(null);
       navigate(`/community/c/${created.slug}`);
     } catch (err) {
-      toast.error('Failed to create community', { description: err instanceof Error ? err.message : undefined });
+      toast.error(uiI18n.t('app.failed_to_create_community_9eec0e1e'), { description: err instanceof Error ? err.message : undefined });
     } finally {
       setSubmitting(false);
     }
@@ -74,9 +77,9 @@ export function CreateCommunityDialog({ open, onOpenChange }: { open: boolean; o
         
         <div className="px-6 pt-6 pb-4">
           <DialogHeader>
-            <DialogTitle className="text-xl">Create a Community</DialogTitle>
+            <DialogTitle className="text-xl">{uiI18n.t('app.create_a_community_a6a52fcc')}</DialogTitle>
             <DialogDescription>
-              Give your new space a name, an icon, and a purpose.
+              {uiI18n.t('app.give_your_new_space_a_name_an_icon_and_a_purpose_b1a4dbc1')}
             </DialogDescription>
           </DialogHeader>
         </div>
@@ -92,7 +95,7 @@ export function CreateCommunityDialog({ open, onOpenChange }: { open: boolean; o
           >
             {banner ? (
               <>
-                <img src={banner.preview} alt="Banner preview" className="h-full w-full object-cover" />
+                <img src={banner.preview} alt={uiI18n.t('app.banner_preview_abf9f4a4')} className="h-full w-full object-cover" />
                 <button 
                   type="button" 
                   onClick={(e) => { e.stopPropagation(); setBanner(null); }}
@@ -104,7 +107,7 @@ export function CreateCommunityDialog({ open, onOpenChange }: { open: boolean; o
             ) : (
               <span className="flex flex-col items-center gap-1.5 text-sm font-medium text-muted-foreground">
                 <ImagePlus className="h-6 w-6 opacity-50" />
-                Add Banner
+                {uiI18n.t('app.add_banner_b5b47e59')}
               </span>
             )}
             
@@ -123,7 +126,7 @@ export function CreateCommunityDialog({ open, onOpenChange }: { open: boolean; o
           >
             {icon ? (
               <>
-                <img src={icon.preview} alt="Icon preview" className="h-full w-full object-cover" />
+                <img src={icon.preview} alt={uiI18n.t('app.icon_preview_655ecdf1')} className="h-full w-full object-cover" />
                 <button 
                   type="button" 
                   onClick={(e) => { e.stopPropagation(); setIcon(null); }}
@@ -148,11 +151,11 @@ export function CreateCommunityDialog({ open, onOpenChange }: { open: boolean; o
           
           {/* Name Field */}
           <div className="space-y-1.5">
-            <label className="text-[13px] font-semibold text-foreground/90">Community Name <span className="text-rose-500">*</span></label>
+            <label className="text-[13px] font-semibold text-foreground/90">{uiI18n.t('app.community_name_8121fc7b')} <span className="text-rose-500">*</span></label>
             <Input 
               value={name} 
               onChange={(e) => setNameAndSlug(e.target.value)} 
-              placeholder="e.g. Anime Enthusiasts" 
+              placeholder={uiI18n.t('app.e_g_anime_enthusiasts_3750a9c0')}
               maxLength={60} 
               className="rounded-xl border-white/10 bg-white/[0.02] px-3.5 focus-visible:border-primary/50 focus-visible:bg-white/[0.04]" 
             />
@@ -160,13 +163,13 @@ export function CreateCommunityDialog({ open, onOpenChange }: { open: boolean; o
 
           {/* Slug Field */}
           <div className="space-y-1.5">
-            <label className="text-[13px] font-semibold text-foreground/90">URL Slug <span className="text-rose-500">*</span></label>
+            <label className="text-[13px] font-semibold text-foreground/90">{uiI18n.t('app.url_slug_1e05ce61')} <span className="text-rose-500">*</span></label>
             <div className="flex items-center overflow-hidden rounded-xl border border-white/10 bg-white/[0.02] px-3.5 transition-colors focus-within:border-primary/50 focus-within:bg-white/[0.04]">
               <span className="select-none text-sm text-muted-foreground/70">/community/c/</span>
               <input 
                 value={slug} 
                 onChange={(e) => { setSlug(slugify(e.target.value)); setSlugEdited(true); }} 
-                placeholder="slug-name" 
+                placeholder={uiI18n.t('app.slug_name_079325c5')}
                 className="flex-1 bg-transparent py-2.5 pl-1 text-sm text-foreground outline-none placeholder:text-muted-foreground/50" 
               />
             </div>
@@ -175,13 +178,13 @@ export function CreateCommunityDialog({ open, onOpenChange }: { open: boolean; o
           {/* Description Field */}
           <div className="space-y-1.5">
             <label className="text-[13px] font-semibold text-foreground/90 flex justify-between">
-              Description
+              {uiI18n.t('app.description_55f8ebc8')}
               <span className="font-normal text-muted-foreground">{description.length}/300</span>
             </label>
             <textarea 
               value={description} 
               onChange={(e) => setDescription(e.target.value)} 
-              placeholder="What is this community about?" 
+              placeholder={uiI18n.t('app.what_is_this_community_about_8667087d')}
               rows={3} 
               maxLength={300} 
               className="w-full resize-none rounded-xl border border-white/10 bg-white/[0.02] px-3.5 py-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/50 focus:border-primary/50 focus:bg-white/[0.04]" 
@@ -193,7 +196,7 @@ export function CreateCommunityDialog({ open, onOpenChange }: { open: boolean; o
         {/* Footer Actions */}
         <div className="flex items-center justify-end gap-3 border-t border-white/[0.05] bg-white/[0.01] p-4 px-6 mt-2">
           <Button variant="ghost" className="rounded-full px-5 hover:bg-white/5" onClick={() => onOpenChange(false)}>
-            Cancel
+            {uiI18n.t('app.cancel_77dfd213')}
           </Button>
           <Button 
             className="rounded-full px-6 font-bold shadow-md transition-transform active:scale-95" 
@@ -201,7 +204,7 @@ export function CreateCommunityDialog({ open, onOpenChange }: { open: boolean; o
             onClick={submit}
           >
             {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-            {submitting ? 'Creating...' : 'Create Community'}
+            {submitting ? 'Creating...' : uiI18n.t('app.create_community_6cd5b58f')}
           </Button>
         </div>
 

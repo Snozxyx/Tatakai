@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Download, X, CheckCircle2, Circle, Loader2, BookOpen } from 'lucide-react';
@@ -36,6 +38,7 @@ interface DownloadableRow {
 export const NovelDownloadModal = ({
   isOpen, onClose, novelId, chapters, anilistId, title, posterUrl, preferredProvider,
 }: NovelDownloadModalProps) => {
+  useUiTranslation();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [downloaded, setDownloaded] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState<Set<string>>(new Set());
@@ -48,7 +51,7 @@ export const NovelDownloadModal = ({
     const out: DownloadableRow[] = [];
     for (const ch of ordered) {
       if (!ch.sources?.length) continue;
-      const numLabel = ch.chapterNumber != null ? `Ch. ${ch.chapterNumber}` : 'Chapter';
+      const numLabel = ch.chapterNumber != null ? uiI18n.t('app.ch_i18n_value_0_4d827531', { value0: ch.chapterNumber }) : uiI18n.t('app.chapter_46b00590');
       out.push({
         key: `${ch.canonicalOrder}:${ch.chapterNumber ?? ch.chapterTitle ?? '?'}`,
         label: numLabel,
@@ -138,9 +141,9 @@ export const NovelDownloadModal = ({
       });
       if (ok) {
         setDownloaded((prev) => new Set(prev).add(row.key));
-        toast.success(`Downloaded ${row.label}`);
+        toast.success(uiI18n.t('app.downloaded_i18n_value_0_a05eaf9c', { value0: row.label }));
       } else {
-        toast.error(`No text available for ${row.label}`);
+        toast.error(uiI18n.t('app.no_text_available_for_i18n_value_0_71a4c521', { value0: row.label }));
       }
     } finally {
       setBusy((prev) => {
@@ -154,7 +157,7 @@ export const NovelDownloadModal = ({
   const downloadSelected = async () => {
     const targets = rows.filter((r) => selected.has(r.key));
     if (targets.length === 0) {
-      toast.error('Select at least one chapter');
+      toast.error(uiI18n.t('app.select_at_least_one_chapter_8f3c5fc6'));
       return;
     }
     setBulkRunning(true);
@@ -182,8 +185,8 @@ export const NovelDownloadModal = ({
     setBulkRunning(false);
     setBulkProgress(null);
     bulkCancelRef.current = false;
-    if (wasCancelled) toast.message(`Stopped — downloaded ${ok}/${targets.length} chapters`);
-    else toast.success(`Downloaded ${ok}/${targets.length} chapters for offline reading`);
+    if (wasCancelled) toast.message(uiI18n.t('app.stopped_downloaded_i18n_value_0_i18n_value_1_cha_fa29049a', { value0: ok, value1: targets.length }));
+    else toast.success(uiI18n.t('app.downloaded_i18n_value_0_i18n_value_1_chapters_fo_3fd32f56', { value0: ok, value1: targets.length }));
   };
 
   const cancelBulk = () => {
@@ -214,9 +217,9 @@ export const NovelDownloadModal = ({
     setBulkRunning(false);
     setBulkProgress(null);
     bulkCancelRef.current = false;
-    if (res.cancelled > 0) toast.message(`Stopped — downloaded ${res.downloaded}/${res.total} chapters`);
-    else if (res.downloaded > 0) toast.success(`Downloaded ${res.downloaded}/${res.total} chapters`);
-    else toast.error('No chapters could be downloaded');
+    if (res.cancelled > 0) toast.message(uiI18n.t('app.stopped_downloaded_i18n_value_0_i18n_value_1_cha_fa29049a', { value0: res.downloaded, value1: res.total }));
+    else if (res.downloaded > 0) toast.success(uiI18n.t('app.downloaded_i18n_value_0_i18n_value_1_chapters_e117fbca', { value0: res.downloaded, value1: res.total }));
+    else toast.error(uiI18n.t('app.no_chapters_could_be_downloaded_07f89dea'));
   };
 
   return createPortal(
@@ -225,14 +228,14 @@ export const NovelDownloadModal = ({
       <GlassPanel className="relative w-full max-w-2xl max-h-[85vh] flex flex-col p-0 overflow-hidden">
         <div className="flex items-center justify-between gap-3 border-b border-white/10 px-5 py-4">
           <div className="min-w-0">
-            <h2 className="truncate text-lg font-black">Download novel</h2>
+            <h2 className="truncate text-lg font-black">{uiI18n.t('app.download_novel_76ab0d3c')}</h2>
             <p className="truncate text-xs text-muted-foreground">
-              {title} · {rows.length} chapters · stored on this device
+              {title} · {rows.length} {uiI18n.t('app.chapters_stored_on_this_device_d0fc118a')}
             </p>
           </div>
           <button
             onClick={onClose}
-            aria-label="Close"
+            aria-label={uiI18n.t('app.close_bbfa773e')}
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 hover:bg-white/10"
           >
             <X className="h-4 w-4" />
@@ -241,7 +244,7 @@ export const NovelDownloadModal = ({
 
         <div className="flex flex-wrap items-center gap-2 border-b border-white/10 px-5 py-3">
           <Button size="sm" variant="outline" onClick={toggleAll} className="h-8 rounded-lg text-xs font-bold">
-            {selected.size === rows.length ? 'Deselect all' : 'Select all'}
+            {selected.size === rows.length ? uiI18n.t('app.deselect_all_85cce1e1') : uiI18n.t('app.select_all_913afff1')}
           </Button>
           <Button
             size="sm"
@@ -250,7 +253,7 @@ export const NovelDownloadModal = ({
             className="h-8 rounded-lg text-xs font-bold"
           >
             <Download className="mr-1.5 h-3.5 w-3.5" />
-            Download selected ({selected.size})
+            {uiI18n.t('app.download_selected_b44c351e')}{selected.size})
           </Button>
           <Button
             size="sm"
@@ -260,7 +263,7 @@ export const NovelDownloadModal = ({
             className="h-8 rounded-lg text-xs font-bold"
           >
             {bulkRunning ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <BookOpen className="mr-1.5 h-3.5 w-3.5" />}
-            {bulkProgress ? `Downloading ${bulkProgress.done}/${bulkProgress.total}…` : 'Download all'}
+            {bulkProgress ? uiI18n.t('app.downloading_i18n_value_0_i18n_value_1_6c7cca00', { value0: bulkProgress.done, value1: bulkProgress.total }) : uiI18n.t('app.download_all_d69edf7c')}
           </Button>
           {bulkRunning && (
             <Button
@@ -270,11 +273,11 @@ export const NovelDownloadModal = ({
               className="h-8 rounded-lg text-xs font-bold"
             >
               <X className="mr-1.5 h-3.5 w-3.5" />
-              Stop
+              {uiI18n.t('app.stop_9e253470')}
             </Button>
           )}
           <span className="ml-auto text-xs tabular-nums text-muted-foreground">
-            {downloaded.size}/{rows.length} offline
+            {downloaded.size}/{rows.length} {uiI18n.t('app.offline_d1ffda5d')}
           </span>
         </div>
 
@@ -296,13 +299,11 @@ export const NovelDownloadModal = ({
               return (
                 <div
                   key={row.key}
-                  className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors ${
-                    isSelected ? 'border-primary/40 bg-primary/10' : 'border-white/5 bg-white/[0.02] hover:bg-white/[0.05]'
-                  }`}
+                  className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors ${isSelected ? 'border-primary/40 bg-primary/10' : 'border-white/5 bg-white/[0.02] hover:bg-white/[0.05]'}`}
                 >
                   <button
                     onClick={() => toggle(row.key)}
-                    aria-label={isSelected ? `Deselect ${row.label}` : `Select ${row.label}`}
+                    aria-label={isSelected ? uiI18n.t('app.deselect_i18n_value_0_6a9a1c3d', { value0: row.label }) : uiI18n.t('app.select_i18n_value_0_ad7d83f4', { value0: row.label })}
                     className="flex h-8 w-8 shrink-0 items-center justify-center"
                   >
                     {isDone ? (
@@ -317,14 +318,14 @@ export const NovelDownloadModal = ({
                   </div>
                   {isDone && (
                     <span className="shrink-0 rounded-md bg-emerald-500/15 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-emerald-400">
-                      Offline
+                      {uiI18n.t('app.offline_e01fa717')}
                     </span>
                   )}
                   <button
                     onClick={() => void downloadOne(row)}
                     disabled={isBusy}
                     className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-50"
-                    aria-label={`Download ${row.label}`}
+                    aria-label={uiI18n.t('app.download_i18n_value_0_741a37b3', { value0: row.label })}
                   >
                     {busy.has(row.key) ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -337,7 +338,7 @@ export const NovelDownloadModal = ({
             })}
             {rows.length === 0 && (
               <p className="py-10 text-center text-sm text-muted-foreground">
-                No downloadable chapters — install the Toko novel extension first.
+                {uiI18n.t('app.no_downloadable_chapters_install_the_toko_novel__d40b0ed0')}
               </p>
             )}
           </div>

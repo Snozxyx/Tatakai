@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useEffect, useRef, useState } from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { RotateCcw, Plus, X, Volume2, Upload, Square, Play } from 'lucide-react';
@@ -34,6 +36,7 @@ const PREVIEW_VOICE_SAMPLE = [
 const PREVIEW_BODY = PREVIEW_VOICE_SAMPLE.slice(1);
 
 function LivePreview() {
+  useUiTranslation();
   const { settings, customFonts } = useNovelReaderSettings();
   const stack = resolveFontStack(settings.font, customFonts);
   return (
@@ -43,10 +46,10 @@ function LivePreview() {
     >
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-background px-4 py-3">
         <span className="text-sm font-medium text-foreground">
-          Reading preview
+          {uiI18n.t('app.reading_preview_6b61477b')}
         </span>
         <span className="text-xs tabular-nums text-muted-foreground">
-          {settings.textSize}px · {settings.lineSpacing.toFixed(2)} · {settings.textWidth}px
+          {settings.textSize}{uiI18n.t('app.px_98bb7667')} {settings.lineSpacing.toFixed(2)} · {settings.textWidth}{uiI18n.t('app.px_07a65dd6')}
         </span>
       </div>
       <div className="mx-auto px-5 py-5" style={{ maxWidth: Math.min(settings.textWidth, 560) }}>
@@ -82,6 +85,7 @@ function LivePreview() {
 }
 
 function VoicePreview() {
+  useUiTranslation();
   const { settings } = useNovelReaderSettings();
   const { user } = useAuth();
   const narratorRef = useRef<NovelNarrator | null>(null);
@@ -150,9 +154,9 @@ function VoicePreview() {
     <div className="rounded-xl bg-muted/20 p-3">
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-sm font-semibold">Hear this voice</p>
+          <p className="text-sm font-semibold">{uiI18n.t('app.hear_this_voice_487ffc3b')}</p>
           <p className="text-[11px] text-muted-foreground">
-            Engine: <span className="font-bold text-foreground">{narratorEngineLabel(settings.narratorEngine)}</span>
+            {uiI18n.t('app.engine_0642f228')} <span className="font-bold text-foreground">{narratorEngineLabel(settings.narratorEngine)}</span>
             {spokenBy ? <span> · <span className="font-bold text-primary">{spokenBy}</span></span> : null}
           </p>
         </div>
@@ -162,7 +166,7 @@ function VoicePreview() {
           className="flex shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground hover:brightness-110"
         >
           {busy ? <Square className="w-3 h-3" /> : <Play className="w-3 h-3" />}
-          {busy ? 'Stop preview' : 'Preview voice'}
+          {busy ? uiI18n.t('app.stop_preview_598779ee') : uiI18n.t('app.preview_voice_560a6fec')}
         </button>
       </div>
       <p className="mt-1.5 text-xs italic text-muted-foreground line-clamp-2">
@@ -171,7 +175,7 @@ function VoicePreview() {
       {working && !playing && (
         <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
           <span className="h-3 w-3 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-          Preparing voice…
+          {uiI18n.t('app.preparing_voice_4fdefa89')}
         </p>
       )}
       {error && (
@@ -179,12 +183,13 @@ function VoicePreview() {
           {error}
         </p>
       )}
-      {buffering && <p role="status" className="mt-2 text-xs text-muted-foreground">Generating the next passage…</p>}
+      {buffering && <p role="status" className="mt-2 text-xs text-muted-foreground">{uiI18n.t('app.generating_the_next_passage_f6d25c35')}</p>}
     </div>
   );
 }
 
 function SystemVoicePicker() {
+  useUiTranslation();
   const { settings, updateSetting } = useNovelReaderSettings();
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   useEffect(() => {
@@ -194,10 +199,11 @@ function SystemVoicePicker() {
     synth.addEventListener('voiceschanged', refresh);
     return () => synth.removeEventListener('voiceschanged', refresh);
   }, []);
-  return <SettingRow title="System voice" description={voices.length ? 'Voices installed on this device' : 'Your device loads its voice list automatically'} control={({ labelId }) => <Select value={settings.narratorVoice === 'kitten-default' ? 'system-default' : settings.narratorVoice} onValueChange={v => updateSetting('narratorVoice', v)}><SelectTrigger aria-labelledby={labelId} className="h-10 w-56 max-w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="system-default">Default system voice</SelectItem><SelectItem value="system-female">Prefer feminine voice</SelectItem><SelectItem value="system-male">Prefer masculine voice</SelectItem>{voices.map((voice, i) => <SelectItem key={voice.voiceURI + i} value={voice.voiceURI}>{voice.name} · {voice.lang}</SelectItem>)}</SelectContent></Select>} />;
+  return <SettingRow title={uiI18n.t('app.system_voice_6fee05d3')} description={voices.length ? uiI18n.t('app.voices_installed_on_this_device_5fc5b4d8') : uiI18n.t('app.your_device_loads_its_voice_list_automatically_cc6480ff')} control={({ labelId }) => <Select value={settings.narratorVoice === 'kitten-default' ? 'system-default' : settings.narratorVoice} onValueChange={v => updateSetting('narratorVoice', v)}><SelectTrigger aria-labelledby={labelId} className="h-10 w-56 max-w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="system-default">{uiI18n.t('app.default_system_voice_2d521c55')}</SelectItem><SelectItem value="system-female">{uiI18n.t('app.prefer_feminine_voice_21d7c733')}</SelectItem><SelectItem value="system-male">{uiI18n.t('app.prefer_masculine_voice_686ed7c2')}</SelectItem>{voices.map((voice, i) => <SelectItem key={voice.voiceURI + i} value={voice.voiceURI}>{voice.name} · {voice.lang}</SelectItem>)}</SelectContent></Select>} />;
 }
 
 export function NovelReaderPanel() {
+  useUiTranslation();
   const {
     settings, updateSetting, resetSettings, customFonts, addCustomFont, addCustomFontFile, removeCustomFont,
   } = useNovelReaderSettings();
@@ -232,25 +238,25 @@ export function NovelReaderPanel() {
       <LivePreview />
 
       <Tabs defaultValue="appearance" className="space-y-6">
-        <TabsList className="grid h-11 w-full grid-cols-3"><TabsTrigger value="appearance">Appearance</TabsTrigger><TabsTrigger value="narration">Narration</TabsTrigger><TabsTrigger value="flow">Reading flow</TabsTrigger></TabsList>
+        <TabsList className="grid h-11 w-full grid-cols-3"><TabsTrigger value="appearance">{uiI18n.t('app.appearance_41def7a0')}</TabsTrigger><TabsTrigger value="narration">{uiI18n.t('app.narration_8ca62683')}</TabsTrigger><TabsTrigger value="flow">{uiI18n.t('app.reading_flow_e281c1ac')}</TabsTrigger></TabsList>
       <TabsContent value="appearance" className="space-y-6">
-      <SettingsSection title="Typography" description="Choose a comfortable typeface and spacing. Changes save automatically.">
+      <SettingsSection title={uiI18n.t('app.typography_f4beb9af')} description={uiI18n.t('app.choose_a_comfortable_typeface_and_spacing_change_e4d657e5')}>
         <div className="flex flex-col">
           <SettingRow
-            title="Font"
-            description="Aa — Default / Sans / Georgia / Lora / Dyslexic, or a custom font"
+            title={uiI18n.t('app.font_b97c4d4c')}
+            description={uiI18n.t('app.aa_default_sans_georgia_lora_dyslexic_or_a_custo_6af56ade')}
             control={
               <Select value={fontValue} onValueChange={(v) => updateSetting('font', v)}>
                 <SelectTrigger className="h-9 w-44 rounded-lg text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {NOVEL_FONT_PRESETS.map((f) => (
                     <SelectItem key={f.key} value={f.key}>
-                      <span style={{ fontFamily: f.stack }}>Aa</span> {f.label}
+                      <span style={{ fontFamily: f.stack }}>{uiI18n.t('app.aa_2c419ecc')}</span> {f.label}
                     </SelectItem>
                   ))}
                   {customFonts.map((f) => (
                     <SelectItem key={`custom:${f.name}`} value={`custom:${f.name}`}>
-                      <span style={{ fontFamily: `"${f.family}"` }}>Aa</span> {f.name}
+                      <span style={{ fontFamily: `"${f.family}"` }}>{uiI18n.t('app.aa_2c419ecc')}</span> {f.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -258,13 +264,13 @@ export function NovelReaderPanel() {
             }
           />
           <details className="rounded-xl border border-border p-4">
-            <summary className="cursor-pointer text-sm font-medium">Custom fonts</summary>
+            <summary className="cursor-pointer text-sm font-medium">{uiI18n.t('app.custom_fonts_4d33ea02')}</summary>
           <div className="mt-4">
             <p className="text-sm font-semibold mb-2 flex items-center gap-1.5">
-              <Upload className="w-3.5 h-3.5" /> Upload a font file
+              <Upload className="w-3.5 h-3.5" /> {uiI18n.t('app.upload_a_font_file_ab1e2694')}
             </p>
             <p className="text-xs text-muted-foreground mb-2">
-              TTF, OTF, WOFF or WOFF2 (max 12 MB). It registers instantly and the preview above updates live.
+              {uiI18n.t('app.ttf_otf_woff_or_woff2_max_12_mb_it_registers_ins_b77deebb')}
             </p>
             <div className="flex gap-2">
               <input
@@ -280,11 +286,11 @@ export function NovelReaderPanel() {
                 onClick={() => fileRef.current?.click()}
                 className="h-9 rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground disabled:opacity-50"
               >
-                {uploading ? 'Loading…' : 'Choose font file'}
+                {uploading ? uiI18n.t('app.loading_33ce4174') : uiI18n.t('app.choose_font_file_d9fc1bdc')}
               </button>
               {customFonts.length > 0 && (
                 <span className="self-center text-xs text-muted-foreground">
-                  {customFonts.length} custom
+                  {customFonts.length} {uiI18n.t('app.custom_f9ac14b6')}
                 </span>
               )}
             </div>
@@ -293,8 +299,8 @@ export function NovelReaderPanel() {
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {customFonts.map((f) => (
                   <span key={f.name} className="flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs">
-                    <span style={{ fontFamily: `"${f.family}"` }}>Aa</span> {f.name}
-                    <button onClick={() => removeCustomFont(f.name)} aria-label={`Remove ${f.name}`}>
+                    <span style={{ fontFamily: `"${f.family}"` }}>{uiI18n.t('app.aa_2c419ecc')}</span> {f.name}
+                    <button onClick={() => removeCustomFont(f.name)} aria-label={uiI18n.t('app.remove_i18n_value_0_89e2cb36', { value0: f.name })}>
                       <X className="w-3 h-3" />
                     </button>
                   </span>
@@ -304,25 +310,25 @@ export function NovelReaderPanel() {
           </div>
           <div className="mt-5">
             <p className="text-sm font-semibold mb-2 flex items-center gap-1.5">
-              <Plus className="w-3.5 h-3.5" /> Add installed font by name
+              <Plus className="w-3.5 h-3.5" /> {uiI18n.t('app.add_installed_font_by_name_e79c121f')}
             </p>
             <p className="text-xs text-muted-foreground mb-2">
-              Use any font installed on this device (e.g. “Merriweather”, “Atkinson Hyperlegible”).
+              {uiI18n.t('app.use_any_font_installed_on_this_device_e_g_merriw_1f60cf90')}
             </p>
             <div className="flex flex-col gap-2">
               <input
                 value={customName}
-                aria-label="Custom font display name"
+                aria-label={uiI18n.t('app.custom_font_display_name_67fc0b22')}
                 onChange={(e) => setCustomName(e.target.value)}
-                placeholder="Display name (e.g. Merriweather)"
+                placeholder={uiI18n.t('app.display_name_e_g_merriweather_611c9b70')}
                 className="h-9 rounded-lg border border-white/10 bg-white/5 px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
               />
               <div className="flex gap-2">
                 <input
                   value={customFamily}
-                  aria-label="Installed font family"
+                  aria-label={uiI18n.t('app.installed_font_family_54e1f7e3')}
                   onChange={(e) => setCustomFamily(e.target.value)}
-                  placeholder="Font family (defaults to name)"
+                  placeholder={uiI18n.t('app.font_family_defaults_to_name_c6381f31')}
                   className="h-9 min-w-0 flex-1 rounded-lg border border-white/10 bg-white/5 px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
                 />
                 <button
@@ -334,15 +340,15 @@ export function NovelReaderPanel() {
                   }}
                   className="h-9 rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground"
                 >
-                  Add
+                  {uiI18n.t('app.add_61cc55aa')}
                 </button>
               </div>
             </div>
           </div>
           </details>
           <SettingRow
-            title="Text size"
-            description="19px default · 15px compact · 26px large"
+            title={uiI18n.t('app.text_size_3cc6e124')}
+            description={uiI18n.t('app.19px_default_15px_compact_26px_large_82bc2ce2')}
             control={
               <div className="flex max-w-full flex-wrap items-center gap-2">
                 {[15, 19, 26].map((s) => (
@@ -354,14 +360,14 @@ export function NovelReaderPanel() {
                     {s}
                   </button>
                 ))}
-                <Slider aria-label="Text size" className="w-28" min={12} max={32} step={1} value={[settings.textSize]} onValueChange={([v]) => updateSetting('textSize', v)} />
-                <span className="w-12 text-right text-sm tabular-nums text-muted-foreground">{settings.textSize}px</span>
+                <Slider aria-label={uiI18n.t('app.text_size_3cc6e124')} className="w-28" min={12} max={32} step={1} value={[settings.textSize]} onValueChange={([v]) => updateSetting('textSize', v)} />
+                <span className="w-12 text-right text-sm tabular-nums text-muted-foreground">{settings.textSize}{uiI18n.t('app.px_07a65dd6')}</span>
               </div>
             }
           />
           <SettingRow
-            title="Line spacing"
-            description="1.65 relaxed · 1.30 tight · 2.20 airy"
+            title={uiI18n.t('app.line_spacing_18f550e3')}
+            description={uiI18n.t('app.1_65_relaxed_1_30_tight_2_20_airy_26ee4193')}
             control={
               <div className="flex max-w-full flex-wrap items-center gap-2">
                 {[1.3, 1.65, 2.2].map((s) => (
@@ -373,13 +379,13 @@ export function NovelReaderPanel() {
                     {s.toFixed(2)}
                   </button>
                 ))}
-                <Slider aria-label="Reading layout adjustment" className="w-24" min={1} max={2.6} step={0.05} value={[settings.lineSpacing]} onValueChange={([v]) => updateSetting('lineSpacing', Math.round(v * 100) / 100)} />
+                <Slider aria-label={uiI18n.t('app.reading_layout_adjustment_72a86bcc')} className="w-24" min={1} max={2.6} step={0.05} value={[settings.lineSpacing]} onValueChange={([v]) => updateSetting('lineSpacing', Math.round(v * 100) / 100)} />
               </div>
             }
           />
           <SettingRow
-            title="Paragraph spacing"
-            description="0.90 default · 0.00 seamless · 3.00 wide"
+            title={uiI18n.t('app.paragraph_spacing_edc5a492')}
+            description={uiI18n.t('app.0_90_default_0_00_seamless_3_00_wide_b443a1fe')}
             control={
               <div className="flex max-w-full flex-wrap items-center gap-2">
                 {[0, 0.9, 3].map((s) => (
@@ -391,13 +397,13 @@ export function NovelReaderPanel() {
                     {s.toFixed(s === 0 || s === 3 ? 1 : 2)}
                   </button>
                 ))}
-                <Slider aria-label="Reading layout adjustment" className="w-24" min={0} max={4} step={0.1} value={[settings.paragraphSpacing]} onValueChange={([v]) => updateSetting('paragraphSpacing', Math.round(v * 10) / 10)} />
+                <Slider aria-label={uiI18n.t('app.reading_layout_adjustment_72a86bcc')} className="w-24" min={0} max={4} step={0.1} value={[settings.paragraphSpacing]} onValueChange={([v]) => updateSetting('paragraphSpacing', Math.round(v * 10) / 10)} />
               </div>
             }
           />
           <SettingRow
-            title="Text width"
-            description="627px book · 456px narrow · 874px wide"
+            title={uiI18n.t('app.text_width_c22e1e4e')}
+            description={uiI18n.t('app.627px_book_456px_narrow_874px_wide_4370c1e3')}
             control={
               <div className="flex max-w-full flex-wrap items-center gap-2">
                 {[456, 627, 874].map((s) => (
@@ -409,37 +415,37 @@ export function NovelReaderPanel() {
                     {s}
                   </button>
                 ))}
-                <Slider aria-label="Reading layout adjustment" className="w-24" min={320} max={1100} step={1} value={[settings.textWidth]} onValueChange={([v]) => updateSetting('textWidth', v)} />
+                <Slider aria-label={uiI18n.t('app.reading_layout_adjustment_72a86bcc')} className="w-24" min={320} max={1100} step={1} value={[settings.textWidth]} onValueChange={([v]) => updateSetting('textWidth', v)} />
               </div>
             }
           />
           <SettingRow
-            title="Background"
-            description="Reader page background"
+            title={uiI18n.t('app.background_64dd60fe')}
+            description={uiI18n.t('app.reader_page_background_3b63dd97')}
             control={
               <div className="flex max-w-full flex-wrap items-center gap-2">
                 {['#0a0a0f', '#f5f1e8', '#1a1611', '#0f1a14'].map((c) => (
                   <button
                     key={c}
                     onClick={() => updateSetting('background', c)}
-                    aria-label={`Background ${c}`}
+                    aria-label={uiI18n.t('app.background_i18n_value_0_eceb56b7', { value0: c })}
                     className={`h-7 w-7 rounded-full border-2 ${settings.background === c ? 'border-primary' : 'border-white/20'}`}
                     style={{ background: c }}
                   />
                 ))}
-                <input type="color" aria-label="Custom background" value={settings.background}
+                <input type="color" aria-label={uiI18n.t('app.custom_background_a4109e17')} value={settings.background}
                   onChange={(e) => updateSetting('background', e.target.value)}
                   className="h-8 w-10 cursor-pointer rounded-lg border border-white/10 bg-transparent" />
               </div>
             }
           />
           <SettingRow
-            title="Text colour"
-            description="Chapter body colour"
+            title={uiI18n.t('app.text_colour_d160595f')}
+            description={uiI18n.t('app.chapter_body_colour_b0915603')}
             control={
               <div className="flex max-w-full flex-wrap items-center gap-2">
                 <span className="text-xs uppercase tabular-nums text-muted-foreground">{settings.textColour}</span>
-                <input type="color" aria-label="Text colour" value={settings.textColour}
+                <input type="color" aria-label={uiI18n.t('app.text_colour_d160595f')} value={settings.textColour}
                   onChange={(e) => updateSetting('textColour', e.target.value)}
                   className="h-8 w-10 cursor-pointer rounded-lg border border-white/10 bg-transparent" />
               </div>
@@ -450,20 +456,20 @@ export function NovelReaderPanel() {
 
       </TabsContent>
       <TabsContent value="narration" className="space-y-6">
-      <SettingsSection title="Narration" description="Choose a device voice, KittenTTS, OpenAI, ElevenLabs or your local model server.">
+      <SettingsSection title={uiI18n.t('app.narration_8ca62683')} description={uiI18n.t('app.choose_a_device_voice_kittentts_openai_elevenlab_5bfdc726')}>
         <div className="flex flex-col">
-          <SettingRow title="Narrator" description="System voice is the default" control={({ labelId }) => <Select value={settings.narratorEngine} onValueChange={value => updateSetting('narratorEngine', value as NovelNarratorEngine)}><SelectTrigger aria-labelledby={labelId} className="h-10 w-56"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="system">System voice (default)</SelectItem><SelectItem value="kitten-local">KittenTTS · Experimental</SelectItem><SelectItem value="openai">OpenAI</SelectItem><SelectItem value="elevenlabs">ElevenLabs</SelectItem><SelectItem value="local-server">Local model server</SelectItem></SelectContent></Select>} />
+          <SettingRow title={uiI18n.t('app.narrator_7de19cb6')} description={uiI18n.t('app.system_voice_is_the_default_876cc45e')} control={({ labelId }) => <Select value={settings.narratorEngine} onValueChange={value => updateSetting('narratorEngine', value as NovelNarratorEngine)}><SelectTrigger aria-labelledby={labelId} className="h-10 w-56"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="system">{uiI18n.t('app.system_voice_default_6225c8cf')}</SelectItem><SelectItem value="kitten-local">{uiI18n.t('app.kittentts_experimental_6593f0a7')}</SelectItem><SelectItem value="openai">{uiI18n.t('app.openai_a19ee5a9')}</SelectItem><SelectItem value="elevenlabs">{uiI18n.t('app.elevenlabs_fc64b48c')}</SelectItem><SelectItem value="local-server">{uiI18n.t('app.local_model_server_141b0724')}</SelectItem></SelectContent></Select>} />
           {settings.narratorEngine === 'kitten-local' && <ExperimentalKittenSettings />}
           {(settings.narratorEngine === 'openai' || settings.narratorEngine === 'elevenlabs' || settings.narratorEngine === 'local-server') && <TtsIntegrationSettings engine={settings.narratorEngine} />}
-          <SettingRow title="Text to speech" description="Read the chapter aloud" control={<Switch checked={settings.textToSpeech} onCheckedChange={(c) => updateSetting('textToSpeech', c)} />} />
+          <SettingRow title={uiI18n.t('app.text_to_speech_d0f1029e')} description={uiI18n.t('app.read_the_chapter_aloud_5884cb9e')} control={<Switch checked={settings.textToSpeech} onCheckedChange={(c) => updateSetting('textToSpeech', c)} />} />
           {settings.narratorEngine === 'system' && <SystemVoicePicker />}
           <div className="my-4"><VoicePreview /></div>
           <SettingRow
-            title="Narration rate"
+            title={uiI18n.t('app.narration_rate_7243ad2a')}
             control={
               <div className="flex items-center gap-3">
                 <Volume2 className="w-4 h-4 text-muted-foreground" />
-                <Slider aria-label="Narration speed" className="w-40" min={0.5} max={2} step={0.05} value={[settings.narratorRate]} onValueChange={([v]) => updateSetting('narratorRate', Math.round(v * 100) / 100)} />
+                <Slider aria-label={uiI18n.t('app.narration_speed_8c88e215')} className="w-40" min={0.5} max={2} step={0.05} value={[settings.narratorRate]} onValueChange={([v]) => updateSetting('narratorRate', Math.round(v * 100) / 100)} />
                 <span className="w-10 text-right text-sm tabular-nums text-muted-foreground">{settings.narratorRate.toFixed(2)}×</span>
               </div>
             }
@@ -473,15 +479,15 @@ export function NovelReaderPanel() {
 
       </TabsContent>
       <TabsContent value="flow">
-      <SettingsSection title="Reading flow" description="Chapter loading, progress, and reader controls.">
+      <SettingsSection title={uiI18n.t('app.reading_flow_e281c1ac')} description={uiI18n.t('app.chapter_loading_progress_and_reader_controls_cdc4b7d3')}>
         <div className="flex flex-col">
-          <SettingRow title="Continuous scroll" description="Load the next chapter as you reach the end" control={<Switch checked={settings.continuousScroll} onCheckedChange={(c) => updateSetting('continuousScroll', c)} />} />
-          <SettingRow title="Progress bar" description="Show a progress bar along the reader" control={<Switch checked={settings.showProgressBar} onCheckedChange={(c) => updateSetting('showProgressBar', c)} />} />
-          <SettingRow title="Show percent read" description="Percent indicator in the header" control={<Switch checked={settings.showPercentRead} onCheckedChange={(c) => updateSetting('showPercentRead', c)} />} />
-          <SettingRow title="Show chapter number" description="Chapter number in the header" control={<Switch checked={settings.showChapterNumber} onCheckedChange={(c) => updateSetting('showChapterNumber', c)} />} />
-          <SettingRow title="Enter fullscreen" description="Open the reader in fullscreen" control={<Switch checked={settings.enterFullscreen} onCheckedChange={(c) => updateSetting('enterFullscreen', c)} />} />
-          <SettingRow title="Keep screen awake" description="Prevent sleep while reading" control={<Switch checked={settings.keepScreenAwake} onCheckedChange={(c) => updateSetting('keepScreenAwake', c)} />} />
-          <SettingRow title="Paragraph comments" description="WebNovel-style per-paragraph threads" control={<Switch checked={settings.showParagraphComments} onCheckedChange={(c) => updateSetting('showParagraphComments', c)} />} />
+          <SettingRow title={uiI18n.t('app.continuous_scroll_bf2bf036')} description={uiI18n.t('app.load_the_next_chapter_as_you_reach_the_end_5922f59d')} control={<Switch checked={settings.continuousScroll} onCheckedChange={(c) => updateSetting('continuousScroll', c)} />} />
+          <SettingRow title={uiI18n.t('app.progress_bar_b1d7cb67')} description={uiI18n.t('app.show_a_progress_bar_along_the_reader_d7332542')} control={<Switch checked={settings.showProgressBar} onCheckedChange={(c) => updateSetting('showProgressBar', c)} />} />
+          <SettingRow title={uiI18n.t('app.show_percent_read_e4c19f7a')} description={uiI18n.t('app.percent_indicator_in_the_header_427a0c33')} control={<Switch checked={settings.showPercentRead} onCheckedChange={(c) => updateSetting('showPercentRead', c)} />} />
+          <SettingRow title={uiI18n.t('app.show_chapter_number_8fcbd936')} description={uiI18n.t('app.chapter_number_in_the_header_9f835a85')} control={<Switch checked={settings.showChapterNumber} onCheckedChange={(c) => updateSetting('showChapterNumber', c)} />} />
+          <SettingRow title={uiI18n.t('app.enter_fullscreen_4c968203')} description={uiI18n.t('app.open_the_reader_in_fullscreen_ab5caf1c')} control={<Switch checked={settings.enterFullscreen} onCheckedChange={(c) => updateSetting('enterFullscreen', c)} />} />
+          <SettingRow title={uiI18n.t('app.keep_screen_awake_e4656630')} description={uiI18n.t('app.prevent_sleep_while_reading_c2c91123')} control={<Switch checked={settings.keepScreenAwake} onCheckedChange={(c) => updateSetting('keepScreenAwake', c)} />} />
+          <SettingRow title={uiI18n.t('app.paragraph_comments_2f82405d')} description={uiI18n.t('app.webnovel_style_per_paragraph_threads_e94b3b2a')} control={<Switch checked={settings.showParagraphComments} onCheckedChange={(c) => updateSetting('showParagraphComments', c)} />} />
         </div>
       </SettingsSection>
       </TabsContent>
@@ -489,7 +495,7 @@ export function NovelReaderPanel() {
 
       <button type="button" onClick={resetSettings}
         className="flex w-full items-center justify-center gap-2 rounded-lg bg-muted/30 px-4 py-2 text-sm text-muted-foreground hover:bg-muted/50 hover:text-foreground">
-        <RotateCcw className="h-4 w-4" /> Reset novel reader settings
+        <RotateCcw className="h-4 w-4" /> {uiI18n.t('app.reset_novel_reader_settings_0bc09bfc')}
       </button>
     </div>
   );

@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useEffect, useRef, useState } from 'react';
 import {
   Settings,
@@ -58,32 +60,32 @@ interface VideoSettingsPanelProps {
 }
 
 const DEFAULT_SUBTITLE_OPTIONS = [
-  { value: 'auto', label: 'Auto' },
-  { value: 'english', label: 'English' },
-  { value: 'spanish', label: 'Spanish' },
-  { value: 'french', label: 'French' },
-  { value: 'german', label: 'German' },
-  { value: 'portuguese', label: 'Portuguese' },
-  { value: 'japanese', label: 'Japanese' },
-  { value: 'arabic', label: 'Arabic' },
-  { value: 'hindi', label: 'Hindi' },
-  { value: 'korean', label: 'Korean' },
-  { value: 'chinese', label: 'Chinese' },
-  { value: 'thai', label: 'Thai' },
-  { value: 'indonesian', label: 'Indonesian' },
-  { value: 'vietnamese', label: 'Vietnamese' },
-  { value: 'italian', label: 'Italian' },
-  { value: 'russian', label: 'Russian' },
-  { value: 'turkish', label: 'Turkish' },
-  { value: 'dutch', label: 'Dutch' },
-  { value: 'polish', label: 'Polish' },
-  { value: 'off', label: 'Off' },
+  { value: 'auto', get label() { return uiI18n.t('app.auto_c614ba7c'); } },
+  { value: 'english', get label() { return uiI18n.t('app.english_649df08a'); } },
+  { value: 'spanish', get label() { return uiI18n.t('app.spanish_8df7f1b3'); } },
+  { value: 'french', get label() { return uiI18n.t('app.french_44389f6a'); } },
+  { value: 'german', get label() { return uiI18n.t('app.german_da91388c'); } },
+  { value: 'portuguese', get label() { return uiI18n.t('app.portuguese_23882c57'); } },
+  { value: 'japanese', get label() { return uiI18n.t('app.japanese_9239c22d'); } },
+  { value: 'arabic', get label() { return uiI18n.t('app.arabic_af4f4762'); } },
+  { value: 'hindi', get label() { return uiI18n.t('app.hindi_c9e6b253'); } },
+  { value: 'korean', get label() { return uiI18n.t('app.korean_dec66c5b'); } },
+  { value: 'chinese', get label() { return uiI18n.t('app.chinese_15dc1886'); } },
+  { value: 'thai', get label() { return uiI18n.t('app.thai_c32767e0'); } },
+  { value: 'indonesian', get label() { return uiI18n.t('app.indonesian_2339b8ad'); } },
+  { value: 'vietnamese', get label() { return uiI18n.t('app.vietnamese_1d6b8a69'); } },
+  { value: 'italian', get label() { return uiI18n.t('app.italian_485b57ad'); } },
+  { value: 'russian', get label() { return uiI18n.t('app.russian_74ad93cb'); } },
+  { value: 'turkish', get label() { return uiI18n.t('app.turkish_ab650a1a'); } },
+  { value: 'dutch', get label() { return uiI18n.t('app.dutch_334a85f1'); } },
+  { value: 'polish', get label() { return uiI18n.t('app.polish_d0119864'); } },
+  { value: 'off', get label() { return uiI18n.t('app.off_e3de5ab0'); } },
 ];
 
 const SPEED_OPTIONS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
 const QUALITY_OPTIONS: { value: VideoSettings['defaultQuality']; label: string }[] = [
-  { value: 'auto', label: 'Auto' },
+  { value: 'auto', get label() { return uiI18n.t('app.auto_c614ba7c'); } },
   { value: '1080p', label: '1080p' },
   { value: '720p', label: '720p' },
   { value: '480p', label: '480p' },
@@ -91,40 +93,40 @@ const QUALITY_OPTIONS: { value: VideoSettings['defaultQuality']; label: string }
 ];
 
 const ANIME4K_OPTIONS: { value: VideoSettings['anime4kPreset']; label: string }[] = [
-  { value: 'off', label: 'Off' },
-  { value: 'light', label: 'Light' },
-  { value: 'standard', label: 'Standard' },
-  { value: 'high', label: 'High' },
+  { value: 'off', get label() { return uiI18n.t('app.off_e3de5ab0'); } },
+  { value: 'light', get label() { return uiI18n.t('app.light_a36ef8ab'); } },
+  { value: 'standard', get label() { return uiI18n.t('app.standard_2dfa6607'); } },
+  { value: 'high', get label() { return uiI18n.t('app.high_b1a5954a'); } },
 ];
 
 const SLEEP_OPTIONS: { value: VideoSettings['sleepTimer']; label: string }[] = [
-  { value: 'off', label: 'Off' },
+  { value: 'off', get label() { return uiI18n.t('app.off_e3de5ab0'); } },
   { value: '15', label: '15m' },
   { value: '30', label: '30m' },
   { value: '45', label: '45m' },
   { value: '60', label: '60m' },
-  { value: 'end-of-episode', label: 'End of episode' },
+  { value: 'end-of-episode', get label() { return uiI18n.t('app.end_of_episode_21e88d42'); } },
 ];
 
 const SIZE_OPTIONS: { value: VideoSettings['subtitleSize']; label: string }[] = [
   { value: 'small', label: 'S' },
   { value: 'medium', label: 'M' },
   { value: 'large', label: 'L' },
-  { value: 'xlarge', label: 'XL' },
+  { value: 'xlarge', get label() { return uiI18n.t('app.xl_a2f9d0d1'); } },
 ];
 
 const FONT_OPTIONS: { value: VideoSettings['subtitleFont']; label: string }[] = [
-  { value: 'default', label: 'Default' },
-  { value: 'serif', label: 'Serif' },
-  { value: 'mono', label: 'Mono' },
-  { value: 'comic', label: 'Comic' },
-  { value: 'custom', label: 'Custom' },
+  { value: 'default', get label() { return uiI18n.t('app.default_808d7dca'); } },
+  { value: 'serif', get label() { return uiI18n.t('app.serif_a5c78a86'); } },
+  { value: 'mono', get label() { return uiI18n.t('app.mono_c5c55338'); } },
+  { value: 'comic', get label() { return uiI18n.t('app.comic_5549c522'); } },
+  { value: 'custom', get label() { return uiI18n.t('app.custom_081ae3fd'); } },
 ];
 
 const BG_OPTIONS: { value: VideoSettings['subtitleBackground']; label: string }[] = [
-  { value: 'none', label: 'None' },
-  { value: 'semi', label: 'Semi' },
-  { value: 'solid', label: 'Solid' },
+  { value: 'none', get label() { return uiI18n.t('app.none_6eef6648'); } },
+  { value: 'semi', get label() { return uiI18n.t('app.semi_3210d8fe'); } },
+  { value: 'solid', get label() { return uiI18n.t('app.solid_d0063586'); } },
 ];
 
 const COLOR_SWATCHES = ['#ffffff', '#ffff00', '#00e5ff', '#7CFC00', '#ff5f5f'];
@@ -132,11 +134,11 @@ const COLOR_SWATCHES = ['#ffffff', '#ffff00', '#00e5ff', '#7CFC00', '#ff5f5f'];
 type TabId = 'playback' | 'video' | 'subtitles' | 'audio' | 'shortcuts';
 
 const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
-  { id: 'playback', label: 'Playback', icon: PlayCircle },
-  { id: 'video', label: 'Video', icon: Video },
-  { id: 'subtitles', label: 'Subtitles', icon: Subtitles },
-  { id: 'audio', label: 'Audio', icon: Music },
-  { id: 'shortcuts', label: 'Keys', icon: Keyboard },
+  { id: 'playback', get label() { return uiI18n.t('app.playback_c8e30870'); }, icon: PlayCircle },
+  { id: 'video', get label() { return uiI18n.t('app.video_bc17c1f0'); }, icon: Video },
+  { id: 'subtitles', get label() { return uiI18n.t('app.subtitles_17770471'); }, icon: Subtitles },
+  { id: 'audio', get label() { return uiI18n.t('app.audio_acdac205'); }, icon: Music },
+  { id: 'shortcuts', get label() { return uiI18n.t('app.keys_e5651c68'); }, icon: Keyboard },
 ];
 
 /** Reusable label + optional caption + Switch row. */
@@ -151,6 +153,7 @@ function ToggleRow({
   checked: boolean;
   onCheckedChange: (value: boolean) => void;
 }) {
+  useUiTranslation();
   return (
     <div className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-muted/20">
       <div className="min-w-0">
@@ -194,6 +197,7 @@ function SettingsPanelBody({
   onSubtitleUpload?: () => void;
   initialTab?: TabId;
 }) {
+  useUiTranslation();
   const { settings, updateSetting, resetSettings } = useVideoSettings();
   const { keybinds, setBinding, reset: resetKeybinds } = useKeybinds();
   const [activeTab, setActiveTab] = useState<TabId>(initialTab);
@@ -267,7 +271,7 @@ function SettingsPanelBody({
       {showHeader && (
         <div className="flex items-center gap-3">
           <Settings className="w-5 h-5 text-primary" />
-          <h2 className="text-lg font-semibold text-foreground">Player Settings</h2>
+          <h2 className="text-lg font-semibold text-foreground">{uiI18n.t('app.player_settings_763c3a64')}</h2>
         </div>
       )}
 
@@ -280,11 +284,9 @@ function SettingsPanelBody({
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               aria-pressed={activeTab === tab.id}
-              className={`min-h-11 min-w-0 flex-1 flex flex-col items-center justify-center gap-1 px-1 py-2 rounded-lg text-[10px] font-medium transition-all ${
-                activeTab === tab.id
+              className={`min-h-11 min-w-0 flex-1 flex flex-col items-center justify-center gap-1 px-1 py-2 rounded-lg text-[10px] font-medium transition-all ${activeTab === tab.id
                   ? 'bg-primary text-primary-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-              }`}
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}`}
             >
               <Icon className="w-4 h-4" />
               <span>{tab.label}</span>
@@ -302,7 +304,7 @@ function SettingsPanelBody({
             <section className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">
                 <Volume2 className="w-4 h-4 text-primary" />
-                <h3 className="text-sm font-medium">Volume</h3>
+                <h3 className="text-sm font-medium">{uiI18n.t('app.volume_3b18e8e3')}</h3>
                 <span className="ml-auto text-sm text-muted-foreground">
                   {Math.round(settings.volume * 100)}%
                 </span>
@@ -320,7 +322,7 @@ function SettingsPanelBody({
             <section className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">
                 <Gauge className="w-4 h-4 text-primary" />
-                <h3 className="text-sm font-medium">Speed</h3>
+                <h3 className="text-sm font-medium">{uiI18n.t('app.speed_2d2cb022')}</h3>
               </div>
               <div className="flex flex-wrap gap-2">
                 {SPEED_OPTIONS.map((speed) => (
@@ -339,22 +341,22 @@ function SettingsPanelBody({
             <section className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">
                 <PlayCircle className="w-4 h-4 text-primary" />
-                <h3 className="text-sm font-medium">Behavior</h3>
+                <h3 className="text-sm font-medium">{uiI18n.t('app.behavior_70cb647a')}</h3>
               </div>
               <div className="space-y-2">
                 <ToggleRow
-                  label="Autoplay"
+                  label={uiI18n.t('app.autoplay_95619b53')}
                   checked={settings.autoplay}
                   onCheckedChange={(checked) => updateSetting('autoplay', checked)}
                 />
                 <ToggleRow
-                  label="Auto Next Episode"
+                  label={uiI18n.t('app.auto_next_episode_560e5abf')}
                   checked={settings.autoNextEpisode}
                   onCheckedChange={(checked) => updateSetting('autoNextEpisode', checked)}
                 />
                 {settings.autoNextEpisode && (
                   <div className="flex items-center gap-2 pl-1 pt-0.5">
-                    <span className="text-xs text-muted-foreground w-28 shrink-0">Up-next countdown</span>
+                    <span className="text-xs text-muted-foreground w-28 shrink-0">{uiI18n.t('app.up_next_countdown_28c9ad18')}</span>
                     <div className="flex min-w-0 items-center gap-3 flex-1">
                       <Slider
                         value={[settings.autoNextCountdownSeconds]}
@@ -363,7 +365,7 @@ function SettingsPanelBody({
                         max={30}
                         step={1}
                         className="min-w-0 flex-1"
-                        aria-label="Up-next countdown seconds"
+                        aria-label={uiI18n.t('app.up_next_countdown_seconds_694fe73c')}
                       />
                       <span className="text-xs text-muted-foreground w-9 text-right tabular-nums">
                         {settings.autoNextCountdownSeconds}s
@@ -372,12 +374,12 @@ function SettingsPanelBody({
                   </div>
                 )}
                 <ToggleRow
-                  label="Auto Skip Intro"
+                  label={uiI18n.t('app.auto_skip_intro_3a2b0c81')}
                   checked={settings.autoSkipIntro}
                   onCheckedChange={(checked) => updateSetting('autoSkipIntro', checked)}
                 />
                 <ToggleRow
-                  label="Loop Video"
+                  label={uiI18n.t('app.loop_video_ec14b3e2')}
                   checked={settings.loopVideo}
                   onCheckedChange={(checked) => updateSetting('loopVideo', checked)}
                 />
@@ -393,7 +395,7 @@ function SettingsPanelBody({
             <section className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">
                 <MonitorPlay className="w-4 h-4 text-primary" />
-                <h3 className="text-sm font-medium">Default Quality</h3>
+                <h3 className="text-sm font-medium">{uiI18n.t('app.default_quality_87d95e09')}</h3>
               </div>
               <div className="flex flex-wrap gap-2">
                 {QUALITY_OPTIONS.map((option) => (
@@ -412,7 +414,7 @@ function SettingsPanelBody({
             <section className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">
                 <Sparkles className="w-4 h-4 text-primary" />
-                <h3 className="text-sm font-medium">Anime4K Upscaling</h3>
+                <h3 className="text-sm font-medium">{uiI18n.t('app.anime4k_upscaling_103f8463')}</h3>
               </div>
               <div className="flex flex-wrap gap-2">
                 {ANIME4K_OPTIONS
@@ -434,8 +436,8 @@ function SettingsPanelBody({
               </div>
               <p className="text-xs text-muted-foreground">
                 {isMobileNative()
-                  ? 'GPU upscaling for anime. On mobile this uses the light preset and needs a capable device.'
-                  : 'GPU upscaling for anime. Higher presets need a stronger GPU.'}
+                  ? uiI18n.t('app.gpu_upscaling_for_anime_on_mobile_this_uses_the__1d3249a0')
+                  : uiI18n.t('app.gpu_upscaling_for_anime_higher_presets_need_a_st_c99015ce')}
               </p>
             </section>
 
@@ -443,24 +445,24 @@ function SettingsPanelBody({
             <section className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">
                 <Video className="w-4 h-4 text-primary" />
-                <h3 className="text-sm font-medium">Display</h3>
+                <h3 className="text-sm font-medium">{uiI18n.t('app.display_574ff9b0')}</h3>
               </div>
               <div className="space-y-2">
                 <ToggleRow
-                  label="Theater Mode"
-                  caption="Wider cinematic layout"
+                  label={uiI18n.t('app.theater_mode_437ff2cb')}
+                  caption={uiI18n.t('app.wider_cinematic_layout_f56f9e6a')}
                   checked={settings.theaterMode}
                   onCheckedChange={(checked) => updateSetting('theaterMode', checked)}
                 />
                 <ToggleRow
-                  label="Ambient Mode"
-                  caption="Glow that matches the video"
+                  label={uiI18n.t('app.ambient_mode_59f453b0')}
+                  caption={uiI18n.t('app.glow_that_matches_the_video_7ec2b496')}
                   checked={settings.ambientMode}
                   onCheckedChange={(checked) => updateSetting('ambientMode', checked)}
                 />
                 <ToggleRow
-                  label="Stable Volume"
-                  caption="Even out loud and quiet parts"
+                  label={uiI18n.t('app.stable_volume_baca6ef4')}
+                  caption={uiI18n.t('app.even_out_loud_and_quiet_parts_61a82d21')}
                   checked={settings.stableVolume}
                   onCheckedChange={(checked) => updateSetting('stableVolume', checked)}
                 />
@@ -471,7 +473,7 @@ function SettingsPanelBody({
             <section className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">
                 <Timer className="w-4 h-4 text-primary" />
-                <h3 className="text-sm font-medium">Sleep Timer</h3>
+                <h3 className="text-sm font-medium">{uiI18n.t('app.sleep_timer_ef29989e')}</h3>
               </div>
               <div className="flex flex-wrap gap-2">
                 {SLEEP_OPTIONS.map((option) => (
@@ -495,13 +497,13 @@ function SettingsPanelBody({
             <section className="space-y-2">
               <div className="flex flex-wrap items-center gap-2">
                 <Type className="w-4 h-4 text-primary" />
-                <h3 className="text-sm font-medium">Preview</h3>
+                <h3 className="text-sm font-medium">{uiI18n.t('app.preview_f1fbb2b4')}</h3>
               </div>
               <div
                 className="relative flex items-end justify-center overflow-hidden rounded-xl border border-white/10 bg-gradient-to-br from-slate-800 via-slate-900 to-black px-4 min-h-[140px] transition-[padding] duration-200"
                 style={{ paddingTop: 16, paddingBottom: 16 + settings.subtitlePosition * 2.6 }}
               >
-                <span style={previewCueStyle}>The quick brown fox jumps</span>
+                <span style={previewCueStyle}>{uiI18n.t('app.the_quick_brown_fox_jumps_743e2756')}</span>
               </div>
             </section>
 
@@ -509,7 +511,7 @@ function SettingsPanelBody({
             <section className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">
                 <Subtitles className="w-4 h-4 text-primary" />
-                <h3 className="text-sm font-medium">Language</h3>
+                <h3 className="text-sm font-medium">{uiI18n.t('app.language_89b86ab0')}</h3>
               </div>
               <div className="flex flex-wrap gap-2">
                 {(() => {
@@ -540,15 +542,15 @@ function SettingsPanelBody({
               </div>
             </section>
 
-            {onSubtitleUpload && <button type="button" onClick={onSubtitleUpload} className={`${pill(false)} w-full text-left`}>Add subtitle file (.srt, .ass, .ssa, .vtt)</button>}
-            {onSubtitleChange && <button type="button" onClick={() => onSubtitleChange('off')} className={`${pill(currentSubtitle === 'off')} w-full text-left`}>Subtitles off</button>}
+            {onSubtitleUpload && <button type="button" onClick={onSubtitleUpload} className={`${pill(false)} w-full text-left`}>{uiI18n.t('app.add_subtitle_file_srt_ass_ssa_vtt_fd0ff143')}</button>}
+            {onSubtitleChange && <button type="button" onClick={() => onSubtitleChange('off')} className={`${pill(currentSubtitle === 'off')} w-full text-left`}>{uiI18n.t('app.subtitles_off_c6906246')}</button>}
             {(availableSubtitles || []).length > 0 && <section className="space-y-3">
-              <h3 className="flex items-center gap-2 text-sm font-medium"><Subtitles className="h-4 w-4 text-primary" />Custom &amp; source subtitles ({availableSubtitles!.length})</h3>
+              <h3 className="flex items-center gap-2 text-sm font-medium"><Subtitles className="h-4 w-4 text-primary" />{uiI18n.t('app.custom_amp_source_subtitles_17e949df')}{availableSubtitles!.length})</h3>
               <div className="max-h-64 space-y-1 overflow-y-auto">
                 {availableSubtitles!.map((option, index) => <button key={option.value} type="button"
                   onClick={() => onSubtitleChange?.(option.value)}
                   className={`${pill((currentSubtitle || settings.subtitleLanguage) === option.value)} w-full text-left`}>
-                  {option.label}{availableSubtitles!.filter(track => track.label === option.label).length > 1 ? ` · ${index + 1}` : ''}
+                  {option.label}{availableSubtitles!.filter(track => track.label === option.label).length > 1 ? uiI18n.t('app.i18n_value_0_92e4cd32', { value0: index + 1 }) : ''}
                 </button>)}
               </div>
             </section>}
@@ -558,7 +560,7 @@ function SettingsPanelBody({
               <section className="space-y-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <Subtitles className="w-4 h-4 text-primary" />
-                  <h3 className="text-sm font-medium">Internal Tracks</h3>
+                  <h3 className="text-sm font-medium">{uiI18n.t('app.internal_tracks_4a715c9b')}</h3>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {internalSubtitles.map((track) => (
@@ -567,7 +569,7 @@ function SettingsPanelBody({
                       onClick={() => onInternalSubtitleChange?.(track.id)}
                       className={pill(currentInternalSubtitleTrackId === track.id)}
                     >
-                      Load {track.label} ({track.lang})
+                      {uiI18n.t('app.load_ddcb77ff')} {track.label} ({track.lang})
                     </button>
                   ))}
                 </div>
@@ -578,22 +580,20 @@ function SettingsPanelBody({
             <section className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">
                 <Type className="w-4 h-4 text-primary" />
-                <h3 className="text-sm font-medium">Style</h3>
+                <h3 className="text-sm font-medium">{uiI18n.t('app.style_99a0efc6')}</h3>
               </div>
               <div className="space-y-2">
                 {/* Size */}
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs text-muted-foreground w-16 shrink-0">Size</span>
+                  <span className="text-xs text-muted-foreground w-16 shrink-0">{uiI18n.t('app.size_b7152342')}</span>
                   <div className="flex min-w-0 flex-wrap gap-1 flex-1">
                     {SIZE_OPTIONS.map((option) => (
                       <button
                         key={option.value}
                         onClick={() => updateSetting('subtitleSize', option.value)}
-                        className={`min-h-11 flex-1 px-2 py-1.5 rounded text-xs font-medium transition-all ${
-                          settings.subtitleSize === option.value
+                        className={`min-h-11 flex-1 px-2 py-1.5 rounded text-xs font-medium transition-all ${settings.subtitleSize === option.value
                             ? 'bg-primary text-primary-foreground'
-                            : 'bg-muted/30 text-foreground hover:bg-muted/50'
-                        }`}
+                            : 'bg-muted/30 text-foreground hover:bg-muted/50'}`}
                       >
                         {option.label}
                       </button>
@@ -602,17 +602,15 @@ function SettingsPanelBody({
                 </div>
                 {/* Font */}
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs text-muted-foreground w-16 shrink-0">Font</span>
+                  <span className="text-xs text-muted-foreground w-16 shrink-0">{uiI18n.t('app.font_b97c4d4c')}</span>
                   <div className="flex min-w-0 flex-wrap gap-1 flex-1">
                     {FONT_OPTIONS.map((option) => (
                       <button
                         key={option.value}
                         onClick={() => updateSetting('subtitleFont', option.value)}
-                        className={`min-h-11 flex-1 px-2 py-1.5 rounded text-xs font-medium transition-all ${
-                          settings.subtitleFont === option.value
+                        className={`min-h-11 flex-1 px-2 py-1.5 rounded text-xs font-medium transition-all ${settings.subtitleFont === option.value
                             ? 'bg-primary text-primary-foreground'
-                            : 'bg-muted/30 text-foreground hover:bg-muted/50'
-                        }`}
+                            : 'bg-muted/30 text-foreground hover:bg-muted/50'}`}
                       >
                         {option.label}
                       </button>
@@ -622,7 +620,7 @@ function SettingsPanelBody({
                 {/* Custom font upload — only relevant when Font = Custom */}
                 {settings.subtitleFont === 'custom' && (
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs text-muted-foreground w-16 shrink-0">File</span>
+                    <span className="text-xs text-muted-foreground w-16 shrink-0">{uiI18n.t('app.file_2c3cafa4')}</span>
                     <div className="flex flex-1 items-center gap-2 min-w-0">
                       <input
                         ref={fontInputRef}
@@ -638,7 +636,7 @@ function SettingsPanelBody({
                         onClick={() => fontInputRef.current?.click()}
                         className="px-3 py-1.5 rounded-lg text-xs font-medium bg-primary text-primary-foreground hover:opacity-90 transition-opacity shrink-0"
                       >
-                        {customFontName ? 'Replace' : 'Upload font'}
+                        {customFontName ? uiI18n.t('app.replace_a7cf7b25') : uiI18n.t('app.upload_font_8fa9d65d')}
                       </button>
                       {customFontName ? (
                         <>
@@ -647,14 +645,14 @@ function SettingsPanelBody({
                           </span>
                           <button
                             onClick={handleClearFont}
-                            aria-label="Remove custom font"
+                            aria-label={uiI18n.t('app.remove_custom_font_72c9dae0')}
                             className="ml-auto text-xs text-muted-foreground hover:text-foreground shrink-0"
                           >
-                            Remove
+                            {uiI18n.t('app.remove_e963907d')}
                           </button>
                         </>
                       ) : (
-                        <span className="text-xs text-muted-foreground/60 truncate">.ttf / .otf / .woff</span>
+                        <span className="text-xs text-muted-foreground/60 truncate">{uiI18n.t('app.ttf_otf_woff_92f14c7e')}</span>
                       )}
                     </div>
                   </div>
@@ -665,17 +663,15 @@ function SettingsPanelBody({
 
                 {/* Background */}
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs text-muted-foreground w-16 shrink-0">BG</span>
+                  <span className="text-xs text-muted-foreground w-16 shrink-0">{uiI18n.t('app.bg_9f5da1d1')}</span>
                   <div className="flex min-w-0 flex-wrap gap-1 flex-1">
                     {BG_OPTIONS.map((option) => (
                       <button
                         key={option.value}
                         onClick={() => updateSetting('subtitleBackground', option.value)}
-                        className={`min-h-11 flex-1 px-2 py-1.5 rounded text-xs font-medium transition-all ${
-                          settings.subtitleBackground === option.value
+                        className={`min-h-11 flex-1 px-2 py-1.5 rounded text-xs font-medium transition-all ${settings.subtitleBackground === option.value
                             ? 'bg-primary text-primary-foreground'
-                            : 'bg-muted/30 text-foreground hover:bg-muted/50'
-                        }`}
+                            : 'bg-muted/30 text-foreground hover:bg-muted/50'}`}
                       >
                         {option.label}
                       </button>
@@ -685,11 +681,11 @@ function SettingsPanelBody({
 
                 {/* Text Color */}
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs text-muted-foreground w-16 shrink-0">Color</span>
+                  <span className="text-xs text-muted-foreground w-16 shrink-0">{uiI18n.t('app.color_1d0c8304')}</span>
                   <div className="flex min-w-0 flex-wrap items-center gap-2 flex-1">
                     <input
                       type="color"
-                      aria-label="Subtitle text color"
+                      aria-label={uiI18n.t('app.subtitle_text_color_a79351bc')}
                       value={settings.subtitleColor}
                       onChange={(e) => updateSetting('subtitleColor', e.target.value)}
                       className="h-11 w-11 shrink-0 cursor-pointer rounded-lg border border-white/10 bg-transparent p-0.5"
@@ -698,14 +694,12 @@ function SettingsPanelBody({
                       {COLOR_SWATCHES.map((color) => (
                         <button
                           key={color}
-                          aria-label={`Set subtitle color ${color}`}
+                          aria-label={uiI18n.t('app.set_subtitle_color_i18n_value_0_0e441340', { value0: color })}
                           onClick={() => updateSetting('subtitleColor', color)}
                           style={{ backgroundColor: color }}
-                          className={`h-11 w-11 rounded-full border transition-transform hover:scale-110 ${
-                            settings.subtitleColor.toLowerCase() === color.toLowerCase()
+                          className={`h-11 w-11 rounded-full border transition-transform hover:scale-110 ${settings.subtitleColor.toLowerCase() === color.toLowerCase()
                               ? 'border-primary ring-2 ring-primary/50'
-                              : 'border-white/20'
-                          }`}
+                              : 'border-white/20'}`}
                         />
                       ))}
                     </div>
@@ -714,7 +708,7 @@ function SettingsPanelBody({
 
                 {/* Background Opacity */}
                 <div className="flex items-center gap-2 pt-1">
-                  <span className="text-xs text-muted-foreground w-16 shrink-0">BG Opacity</span>
+                  <span className="text-xs text-muted-foreground w-16 shrink-0">{uiI18n.t('app.bg_opacity_54bfc748')}</span>
                   <div className="flex min-w-0 items-center gap-3 flex-1">
                     <Slider
                       value={[Math.round(settings.subtitleOpacity * 100)]}
@@ -731,7 +725,7 @@ function SettingsPanelBody({
 
                 {/* Position */}
                 <div className="flex items-center gap-2 pt-1">
-                  <span className="text-xs text-muted-foreground w-16 shrink-0">Position</span>
+                  <span className="text-xs text-muted-foreground w-16 shrink-0">{uiI18n.t('app.position_cf1c85ad')}</span>
                   <div className="flex min-w-0 items-center gap-3 flex-1">
                     <Slider
                       value={[settings.subtitlePosition]}
@@ -739,7 +733,7 @@ function SettingsPanelBody({
                       max={40}
                       step={1}
                       className="min-w-0 flex-1"
-                      aria-label="Vertical position"
+                      aria-label={uiI18n.t('app.vertical_position_f2a31e6a')}
                     />
                     <span className="text-xs text-muted-foreground w-9 text-right">
                       {settings.subtitlePosition}
@@ -747,16 +741,16 @@ function SettingsPanelBody({
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Vertical position — higher moves subtitles further from the bottom.
+                  {uiI18n.t('app.vertical_position_higher_moves_subtitles_further_2ffa2f50')}
                 </p>
 
                 {/* Sync Offset */}
                 <div className="flex items-center gap-2 pt-1">
-                  <span className="text-xs text-muted-foreground w-16 shrink-0">Sync</span>
+                  <span className="text-xs text-muted-foreground w-16 shrink-0">{uiI18n.t('app.sync_905f6309')}</span>
                   <div className="flex min-w-0 items-center gap-2 flex-1">
                     <button
                       type="button"
-                      aria-label="Shift subtitles earlier"
+                      aria-label={uiI18n.t('app.shift_subtitles_earlier_03042f34')}
                       onClick={() =>
                         updateSetting(
                           'subtitleOffset',
@@ -774,11 +768,11 @@ function SettingsPanelBody({
                       max={30}
                       step={0.1}
                       className="min-w-0 flex-1"
-                      aria-label="Subtitle sync offset in seconds"
+                      aria-label={uiI18n.t('app.subtitle_sync_offset_in_seconds_0504e7ac')}
                     />
                     <button
                       type="button"
-                      aria-label="Shift subtitles later"
+                      aria-label={uiI18n.t('app.shift_subtitles_later_d058a290')}
                       onClick={() =>
                         updateSetting(
                           'subtitleOffset',
@@ -796,13 +790,13 @@ function SettingsPanelBody({
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Positive delays subtitles; negative shows them earlier. Tap ± for 0.1s steps.
+                  {uiI18n.t('app.positive_delays_subtitles_negative_shows_them_ea_3e2a971d')}
                 </p>
 
                 {/* Outline */}
                 <ToggleRow
-                  label="Outline"
-                  caption="Add an outline behind subtitle text"
+                  label={uiI18n.t('app.outline_cdd6290b')}
+                  caption={uiI18n.t('app.add_an_outline_behind_subtitle_text_ac032246')}
                   checked={settings.subtitleOutline}
                   onCheckedChange={(checked) => updateSetting('subtitleOutline', checked)}
                 />
@@ -818,7 +812,7 @@ function SettingsPanelBody({
               <section className="space-y-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <Volume2 className="w-4 h-4 text-primary" />
-                  <h3 className="text-sm font-medium">Audio Tracks</h3>
+                  <h3 className="text-sm font-medium">{uiI18n.t('app.audio_tracks_b273b321')}</h3>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {audioTracks.map((track) => (
@@ -827,7 +821,7 @@ function SettingsPanelBody({
                       onClick={() => onAudioTrackChange?.(track.id)}
                       className={pill(currentAudioTrack === track.id)}
                     >
-                      {track.label || `Track ${track.id}`} ({track.lang || 'und'})
+                      {track.label || uiI18n.t('app.track_i18n_value_0_098f1b62', { value0: track.id })} ({track.lang || uiI18n.t('app.und_b03a4348')})
                     </button>
                   ))}
                 </div>
@@ -837,9 +831,9 @@ function SettingsPanelBody({
             {audioTracks.length === 0 && (
               <div className="flex flex-col items-center justify-center py-8 text-center">
                 <Music className="w-10 h-10 text-muted-foreground/40 mb-3" />
-                <p className="text-sm text-muted-foreground">No audio tracks detected</p>
+                <p className="text-sm text-muted-foreground">{uiI18n.t('app.no_audio_tracks_detected_61309f82')}</p>
                 <p className="text-xs text-muted-foreground/60 mt-1">
-                  Audio tracks are detected automatically for MKV files
+                  {uiI18n.t('app.audio_tracks_are_detected_automatically_for_mkv__8aaf0590')}
                 </p>
               </div>
             )}
@@ -852,7 +846,7 @@ function SettingsPanelBody({
             <section className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">
                 <Keyboard className="w-4 h-4 text-primary" />
-                <h3 className="text-sm font-medium">Keyboard Shortcuts</h3>
+                <h3 className="text-sm font-medium">{uiI18n.t('app.keyboard_shortcuts_b465751c')}</h3>
               </div>
               <div className="space-y-2">
                 {KEYBIND_ACTIONS.map(({ action, label, hint }) => {
@@ -868,13 +862,11 @@ function SettingsPanelBody({
                       </div>
                       <button
                         onClick={() => setListeningAction(isListening ? null : action)}
-                        className={`min-w-[96px] px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                          isListening
+                        className={`min-w-[96px] px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${isListening
                             ? 'bg-primary text-primary-foreground animate-pulse'
-                            : 'bg-muted/40 text-foreground hover:bg-muted/60'
-                        }`}
+                            : 'bg-muted/40 text-foreground hover:bg-muted/60'}`}
                       >
-                        {isListening ? 'Press a key…' : formatKeyToken(keybinds[action])}
+                        {isListening ? uiI18n.t('app.press_a_key_9026d7b5') : formatKeyToken(keybinds[action])}
                       </button>
                     </div>
                   );
@@ -885,7 +877,7 @@ function SettingsPanelBody({
                 className="flex items-center justify-center gap-2 w-full px-4 py-2 rounded-lg bg-muted/30 hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors text-sm"
               >
                 <Repeat className="w-4 h-4" />
-                Reset shortcuts
+                {uiI18n.t('app.reset_shortcuts_a8c9e9e7')}
               </button>
             </section>
           </>
@@ -898,7 +890,7 @@ function SettingsPanelBody({
         className="flex items-center justify-center gap-2 w-full px-4 py-2 rounded-lg bg-muted/30 hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors text-sm"
       >
         <RotateCcw className="w-4 h-4" />
-        Reset
+        {uiI18n.t('app.reset_44c57abd')}
       </button>
     </div>
   );
@@ -921,6 +913,7 @@ export function VideoSettingsPanel({
   initialTab = 'playback',
   portalContainer,
 }: VideoSettingsPanelProps) {
+  useUiTranslation();
   const isMobile = useIsMobile();
   const bodyProps = {
     availableSubtitles,
@@ -957,8 +950,8 @@ export function VideoSettingsPanel({
         className="z-[210] flex max-w-full flex-col gap-0 overflow-hidden border-white/10 bg-background/95 p-0 backdrop-blur-xl md:w-[400px] md:max-w-[400px] max-md:max-h-[85dvh] max-md:rounded-t-2xl"
         overlayClassName="z-[209]"
       >
-        <SheetTitle className="shrink-0 px-4 py-4 pr-14 text-lg font-semibold">Player settings</SheetTitle>
-        <SheetDescription className="sr-only">Adjust playback, video, subtitles, and audio.</SheetDescription>
+        <SheetTitle className="shrink-0 px-4 py-4 pr-14 text-lg font-semibold">{uiI18n.t('app.player_settings_c1823e10')}</SheetTitle>
+        <SheetDescription className="sr-only">{uiI18n.t('app.adjust_playback_video_subtitles_and_audio_99dd0126')}</SheetDescription>
         {/* drag handle — mobile only */}
         <div className="shrink-0 pt-2.5 md:hidden" aria-hidden>
           <div className="mx-auto h-1 w-10 rounded-full bg-white/20" />

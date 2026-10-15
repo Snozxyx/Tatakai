@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -12,7 +14,7 @@ import {
   Trash2,
   PlusCircle,
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format } from '@/lib/localeFormat';
 import { validateIpAddress } from '@/utils/banUtils';
 import type { IpBan } from '@/types/admin-dashboard';
 
@@ -25,6 +27,7 @@ const QUERY_KEY = ['admin_ip_bans'] as const;
 // Component
 // ---------------------------------------------------------------------------
 export function IPBanPanel() {
+  useUiTranslation();
   const queryClient = useQueryClient();
 
   // Form state
@@ -72,7 +75,7 @@ export function IPBanPanel() {
       setExpiresAt('');
       setFormError(null);
       setShowForm(false);
-      toast.success('IP address banned successfully');
+      toast.success(uiI18n.t('app.ip_address_banned_successfully_61431881'));
     },
     onError: (error: unknown) => {
       const msg = error instanceof Error ? error.message : String(error);
@@ -81,7 +84,7 @@ export function IPBanPanel() {
       } else if (msg.toLowerCase().includes('invalid') || msg.toLowerCase().includes('ip')) {
         setFormError('Invalid IP address format');
       } else {
-        toast.error(`Failed to ban IP: ${msg}`);
+        toast.error(uiI18n.t('app.failed_to_ban_ip_i18n_value_0_f94dded3', { value0: msg }));
       }
     },
   });
@@ -99,11 +102,11 @@ export function IPBanPanel() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEY });
-      toast.success('IP ban removed');
+      toast.success(uiI18n.t('app.ip_ban_removed_f48e16a6'));
     },
     onError: (error: unknown) => {
       const msg = error instanceof Error ? error.message : String(error);
-      toast.error(`Failed to remove ban: ${msg}`);
+      toast.error(uiI18n.t('app.failed_to_remove_ban_i18n_value_0_7a9835e4', { value0: msg }));
     },
   });
 
@@ -134,7 +137,7 @@ export function IPBanPanel() {
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold flex items-center gap-2">
           <Globe className="w-6 h-6 text-primary" />
-          IP Bans
+          {uiI18n.t('app.ip_bans_ac015ff7')}
         </h2>
         <div className="flex items-center gap-2">
           <Button
@@ -144,7 +147,7 @@ export function IPBanPanel() {
             className="gap-1.5 text-xs"
           >
             <PlusCircle className="w-3.5 h-3.5" />
-            Add Ban
+            {uiI18n.t('app.add_ban_d743fc07')}
           </Button>
           <Button
             variant="ghost"
@@ -154,7 +157,7 @@ export function IPBanPanel() {
             className="gap-2 text-muted-foreground hover:text-foreground"
           >
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-            Refresh
+            {uiI18n.t('app.refresh_56e3badc')}
           </Button>
         </div>
       </div>
@@ -164,7 +167,7 @@ export function IPBanPanel() {
         <GlassPanel className="p-5 border-white/10">
           <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
             <PlusCircle className="w-4 h-4 text-primary" />
-            Ban IP Address
+            {uiI18n.t('app.ban_ip_address_7a06b5a6')}
           </h3>
           <form onSubmit={handleSubmit} className="space-y-4">
             {formError && (
@@ -174,27 +177,27 @@ export function IPBanPanel() {
             )}
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
-                IP Address <span className="text-destructive">*</span>
+                {uiI18n.t('app.ip_address_11f51070')} <span className="text-destructive">*</span>
               </label>
               <input
                 type="text"
                 value={ipAddress}
                 onChange={(e) => { setIpAddress(e.target.value); setFormError(null); }}
-                placeholder="e.g. 192.168.1.1 or 2001:db8::1"
+                placeholder={uiI18n.t('app.e_g_192_168_1_1_or_2001_db8_1_f5de3c31')}
                 className="w-full bg-white/5 border border-white/10 rounded px-3 py-1.5 text-sm font-mono text-white placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary"
               />
               {ipAddress && !validateIpAddress(ipAddress.trim()) && (
-                <p className="text-xs text-destructive">Invalid IP address format</p>
+                <p className="text-xs text-destructive">{uiI18n.t('app.invalid_ip_address_format_b7c00a58')}</p>
               )}
             </div>
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
-                Reason <span className="text-destructive">*</span>
+                {uiI18n.t('app.reason_f219cc06')} <span className="text-destructive">*</span>
               </label>
               <textarea
                 value={reason}
                 onChange={(e) => { setReason(e.target.value); setFormError(null); }}
-                placeholder="Reason for banning this IP…"
+                placeholder={uiI18n.t('app.reason_for_banning_this_ip_1f36c046')}
                 maxLength={500}
                 rows={3}
                 className="w-full bg-white/5 border border-white/10 rounded px-3 py-1.5 text-sm text-white placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary resize-none"
@@ -203,7 +206,7 @@ export function IPBanPanel() {
             </div>
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
-                Expiry (optional)
+                {uiI18n.t('app.expiry_optional_728bac66')}
               </label>
               <input
                 type="datetime-local"
@@ -224,7 +227,7 @@ export function IPBanPanel() {
                 ) : (
                   <Globe className="w-3.5 h-3.5" />
                 )}
-                Ban IP
+                {uiI18n.t('app.ban_ip_82ea0a98')}
               </Button>
               <Button
                 type="button"
@@ -233,7 +236,7 @@ export function IPBanPanel() {
                 onClick={() => { setShowForm(false); setIpAddress(''); setReason(''); setExpiresAt(''); setFormError(null); }}
                 className="text-muted-foreground"
               >
-                Cancel
+                {uiI18n.t('app.cancel_77dfd213')}
               </Button>
             </div>
           </form>
@@ -248,7 +251,7 @@ export function IPBanPanel() {
       ) : isError ? (
         <GlassPanel className="p-10 text-center border-destructive/20 bg-destructive/5">
           <XCircle className="w-8 h-8 text-destructive/50 mx-auto mb-3" />
-          <p className="text-sm font-medium text-destructive mb-4">Failed to load IP bans</p>
+          <p className="text-sm font-medium text-destructive mb-4">{uiI18n.t('app.failed_to_load_ip_bans_790e06a1')}</p>
           <Button
             variant="outline"
             size="sm"
@@ -256,13 +259,13 @@ export function IPBanPanel() {
             className="gap-2 border-destructive/30 hover:bg-destructive/10 text-destructive"
           >
             <RefreshCw className="w-4 h-4" />
-            Retry
+            {uiI18n.t('app.retry_9f5cd8a2')}
           </Button>
         </GlassPanel>
       ) : !bans || bans.length === 0 ? (
         <GlassPanel className="p-12 text-center border-dashed border-white/5">
           <Globe className="w-10 h-10 text-muted-foreground/25 mx-auto mb-3" />
-          <p className="text-sm text-muted-foreground">No active IP bans</p>
+          <p className="text-sm text-muted-foreground">{uiI18n.t('app.no_active_ip_bans_fe3dc9a9')}</p>
         </GlassPanel>
       ) : (
         <GlassPanel className="border-white/5">
@@ -270,10 +273,10 @@ export function IPBanPanel() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-white/10">
-                  <th className="text-left py-3 px-4 text-xs text-muted-foreground font-medium uppercase tracking-wide">IP Address</th>
-                  <th className="text-left py-3 px-4 text-xs text-muted-foreground font-medium uppercase tracking-wide">Reason</th>
-                  <th className="text-left py-3 px-4 text-xs text-muted-foreground font-medium uppercase tracking-wide">Banned By</th>
-                  <th className="text-left py-3 px-4 text-xs text-muted-foreground font-medium uppercase tracking-wide">Expires</th>
+                  <th className="text-left py-3 px-4 text-xs text-muted-foreground font-medium uppercase tracking-wide">{uiI18n.t('app.ip_address_11f51070')}</th>
+                  <th className="text-left py-3 px-4 text-xs text-muted-foreground font-medium uppercase tracking-wide">{uiI18n.t('app.reason_f219cc06')}</th>
+                  <th className="text-left py-3 px-4 text-xs text-muted-foreground font-medium uppercase tracking-wide">{uiI18n.t('app.banned_by_b5d48b82')}</th>
+                  <th className="text-left py-3 px-4 text-xs text-muted-foreground font-medium uppercase tracking-wide">{uiI18n.t('app.expires_a99be3da')}</th>
                   <th className="py-3 px-4" />
                 </tr>
               </thead>
@@ -290,7 +293,7 @@ export function IPBanPanel() {
                     <td className="py-3 px-4 text-xs text-muted-foreground">
                       {ban.expires_at
                         ? format(new Date(ban.expires_at), 'MMM d, yyyy HH:mm')
-                        : 'Permanent'}
+                        : uiI18n.t('app.permanent_af0fa7cd')}
                     </td>
                     <td className="py-3 px-4 text-right">
                       <Button
@@ -305,7 +308,7 @@ export function IPBanPanel() {
                         ) : (
                           <Trash2 className="w-3 h-3" />
                         )}
-                        Remove
+                        {uiI18n.t('app.remove_e963907d')}
                       </Button>
                     </td>
                   </tr>

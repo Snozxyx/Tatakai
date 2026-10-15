@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
@@ -29,9 +31,9 @@ type VariantId = "best" | "gem" | "trending";
 type StatusFilter = "all" | "ongoing" | "completed";
 
 const VARIANTS: Array<{ id: VariantId; label: string; hint: string; icon: typeof Target }> = [
-  { id: "best", label: "Best for you", hint: "Ranked by your taste + shelf", icon: Target },
-  { id: "gem", label: "Hidden gem", hint: "High score, few readers", icon: Gem },
-  { id: "trending", label: "Trending now", hint: "What readers open today", icon: Flame },
+  { id: "best", get label() { return uiI18n.t('app.best_for_you_1d81530a'); }, hint: "Ranked by your taste + shelf", icon: Target },
+  { id: "gem", get label() { return uiI18n.t('app.hidden_gem_ce12647f'); }, hint: "High score, few readers", icon: Gem },
+  { id: "trending", get label() { return uiI18n.t('app.trending_now_18292796'); }, hint: "What readers open today", icon: Flame },
 ];
 
 function formatStatus(status?: string | null) {
@@ -85,6 +87,7 @@ function useRankedPicks(
   canShowAdult: boolean,
   readlistIds: Set<string>,
 ) {
+  useUiTranslation();
   return useMemo(() => {
     const eligible = results.filter((item) => {
       if (!item || !routeIdOf(item)) return false;
@@ -135,6 +138,7 @@ function useRankedPicks(
 }
 
 export const NovelSmartDiscover = memo(function NovelSmartDiscover() {
+  useUiTranslation();
   const navigate = useNavigate();
   const { settings } = useContentSafetySettings();
   const canShowAdult = settings.showAdultEverywhere;
@@ -256,12 +260,12 @@ export const NovelSmartDiscover = memo(function NovelSmartDiscover() {
   };
 
   return (
-    <section className="mb-14" aria-label="Smart discover">
+    <section className="mb-14" aria-label={uiI18n.t('app.smart_discover_dc7839a7')}>
       <HomeSectionHeading
         icon={<Sparkles className="h-5 w-5 text-amber-400" />}
-        title="Smart Discover"
+        title={uiI18n.t('app.smart_discover_fc72f560')}
         subtitle={
-          topTasteGenre ? `Tuned to your taste for ${topTasteGenre}` : "Picks tuned to your shelf"
+          topTasteGenre ? uiI18n.t('app.tuned_to_your_taste_for_i18n_value_0_0f52f935', { value0: topTasteGenre }) : uiI18n.t('app.picks_tuned_to_your_shelf_596db53b')
         }
         action={
           <button
@@ -270,7 +274,7 @@ export const NovelSmartDiscover = memo(function NovelSmartDiscover() {
             className="flex shrink-0 items-center gap-2 rounded-full border border-border bg-card px-3.5 py-1.5 text-xs font-bold text-foreground transition-[color,background-color,border-color,opacity,transform]  hover:bg-muted motion-safe:active:scale-[0.98]"
           >
             <Shuffle className="h-3.5 w-3.5 text-primary" />
-            <span>Surprise me</span>
+            <span>{uiI18n.t('app.surprise_me_92898d55')}</span>
           </button>
         }
       />
@@ -308,14 +312,14 @@ export const NovelSmartDiscover = memo(function NovelSmartDiscover() {
       <div className="mb-5 rounded-2xl border border-border bg-muted/30 p-3 backdrop-blur-sm">
         <div className="flex flex-wrap items-center gap-2">
         <select
-          aria-label="Publication status"
+          aria-label={uiI18n.t('app.publication_status_084ea620')}
           value={status}
           onChange={(e) => setStatus(e.target.value as StatusFilter)}
           className="h-10 cursor-pointer rounded-full border border-border bg-card px-3 text-xs font-bold text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors hover:border-primary/30 hover:text-foreground focus:border-primary/60"
         >
-          <option value="all">Any status</option>
-          <option value="ongoing">Ongoing</option>
-          <option value="completed">Completed</option>
+          <option value="all">{uiI18n.t('app.any_status_55201ac9')}</option>
+          <option value="ongoing">{uiI18n.t('app.ongoing_2e0254c2')}</option>
+          <option value="completed">{uiI18n.t('app.completed_1798b3ba')}</option>
         </select>
 
         <div className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto py-0.5" style={{ scrollbarWidth: "none" }}>
@@ -332,7 +336,7 @@ export const NovelSmartDiscover = memo(function NovelSmartDiscover() {
                 : "border-border text-muted-foreground hover:border-primary/30 hover:text-foreground",
             )}
           >
-            All genres
+            {uiI18n.t('app.all_genres_09ac5f61')}
           </button>
           {genres.map((g: string) => (
             <button
@@ -421,7 +425,7 @@ export const NovelSmartDiscover = memo(function NovelSmartDiscover() {
                     <span className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 transition-opacity duration-150 group-hover:opacity-100" />
                     <span className="absolute inset-x-0 bottom-0 flex translate-y-2 items-center justify-center gap-1.5 pb-3 text-[11px] font-bold uppercase tracking-[0.18em] text-white opacity-0 transition-[color,background-color,border-color,opacity,transform] duration-150 group-hover:translate-y-0 group-hover:opacity-100">
                       <BookOpen className="h-3.5 w-3.5" />
-                      Open
+                      {uiI18n.t('app.open_cf9b7706')}
                     </span>
                   </button>
                 </Peekable>
@@ -437,13 +441,13 @@ export const NovelSmartDiscover = memo(function NovelSmartDiscover() {
                     {VARIANTS.find((v) => v.id === variant)?.label}
                   </p>
                   {shortlist.length > 1 && (
-                    <div className="flex items-center gap-1.5" role="tablist" aria-label="Picks">
+                    <div className="flex items-center gap-1.5" role="tablist" aria-label={uiI18n.t('app.picks_f5f61efb')}>
                       {shortlist.map((_, i) => (
                         <button
                           key={i}
                           role="tab"
                           aria-selected={i === pickIndex % shortlist.length}
-                          aria-label={`Pick ${i + 1}`}
+                          aria-label={uiI18n.t('app.pick_i18n_value_0_67eead12', { value0: i + 1 })}
                           onClick={() => setPickIndex(i)}
                           className={cn(
                             "h-1.5 rounded-full transition-[color,background-color,border-color,opacity,transform] duration-150",
@@ -464,7 +468,7 @@ export const NovelSmartDiscover = memo(function NovelSmartDiscover() {
                 {reasons.length > 0 && (
                   <div className="mt-4">
                     <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/60">
-                      Why this pick
+                      {uiI18n.t('app.why_this_pick_4f9784d2')}
                     </p>
                     <ul className="mt-2 flex flex-wrap justify-center gap-1.5 md:justify-start">
                       {reasons.map((reason) => (
@@ -491,7 +495,7 @@ export const NovelSmartDiscover = memo(function NovelSmartDiscover() {
                     <p className="line-clamp-4 text-[13px] leading-relaxed text-white/75 md:text-sm">
                       {synopsis}
                     </p>
-                  ) : <p className="text-sm leading-relaxed text-white/65">{detailError ? "Synopsis couldn’t load. Open the title for more details." : "No synopsis available for this pick."}</p>}
+                  ) : <p className="text-sm leading-relaxed text-white/65">{detailError ? uiI18n.t('app.synopsis_couldn_t_load_open_the_title_for_more_d_b50a327e') : uiI18n.t('app.no_synopsis_available_for_this_pick_10b80ade')}</p>}
                 </div>
 
                 <div className="mx-auto mt-4 grid max-w-md grid-cols-3 divide-x divide-white/10 overflow-hidden rounded-2xl border border-white/10 bg-black/30 backdrop-blur-md md:mx-0">
@@ -500,22 +504,22 @@ export const NovelSmartDiscover = memo(function NovelSmartDiscover() {
                       <Star className="h-3.5 w-3.5 fill-amber text-amber" />
                       {activeScore ?? "—"}
                     </span>
-                    <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-white/60">Score</span>
+                    <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-white/60">{uiI18n.t('app.score_489f4877')}</span>
                   </div>
                   <div className="flex flex-col items-center gap-0.5 px-2 py-3">
                     <span className="text-base font-black tabular-nums text-white">
                       {typeof active.chapters === "number" && active.chapters > 0 ? active.chapters : "—"}
                     </span>
-                    <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-white/60">Chapters</span>
+                    <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-white/60">{uiI18n.t('app.chapters_034e2733')}</span>
                   </div>
                   <div className="flex flex-col items-center gap-0.5 px-2 py-3">
                     <span className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-white">
                       {formatStatus(active.status) === "Ongoing" && (
                         <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
                       )}
-                      {formatStatus(active.status) ?? "Novel"}
+                      {formatStatus(active.status) ?? uiI18n.t('app.novel_1a9fdb91')}
                     </span>
-                    <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-white/60">Status</span>
+                    <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-white/60">{uiI18n.t('app.status_bae7d5be')}</span>
                   </div>
                 </div>
 
@@ -525,7 +529,7 @@ export const NovelSmartDiscover = memo(function NovelSmartDiscover() {
                     className="group flex items-center gap-2 rounded-full bg-gradient-to-b from-primary to-primary px-7 py-3 text-sm font-bold text-primary-foreground shadow-sm transition-[color,background-color,border-color,opacity,transform] hover:bg-primary/90 motion-safe:active:scale-[0.98]"
                   >
                     <BookOpen className="h-4 w-4 transition-transform " />
-                    Start Reading
+                    {uiI18n.t('app.start_reading_ec8c2d85')}
                   </button>
                   <button
                     disabled={shortlist.length < 2}
@@ -533,14 +537,14 @@ export const NovelSmartDiscover = memo(function NovelSmartDiscover() {
                     className="flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-5 py-3 text-sm font-bold text-white backdrop-blur-md transition-[color,background-color,border-color,opacity,transform] hover:border-white/30 hover:bg-white/[0.12] motion-safe:active:scale-[0.98]"
                   >
                     <Shuffle className="h-4 w-4 text-white/80" />
-                    Next pick
+                    {uiI18n.t('app.next_pick_52abeb5d')}
                   </button>
                 </div>
               </div>
             </>
           ) : (
             <div className="mx-auto py-8 text-center">
-              <p className="text-sm text-white/70">{isError ? "Picks couldn’t load. Please try again." : "No picks match those filters — try another genre or status."}</p>
+              <p className="text-sm text-white/70">{isError ? uiI18n.t('app.picks_couldn_t_load_please_try_again_0d653c76') : uiI18n.t('app.no_picks_match_those_filters_try_another_genre_o_f1df178a')}</p>
               <button
                 onClick={() => {
                   if (isError) { void refetch(); return; }
@@ -550,7 +554,7 @@ export const NovelSmartDiscover = memo(function NovelSmartDiscover() {
                 }}
                 className="mt-3 rounded-full border border-white/15 bg-white/10 px-5 py-2 text-xs font-bold text-white transition-colors hover:bg-white/20"
               >
-                {isError ? "Retry picks" : "Reset filters"}
+                {isError ? uiI18n.t('app.retry_picks_686c0217') : uiI18n.t('app.reset_filters_56553100')}
               </button>
             </div>
           )}

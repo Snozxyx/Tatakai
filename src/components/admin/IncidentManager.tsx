@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,7 +15,7 @@ import {
   AlertCircle, Plus, X, CheckCircle, AlertTriangle, 
   Clock, Eye, Loader2, ChevronDown, ChevronUp
 } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from '@/lib/localeFormat';
 
 const SEVERITY_COLORS = {
   minor: 'bg-yellow-500/20 text-yellow-500 border-yellow-500/50',
@@ -38,6 +40,7 @@ const SERVICES = [
 ];
 
 export function IncidentManager() {
+  useUiTranslation();
   const [showForm, setShowForm] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [newIncident, setNewIncident] = useState({
@@ -55,13 +58,13 @@ export function IncidentManager() {
 
   const handleCreate = async () => {
     if (!newIncident.title.trim() || !newIncident.description.trim()) {
-      toast.error('Please fill in title and description');
+      toast.error(uiI18n.t('app.please_fill_in_title_and_description_16257370'));
       return;
     }
 
     try {
       await createIncident.mutateAsync(newIncident);
-      toast.success('Incident created');
+      toast.success(uiI18n.t('app.incident_created_7e803d37'));
       setShowForm(false);
       setNewIncident({
         title: '',
@@ -71,7 +74,7 @@ export function IncidentManager() {
         affected_services: [],
       });
     } catch (error) {
-      toast.error('Failed to create incident');
+      toast.error(uiI18n.t('app.failed_to_create_incident_4e1477c6'));
     }
   };
 
@@ -82,10 +85,10 @@ export function IncidentManager() {
         updates: { status: newStatus },
         updateMessage: updateMessage || `Status changed to ${newStatus}`,
       });
-      toast.success('Incident updated');
+      toast.success(uiI18n.t('app.incident_updated_8a06eb64'));
       setUpdateMessage('');
     } catch (error) {
-      toast.error('Failed to update incident');
+      toast.error(uiI18n.t('app.failed_to_update_incident_01541268'));
     }
   };
 
@@ -103,11 +106,11 @@ export function IncidentManager() {
       <div className="flex items-center justify-between">
         <h2 className="font-display text-xl font-semibold flex items-center gap-2">
           <AlertCircle className="w-5 h-5 text-primary" />
-          Status Page Incidents
+          {uiI18n.t('app.status_page_incidents_7a812e4e')}
         </h2>
         <Button onClick={() => setShowForm(true)} className="gap-2">
           <Plus className="w-4 h-4" />
-          New Incident
+          {uiI18n.t('app.new_incident_37a672b0')}
         </Button>
       </div>
 
@@ -115,7 +118,7 @@ export function IncidentManager() {
       {showForm && (
         <div className="p-6 rounded-xl bg-muted/30 border border-muted space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="font-medium">Create New Incident</h3>
+            <h3 className="font-medium">{uiI18n.t('app.create_new_incident_74342608')}</h3>
             <button onClick={() => setShowForm(false)} className="text-muted-foreground hover:text-foreground">
               <X className="w-5 h-5" />
             </button>
@@ -123,38 +126,36 @@ export function IncidentManager() {
 
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium mb-2 block">Title</label>
+              <label className="text-sm font-medium mb-2 block">{uiI18n.t('app.title_768e0c1c')}</label>
               <Input
                 value={newIncident.title}
                 onChange={(e) => setNewIncident(prev => ({ ...prev, title: e.target.value }))}
-                placeholder="e.g., Video streaming degraded performance"
+                placeholder={uiI18n.t('app.e_g_video_streaming_degraded_performance_f2b4b9fc')}
                 className="bg-muted/50"
               />
             </div>
 
             <div>
-              <label className="text-sm font-medium mb-2 block">Description</label>
+              <label className="text-sm font-medium mb-2 block">{uiI18n.t('app.description_55f8ebc8')}</label>
               <Textarea
                 value={newIncident.description}
                 onChange={(e) => setNewIncident(prev => ({ ...prev, description: e.target.value }))}
-                placeholder="Describe the incident..."
+                placeholder={uiI18n.t('app.describe_the_incident_66db538a')}
                 className="bg-muted/50"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-sm font-medium mb-2 block">Severity</label>
+                <label className="text-sm font-medium mb-2 block">{uiI18n.t('app.severity_de314fa0')}</label>
                 <div className="flex gap-2">
                   {(['minor', 'major', 'critical'] as const).map((severity) => (
                     <button
                       key={severity}
                       onClick={() => setNewIncident(prev => ({ ...prev, severity }))}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${
-                        newIncident.severity === severity 
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${newIncident.severity === severity
                           ? SEVERITY_COLORS[severity] 
-                          : 'border-muted text-muted-foreground hover:border-foreground/30'
-                      }`}
+                          : 'border-muted text-muted-foreground hover:border-foreground/30'}`}
                     >
                       {severity.charAt(0).toUpperCase() + severity.slice(1)}
                     </button>
@@ -163,17 +164,15 @@ export function IncidentManager() {
               </div>
 
               <div>
-                <label className="text-sm font-medium mb-2 block">Status</label>
+                <label className="text-sm font-medium mb-2 block">{uiI18n.t('app.status_bae7d5be')}</label>
                 <div className="flex gap-2 flex-wrap">
                   {(['investigating', 'identified', 'monitoring'] as const).map((status) => (
                     <button
                       key={status}
                       onClick={() => setNewIncident(prev => ({ ...prev, status }))}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                        newIncident.status === status 
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${newIncident.status === status
                           ? STATUS_COLORS[status] 
-                          : 'bg-muted/30 text-muted-foreground hover:bg-muted/50'
-                      }`}
+                          : 'bg-muted/30 text-muted-foreground hover:bg-muted/50'}`}
                     >
                       {status.charAt(0).toUpperCase() + status.slice(1)}
                     </button>
@@ -183,19 +182,17 @@ export function IncidentManager() {
             </div>
 
             <div>
-              <label className="text-sm font-medium mb-2 block">Affected Services</label>
+              <label className="text-sm font-medium mb-2 block">{uiI18n.t('app.affected_services_3856450f')}</label>
               <div className="flex flex-wrap gap-2">
                 {SERVICES.map((service) => (
                   <button
                     key={service}
                     onClick={() => toggleService(service)}
-                    className={`px-3 py-1.5 rounded-lg text-sm transition-all ${
-                      newIncident.affected_services.includes(service)
+                    className={`px-3 py-1.5 rounded-lg text-sm transition-all ${newIncident.affected_services.includes(service)
                         ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted/30 text-muted-foreground hover:bg-muted/50'
-                    }`}
+                        : 'bg-muted/30 text-muted-foreground hover:bg-muted/50'}`}
                   >
-                    {service}
+                    {uiI18n.t(({"Tatakai Website":"app.tatakai_website_0d7f52b3","Video Streaming":"app.video_streaming_800500f5","API Services":"app.api_services_a2070cc1","Authentication":"app.authentication_ee1acfa5","Database":"app.database_61074f1c","Search":"app.search_bce06414"})[service])}
                   </button>
                 ))}
               </div>
@@ -207,7 +204,7 @@ export function IncidentManager() {
               className="gap-2"
             >
               {createIncident.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-              Create Incident
+              {uiI18n.t('app.create_incident_8fd0984a')}
             </Button>
           </div>
         </div>
@@ -219,16 +216,14 @@ export function IncidentManager() {
       ) : incidents.length === 0 ? (
         <div className="text-center py-12">
           <CheckCircle className="w-12 h-12 mx-auto text-green-500 mb-4" />
-          <p className="text-muted-foreground">No incidents reported</p>
+          <p className="text-muted-foreground">{uiI18n.t('app.no_incidents_reported_3d09db9f')}</p>
         </div>
       ) : (
         <div className="space-y-4">
           {incidents.map((incident) => (
             <div
               key={incident.id}
-              className={`p-4 rounded-xl border transition-all ${
-                incident.is_active ? 'border-orange-500/50 bg-orange-500/5' : 'border-muted bg-muted/10'
-              }`}
+              className={`p-4 rounded-xl border transition-all ${incident.is_active ? 'border-orange-500/50 bg-orange-500/5' : 'border-muted bg-muted/10'}`}
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1">
@@ -241,7 +236,7 @@ export function IncidentManager() {
                     </span>
                     {incident.is_active && (
                       <span className="px-2 py-0.5 rounded-full bg-red-500/20 text-red-500 text-xs font-bold">
-                        ACTIVE
+                        {uiI18n.t('app.active_c72633f6')}
                       </span>
                     )}
                   </div>
@@ -259,7 +254,7 @@ export function IncidentManager() {
                   )}
                   
                   <p className="text-xs text-muted-foreground mt-2">
-                    Created {formatDistanceToNow(new Date(incident.created_at), { addSuffix: true })}
+                    {uiI18n.t('app.created_accf40c8')} {formatDistanceToNow(new Date(incident.created_at), { addSuffix: true })}
                   </p>
                 </div>
 
@@ -281,12 +276,12 @@ export function IncidentManager() {
                   {/* Updates */}
                   {incident.updates && incident.updates.length > 0 && (
                     <div className="space-y-2">
-                      <h4 className="text-sm font-medium">Updates</h4>
+                      <h4 className="text-sm font-medium">{uiI18n.t('app.updates_c76d1807')}</h4>
                       {incident.updates.map((update) => (
                         <div key={update.id} className="pl-4 border-l-2 border-muted">
                           <p className="text-sm">{update.message}</p>
                           <p className="text-xs text-muted-foreground">
-                            Status: {update.status} • {formatDistanceToNow(new Date(update.created_at), { addSuffix: true })}
+                            {uiI18n.t('app.status_11dc9e19')} {update.status} • {formatDistanceToNow(new Date(update.created_at), { addSuffix: true })}
                           </p>
                         </div>
                       ))}
@@ -296,12 +291,12 @@ export function IncidentManager() {
                   {/* Update Status */}
                   {incident.is_active && (
                     <div className="space-y-2">
-                      <h4 className="text-sm font-medium">Update Status</h4>
+                      <h4 className="text-sm font-medium">{uiI18n.t('app.update_status_53007c05')}</h4>
                       <div className="flex gap-2">
                         <Input
                           value={updateMessage}
                           onChange={(e) => setUpdateMessage(e.target.value)}
-                          placeholder="Update message..."
+                          placeholder={uiI18n.t('app.update_message_87d84768')}
                           className="flex-1 bg-muted/50"
                         />
                       </div>

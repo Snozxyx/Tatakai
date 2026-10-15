@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { getProxiedImageUrl } from '@/lib/api';
 import { VideoPlayer } from '@/components/video/VideoPlayer';
 import { EmbedPlayer } from '@/components/video/EmbedPlayer';
@@ -6,6 +8,7 @@ import { useWatchRoomContext } from './WatchRoomContext';
 
 /** Centered 16:9 theater stage: countdown screen, the player (embed/video), and live/sync overlays. */
 export function WatchRoomStage() {
+  useUiTranslation();
     const {
         room, streamingData, currentEpisodeId, selectedServer, playerRef,
         isHost, roomId, lastUpdateRef, updatePlayback, handlePlayerError,
@@ -38,8 +41,8 @@ export function WatchRoomStage() {
                             <Timer className="w-8 h-8 sm:w-10 sm:h-10 text-[hsl(var(--isshoni-accent))] animate-pulse" />
                         </div>
                         
-                        <h2 className="text-2xl sm:text-4xl font-bold tracking-tight text-white mb-2 drop-shadow-lg">Starting soon</h2>
-                        <p className="text-xs sm:text-sm font-medium text-white/60 mb-8 uppercase tracking-widest">The broadcast begins in</p>
+                        <h2 className="text-2xl sm:text-4xl font-bold tracking-tight text-white mb-2 drop-shadow-lg">{uiI18n.t('app.starting_soon_2b6722cb')}</h2>
+                        <p className="text-xs sm:text-sm font-medium text-white/60 mb-8 uppercase tracking-widest">{uiI18n.t('app.the_broadcast_begins_in_4f6476d5')}</p>
                         
                         {/* Timer Digits */}
                         <div className="flex items-end justify-center gap-3 sm:gap-5 mb-10 text-white drop-shadow-2xl">
@@ -47,14 +50,14 @@ export function WatchRoomStage() {
                                 <div className="text-5xl sm:text-7xl font-bold tabular-nums tracking-tighter">
                                     {countdown !== null ? Math.floor(countdown / 60) : '0'}
                                 </div>
-                                <div className="text-[10px] sm:text-xs font-semibold text-white/50 mt-1 uppercase tracking-widest">Minutes</div>
+                                <div className="text-[10px] sm:text-xs font-semibold text-white/50 mt-1 uppercase tracking-widest">{uiI18n.t('app.minutes_092f99ea')}</div>
                             </div>
                             <div className="text-4xl sm:text-6xl font-light text-white/20 pb-4 sm:pb-6 animate-pulse">:</div>
                             <div className="flex flex-col items-center">
                                 <div className="text-5xl sm:text-7xl font-bold tabular-nums tracking-tighter">
                                     {(countdown !== null ? countdown % 60 : 0).toString().padStart(2, '0')}
                                 </div>
-                                <div className="text-[10px] sm:text-xs font-semibold text-white/50 mt-1 uppercase tracking-widest">Seconds</div>
+                                <div className="text-[10px] sm:text-xs font-semibold text-white/50 mt-1 uppercase tracking-widest">{uiI18n.t('app.seconds_5fb1db52')}</div>
                             </div>
                         </div>
 
@@ -66,7 +69,7 @@ export function WatchRoomStage() {
                                     <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
                                 </span>
                                 <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-white/90">
-                                    {participants.length} Ready
+                                    {participants.length} {uiI18n.t('app.ready_20c7c552')}
                                 </span>
                             </div>
                             {isHost && (
@@ -76,7 +79,7 @@ export function WatchRoomStage() {
                                         onClick={handleForceStart} 
                                         className="rounded-full bg-[hsl(var(--isshoni-accent))] px-4 py-1.5 text-[11px] sm:text-xs font-bold text-black transition-all hover:bg-[hsl(var(--isshoni-accent)/0.9)] hover:scale-105 active:scale-95 shadow-[0_0_15px_hsl(var(--isshoni-accent)/0.3)]"
                                     >
-                                        Start Now
+                                        {uiI18n.t('app.start_now_7ff050af')}
                                     </button>
                                 </>
                             )}
@@ -104,7 +107,7 @@ export function WatchRoomStage() {
                                     <div className="flex items-center gap-2 rounded-full border border-amber-500/20 bg-amber-500/10 px-4 py-1.5 shadow-[0_0_20px_rgba(245,158,11,0.15)] backdrop-blur-md">
                                         <AlertTriangle className="h-3.5 w-3.5 text-amber-400" />
                                         <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400">
-                                            Sync disabled for embedded sources
+                                            {uiI18n.t('app.sync_disabled_for_embedded_sources_564346e0')}
                                         </span>
                                     </div>
                                 </div>
@@ -130,7 +133,7 @@ export function WatchRoomStage() {
                                             return true;
                                         });
                                     })(streamingData || { subtitles: [], tracks: [] }),
-                                    ...(room.manual_subtitle_url ? [{ lang: 'Manual', url: room.manual_subtitle_url, label: 'Manual' }] : [])
+                                    ...(room.manual_subtitle_url ? [{ lang: 'Manual', url: room.manual_subtitle_url, get label() { return uiI18n.t('app.manual_4e836fdc'); } }] : [])
                                 ]}
                                 isLive={!isHost}
                                 initialSeekSeconds={room.current_time_seconds}
@@ -164,7 +167,7 @@ export function WatchRoomStage() {
                                 )}
                             </div>
                             <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/60">
-                                {loadingSources ? 'Loading stream...' : (room.anime_title ? 'Preparing...' : 'Waiting for host')}
+                                {loadingSources ? uiI18n.t('app.loading_stream_7d551d57') : (room.anime_title ? 'Preparing...' : uiI18n.t('app.waiting_for_host_d10505f2'))}
                             </p>
                         </div>
                     )}
@@ -175,7 +178,7 @@ export function WatchRoomStage() {
                             <div className="flex items-center gap-2.5 rounded-full border border-white/[0.08] bg-black/60 px-3.5 py-1.5 shadow-[0_10px_20px_rgba(0,0,0,0.5)] backdrop-blur-xl">
                                 <div className="flex items-center gap-1.5">
                                     <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.8)]" />
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-white">Live</span>
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-white">{uiI18n.t('app.live_65c821a5')}</span>
                                 </div>
                                 <div className="w-px h-3 bg-white/15" />
                                 <span className="text-[11px] font-semibold text-[hsl(var(--isshoni-accent))] tabular-nums">

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
-import { AlertTriangle, Eye, EyeOff, Globe, History, Search, Shield, Trash2 } from 'lucide-react';
+import { AlertTriangle, EyeOff, Globe, History, Search, Shield, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/contexts/AuthContext';
@@ -19,6 +20,7 @@ import {
  * `mature-content-controls`) into view once mounted, for deep-links.
  */
 export function PrivacyPanel({ section }: { section?: string }) {
+  const { t } = useTranslation();
   const { user, profile } = useAuth();
   const { settings: contentSafetySettings, updateSettings: updateContentSafetySettings } = useContentSafetySettings();
   const updatePrivacy = useUpdateProfilePrivacy();
@@ -45,20 +47,20 @@ export function PrivacyPanel({ section }: { section?: string }) {
     setIsPublic(value);
     try {
       await updatePrivacy.mutateAsync(value);
-      toast.success(value ? 'Profile is now public' : 'Profile is now private');
+      toast.success(value ? t('privacy.publicNow') : t('privacy.privateNow'));
     } catch (error) {
       setIsPublic(!value);
-      toast.error('Failed to update privacy settings');
+      toast.error(t('privacy.updateFailed'));
     }
   };
 
   const handleClearHistory = async () => {
     try {
       await clearHistory.mutateAsync();
-      toast.success('All watch history cleared');
+      toast.success(t('privacy.historyCleared'));
       setShowClearConfirm(false);
     } catch {
-      toast.error('Failed to clear history');
+      toast.error(t('privacy.historyClearFailed'));
     }
   };
 
@@ -66,18 +68,18 @@ export function PrivacyPanel({ section }: { section?: string }) {
     <SettingsSection
       id="mature-content-controls"
       icon={AlertTriangle}
-      eyebrow="Content safety"
-      title="Mature content controls"
+      eyebrow={t('privacy.matureEyebrow')}
+      title={t('privacy.matureTitle')}
       description={
         signedIn
-          ? 'Hide 18+ titles by default, blur explicit search results, and decide whether warnings appear before opening.'
-          : 'These settings are local to this device and apply even when you are not signed in.'
+          ? t('privacy.matureDescriptionSignedIn')
+          : t('privacy.matureDescriptionGuest')
       }
     >
       <div>
         <SettingRow
-          title="Show Mature Media Everywhere"
-          description="Includes mature titles in home shelves and non-explicit discovery lists."
+          title={t('privacy.showEverywhere')}
+          description={t('privacy.showEverywhereDescription')}
           control={
             <Switch
               checked={contentSafetySettings.showAdultEverywhere}
@@ -86,8 +88,8 @@ export function PrivacyPanel({ section }: { section?: string }) {
                 if (signedIn) {
                   toast.success(
                     checked
-                      ? 'Mature media is now visible across discovery.'
-                      : 'Mature media will stay hidden unless explicitly searched.',
+                      ? t('privacy.showEverywhereOn')
+                      : t('privacy.showEverywhereOff'),
                   );
                 }
               }}
@@ -95,30 +97,30 @@ export function PrivacyPanel({ section }: { section?: string }) {
           }
         />
         <SettingRow
-          title="Blur Mature Search Results"
-          description="When explicit queries are used in safe mode, mature covers stay blurred in search results."
+          title={t('privacy.blurSearch')}
+          description={t('privacy.blurSearchDescription')}
           control={
             <Switch
               checked={contentSafetySettings.blurAdultInSearch}
               onCheckedChange={(checked) => {
                 updateContentSafetySettings({ blurAdultInSearch: checked });
                 if (signedIn) {
-                  toast.success(checked ? 'Mature search results will be blurred.' : 'Mature search results will be shown clearly.');
+                  toast.success(checked ? t('privacy.blurSearchOn') : t('privacy.blurSearchOff'));
                 }
               }}
             />
           }
         />
         <SettingRow
-          title="Warn Before Opening Mature Media"
-          description="Shows a warning screen before loading mature manga or anime details, chapters, or episodes."
+          title={t('privacy.warnBefore')}
+          description={t('privacy.warnBeforeDescription')}
           control={
             <Switch
               checked={contentSafetySettings.warnBeforeAdultOpen}
               onCheckedChange={(checked) => {
                 updateContentSafetySettings({ warnBeforeAdultOpen: checked });
                 if (signedIn) {
-                  toast.success(checked ? 'Mature content warnings enabled.' : 'Mature content warnings disabled.');
+                  toast.success(checked ? t('privacy.warnOn') : t('privacy.warnOff'));
                 }
               }}
             />
@@ -132,10 +134,10 @@ export function PrivacyPanel({ section }: { section?: string }) {
     return (
       <div className="space-y-6">
         {matureControls(false)}
-        <SettingsSection icon={Shield} eyebrow="Account" title="Profile privacy">
+        <SettingsSection icon={Shield} eyebrow={t('privacy.accountEyebrow')} title={t('privacy.profilePrivacyTitle')}>
           <div className="flex flex-col items-center gap-4 py-4 text-center">
-            <p className="text-sm text-muted-foreground">Sign in to manage profile privacy settings</p>
-            <Button onClick={() => (window.location.href = '/auth')}>Sign In</Button>
+            <p className="text-sm text-muted-foreground">{t('privacy.signInPrompt')}</p>
+            <Button onClick={() => (window.location.href = '/auth')}>{t('privacy.signIn')}</Button>
           </div>
         </SettingsSection>
       </div>
@@ -148,34 +150,34 @@ export function PrivacyPanel({ section }: { section?: string }) {
 
       <SettingsSection
         icon={isPublic ? Globe : EyeOff}
-        eyebrow="Visibility"
-        title="Public profile"
-        description="Control who can see your profile, watchlist, and history."
+        eyebrow={t('privacy.visibilityEyebrow')}
+        title={t('privacy.publicProfileTitle')}
+        description={t('privacy.publicProfileDescription')}
       >
         <div className="space-y-3">
           <SettingRow
-            title="Public Profile"
+            title={t('privacy.publicProfile')}
             badge={
               <SettingsBadge tone={isPublic ? 'success' : 'muted'}>
-                {isPublic ? 'Public' : 'Private'}
+                {isPublic ? t('privacy.public') : t('privacy.private')}
               </SettingsBadge>
             }
             description={
               isPublic
-                ? 'Your profile, watchlist, and history are visible to everyone.'
-                : 'Only you can see your profile, watchlist, and history.'
+                ? t('privacy.publicDescription')
+                : t('privacy.privateDescription')
             }
             control={
               <Switch checked={isPublic} onCheckedChange={handlePrivacyChange} disabled={updatePrivacy.isPending} />
             }
           />
           <div className="rounded-xl border border-white/5 bg-muted/30 p-4">
-            <p className="text-sm text-muted-foreground">When your profile is public, other users can view your:</p>
+            <p className="text-sm text-muted-foreground">{t('privacy.visibleToOthers')}</p>
             <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-muted-foreground">
-              <li>Profile information and avatar</li>
-              <li>Watchlist (favorited anime)</li>
-              <li>Watch history and progress</li>
-              <li>Tier lists you've created</li>
+              <li>{t('privacy.visibleInfo')}</li>
+              <li>{t('privacy.visibleWatchlist')}</li>
+              <li>{t('privacy.visibleHistory')}</li>
+              <li>{t('privacy.visibleTierLists')}</li>
             </ul>
           </div>
         </div>
@@ -183,20 +185,20 @@ export function PrivacyPanel({ section }: { section?: string }) {
 
       <SettingsSection
         icon={History}
-        eyebrow="Data"
-        title="History"
-        description="Permanently remove your watch and search history."
+        eyebrow={t('privacy.historyEyebrow')}
+        title={t('privacy.historyTitle')}
+        description={t('privacy.historyDescription')}
       >
         <div>
           <SettingRow
             icon={Trash2}
-            title="Clear Watch History"
-            description="Permanently delete all your watch history. This action cannot be undone."
+            title={t('privacy.clearWatchHistory')}
+            description={t('privacy.clearWatchHistoryDescription')}
             control={
               !showClearConfirm ? (
                 <Button variant="destructive" size="sm" onClick={() => setShowClearConfirm(true)} className="gap-2">
                   <Trash2 className="h-4 w-4" />
-                  Clear
+                  {t('privacy.clear')}
                 </Button>
               ) : undefined
             }
@@ -205,7 +207,7 @@ export function PrivacyPanel({ section }: { section?: string }) {
               <div className="space-y-3">
                 <div className="rounded-lg border border-destructive bg-destructive/20 p-3">
                   <p className="text-sm font-medium text-destructive">
-                    Are you sure? This will permanently delete all your watch history and progress.
+                    {t('privacy.clearConfirm')}
                   </p>
                 </div>
                 <div className="flex gap-2">
@@ -217,10 +219,10 @@ export function PrivacyPanel({ section }: { section?: string }) {
                     className="gap-2"
                   >
                     <Trash2 className="h-4 w-4" />
-                    {clearHistory.isPending ? 'Clearing...' : 'Yes, Delete All'}
+                    {clearHistory.isPending ? t('common.clearing') : t('common.yesDeleteAll')}
                   </Button>
                   <Button variant="outline" size="sm" onClick={() => setShowClearConfirm(false)} disabled={clearHistory.isPending}>
-                    Cancel
+                    {t('common.cancel')}
                   </Button>
                 </div>
               </div>
@@ -228,8 +230,8 @@ export function PrivacyPanel({ section }: { section?: string }) {
           </SettingRow>
           <SettingRow
             icon={Search}
-            title="Clear Search History"
-            description="Delete all your search history stored locally on this device."
+            title={t('privacy.clearSearchHistory')}
+            description={t('privacy.clearSearchHistoryDescription')}
             control={
               <Button
                 variant="outline"
@@ -237,15 +239,15 @@ export function PrivacyPanel({ section }: { section?: string }) {
                 onClick={() => {
                   try {
                     localStorage.removeItem('tatakai_search_history');
-                    toast.success('Search history cleared');
+                    toast.success(t('privacy.searchCleared'));
                   } catch {
-                    toast.error('Failed to clear search history');
+                    toast.error(t('privacy.searchClearFailed'));
                   }
                 }}
                 className="gap-2"
               >
                 <Trash2 className="h-4 w-4" />
-                Clear
+                {t('privacy.clear')}
               </Button>
             }
           />

@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState } from 'react';
 import { Background } from '@/components/layout/Background';
 import { Sidebar } from '@/components/layout/Sidebar';
@@ -30,19 +32,19 @@ import { BookOpen } from 'lucide-react';
 type RecommendationFeedback = 'like' | 'dislike' | 'already_seen' | 'skip';
 
 const FACTOR_ITEMS: Array<{ key: keyof RecommendationFactors; label: string; color: string }> = [
-  { key: 'genreMatch', label: 'Genre fit', color: 'bg-primary' },
-  { key: 'collaborative', label: 'Community', color: 'bg-fuchsia-500' },
-  { key: 'ratingMatch', label: 'Rating fit', color: 'bg-green-500' },
-  { key: 'studioMatch', label: 'Studio fit', color: 'bg-amber-500' },
-  { key: 'tagMatch', label: 'Theme fit', color: 'bg-blue-500' },
-  { key: 'recencyBoost', label: 'Era fit', color: 'bg-cyan-500' },
-  { key: 'popularityBoost', label: 'Popularity', color: 'bg-rose-500' },
+  { key: 'genreMatch', get label() { return uiI18n.t('app.genre_fit_12ca4401'); }, color: 'bg-primary' },
+  { key: 'collaborative', get label() { return uiI18n.t('app.community_bfd58ee3'); }, color: 'bg-fuchsia-500' },
+  { key: 'ratingMatch', get label() { return uiI18n.t('app.rating_fit_1d470498'); }, color: 'bg-green-500' },
+  { key: 'studioMatch', get label() { return uiI18n.t('app.studio_fit_9cda8e16'); }, color: 'bg-amber-500' },
+  { key: 'tagMatch', get label() { return uiI18n.t('app.theme_fit_04b84dd0'); }, color: 'bg-blue-500' },
+  { key: 'recencyBoost', get label() { return uiI18n.t('app.era_fit_38f6488f'); }, color: 'bg-cyan-500' },
+  { key: 'popularityBoost', get label() { return uiI18n.t('app.popularity_be6c200f'); }, color: 'bg-rose-500' },
 ];
 
 const TIER_STYLES: Record<string, { dot: string; label: string }> = {
-  strong: { dot: 'bg-green-500', label: 'Strong match' },
-  possible: { dot: 'bg-yellow-500', label: 'Possible match' },
-  weak: { dot: 'bg-gray-500', label: 'Weak match' },
+  strong: { dot: 'bg-green-500', get label() { return uiI18n.t('app.strong_match_a99cde57'); } },
+  possible: { dot: 'bg-yellow-500', get label() { return uiI18n.t('app.possible_match_d11ba676'); } },
+  weak: { dot: 'bg-gray-500', get label() { return uiI18n.t('app.weak_match_7334132e'); } },
 };
 
 function RecommendationCard({
@@ -54,6 +56,7 @@ function RecommendationCard({
   feedback?: RecommendationFeedback;
   onFeedback: (animeId: string, feedback: RecommendationFeedback, rec: EngineRecommendation) => void;
 }) {
+  useUiTranslation();
   const { anime, score, confidence, reasons, factors, tier } = recommendation;
   const [showExplain, setShowExplain] = useState(false);
   const tierStyle = tier ? TIER_STYLES[tier] : undefined;
@@ -79,10 +82,10 @@ function RecommendationCard({
           <div className="flex flex-wrap items-center gap-1.5">
             <div className={`shrink-0 whitespace-nowrap px-2 py-1 rounded-md text-[11px] font-bold ${confidence > 0.7 ? 'bg-green-500/80 text-white' :
               confidence > 0.4 ? 'bg-yellow-500/80 text-white' : 'bg-gray-500/80 text-white'}`}>
-              {confidence > 0.7 ? 'High' : confidence > 0.4 ? 'Medium' : 'Low'} Match
+              {confidence > 0.7 ? uiI18n.t('app.high_b1a5954a') : confidence > 0.4 ? uiI18n.t('app.medium_d404968e') : uiI18n.t('app.low_a124947c')} {uiI18n.t('app.match_0335207f')}
             </div>
             {tierStyle && (
-              <div className="shrink-0 whitespace-nowrap px-2 py-1 rounded-md text-[10px] font-bold bg-black/60 text-white flex items-center gap-1.5" title="How this score compares to titles you rated">
+              <div className="shrink-0 whitespace-nowrap px-2 py-1 rounded-md text-[10px] font-bold bg-black/60 text-white flex items-center gap-1.5" title={uiI18n.t('app.how_this_score_compares_to_titles_you_rated_0a057dca')}>
                 <span className={`w-1.5 h-1.5 rounded-full ${tierStyle.dot}`} />
                 {tierStyle.label}
               </div>
@@ -107,34 +110,34 @@ function RecommendationCard({
 
           {feedback && (
             <div className="text-[10px] uppercase tracking-wide text-primary font-bold">
-              Feedback: {feedback.replace('_', ' ')}
+              {uiI18n.t('app.feedback_da4abb9f')} {feedback.replace('_', ' ')}
             </div>
           )}
 
           <div className="flex flex-wrap items-center gap-1.5">
             <button type="button" onClick={() => onFeedback(anime.id, 'like', recommendation)}
               className={`h-7 px-2 rounded-md border text-[10px] font-bold uppercase tracking-wide ${feedback === 'like' ? 'bg-green-500/20 text-green-400 border-green-500/40' : 'bg-white/5 border-white/10 hover:border-green-500/40'}`}
-              title="More like this">
+              title={uiI18n.t('app.more_like_this_a11d8172')}>
               <ThumbsUp className="w-3 h-3" />
             </button>
             <button type="button" onClick={() => onFeedback(anime.id, 'dislike', recommendation)}
               className={`h-7 px-2 rounded-md border text-[10px] font-bold uppercase tracking-wide ${feedback === 'dislike' ? 'bg-red-500/20 text-red-400 border-red-500/40' : 'bg-white/5 border-white/10 hover:border-red-500/40'}`}
-              title="Not interested">
+              title={uiI18n.t('app.not_interested_41d90aba')}>
               <ThumbsDown className="w-3 h-3" />
             </button>
             <button type="button" onClick={() => onFeedback(anime.id, 'skip', recommendation)}
               className={`h-7 px-2 rounded-md border text-[10px] font-bold uppercase tracking-wide ${feedback === 'skip' ? 'bg-slate-500/25 text-slate-300 border-slate-400/40' : 'bg-white/5 border-white/10 hover:border-slate-400/40'}`}
-              title="Skip for now">
-              Skip
+              title={uiI18n.t('app.skip_for_now_6fc09607')}>
+              {uiI18n.t('app.skip_3da47453')}
             </button>
             <button type="button" onClick={() => onFeedback(anime.id, 'already_seen', recommendation)}
               className={`h-7 px-2 rounded-md border text-[10px] font-bold uppercase tracking-wide ${feedback === 'already_seen' ? 'bg-amber-500/20 text-amber-400 border-amber-500/40' : 'bg-white/5 border-white/10 hover:border-amber-500/40'}`}
-              title="Already watched">
+              title={uiI18n.t('app.already_watched_5685a59d')}>
               <EyeOff className="w-3 h-3" />
             </button>
             <button type="button" onClick={() => setShowExplain((p) => !p)}
               className="h-7 px-2 rounded-md border border-white/10 bg-white/5 text-[10px] font-bold uppercase tracking-wide flex items-center gap-1">
-              Why
+              {uiI18n.t('app.why_21e2caea')}
               <ChevronDown className={`w-3 h-3 transition-transform ${showExplain ? 'rotate-180' : ''}`} />
             </button>
           </div>
@@ -161,6 +164,7 @@ function RecommendationCard({
 }
 
 function TasteProfileDisplay({ profile }: { profile: TasteProfile }) {
+  useUiTranslation();
   const radarData = profile.topGenres.slice(0, 6).map((g) => ({
     genre: g.genre,
     weight: Math.round(g.weight * 100),
@@ -173,9 +177,9 @@ function TasteProfileDisplay({ profile }: { profile: TasteProfile }) {
           <Brain className="w-6 h-6 text-primary" />
         </div>
         <div>
-          <h2 className="text-xl font-bold">Your Taste Profile</h2>
+          <h2 className="text-xl font-bold">{uiI18n.t('app.your_taste_profile_703b86dd')}</h2>
           <p className="text-sm text-muted-foreground">
-            Built from {profile.sampleSize} title{profile.sampleSize === 1 ? '' : 's'} across your lists, ratings and history
+            {uiI18n.t('app.built_from_a3d5f439')} {profile.sampleSize} {uiI18n.t('app.title_3c6de1b7')}{profile.sampleSize === 1 ? '' : 's'} {uiI18n.t('app.across_your_lists_ratings_and_history_3ef12e03')}
           </p>
         </div>
       </div>
@@ -193,7 +197,7 @@ function TasteProfileDisplay({ profile }: { profile: TasteProfile }) {
           </div>
         ) : (
           <div>
-            <h3 className="text-sm font-bold text-muted-foreground mb-2">Top Genres</h3>
+            <h3 className="text-sm font-bold text-muted-foreground mb-2">{uiI18n.t('app.top_genres_dd8a1654')}</h3>
             <div className="space-y-1">
               {profile.topGenres.slice(0, 5).map((g, i) => (
                 <div key={i} className="flex items-center justify-between">
@@ -212,15 +216,15 @@ function TasteProfileDisplay({ profile }: { profile: TasteProfile }) {
 
         <div className="space-y-4">
           <div>
-            <h3 className="text-sm font-bold text-muted-foreground mb-2">Rating Range</h3>
+            <h3 className="text-sm font-bold text-muted-foreground mb-2">{uiI18n.t('app.rating_range_a0eacf18')}</h3>
             <p className="text-sm">
-              {profile.ratingRange.min.toFixed(1)} - {profile.ratingRange.max.toFixed(1)} (avg: {profile.ratingRange.average.toFixed(1)})
+              {profile.ratingRange.min.toFixed(1)} - {profile.ratingRange.max.toFixed(1)} {uiI18n.t('app.avg_50cf99ab')} {profile.ratingRange.average.toFixed(1)})
             </p>
           </div>
 
           {profile.topStudios.length > 0 && (
             <div>
-              <h3 className="text-sm font-bold text-muted-foreground mb-2">Favorite Studios</h3>
+              <h3 className="text-sm font-bold text-muted-foreground mb-2">{uiI18n.t('app.favorite_studios_a8418fa3')}</h3>
               <div className="flex flex-wrap gap-2">
                 {profile.topStudios.slice(0, 4).map((s, i) => (
                   <span key={i} className="px-2 py-1 bg-primary/20 text-primary text-xs rounded">{s.studio}</span>
@@ -231,16 +235,16 @@ function TasteProfileDisplay({ profile }: { profile: TasteProfile }) {
 
           {profile.accuracy != null && (
             <div>
-              <h3 className="text-sm font-bold text-muted-foreground mb-2">Prediction Accuracy</h3>
+              <h3 className="text-sm font-bold text-muted-foreground mb-2">{uiI18n.t('app.prediction_accuracy_c91838df')}</h3>
               <p className="text-sm">
-                Off by <span className="font-bold text-primary">{profile.accuracy.toFixed(1)}%</span> on average
-                <span className="text-muted-foreground"> — predicted scores vs. your actual ratings</span>
+                {uiI18n.t('app.off_by_92e82f03')} <span className="font-bold text-primary">{profile.accuracy.toFixed(1)}%</span> {uiI18n.t('app.on_average_352c9b65')}
+                <span className="text-muted-foreground"> {uiI18n.t('app.predicted_scores_vs_your_actual_ratings_407ba5ea')}</span>
               </p>
             </div>
           )}
 
           <div>
-            <h3 className="text-sm font-bold text-muted-foreground mb-2">Diversity Score</h3>
+            <h3 className="text-sm font-bold text-muted-foreground mb-2">{uiI18n.t('app.diversity_score_5370dacb')}</h3>
             <div className="flex items-center gap-2">
               <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
                 <div className="h-full bg-green-500" style={{ width: `${profile.diversityScore * 100}%` }} />
@@ -248,7 +252,7 @@ function TasteProfileDisplay({ profile }: { profile: TasteProfile }) {
               <span className="text-sm font-bold">{Math.round(profile.diversityScore * 100)}%</span>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {profile.diversityScore > 0.7 ? 'Very diverse taste' : profile.diversityScore > 0.4 ? 'Moderate diversity' : 'Focused preferences'}
+              {profile.diversityScore > 0.7 ? uiI18n.t('app.very_diverse_taste_67ea62c6') : profile.diversityScore > 0.4 ? uiI18n.t('app.moderate_diversity_143890c1') : uiI18n.t('app.focused_preferences_645d118e')}
             </p>
           </div>
         </div>
@@ -258,6 +262,7 @@ function TasteProfileDisplay({ profile }: { profile: TasteProfile }) {
 }
 
 export default function RecommendationsPage() {
+  useUiTranslation();
   const isDesktopApp = useIsDesktopApp();
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -293,7 +298,7 @@ export default function RecommendationsPage() {
 
   const feedbackMutation = useMutation({
     mutationFn: async ({ animeId, feedback, recommendation }: { animeId: string; feedback: RecommendationFeedback; recommendation: EngineRecommendation }) => {
-      if (!user) throw new Error('Not authenticated');
+      if (!user) throw new Error(uiI18n.t('app.not_authenticated_0c91acba'));
       const payload = {
         user_id: user.id,
         anime_id: animeId,
@@ -319,10 +324,10 @@ export default function RecommendationsPage() {
   const handleFeedback = (animeId: string, feedback: RecommendationFeedback, recommendation: EngineRecommendation) => {
     feedbackMutation.mutate({ animeId, feedback, recommendation }, {
       onSuccess: () => {
-        const label = feedback === 'already_seen' ? 'already watched' : feedback;
-        toast.success(`Feedback saved: ${label}`);
+        const label = feedback === 'already_seen' ? uiI18n.t('app.already_watched_435ea51f') : feedback;
+        toast.success(uiI18n.t('app.feedback_saved_i18n_value_0_2a1bf1cf', { value0: label }));
       },
-      onError: (error: any) => toast.error(error?.message || 'Failed to save recommendation feedback'),
+      onError: (error: any) => toast.error(error?.message || uiI18n.t('app.failed_to_save_recommendation_feedback_e72fa26e')),
     });
   };
 
@@ -331,8 +336,8 @@ export default function RecommendationsPage() {
       <div className="min-h-screen bg-background flex items-center justify-center">
         <GlassPanel className="p-8 text-center max-w-md">
           <Sparkles className="w-16 h-16 mx-auto mb-4 text-primary" />
-          <h2 className="text-2xl font-bold mb-2">Sign In Required</h2>
-          <p className="text-muted-foreground mb-4">Sign in to get personalized recommendations from your lists, ratings and viewing history.</p>
+          <h2 className="text-2xl font-bold mb-2">{uiI18n.t('app.sign_in_required_05e76e79')}</h2>
+          <p className="text-muted-foreground mb-4">{uiI18n.t('app.sign_in_to_get_personalized_recommendations_from_be5f978f')}</p>
         </GlassPanel>
       </div>
     );
@@ -358,8 +363,8 @@ export default function RecommendationsPage() {
               <Sparkles className="w-6 h-6 text-primary" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold">Recommendations</h1>
-              <p className="text-muted-foreground">Personalized from your lists, ratings and history, blended with what similar fans enjoy</p>
+              <h1 className="text-3xl font-bold">{uiI18n.t('app.recommendations_4faa65b5')}</h1>
+              <p className="text-muted-foreground">{uiI18n.t('app.personalized_from_your_lists_ratings_and_history_3ddd9fa6')}</p>
             </div>
           </div>
         </div>
@@ -376,29 +381,29 @@ export default function RecommendationsPage() {
         ) : (
           <GlassPanel className="p-6 text-center">
             <Brain className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-            <p className="text-muted-foreground">Watch, rate or add some anime to build your taste profile.</p>
+            <p className="text-muted-foreground">{uiI18n.t('app.watch_rate_or_add_some_anime_to_build_your_taste_a58cca88')}</p>
           </GlassPanel>
         )}
 
         <Tabs defaultValue="grid" className="mt-8">
           <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
             <TabsList>
-              <TabsTrigger value="grid" className="gap-2"><TrendingUp className="w-4 h-4" /> For You</TabsTrigger>
-              <TabsTrigger value="manga" className="gap-2"><BookOpen className="w-4 h-4" /> Manga</TabsTrigger>
-              <TabsTrigger value="novels" className="gap-2"><BookOpen className="w-4 h-4" /> Novels</TabsTrigger>
-              <TabsTrigger value="atlas" className="gap-2"><Compass className="w-4 h-4" /> Atlas</TabsTrigger>
+              <TabsTrigger value="grid" className="gap-2"><TrendingUp className="w-4 h-4" /> {uiI18n.t('app.for_you_21f25753')}</TabsTrigger>
+              <TabsTrigger value="manga" className="gap-2"><BookOpen className="w-4 h-4" /> {uiI18n.t('app.manga_87db0f99')}</TabsTrigger>
+              <TabsTrigger value="novels" className="gap-2"><BookOpen className="w-4 h-4" /> {uiI18n.t('app.novels_4ae488fd')}</TabsTrigger>
+              <TabsTrigger value="atlas" className="gap-2"><Compass className="w-4 h-4" /> {uiI18n.t('app.atlas_8bd28d90')}</TabsTrigger>
             </TabsList>
 
             <div className="flex flex-wrap items-center gap-4">
               <div className="flex items-center gap-3 min-w-[220px]">
-                <span className="text-xs text-muted-foreground whitespace-nowrap">Popular</span>
+                <span className="text-xs text-muted-foreground whitespace-nowrap">{uiI18n.t('app.popular_9bc2c5b3')}</span>
                 <Slider value={[nicheBoost]} min={0} max={1} step={0.05} onValueChange={(v) => setNicheBoost(v[0])} className="w-32" />
-                <span className="text-xs text-muted-foreground whitespace-nowrap">Niche</span>
+                <span className="text-xs text-muted-foreground whitespace-nowrap">{uiI18n.t('app.niche_d6aa4102')}</span>
               </div>
               <div className="flex gap-2">
-                <Button variant={filter === 'all' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('all')}>All</Button>
-                <Button variant={filter === 'high' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('high')}>High</Button>
-                <Button variant={filter === 'medium' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('medium')}>Medium</Button>
+                <Button variant={filter === 'all' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('all')}>{uiI18n.t('app.all_6a720856')}</Button>
+                <Button variant={filter === 'high' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('high')}>{uiI18n.t('app.high_b1a5954a')}</Button>
+                <Button variant={filter === 'medium' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('medium')}>{uiI18n.t('app.medium_d404968e')}</Button>
               </div>
             </div>
           </div>
@@ -424,14 +429,14 @@ export default function RecommendationsPage() {
             ) : (
               <GlassPanel className="p-8 text-center">
                 <Film className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                <p className="text-muted-foreground">No recommendations yet. Watch and rate more anime to improve suggestions.</p>
+                <p className="text-muted-foreground">{uiI18n.t('app.no_recommendations_yet_watch_and_rate_more_anime_41af36ab')}</p>
               </GlassPanel>
             )}
 
             {recommendations.some((r) => r.factors.collaborative > 0) && (
               <p className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
                 <Users className="w-3.5 h-3.5" />
-                Community signal is active — some picks are boosted by fans with similar taste.
+                {uiI18n.t('app.community_signal_is_active_some_picks_are_booste_ad25e6d7')}
               </p>
             )}
           </TabsContent>
@@ -439,8 +444,8 @@ export default function RecommendationsPage() {
           <TabsContent value="manga">
             <div className="flex items-center gap-2 mb-4">
               <BookOpen className="w-5 h-5 text-primary" />
-              <h2 className="text-lg font-bold">Manga, Manhwa & Manhua for you</h2>
-              <span className="text-xs text-muted-foreground">Based on your readlist</span>
+              <h2 className="text-lg font-bold">{uiI18n.t('app.manga_manhwa_manhua_for_you_4d15d41f')}</h2>
+              <span className="text-xs text-muted-foreground">{uiI18n.t('app.based_on_your_readlist_2964c256')}</span>
             </div>
             <MangaRecommendationGrid recommendations={mangaRecs} isLoading={loadingManga} />
           </TabsContent>
@@ -448,8 +453,8 @@ export default function RecommendationsPage() {
           <TabsContent value="novels">
             <div className="flex items-center gap-2 mb-4">
               <BookOpen className="w-5 h-5 text-primary" />
-              <h2 className="text-lg font-bold">Light novels for you</h2>
-              <span className="text-xs text-muted-foreground">Based on your novel library</span>
+              <h2 className="text-lg font-bold">{uiI18n.t('app.light_novels_for_you_80013f13')}</h2>
+              <span className="text-xs text-muted-foreground">{uiI18n.t('app.based_on_your_novel_library_97e1d559')}</span>
             </div>
             <NovelRecommendationGrid recommendations={novelRecs} isLoading={loadingNovels} />
           </TabsContent>

@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -26,6 +28,7 @@ export function OverviewSocialConnections({
   followersCount = 0,
   followingCount = 0,
 }: OverviewSocialConnectionsProps) {
+  useUiTranslation();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<SocialTab>('followers');
 
@@ -59,16 +62,16 @@ export function OverviewSocialConnections({
               <Users className="w-3.5 h-3.5" />
             </div>
             <h4 className="font-display font-bold text-sm text-foreground tracking-tight">
-              Social Connections
+              {uiI18n.t('app.social_connections_2a4899dc')}
             </h4>
           </div>
 
           <Link
             to={username ? `/social/${username}?tab=${activeTab}` : '#'}
             className="flex items-center gap-0.5 text-[11px] font-medium text-indigo-400 hover:text-indigo-300 transition-colors group shrink-0 focus-visible:outline-none focus-visible:underline"
-            aria-label="View all social connections"
+            aria-label={uiI18n.t('app.view_all_social_connections_38ccac58')}
           >
-            <span>View All</span>
+            <span>{uiI18n.t('app.view_all_efd83559')}</span>
             <ChevronRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
           </Link>
         </div>
@@ -76,7 +79,7 @@ export function OverviewSocialConnections({
         {/* Followers / Following toggle */}
         <div
           role="tablist"
-          aria-label="Social connections filter"
+          aria-label={uiI18n.t('app.social_connections_filter_b633421d')}
           className="flex items-center gap-1 bg-black/20 p-1 rounded-xl border border-white/[0.03]"
         >
           <button
@@ -93,7 +96,7 @@ export function OverviewSocialConnections({
             <span className="font-display font-bold text-sm text-foreground tabular-nums">
               <AnimatedCounter value={followersCount} />
             </span>
-            <span className="text-[10px] font-semibold text-muted-foreground/80">Followers</span>
+            <span className="text-[10px] font-semibold text-muted-foreground/80">{uiI18n.t('app.followers_78eaabf4')}</span>
           </button>
 
           <div className="w-px h-4 bg-white/[0.06] shrink-0" />
@@ -112,7 +115,7 @@ export function OverviewSocialConnections({
             <span className="font-display font-bold text-sm text-foreground tabular-nums">
               <AnimatedCounter value={followingCount} />
             </span>
-            <span className="text-[10px] font-semibold text-muted-foreground/80">Following</span>
+            <span className="text-[10px] font-semibold text-muted-foreground/80">{uiI18n.t('app.following_90eeb100')}</span>
           </button>
         </div>
 
@@ -165,7 +168,7 @@ export function OverviewSocialConnections({
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.15, delay: idx * 0.04 }}
                       className="group/card relative overflow-hidden rounded-xl border border-white/[0.07] text-left transition-all duration-200 hover:border-white/[0.14]"
-                      aria-label={`View ${name}'s profile`}
+                      aria-label={uiI18n.t('app.view_i18n_value_0_s_profile_9867fb9b', { value0: name })}
                     >
                       {/* Banner fills the whole card */}
                       {u.banner_url ? (
@@ -225,7 +228,7 @@ export function OverviewSocialConnections({
               >
                 <Users className="w-5 h-5 mx-auto text-muted-foreground/30 mb-1.5" />
                 <p className="text-xs text-muted-foreground/60">
-                  No {activeTab} found yet
+                  {uiI18n.t('app.no_816c52fd')} {activeTab} {uiI18n.t('app.found_yet_de24674a')}
                 </p>
               </motion.div>
             )}

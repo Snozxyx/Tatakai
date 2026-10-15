@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
  * Novel readlist — progress + library state for light novels.
  *
@@ -92,6 +94,7 @@ const toItem = (row: any): NovelReadlistItem => ({
 });
 
 export function useNovelReadlist() {
+  useUiTranslation();
   const { user } = useAuth();
   return useQuery({
     queryKey: ['novel-readlist', user?.id],
@@ -113,6 +116,7 @@ export function useNovelReadlist() {
 }
 
 export function useNovelReadlistItem(novelId: string | undefined) {
+  useUiTranslation();
   const { user } = useAuth();
   return useQuery({
     queryKey: ['novel-readlist-item', user?.id, novelId],
@@ -134,11 +138,12 @@ export function useNovelReadlistItem(novelId: string | undefined) {
 }
 
 export function useUpsertNovelReadlist() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user, profile } = useAuth();
   return useMutation({
     mutationFn: async (input: UpsertNovelReadlistInput) => {
-      if (!user?.id) throw new Error('Sign in to save novels');
+      if (!user?.id) throw new Error(uiI18n.t('app.sign_in_to_save_novels_aabadc88'));
       const payload: any = {
         user_id: user.id,
         manga_id: String(input.novelId),
@@ -220,16 +225,17 @@ export function useUpsertNovelReadlist() {
         toast.success(action);
       }
     },
-    onError: () => toast.error('Could not save novel'),
+    onError: () => toast.error(uiI18n.t('app.could_not_save_novel_8c9b7cfa')),
   });
 }
 
 export function useRemoveFromNovelReadlist() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   return useMutation({
     mutationFn: async ({ novelId }: { novelId: string }) => {
-      if (!user?.id) throw new Error('Sign in first');
+      if (!user?.id) throw new Error(uiI18n.t('app.sign_in_first_77a74f57'));
       const { error } = await supabase
         .from('manga_readlist')
         .delete()
@@ -241,13 +247,14 @@ export function useRemoveFromNovelReadlist() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['novel-readlist'] });
       queryClient.invalidateQueries({ queryKey: ['novel-readlist-item'] });
-      toast.success('Removed from novel library');
+      toast.success(uiI18n.t('app.removed_from_novel_library_29e53f8f'));
     },
   });
 }
 
 /** Persist paragraph progress (debounced by the reader) + mirror to trackers. */
 export function useSaveNovelReadingProgress() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user, profile } = useAuth();
   return useMutation({

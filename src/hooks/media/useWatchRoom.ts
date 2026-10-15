@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -119,6 +121,7 @@ export interface CreateRoomInput {
 
 // Fetch public active rooms with infinite loading
 export function useInfinitePublicWatchRooms() {
+  useUiTranslation();
     return useInfiniteQuery({
         queryKey: ['watch-rooms-public-infinite'],
         queryFn: async ({ pageParam = 0 }) => {
@@ -174,6 +177,7 @@ export function useInfinitePublicWatchRooms() {
 
 // Fetch public active rooms (legacy/simple version)
 export function usePublicWatchRooms() {
+  useUiTranslation();
     return useQuery({
         queryKey: ['watch-rooms-public'],
         queryFn: async () => {
@@ -221,6 +225,7 @@ export function usePublicWatchRooms() {
 }
 // Fetch user's own rooms (including private and invite-only)
 export function useUserWatchRooms() {
+  useUiTranslation();
     const { user } = useAuth();
 
     return useQuery({
@@ -263,6 +268,7 @@ export function useUserWatchRooms() {
 
 // Fetch a single room by ID
 export function useWatchRoom(roomId: string | undefined) {
+  useUiTranslation();
     return useQuery({
         queryKey: ['watch-room', roomId],
         queryFn: async () => {
@@ -283,6 +289,7 @@ export function useWatchRoom(roomId: string | undefined) {
 
 // Fetch room participants
 export function useRoomParticipants(roomId: string | undefined) {
+  useUiTranslation();
     return useQuery({
         queryKey: ['watch-room-participants', roomId],
         queryFn: async () => {
@@ -304,6 +311,7 @@ export function useRoomParticipants(roomId: string | undefined) {
 
 // Fetch room messages
 export function useRoomMessages(roomId: string | undefined) {
+  useUiTranslation();
     return useQuery({
         queryKey: ['watch-room-messages', roomId],
         queryFn: async () => {
@@ -330,6 +338,7 @@ export function useRoomMessages(roomId: string | undefined) {
 
 // Fetch room queue (host queue feature)
 export function useRoomQueue(roomId: string | undefined) {
+  useUiTranslation();
     return useQuery({
         queryKey: ['watch-room-queue', roomId],
         queryFn: async () => {
@@ -371,6 +380,7 @@ export function useRoomQueue(roomId: string | undefined) {
 
 // Add item to host queue
 export function useAddQueueItem() {
+  useUiTranslation();
     const queryClient = useQueryClient();
     const { user } = useAuth();
 
@@ -392,7 +402,7 @@ export function useAddQueueItem() {
             episodeNumber?: number | null;
             episodeTitle?: string | null;
         }) => {
-            if (!user) throw new Error('Must be logged in');
+            if (!user) throw new Error(uiI18n.t('app.must_be_logged_in_9cf435d8'));
 
             const db = supabase as any;
             const { data: lastItem } = await db
@@ -429,6 +439,7 @@ export function useAddQueueItem() {
 
 // Remove queue item
 export function useRemoveQueueItem() {
+  useUiTranslation();
     const queryClient = useQueryClient();
 
     return useMutation({
@@ -450,6 +461,7 @@ export function useRemoveQueueItem() {
 
 // Reorder queue items
 export function useReorderQueueItems() {
+  useUiTranslation();
     const queryClient = useQueryClient();
 
     return useMutation({
@@ -473,6 +485,7 @@ export function useReorderQueueItems() {
 
 // Fetch currently active poll and computed vote breakdown
 export function useActiveRoomPoll(roomId: string | undefined) {
+  useUiTranslation();
     const { user } = useAuth();
 
     return useQuery({
@@ -540,6 +553,7 @@ export function useActiveRoomPoll(roomId: string | undefined) {
 
 // Host: create a poll in room
 export function useCreateRoomPoll() {
+  useUiTranslation();
     const queryClient = useQueryClient();
     const { user } = useAuth();
 
@@ -555,7 +569,7 @@ export function useCreateRoomPoll() {
             options: string[];
             endsAt?: string | null;
         }) => {
-            if (!user) throw new Error('Must be logged in');
+            if (!user) throw new Error(uiI18n.t('app.must_be_logged_in_9cf435d8'));
 
             const db = supabase as any;
 
@@ -587,6 +601,7 @@ export function useCreateRoomPoll() {
 
 // Participant: vote on active poll
 export function useVoteRoomPoll() {
+  useUiTranslation();
     const queryClient = useQueryClient();
     const { user } = useAuth();
 
@@ -600,7 +615,7 @@ export function useVoteRoomPoll() {
             pollId: string;
             optionIndex: number;
         }) => {
-            if (!user) throw new Error('Must be logged in');
+            if (!user) throw new Error(uiI18n.t('app.must_be_logged_in_9cf435d8'));
 
             const db = supabase as any;
             const { error } = await db
@@ -623,6 +638,7 @@ export function useVoteRoomPoll() {
 
 // Host: close poll
 export function useCloseRoomPoll() {
+  useUiTranslation();
     const queryClient = useQueryClient();
 
     return useMutation({
@@ -644,12 +660,13 @@ export function useCloseRoomPoll() {
 
 // Create a new room
 export function useCreateRoom() {
+  useUiTranslation();
     const queryClient = useQueryClient();
     const { user, profile } = useAuth();
 
     return useMutation({
         mutationFn: async (input: CreateRoomInput) => {
-            if (!user) throw new Error('Must be logged in');
+            if (!user) throw new Error(uiI18n.t('app.must_be_logged_in_9cf435d8'));
 
             // Room creation goes through a SECURITY DEFINER RPC that hashes the
             // password server-side; password_hash is never sent from the client.
@@ -696,12 +713,13 @@ export function useCreateRoom() {
 
 // Join a room
 export function useJoinRoom() {
+  useUiTranslation();
     const queryClient = useQueryClient();
     const { user, profile } = useAuth();
 
     return useMutation({
         mutationFn: async ({ roomId, password }: { roomId: string; password?: string }) => {
-            if (!user) throw new Error('Must be logged in');
+            if (!user) throw new Error(uiI18n.t('app.must_be_logged_in_9cf435d8'));
 
             // Joining goes through a SECURITY DEFINER RPC that verifies the
             // password, enforces capacity, and inserts the participant. The
@@ -738,12 +756,13 @@ export function useJoinRoom() {
 // verifies host ownership server-side and bypasses that check, working for
 // every access type without a password. Idempotent (ON CONFLICT in the RPC).
 export function useHostSelfJoin() {
+  useUiTranslation();
     const queryClient = useQueryClient();
     const { user, profile } = useAuth();
 
     return useMutation({
         mutationFn: async (roomId: string) => {
-            if (!user) throw new Error('Must be logged in');
+            if (!user) throw new Error(uiI18n.t('app.must_be_logged_in_9cf435d8'));
 
             const { error } = await supabase.rpc('host_self_join_watch_room', {
                 p_room_id: roomId,
@@ -781,12 +800,13 @@ export function useHostSelfJoin() {
 
 // Leave a room
 export function useLeaveRoom() {
+  useUiTranslation();
     const queryClient = useQueryClient();
     const { user } = useAuth();
 
     return useMutation({
         mutationFn: async (roomId: string) => {
-            if (!user) throw new Error('Must be logged in');
+            if (!user) throw new Error(uiI18n.t('app.must_be_logged_in_9cf435d8'));
 
             const { error } = await supabase
                 .from('watch_room_participants')
@@ -805,12 +825,13 @@ export function useLeaveRoom() {
 
 // Send a message
 export function useSendMessage() {
+  useUiTranslation();
     const queryClient = useQueryClient();
     const { user, profile } = useAuth();
 
     return useMutation({
         mutationFn: async ({ roomId, message, messageType = 'chat' }: { roomId: string; message: string; messageType?: 'chat' | 'system' | 'reaction' }) => {
-            if (!user) throw new Error('Must be logged in');
+            if (!user) throw new Error(uiI18n.t('app.must_be_logged_in_9cf435d8'));
 
             const { error } = await supabase.from('watch_room_messages').insert({
                 room_id: roomId,
@@ -831,6 +852,7 @@ export function useSendMessage() {
 
 // Update room playback state (host only)
 export function useUpdatePlayback() {
+  useUiTranslation();
     const queryClient = useQueryClient();
 
     return useMutation({
@@ -854,6 +876,7 @@ export function useUpdatePlayback() {
 
 // Close a room (host only)
 export function useCloseRoom() {
+  useUiTranslation();
     const queryClient = useQueryClient();
 
     return useMutation({
@@ -880,6 +903,7 @@ export function useCloseRoom() {
 
 // Update room details (host only)
 export function useUpdateRoom() {
+  useUiTranslation();
     const queryClient = useQueryClient();
 
     return useMutation({
@@ -899,12 +923,13 @@ export function useUpdateRoom() {
 
 // Update participant ready status
 export function useUpdateParticipantReady() {
+  useUiTranslation();
     const queryClient = useQueryClient();
     const { user } = useAuth();
 
     return useMutation({
         mutationFn: async ({ roomId, isReady }: { roomId: string; isReady: boolean }) => {
-            if (!user) throw new Error('Must be logged in');
+            if (!user) throw new Error(uiI18n.t('app.must_be_logged_in_9cf435d8'));
 
             const { error } = await supabase
                 .from('watch_room_participants')
@@ -922,6 +947,7 @@ export function useUpdateParticipantReady() {
 
 // Admin: Fetch all watch rooms (including inactive)
 export function useAllWatchRooms() {
+  useUiTranslation();
     const { user, isAdmin } = useAuth();
 
     return useQuery({
@@ -972,12 +998,13 @@ export function useAllWatchRooms() {
 
 // Admin: Delete any watch room
 export function useAdminDeleteRoom() {
+  useUiTranslation();
     const queryClient = useQueryClient();
     const { user, isAdmin } = useAuth();
 
     return useMutation({
         mutationFn: async (roomId: string) => {
-            if (!user || !isAdmin) throw new Error('Admin access required');
+            if (!user || !isAdmin) throw new Error(uiI18n.t('app.admin_access_required_737b16b6'));
 
             // Client-side deletes are blocked by the host-only RLS DELETE policy,
             // so a non-host admin's delete silently affected 0 rows. Route through

@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useNavigate } from 'react-router-dom';
 import { Users, Check, UserPlus } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -27,6 +29,7 @@ interface FollowSuggestion {
 }
 
 function TopUserRow({ entry, badges, online }: { entry: FollowSuggestion; badges?: BadgeDef[]; online?: boolean }) {
+  useUiTranslation();
   const navigate = useNavigate();
   const { isFollowing, follow, unfollow, isFollowingLoading } = useFollow(entry.user_id);
 
@@ -53,7 +56,7 @@ function TopUserRow({ entry, badges, online }: { entry: FollowSuggestion; badges
 
       {/* Content */}
       <div className="relative flex items-center gap-2.5 p-2.5">
-        <button onClick={goToProfile} aria-label={`View ${name}'s profile`} className="relative shrink-0">
+        <button onClick={goToProfile} aria-label={uiI18n.t('app.view_i18n_value_0_s_profile_9867fb9b', { value0: name })} className="relative shrink-0">
           <Avatar className="h-9 w-9 ring-2 ring-white/10 transition-transform duration-200 group-hover/row:scale-105">
             <AvatarImage src={entry.avatar_url || ''} className="object-cover" />
             <AvatarFallback className="bg-zinc-800 text-xs font-bold text-zinc-400">
@@ -89,9 +92,9 @@ function TopUserRow({ entry, badges, online }: { entry: FollowSuggestion; badges
           )}
         >
           {isFollowing ? (
-            <><Check className="h-3 w-3" />Following</>
+            <><Check className="h-3 w-3" />{uiI18n.t('app.following_90eeb100')}</>
           ) : (
-            <><UserPlus className="h-3 w-3" />Follow</>
+            <><UserPlus className="h-3 w-3" />{uiI18n.t('app.follow_66587a7a')}</>
           )}
         </button>
       </div>
@@ -100,6 +103,7 @@ function TopUserRow({ entry, badges, online }: { entry: FollowSuggestion; badges
 }
 
 export function SocialWidget({ className, onlineUserIds }: SocialWidgetProps) {
+  useUiTranslation();
   const { user } = useAuth();
   const { data: suggested = [], isLoading: loadingSuggested } = useSuggestedUsers(8);
   const { data: leaders = [], isLoading: loadingLeaders } = useLeaderboard('active', 8);
@@ -127,7 +131,7 @@ export function SocialWidget({ className, onlineUserIds }: SocialWidgetProps) {
           <Users className="h-3.5 w-3.5 text-sky-400" />
         </div>
         <span className="text-[11px] font-bold uppercase tracking-widest text-sky-400">
-          Who to Follow
+          {uiI18n.t('app.who_to_follow_27e99474')}
         </span>
       </div>
 
@@ -151,7 +155,7 @@ export function SocialWidget({ className, onlineUserIds }: SocialWidgetProps) {
             </div>
           ))
         ) : suggestions.length === 0 ? (
-          <p className="px-2 py-6 text-center text-[13px] text-zinc-500">No suggestions yet.</p>
+          <p className="px-2 py-6 text-center text-[13px] text-zinc-500">{uiI18n.t('app.no_suggestions_yet_c7b8bc3e')}</p>
         ) : (
           suggestions.map((entry) => (
             <TopUserRow key={entry.user_id} entry={entry} badges={badgeMap?.[entry.user_id]} online={onlineUserIds?.has(entry.user_id)} />

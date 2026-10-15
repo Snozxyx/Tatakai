@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Dialog,
   DialogContent,
@@ -57,6 +58,7 @@ export function AddMediaToPlaylistDialog({
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [pendingRef, setPendingRef] = useState<string | null>(null);
 
+  const { t } = useTranslation();
   const addToPlaylist = useAddToPlaylist();
 
   useEffect(() => {
@@ -68,14 +70,14 @@ export function AddMediaToPlaylistDialog({
   const mangaSearch = useMangaSearch(kind === 'manga' ? debouncedQuery : '');
   const novelSearch = useNovelSearch(kind === 'novel' ? debouncedQuery : '');
 
-  const kindLabel = kind === 'anime' ? 'anime' : kind === 'novel' ? 'novel' : 'manga';
+  const kindLabel = t(kind === 'anime' ? 'playlist.anime' : kind === 'novel' ? 'nav.novels' : 'playlist.manga');
 
   const results = useMemo<MediaResult[]>(() => {
     if (kind === 'anime') {
       const animes = (animeSearch.data?.animes || []) as Array<{ id: string; name?: string; poster?: string }>;
       return animes
         .filter((a) => a.id)
-        .map((a) => ({ ref: String(a.id), name: a.name || 'Untitled', poster: a.poster || null, kind: 'anime' as const, format: 'anime' }));
+        .map((a) => ({ ref: String(a.id), name: a.name || t('playlist.untitled'), poster: a.poster || null, kind: 'anime' as const, format: 'anime' }));
     }
     if (kind === 'novel') {
       const rows = (novelSearch.data?.results || []) as Array<{
@@ -89,10 +91,10 @@ export function AddMediaToPlaylistDialog({
         .map((row) => {
           const mediaId = String(row.anilistId || row.malId || row.id || '');
           return mediaId
-            ? { ref: `novel:${mediaId}`, name: row.canonicalTitle || 'Untitled', poster: row.poster || null, kind: 'novel' as const, format: 'novel' }
+            ? { ref: `novel:${mediaId}`, name: row.canonicalTitle || t('playlist.untitled'), poster: row.poster || null, kind: 'novel' as const, format: 'novel' }
             : null;
         })
-        .filter((r): r is MediaResult => r !== null);
+        .filter((r) => r !== null);
     }
     const rows = (mangaSearch.data?.results || []) as Array<{
       id: string;
@@ -107,11 +109,11 @@ export function AddMediaToPlaylistDialog({
       .map((row) => {
         const mediaId = String(row.anilistId || row.malId || row.id || '');
         return mediaId
-          ? { ref: `manga:${mediaId}`, name: row.canonicalTitle || 'Untitled', poster: row.poster || null, kind: 'manga' as const, format: resolveMangaFormat(row) }
+          ? { ref: `manga:${mediaId}`, name: row.canonicalTitle || t('playlist.untitled'), poster: row.poster || null, kind: 'manga' as const, format: resolveMangaFormat(row) }
           : null;
       })
-      .filter((r): r is MediaResult => r !== null);
-  }, [kind, animeSearch.data, mangaSearch.data, novelSearch.data]);
+      .filter((r) => r !== null);
+  }, [kind, animeSearch.data, mangaSearch.data, novelSearch.data, t]);
 
   const isLoading =
     kind === 'anime' ? animeSearch.isFetching : kind === 'novel' ? novelSearch.isFetching : mangaSearch.isFetching;
@@ -145,7 +147,7 @@ export function AddMediaToPlaylistDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Plus className="w-5 h-5 text-primary" />
-            Add media to playlist
+            {t('playlist.addMedia')}
           </DialogTitle>
         </DialogHeader>
 
@@ -159,7 +161,7 @@ export function AddMediaToPlaylistDialog({
                 kind === 'anime' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
               )}
             >
-              <Tv className="w-4 h-4" /> Anime
+              <Tv className="w-4 h-4" /> {t('playlist.anime')}
             </button>
             <button
               type="button"
@@ -169,7 +171,7 @@ export function AddMediaToPlaylistDialog({
                 kind === 'manga' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
               )}
             >
-              <BookOpen className="w-4 h-4" /> Manga
+              <BookOpen className="w-4 h-4" /> {t('playlist.manga')}
             </button>
             <button
               type="button"
@@ -179,7 +181,7 @@ export function AddMediaToPlaylistDialog({
                 kind === 'novel' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
               )}
             >
-              <ScrollText className="w-4 h-4" /> Novels
+              <ScrollText className="w-4 h-4" /> {t('nav.novels')}
             </button>
           </div>
 
@@ -188,7 +190,7 @@ export function AddMediaToPlaylistDialog({
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder={`Search ${kindLabel}...`}
+              placeholder={t('migration.searchMedia', { kind: kindLabel })}
               className="pl-9"
               autoFocus
             />
@@ -201,10 +203,10 @@ export function AddMediaToPlaylistDialog({
               </div>
             ) : !debouncedQuery ? (
               <div className="text-center py-16 text-muted-foreground text-sm">
-                Start typing to search for {kindLabel}.
+                {t('migration.typeMedia', { kind: kindLabel })}
               </div>
             ) : results.length === 0 ? (
-              <div className="text-center py-16 text-muted-foreground text-sm">No results found.</div>
+              <div className="text-center py-16 text-muted-foreground text-sm">{t('common.noResults')}</div>
             ) : (
               <div className="grid grid-cols-3 gap-3">
                 {results.map((result) => {

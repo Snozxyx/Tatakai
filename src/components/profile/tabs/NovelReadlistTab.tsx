@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { BookOpen, BookMarked, ArrowRight, Layers, Search } from 'lucide-react';
@@ -23,6 +25,7 @@ const SHELF_GRID = 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4';
 const DIALOG_GRID = 'grid grid-cols-1 sm:grid-cols-2 gap-4';
 
 export function NovelReadlistTab({ novels, loading, isViewingOther, onNavigate }: NovelReadlistTabProps) {
+  useUiTranslation();
   const rows = useMemo(() => novels || [], [novels]);
   const { search, setSearch, term, groups, matchCount } = useShelfSearch<NovelReadlistItem>(
     rows,
@@ -49,10 +52,10 @@ export function NovelReadlistTab({ novels, loading, isViewingOther, onNavigate }
     const accent = STATUS_ACCENT[statusKey] || STATUS_ACCENT.plan_to_read;
     const hasChapter = Number(item.last_chapter_number) > 0 || !!item.last_chapter_key;
     const chapterLabel = hasChapter && item.last_chapter_number != null
-      ? `Chapter ${item.last_chapter_number}`
-      : item.last_chapter_title || 'Not started';
+      ? uiI18n.t('app.chapter_i18n_value_0_e0f6e591', { value0: item.last_chapter_number })
+      : item.last_chapter_title || uiI18n.t('app.not_started_db2c45d5');
     const paraLabel = item.last_chapter_key
-      ? `Paragraph ${(Number(item.last_page_index) || 0) + 1}${item.total_pages ? ` / ${item.total_pages}` : ''}`
+      ? uiI18n.t('app.paragraph_i18n_value_0i18n_value_1_43a0c10e', { value0: (Number(item.last_page_index) || 0) + 1, value1: item.total_pages ? ` / ${item.total_pages}` : '' })
       : null;
 
     return (
@@ -123,7 +126,7 @@ export function NovelReadlistTab({ novels, loading, isViewingOther, onNavigate }
 
             {/* continue affordance — slides in on hover */}
             <span className="flex items-center gap-1 text-[11px] font-bold text-primary opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300 shrink-0">
-              {hasChapter ? 'Continue' : 'Read'}
+              {hasChapter ? uiI18n.t('app.continue_2e026239') : uiI18n.t('app.read_852b438f')}
               <ArrowRight className="w-3.5 h-3.5" />
             </span>
           </div>
@@ -144,10 +147,10 @@ export function NovelReadlistTab({ novels, loading, isViewingOther, onNavigate }
           <div className="flex items-center gap-2">
             <BookOpen className="w-4 h-4 text-primary/80" />
             <h3 className="font-display font-bold text-base sm:text-lg text-foreground tracking-tight">
-              {isViewingOther ? 'Novel Library' : 'My Novel Library'}
+              {isViewingOther ? uiI18n.t('app.novel_library_9222074b') : uiI18n.t('app.my_novel_library_440e36b9')}
             </h3>
             <span className="px-3 py-1 rounded-full bg-white/[0.03] text-xs font-semibold text-muted-foreground border border-white/[0.05]">
-              {rows.length} items
+              {rows.length} {uiI18n.t('app.items_7316c8b2')}
             </span>
           </div>
           {rows.length > 0 && (
@@ -156,7 +159,7 @@ export function NovelReadlistTab({ novels, loading, isViewingOther, onNavigate }
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search library…"
+                placeholder={uiI18n.t('app.search_library_261f86e9')}
                 className="pl-9 rounded-full bg-white/[0.03] border-white/[0.08] h-10"
               />
             </div>
@@ -172,18 +175,18 @@ export function NovelReadlistTab({ novels, loading, isViewingOther, onNavigate }
         ) : rows.length === 0 ? (
           <div className="text-center py-20 border border-dashed border-white/10 bg-white/[0.01] rounded-[2rem]">
             <BookOpen className="w-16 h-16 mx-auto text-muted-foreground/30 mb-6" />
-            <h3 className="text-xl font-bold mb-2">{isViewingOther ? 'Library is empty' : 'Your novel library is empty'}</h3>
+            <h3 className="text-xl font-bold mb-2">{isViewingOther ? uiI18n.t('app.library_is_empty_a5883249') : uiI18n.t('app.your_novel_library_is_empty_fceebaae')}</h3>
             <p className="text-muted-foreground mb-8">
-              {isViewingOther ? 'This user has not saved any novels yet.' : 'Save novels to your library from any novel details page.'}
+              {isViewingOther ? uiI18n.t('app.this_user_has_not_saved_any_novels_yet_e624732a') : uiI18n.t('app.save_novels_to_your_library_from_any_novel_detai_38d65d29')}
             </p>
             {!isViewingOther && (
               <Button onClick={() => onNavigate('/novel')} className="rounded-full h-12 px-8 font-bold">
-                Browse Novels
+                {uiI18n.t('app.browse_novels_cad832c4')}
               </Button>
             )}
           </div>
         ) : term && matchCount === 0 ? (
-          <div className="text-center py-16 text-muted-foreground text-sm">No novels match “{search}”.</div>
+          <div className="text-center py-16 text-muted-foreground text-sm">{uiI18n.t('app.no_novels_match_cfa5e86b')}{search}”.</div>
         ) : (
           <div className="space-y-10">
             {groups.map((g) => (

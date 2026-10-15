@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
  * The novel block for the trending page — same furniture as the manga block:
  * `SectionHeading`, a `PillGroup` of tabs and the shared `PosterCard` in the
@@ -32,9 +34,9 @@ interface NovelTrendingSectionProps {
 }
 
 const TABS: ReadonlyArray<PillOption<NovelTab>> = [
-  { id: 'trending', label: 'Trending', icon: <TrendingUp className="h-3.5 w-3.5" /> },
-  { id: 'top', label: 'Top Rated', icon: <BookOpen className="h-3.5 w-3.5" /> },
-  { id: 'new', label: 'New & Hot', icon: <Clock className="h-3.5 w-3.5" /> },
+  { id: 'trending', get label() { return uiI18n.t('app.trending_8a12d562'); }, icon: <TrendingUp className="h-3.5 w-3.5" /> },
+  { id: 'top', get label() { return uiI18n.t('app.top_rated_004d7e71'); }, icon: <BookOpen className="h-3.5 w-3.5" /> },
+  { id: 'new', get label() { return uiI18n.t('app.new_hot_ac271a5b'); }, icon: <Clock className="h-3.5 w-3.5" /> },
 ];
 
 /** The line under the heading, so the tabs are not the only label. */
@@ -71,12 +73,13 @@ function novelToPosterItem(item: NovelSearchItem, index = 0): PosterItem | null 
 }
 
 export function NovelTrendingSection({
-  title = 'Trending novels',
+  title = uiI18n.t('app.trending_novels_127f6f21'),
   defaultTab = 'trending',
   limit = 18,
   showTabs = true,
   className,
 }: NovelTrendingSectionProps) {
+  useUiTranslation();
   const [activeTab, setActiveTab] = useState<NovelTab>(defaultTab);
 
   const wants = (tab: NovelTab) => showTabs || activeTab === tab;
@@ -130,7 +133,7 @@ export function NovelTrendingSection({
             to="/novel"
             className="group inline-flex items-center gap-1 text-xs font-bold uppercase tracking-widest text-white/45 transition-colors hover:text-white"
           >
-            View all
+            {uiI18n.t('app.view_all_931e1a4b')}
             <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
           </Link>
         }
@@ -144,7 +147,7 @@ export function NovelTrendingSection({
             // Wrapped rather than passed as the setter: `SetStateAction` also
             // accepts an updater, and that widens the pill group's id to `string`.
             onChange={(id) => setActiveTab(id)}
-            label="Novel chart"
+            label={uiI18n.t('app.novel_chart_a7f846d1')}
           />
         )}
         <p className="text-xs font-medium text-white/40">{DESCRIPTION[activeTab]}</p>
@@ -155,9 +158,9 @@ export function NovelTrendingSection({
       ) : items.length === 0 ? (
         <div className="mt-6 flex flex-col items-center gap-2 rounded-3xl border border-white/[0.07] bg-white/[0.02] py-16 text-center">
           <BookOpen className="h-7 w-7 text-white/25" />
-          <p className="text-base font-bold text-white/70">No titles on this chart</p>
+          <p className="text-base font-bold text-white/70">{uiI18n.t('app.no_titles_on_this_chart_77eee095')}</p>
           <p className="max-w-sm text-sm text-white/40">
-            The novel charts could not be reached. Try again in a moment.
+            {uiI18n.t('app.the_novel_charts_could_not_be_reached_try_again__a275d8d5')}
           </p>
         </div>
       ) : (

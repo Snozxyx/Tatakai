@@ -1,3 +1,4 @@
+import uiI18n from '@/lib/uiI18n';
 import { useEffect, useRef, useState } from 'react';
 import { useInView, useReducedMotion } from 'framer-motion';
 
@@ -64,11 +65,11 @@ export function AnimatedCounter({
   }, [value, duration, isInView, prefersReducedMotion]);
 
   const formatted = decimals > 0
-    ? displayValue.toLocaleString(undefined, {
+    ? displayValue.toLocaleString(uiI18n.language, {
         minimumFractionDigits: decimals,
         maximumFractionDigits: decimals,
       })
-    : Math.round(displayValue).toLocaleString();
+    : Math.round(displayValue).toLocaleString(uiI18n.language);
 
   return (
     <span ref={ref} className={className}>

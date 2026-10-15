@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useEffect, useState } from 'react';
 import { Maximize } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
@@ -13,6 +15,7 @@ import { useTitlebarHidden } from '@/hooks/ui/useTitlebarHidden';
  * the sidebar) — here the app chrome stays put while the window fills the screen.
  */
 export function DisplayWindowPanel() {
+  useUiTranslation();
   const [fullscreen, setFullscreenState] = useState(false);
   const [titlebarHidden, setTitlebarHidden] = useTitlebarHidden();
 
@@ -42,29 +45,29 @@ export function DisplayWindowPanel() {
     <SettingsSection
       icon={Maximize}
       eyebrow="Display"
-      title="Window & display"
-      description="Control how the desktop window fills your screen and whether the custom title bar is shown."
+      title={uiI18n.t('app.window_display_c9adb975')}
+      description={uiI18n.t('app.control_how_the_desktop_window_fills_your_screen_f22ddc61')}
     >
       <div className="space-y-3">
         <SettingRow
-          title="Fullscreen"
-          description="Fill the entire screen. Press F11 to toggle fullscreen at any time."
+          title={uiI18n.t('app.fullscreen_bb08d10b')}
+          description={uiI18n.t('app.fill_the_entire_screen_press_f11_to_toggle_fulls_0dc54922')}
           control={
             <Switch
               checked={fullscreen}
               onCheckedChange={toggleFullscreen}
-              aria-label="Toggle fullscreen"
+              aria-label={uiI18n.t('app.toggle_fullscreen_751fc48b')}
             />
           }
         />
         <SettingRow
-          title="Hide title bar"
-          description="Reclaim the top strip by hiding the custom title bar. Use your OS shortcuts (e.g. Alt+F4 to close, Win/⌘ snapping to move) while it's hidden — toggle this off to bring it back."
+          title={uiI18n.t('app.hide_title_bar_d752f237')}
+          description={uiI18n.t('app.reclaim_the_top_strip_by_hiding_the_custom_title_3bcafa9f')}
           control={
             <Switch
               checked={titlebarHidden}
               onCheckedChange={setTitlebarHidden}
-              aria-label="Hide title bar"
+              aria-label={uiI18n.t('app.hide_title_bar_d752f237')}
             />
           }
         />

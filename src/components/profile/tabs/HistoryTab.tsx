@@ -1,8 +1,10 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { compareWatchHistory } from '@/lib/watchHistoryQuery';
 import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { History, Play, BookOpen, Clock, Search, LayoutGrid } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from '@/lib/localeFormat';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,12 +25,13 @@ interface HistoryTabProps {
 type HistoryFilter = 'all' | 'anime' | 'manga';
 
 const FILTERS: { key: HistoryFilter; label: string; icon: typeof Play }[] = [
-  { key: 'all', label: 'All', icon: LayoutGrid },
-  { key: 'anime', label: 'Anime', icon: Play },
-  { key: 'manga', label: 'Manga', icon: BookOpen },
+  { key: 'all', get label() { return uiI18n.t('app.all_6a720856'); }, icon: LayoutGrid },
+  { key: 'anime', get label() { return uiI18n.t('app.anime_f1b32a19'); }, icon: Play },
+  { key: 'manga', get label() { return uiI18n.t('app.manga_87db0f99'); }, icon: BookOpen },
 ];
 
 export function HistoryTab({ history, mangaHistoryEntries, loading, isViewingOther, onNavigate, formatDate }: HistoryTabProps) {
+  useUiTranslation();
   const [filter, setFilter] = useState<HistoryFilter>('all');
   const [search, setSearch] = useState('');
   const term = search.trim().toLowerCase();
@@ -57,7 +60,7 @@ export function HistoryTab({ history, mangaHistoryEntries, loading, isViewingOth
         <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
           <div className="flex items-center gap-2">
             <History className="w-4 h-4 text-primary/80" />
-            <h3 className="font-display font-bold text-base sm:text-lg text-foreground tracking-tight">Activity History</h3>
+            <h3 className="font-display font-bold text-base sm:text-lg text-foreground tracking-tight">{uiI18n.t('app.activity_history_ca84f7d0')}</h3>
           </div>
 
           {(hasAnyAnime || hasAnyManga) && (
@@ -89,7 +92,7 @@ export function HistoryTab({ history, mangaHistoryEntries, loading, isViewingOth
                 <Input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search history…"
+                  placeholder={uiI18n.t('app.search_history_bebd2c90')}
                   className="pl-9 rounded-full bg-white/[0.03] border-white/[0.08] h-10"
                 />
               </div>
@@ -105,7 +108,7 @@ export function HistoryTab({ history, mangaHistoryEntries, loading, isViewingOth
         ) : hasAnyAnime || hasAnyManga ? (
           nothingToShow ? (
             <div className="text-center py-16 text-muted-foreground text-sm">
-              {term ? `No history matches “${search}”.` : 'Nothing in this filter.'}
+              {term ? uiI18n.t('app.no_history_matches_i18n_value_0_526a8e4d', { value0: search }) : uiI18n.t('app.nothing_in_this_filter_592d07b9')}
             </div>
           ) : (
           <div className="space-y-10">
@@ -113,7 +116,7 @@ export function HistoryTab({ history, mangaHistoryEntries, loading, isViewingOth
               <section>
                 <div className="mb-4 flex items-center gap-2 px-2">
                   <Play className="w-4 h-4 text-primary" />
-                  <h3 className="text-sm font-black uppercase tracking-widest text-muted-foreground">Anime Watching</h3>
+                  <h3 className="text-sm font-black uppercase tracking-widest text-muted-foreground">{uiI18n.t('app.anime_watching_e412abdf')}</h3>
                 </div>
 
                 <div className="space-y-4">
@@ -145,7 +148,7 @@ export function HistoryTab({ history, mangaHistoryEntries, loading, isViewingOth
                             <div className="flex-1 min-w-0">
                               <h3 className="font-bold text-lg line-clamp-1 mb-1">{episodes[0].anime_name}</h3>
                               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                                {episodes.length} episodes watched
+                                {episodes.length} {uiI18n.t('app.episodes_watched_7ff033df')}
                               </p>
                             </div>
                           </div>
@@ -163,7 +166,7 @@ export function HistoryTab({ history, mangaHistoryEntries, loading, isViewingOth
                                   </div>
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 mb-1">
-                                      <span className="text-sm font-bold">Episode {item.episode_number}</span>
+                                      <span className="text-sm font-bold">{uiI18n.t('app.episode_8669aa56')} {item.episode_number}</span>
                                       <span className="text-xs text-muted-foreground/50">•</span>
                                       <span className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
                                         <Clock className="w-3 h-3" />
@@ -193,7 +196,7 @@ export function HistoryTab({ history, mangaHistoryEntries, loading, isViewingOth
               <section>
                 <div className="mb-4 flex items-center gap-2 px-2">
                   <BookOpen className="w-4 h-4 text-primary" />
-                  <h3 className="text-sm font-black uppercase tracking-widest text-muted-foreground">Manga Reading</h3>
+                  <h3 className="text-sm font-black uppercase tracking-widest text-muted-foreground">{uiI18n.t('app.manga_reading_054694f6')}</h3>
                 </div>
 
                 <div className="space-y-3">
@@ -201,8 +204,8 @@ export function HistoryTab({ history, mangaHistoryEntries, loading, isViewingOth
                     const status = MANGA_STATUS_LABELS[item.status || 'plan_to_read'] || MANGA_STATUS_LABELS.plan_to_read;
                     const chapterLabel =
                       item.last_chapter_number != null
-                        ? `Chapter ${item.last_chapter_number}`
-                        : item.last_chapter_title || 'Reading progress updated';
+                        ? uiI18n.t('app.chapter_i18n_value_0_e0f6e591', { value0: item.last_chapter_number })
+                        : item.last_chapter_title || uiI18n.t('app.reading_progress_updated_a6460dcf');
                     const chapterKey = String(item.last_chapter_key || '').trim();
                     const nextPage = Math.max(0, Number(item.last_page_index || 0));
                     const mangaId = encodeURIComponent(item.resolved_manga_id || item.manga_id);
@@ -256,11 +259,11 @@ export function HistoryTab({ history, mangaHistoryEntries, loading, isViewingOth
         ) : (
           <div className="text-center py-20 border border-dashed border-white/10 bg-white/[0.01] rounded-[2rem]">
             <History className="w-16 h-16 mx-auto text-muted-foreground/30 mb-6" />
-            <h3 className="text-xl font-bold mb-2">No activity history</h3>
-            <p className="text-muted-foreground mb-8">{isViewingOther ? 'This user has no watch or manga activity yet.' : 'Your anime and manga activity will appear here.'}</p>
+            <h3 className="text-xl font-bold mb-2">{uiI18n.t('app.no_activity_history_4458aa8c')}</h3>
+            <p className="text-muted-foreground mb-8">{isViewingOther ? uiI18n.t('app.this_user_has_no_watch_or_manga_activity_yet_2260bce7') : uiI18n.t('app.your_anime_and_manga_activity_will_appear_here_cbd9c0d4')}</p>
             {!isViewingOther && (
               <Button onClick={() => onNavigate('/')} className="rounded-full h-12 px-8 font-bold">
-                Start Watching
+                {uiI18n.t('app.start_watching_e408bda7')}
               </Button>
             )}
           </div>

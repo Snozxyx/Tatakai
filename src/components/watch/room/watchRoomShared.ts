@@ -1,3 +1,4 @@
+import uiI18n from '@/lib/uiI18n';
 import type { CSSProperties } from 'react';
 
 // -----------------------------------------------------------------------------
@@ -79,7 +80,7 @@ export function groupProviderServers(providerServers: ProviderServer[] = []) {
         const isDub = Boolean(server.isDub) || /dub/i.test(raw);
         
         // 3. Format the label beautifully
-        let label = isDub ? 'Dubbed' : 'Subtitled';
+        let label = isDub ? uiI18n.t('app.dubbed_4362fd30') : uiI18n.t('app.subtitled_878d9d39');
         
         if (raw) {
             // Capitalize first letter of the raw string if it exists

@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { memo, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { BellRing, ChevronLeft, ChevronRight, Play } from "lucide-react";
@@ -21,7 +23,7 @@ function timeAgo(iso: string | null): string | null {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
   if (days < 7) return `${days}d ago`;
-  return new Date(then).toLocaleDateString();
+  return new Date(then).toLocaleDateString(uiI18n.language);
 }
 
 const FollowedEpisodeCard = memo(function FollowedEpisodeCard({
@@ -29,6 +31,7 @@ const FollowedEpisodeCard = memo(function FollowedEpisodeCard({
 }: {
   update: ReturnType<typeof useFollowedAnimeUpdates>["updates"][number];
 }) {
+  useUiTranslation();
   const navigate = useNavigate();
   const routeId =
     buildPreferredAnimeRouteId({
@@ -75,7 +78,7 @@ const FollowedEpisodeCard = memo(function FollowedEpisodeCard({
             src={thumb}
             alt={
               update.episodeTitle
-                ? `Episode ${update.latestEpisodeNumber}: ${update.episodeTitle}`
+                ? uiI18n.t('app.episode_i18n_value_0_i18n_value_1_ea088a33', { value0: update.latestEpisodeNumber, value1: update.episodeTitle })
                 : update.animeName
             }
             loading="lazy"
@@ -93,13 +96,13 @@ const FollowedEpisodeCard = memo(function FollowedEpisodeCard({
           {/* EP badge */}
           {update.latestEpisodeNumber != null && (
             <span className="absolute left-2 top-2 rounded-md bg-black/70 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-white backdrop-blur-sm">
-              EP {update.latestEpisodeNumber}
+              {uiI18n.t('app.ep_00c1bff9')} {update.latestEpisodeNumber}
             </span>
           )}
           {/* New count badge */}
           {update.hasNew && (
             <span className="absolute right-2 top-2 rounded-full bg-primary px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-primary-foreground shadow-lg">
-              {update.newEpisodesCount} new
+              {update.newEpisodesCount} {uiI18n.t('app.new_c2a6b03f')}
             </span>
           )}
 
@@ -140,15 +143,15 @@ const FollowedEpisodeCard = memo(function FollowedEpisodeCard({
             <p className="mt-0.5 line-clamp-1 text-[11px] text-white/50">
               {update.latestEpisodeNumber != null ? (
                 <>
-                  Episode {update.latestEpisodeNumber}
+                  {uiI18n.t('app.episode_8669aa56')} {update.latestEpisodeNumber}
                   {update.lastWatchedEpisode != null &&
-                    ` • Watched ${update.lastWatchedEpisode}`}
+                    uiI18n.t('app.watched_i18n_value_0_590eca42', { value0: update.lastWatchedEpisode })}
                 </>
               ) : (
                 "In your watchlist"
               )}
               {timeAgo(update.airDateUtc)
-                ? ` • ${timeAgo(update.airDateUtc)}`
+                ? uiI18n.t('app.i18n_value_0_723b674d', { value0: timeAgo(update.airDateUtc) })
                 : null}
             </p>
           </div>
@@ -159,6 +162,7 @@ const FollowedEpisodeCard = memo(function FollowedEpisodeCard({
 });
 
 export const FollowedAnimeEpisodes = memo(function FollowedAnimeEpisodes() {
+  useUiTranslation();
   const { user } = useAuth();
   const { updates, isLoading, hasFollowed } = useFollowedAnimeUpdates(10);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -178,25 +182,25 @@ export const FollowedAnimeEpisodes = memo(function FollowedAnimeEpisodes() {
     <section className="mb-10 space-y-4 md:mb-12 md:space-y-5" aria-labelledby="followed-episodes-heading">
       <HomeSectionHeading
         icon={<BellRing className="h-5 w-5 text-primary" />}
-        title={<span id="followed-episodes-heading">New Episodes from Followed Anime</span>}
+        title={<span id="followed-episodes-heading">{uiI18n.t('app.new_episodes_from_followed_anime_ce93032f')}</span>}
         subtitle={
           updates.some((u) => u.hasNew)
-            ? `${updates.filter((u) => u.hasNew).length} series with unwatched episodes`
-            : "Latest aired episodes from your watchlist"
+            ? uiI18n.t('app.i18n_value_0_series_with_unwatched_episodes_8fcd6137', { value0: updates.filter((u) => u.hasNew).length })
+            : uiI18n.t('app.latest_aired_episodes_from_your_watchlist_738bbedb')
         }
         action={
           <div className="flex items-center gap-2">
             <div className="hidden items-center gap-2 md:flex">
               <button
                 onClick={() => scroll("left")}
-                aria-label="Scroll left"
+                aria-label={uiI18n.t('app.scroll_left_2c9e5a60')}
                 className="flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.02] text-white/60 transition-colors hover:bg-white/[0.08] hover:text-white"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
               <button
                 onClick={() => scroll("right")}
-                aria-label="Scroll right"
+                aria-label={uiI18n.t('app.scroll_right_2994b49c')}
                 className="flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.02] text-white/60 transition-colors hover:bg-white/[0.08] hover:text-white"
               >
                 <ChevronRight className="h-4 w-4" />
@@ -206,7 +210,7 @@ export const FollowedAnimeEpisodes = memo(function FollowedAnimeEpisodes() {
               to="/profile?tab=watchlist"
               className="shrink-0 text-sm text-muted-foreground transition-colors hover:text-foreground"
             >
-              View All
+              {uiI18n.t('app.view_all_efd83559')}
             </Link>
           </div>
         }

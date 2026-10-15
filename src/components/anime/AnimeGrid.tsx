@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { Star, Tv } from "lucide-react";
 import { memo } from "react";
 import { MediaCardFrame } from "@/components/MediaCardFrame";
@@ -28,6 +30,7 @@ export const AnimeGrid = memo(function AnimeGrid({
   enablePreview = true,
   gridSize = "normal"
 }: AnimeGridProps) {
+  useUiTranslation();
   const isMobile = useIsMobile();
   // BlurHash canvas decode per card is main-thread CPU — skip it on phones.
   const blurhashEnabled = useFeatureFlag(FeatureFlag.BLURHASH_IMAGES) && !isMobile;
@@ -108,8 +111,8 @@ export const AnimeGrid = memo(function AnimeGrid({
                 {inferAnimeAdultFlag(anime) && <AdultBadge className="absolute left-2 top-2 z-20" />}
                 {score && <span className="media-card-score absolute right-2 top-2 z-20 inline-flex items-center gap-1 rounded-lg bg-black/75 px-2 py-1 text-xs font-semibold text-white"><Star aria-hidden className="h-3 w-3 fill-amber text-amber" />{score}</span>}
               </>}
-              metadata={<div className="flex flex-wrap gap-x-1.5"><span>{anime.type || 'Anime'}</span>
-                {anime.year && <span>· {anime.year}</span>}{!!anime.episodes?.sub && <span>· {anime.episodes.sub} sub</span>}{!!anime.episodes?.dub && <span>· {anime.episodes.dub} dub</span>}{label && <span>· {label}</span>}
+              metadata={<div className="flex flex-wrap gap-x-1.5"><span>{anime.type || uiI18n.t('app.anime_f1b32a19')}</span>
+                {anime.year && <span>· {anime.year}</span>}{!!anime.episodes?.sub && <span>· {anime.episodes.sub} {uiI18n.t('app.sub_5d85613a')}</span>}{!!anime.episodes?.dub && <span>· {anime.episodes.dub} {uiI18n.t('app.dub_1ca4b285')}</span>}{label && <span>· {label}</span>}
               </div>} />
           </Peekable>;
         })}

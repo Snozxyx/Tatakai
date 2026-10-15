@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Tv, ChevronRight } from 'lucide-react';
@@ -28,6 +30,7 @@ function formatAiring(airingAt: number): string {
 }
 
 export function AiringWidget({ className }: AiringWidgetProps) {
+  useUiTranslation();
   const navigate = useNavigate();
 
   const weekStart = useMemo(() => {
@@ -66,7 +69,7 @@ export function AiringWidget({ className }: AiringWidgetProps) {
             <Tv className="h-3.5 w-3.5 text-rose-400" />
           </div>
           <span className="text-[11px] font-bold uppercase tracking-widest text-rose-400">
-            Airing This Week
+            {uiI18n.t('app.airing_this_week_aca01ded')}
           </span>
         </div>
       </div>
@@ -84,7 +87,7 @@ export function AiringWidget({ className }: AiringWidgetProps) {
             </div>
           ))
         ) : upcoming.length === 0 ? (
-          <p className="px-2 py-6 text-center text-[13px] text-zinc-500">Nothing airing soon.</p>
+          <p className="px-2 py-6 text-center text-[13px] text-zinc-500">{uiI18n.t('app.nothing_airing_soon_e7a58c15')}</p>
         ) : (
           upcoming.map((entry) => (
             <button
@@ -113,7 +116,7 @@ export function AiringWidget({ className }: AiringWidgetProps) {
                 </p>
                 <div className="mt-1 flex items-center gap-2">
                   <span className="rounded border border-rose-500/20 bg-rose-500/10 px-1.5 py-0.5 text-[9px] font-bold tracking-wider text-rose-300">
-                    EP {entry.episode}
+                    {uiI18n.t('app.ep_00c1bff9')} {entry.episode}
                   </span>
                   <span className="text-[11px] font-medium text-zinc-500">
                     {formatAiring(entry.airingAt)}

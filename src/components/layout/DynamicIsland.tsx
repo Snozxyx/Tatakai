@@ -1,4 +1,7 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
 import { Download, ArrowDown, ArrowUp, Users, Check, X, Radio, Eye, Magnet, RefreshCw, Sparkles } from "lucide-react";
 import { useDownloadStates, markCancelled } from "@/core/download/download-monitor";
@@ -68,19 +71,19 @@ interface UIItem {
 
 const KIND_BADGE: Record<DlKind, { label: string; cls: string } | null> = {
   anime: null,
-  manga: { label: "Manga", cls: "bg-sky-500/20 text-sky-300" },
-  manhwa: { label: "Manhwa", cls: "bg-fuchsia-500/20 text-fuchsia-300" },
-  manhua: { label: "Manhua", cls: "bg-amber-500/20 text-amber-300" },
-  novel: { label: "Novel", cls: "bg-violet-500/20 text-violet-300" },
+  manga: { get label() { return uiI18n.t('app.manga_87db0f99'); }, cls: "bg-sky-500/20 text-sky-300" },
+  manhwa: { get label() { return uiI18n.t('app.manhwa_8251bcf8'); }, cls: "bg-fuchsia-500/20 text-fuchsia-300" },
+  manhua: { get label() { return uiI18n.t('app.manhua_b6ddb037'); }, cls: "bg-amber-500/20 text-amber-300" },
+  novel: { get label() { return uiI18n.t('app.novel_1a9fdb91'); }, cls: "bg-violet-500/20 text-violet-300" },
 };
 
 const ACTIVITY_META: Record<
   ActivityKind,
   { label: string; Icon: typeof Radio; color: string; dot: string }
 > = {
-  streaming: { label: "Streaming", Icon: Radio, color: "text-rose-400", dot: "bg-rose-400" },
-  watching: { label: "Watching", Icon: Eye, color: "text-emerald-400", dot: "bg-emerald-400" },
-  torrenting: { label: "Torrenting", Icon: Magnet, color: "text-primary", dot: "bg-primary" },
+  streaming: { label: "layout.islandStreaming", Icon: Radio, color: "text-rose-400", dot: "bg-rose-400" },
+  watching: { label: "layout.islandWatching", Icon: Eye, color: "text-emerald-400", dot: "bg-emerald-400" },
+  torrenting: { label: "layout.islandTorrenting", Icon: Magnet, color: "text-primary", dot: "bg-primary" },
 };
 
 function cancelAnime(episodeId: string) {
@@ -114,6 +117,7 @@ function cancelNovel(jobId: string) {
 
 /** A single pulsing status dot (the "live" indicator on activity pills). */
 function PulseDot({ className }: { className: string }) {
+  useUiTranslation();
   return (
     <motion.span
       className={`h-2 w-2 rounded-full ${className}`}
@@ -124,6 +128,8 @@ function PulseDot({ className }: { className: string }) {
 }
 
 export function DynamicIsland() {
+  useUiTranslation();
+  const { t } = useTranslation();
   useUpdateOrchestrator();
   const animeStates = useDownloadStates();
   const mangaStates = useMangaDownloadStates();
@@ -141,7 +147,7 @@ export function DynamicIsland() {
       progress: s.progress ?? 0,
       title: s.animeName,
       posterUrl: s.posterUrl,
-      subtitle: s.episodeNumber ? `Ep ${s.episodeNumber}` : undefined,
+      subtitle: s.episodeNumber ? t('layout.islandEpisodeShort', { number: s.episodeNumber }) : undefined,
       isTorrent: s.sourceType === "torrent",
       dlSpeedBps: s.dlSpeedBps,
       upSpeedBps: s.upSpeedBps,
@@ -176,7 +182,7 @@ export function DynamicIsland() {
       cancel: () => cancelNovel(s.jobId),
     }));
     return [...anime, ...manga, ...novels];
-  }, [animeStates, mangaStates, novelStates]);
+  }, [animeStates, mangaStates, novelStates, uiI18n.language]);
 
   const active = useMemo(
     () =>
@@ -237,16 +243,18 @@ export function DynamicIsland() {
 
   const expanded = hovered;
   const label =
-    downloading.length > 0 ? `${downloading.length} downloading` : `${active.length} queued`;
+    downloading.length > 0
+      ? t('layout.islandDownloading', { count: downloading.length })
+      : t('layout.islandQueued', { count: active.length });
   const totalDl = fmtBps(totals.dl);
   const leadActivity = activityList[0];
 
   const updateHeaderLabel =
     update.phase === "downloading"
-      ? `Updating ${Math.round(update.progress)}%`
+      ? t('layout.islandUpdating', { progress: Math.round(update.progress) })
       : update.phase === "installing"
-        ? "Installing…"
-        : "Update ready";
+        ? t('layout.islandInstalling')
+        : t('layout.islandUpdateReady');
 
   return (
     <div
@@ -297,7 +305,7 @@ export function DynamicIsland() {
                 return <Icon className={`h-3.5 w-3.5 ${meta.color}`} />;
               })()}
               <span className="text-[11px] font-medium leading-none text-white/80">
-                {ACTIVITY_META[leadActivity.kind].label}
+                {t(ACTIVITY_META[leadActivity.kind].label)}
               </span>
               <PulseDot className={ACTIVITY_META[leadActivity.kind].dot} />
               {leadActivity.label && (
@@ -349,10 +357,10 @@ export function DynamicIsland() {
                       <div className="flex items-center gap-1.5">
                         <span className="truncate text-[12px] font-semibold text-white/90">
                           {update.phase === "downloaded"
-                            ? "Update ready to install"
+                            ? t('layout.islandUpdateReadyTitle')
                             : update.phase === "installing"
-                              ? "Installing update…"
-                              : "Downloading update"}
+                              ? t('layout.islandInstallingTitle')
+                              : t('layout.islandDownloadingUpdate')}
                         </span>
                         {update.version && (
                           <span className="flex-shrink-0 rounded bg-primary/20 px-1 py-px text-[9px] font-bold text-primary">
@@ -362,12 +370,12 @@ export function DynamicIsland() {
                       </div>
                       <div className="text-[10px] text-white/50">
                         {update.phase === "downloading"
-                          ? `${Math.round(update.progress)}%`
+                          ? uiI18n.t('app.i18n_value_0_cac4fa79', { value0: Math.round(update.progress) })
                           : update.phase === "downloaded"
                             ? update.mandatory
-                              ? "Restarting to finish…"
-                              : "Installs when you close Tatakai"
-                            : "Please wait…"}
+                              ? t('layout.islandRestarting')
+                              : t('layout.islandInstallOnClose')
+                            : t('layout.islandPleaseWait')}
                       </div>
                     </div>
                     {update.phase === "downloaded" && !update.mandatory && (
@@ -375,14 +383,14 @@ export function DynamicIsland() {
                         <button
                           onClick={installUpdateNow}
                           className="rounded-lg bg-emerald-500/90 px-2 py-1 text-[10px] font-bold text-white hover:bg-emerald-500"
-                          title="Restart and install now"
+                          title={t('layout.islandRestartNow')}
                         >
-                          Restart
+                          {t('layout.islandRestart')}
                         </button>
                         <button
                           onClick={dismissUpdateNotice}
                           className="flex h-6 w-6 items-center justify-center rounded-full text-white/40 hover:bg-white/10 hover:text-white"
-                          title="Later"
+                          title={t('layout.islandLater')}
                         >
                           <X className="h-3.5 w-3.5" />
                         </button>
@@ -416,7 +424,7 @@ export function DynamicIsland() {
                           </span>
                         </div>
                         <div className="min-w-0 flex-1">
-                          <span className={`text-[12px] font-semibold ${meta.color}`}>{meta.label}</span>
+                          <span className={`text-[12px] font-semibold ${meta.color}`}>{t(meta.label)}</span>
                           {a.label && (
                             <div className="truncate text-[11px] text-white/70">{a.label}</div>
                           )}
@@ -471,18 +479,18 @@ export function DynamicIsland() {
                         )}
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5">
-                            <span className="truncate text-[12px] font-semibold text-white/90">{item.title || "Downloading"}</span>
+                            <span className="truncate text-[12px] font-semibold text-white/90">{item.title || t('layout.islandDownloadingTitle')}</span>
                             {badge && (
-                              <span className={`flex-shrink-0 rounded px-1 py-px text-[9px] font-bold ${badge.cls}`}>{badge.label}</span>
+                              <span className={`flex-shrink-0 rounded px-1 py-px text-[9px] font-bold ${badge.cls}`}>{t(badge.label)}</span>
                             )}
                             {item.isTorrent && (
-                              <span className="flex-shrink-0 rounded bg-primary/20 px-1 py-px text-[9px] font-bold text-primary">Torrent</span>
+                              <span className="flex-shrink-0 rounded bg-primary/20 px-1 py-px text-[9px] font-bold text-primary">{t('layout.badgeTorrent')}</span>
                             )}
                           </div>
                           <div className="flex items-center gap-2 text-[10px] text-white/50">
                             {item.subtitle && <span className="truncate">{item.subtitle}</span>}
                             {item.status === "queued" ? (
-                              <span className="text-white/40">Queued</span>
+                              <span className="text-white/40">{t('layout.islandQueuedStatus')}</span>
                             ) : (
                               <>
                                 {dl && <span className="flex items-center gap-0.5 text-emerald-400"><ArrowDown className="h-2.5 w-2.5" />{dl}</span>}
@@ -495,7 +503,7 @@ export function DynamicIsland() {
                         <button
                           onClick={item.cancel}
                           className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-white/40 hover:bg-white/10 hover:text-white"
-                          title="Cancel"
+                          title={t('common.cancel')}
                         >
                           <X className="h-3.5 w-3.5" />
                         </button>
@@ -514,7 +522,7 @@ export function DynamicIsland() {
                               {item.numPeers}
                             </span>
                           )}
-                          {typeof item.ratio === "number" && <span>Ratio {item.ratio.toFixed(2)}</span>}
+                          {typeof item.ratio === "number" && <span>{t('layout.islandRatio', { value: item.ratio.toFixed(2) })}</span>}
                         </div>
                       )}
                       <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/10">
@@ -539,10 +547,10 @@ export function DynamicIsland() {
                         ) : (
                           <X className="h-3 w-3 flex-shrink-0 text-white/30" />
                         )}
-                        <span className="truncate text-white/50">{item.title || "Download"}</span>
+                        <span className="truncate text-white/50">{item.title || t('download.download')}</span>
                         {item.subtitle && <span className="flex-shrink-0 text-white/30">· {item.subtitle}</span>}
                         <span className="ml-auto flex-shrink-0 text-white/25">
-                          {item.status === "completed" ? "Done" : item.status === "cancelled" ? "Cancelled" : "Failed"}
+                          {item.status === "completed" ? t('layout.islandDone') : item.status === "cancelled" ? t('layout.islandCancelled') : t('layout.islandFailed')}
                         </span>
                       </div>
                     ))}

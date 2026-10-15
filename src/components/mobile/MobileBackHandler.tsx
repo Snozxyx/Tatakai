@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -12,6 +14,7 @@ import { isCapacitor } from '@/lib/platform/platform';
  * Mount once in MainLayout. No-op off Capacitor.
  */
 export function MobileBackHandler() {
+  useUiTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const lastRootPress = useRef(0);
@@ -66,7 +69,7 @@ export function MobileBackHandler() {
             void App.exitApp();
           } else {
             lastRootPress.current = now;
-            toast.info('Press back again to exit', { id: 'mobile-back-exit', duration: 1800 });
+            toast.info(uiI18n.t('app.press_back_again_to_exit_deccaac6'), { id: 'mobile-back-exit', duration: 1800 });
           }
         });
         if (cancelled) {

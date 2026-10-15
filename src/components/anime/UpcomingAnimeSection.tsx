@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { Calendar, ChevronLeft, ChevronRight, Star } from "lucide-react";
 import { GlassPanel } from "@/components/ui/GlassPanel";
 import { useUpcomingAnime, type UpcomingAnimeItem } from "@/hooks/api/useUpcomingAnime";
@@ -16,8 +18,9 @@ function formatAirDate(media: UpcomingAnimeItem): string | null {
 }
 
 function UpcomingAnimeCard({ anime }: { anime: UpcomingAnimeItem }) {
+  useUiTranslation();
   const imageUrl = anime.coverImage?.large || anime.coverImage?.medium || "/placeholder.svg";
-  const title = anime.title?.english || anime.title?.romaji || anime.title?.native || "Unknown title";
+  const title = anime.title?.english || anime.title?.romaji || anime.title?.native || uiI18n.t('app.unknown_title_bceca39d');
   const airDate = formatAirDate(anime);
   const studio = anime.studios?.nodes?.find((node) => node?.name)?.name || null;
   const score = anime.averageScore ? (anime.averageScore / 10).toFixed(1) : null;
@@ -94,6 +97,7 @@ function UpcomingAnimeCard({ anime }: { anime: UpcomingAnimeItem }) {
 }
 
 export function UpcomingAnimeSection() {
+  useUiTranslation();
   const { data, isLoading, error } = useUpcomingAnime();
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -117,7 +121,7 @@ export function UpcomingAnimeSection() {
             <div className="p-1.5 rounded-lg bg-purple-500/10 text-purple-400">
               <Calendar className="w-5 h-5" />
             </div>
-            Upcoming Anime
+            {uiI18n.t('app.upcoming_anime_42c61559')}
           </h3>
         </div>
         <div className="flex gap-4 overflow-hidden px-2">
@@ -141,20 +145,20 @@ export function UpcomingAnimeSection() {
           <div className="p-1.5 rounded-lg bg-purple-500/10 text-purple-400">
             <Calendar className="w-5 h-5" />
           </div>
-          Upcoming Anime
+          {uiI18n.t('app.upcoming_anime_42c61559')}
         </h3>
 
         <div className="flex gap-1 p-1 rounded-full bg-white/5 border border-white/10">
           <button
             onClick={() => scroll("left")}
-            aria-label="Scroll left"
+            aria-label={uiI18n.t('app.scroll_left_2c9e5a60')}
             className="p-2 rounded-full text-muted-foreground hover:text-white hover:bg-white/10 transition-all duration-300"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
           <button
             onClick={() => scroll("right")}
-            aria-label="Scroll right"
+            aria-label={uiI18n.t('app.scroll_right_2994b49c')}
             className="p-2 rounded-full text-muted-foreground hover:text-white hover:bg-white/10 transition-all duration-300"
           >
             <ChevronRight className="w-4 h-4" />

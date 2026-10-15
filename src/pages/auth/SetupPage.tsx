@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { rankSetupExtensions } from '@/core/extensions/setup-ranking';
 import { usePersistentState } from '@/hooks/ui/usePersistentState';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -55,44 +57,44 @@ const STEP_META = [
   {
     icon: Folder,
     color: 'blue',
-    title: 'Storage',
-    subtitle: 'Where should your anime live?',
+    get title() { return uiI18n.t('app.storage_9e092dda'); },
+    get subtitle() { return uiI18n.t('app.where_should_your_anime_live_89e76c61'); },
   },
   {
     icon: Shield,
     color: 'purple',
-    title: 'Privacy',
-    subtitle: 'Control your integrations',
+    get title() { return uiI18n.t('app.privacy_cf01481f'); },
+    get subtitle() { return uiI18n.t('app.control_your_integrations_97de6670'); },
   },
   {
     icon: Globe,
     color: 'red',
-    title: 'Country Policy',
-    subtitle: 'Legal context for torrent use',
+    get title() { return uiI18n.t('app.country_policy_346b76a4'); },
+    get subtitle() { return uiI18n.t('app.legal_context_for_torrent_use_b287e22f'); },
   },
   {
     icon: Wifi,
     color: 'cyan',
-    title: 'Network',
-    subtitle: 'Secure your connection',
+    get title() { return uiI18n.t('app.network_53ebc572'); },
+    get subtitle() { return uiI18n.t('app.secure_your_connection_c01b6aa8'); },
   },
   {
     icon: Puzzle,
     color: 'green',
-    title: 'Extensions',
-    subtitle: 'Power up your experience',
+    get title() { return uiI18n.t('app.extensions_656bcfe2'); },
+    get subtitle() { return uiI18n.t('app.power_up_your_experience_ff033ff4'); },
   },
   {
     icon: Key,
     color: 'blue',
-    title: 'Debrid Services',
-    subtitle: 'Direct high-speed streaming',
+    get title() { return uiI18n.t('app.debrid_services_8677d82b'); },
+    get subtitle() { return uiI18n.t('app.direct_high_speed_streaming_9eeef00e'); },
   },
   {
     icon: Heart,
     color: 'purple',
-    title: 'Support',
-    subtitle: 'Help the project grow',
+    get title() { return uiI18n.t('app.support_f32d5a3b'); },
+    get subtitle() { return uiI18n.t('app.help_the_project_grow_115237c3'); },
   },
 ];
 
@@ -184,6 +186,7 @@ const CustomCheckbox = ({
 );
 
 const Toggle = ({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) => {
+  useUiTranslation();
   return (
     <motion.button
       whileTap={{ scale: 0.9 }}
@@ -204,6 +207,7 @@ const Toggle = ({ value, onChange }: { value: boolean; onChange: (v: boolean) =>
 };
 
 function ProgressBar({ step, total }: { step: number; total: number }) {
+  useUiTranslation();
   return (
     <div className="flex items-center gap-1.5 mb-8">
       {Array.from({ length: total }).map((_, i) => {
@@ -253,11 +257,12 @@ function ProgressBar({ step, total }: { step: number; total: number }) {
 }
 
 function StepHeader({ stepIndex }: { stepIndex: number }) {
+  useUiTranslation();
   const base = STEP_META[stepIndex - 1];
   const meta = isMobileNative() && stepIndex === 2
-    ? { ...base, subtitle: 'Review mobile app permissions' }
+    ? { ...base, get subtitle() { return uiI18n.t('app.review_mobile_app_permissions_4c156817'); } }
     : isIOS() && stepIndex === 3
-      ? { ...base, title: 'Region', subtitle: 'Regional content settings' }
+      ? { ...base, get title() { return uiI18n.t('app.region_0f217179'); }, get subtitle() { return uiI18n.t('app.regional_content_settings_76804b26'); } }
       : base;
   if (!meta) return null;
   const Icon = meta.icon;
@@ -306,6 +311,7 @@ function ToggleRow({
   value: boolean;
   onChange: (v: boolean) => void;
 }) {
+  useUiTranslation();
   return (
     <motion.div
       variants={itemVariants}
@@ -339,6 +345,7 @@ function NavButtons({
   nextIcon?: React.ElementType;
   nextDisabled?: boolean;
 }) {
+  useUiTranslation();
   return (
     <div className="flex gap-3 pt-4">
       {onBack && (
@@ -348,7 +355,7 @@ function NavButtons({
           className="flex-1 h-12 gap-2 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-xl"
         >
           <ArrowLeft className="w-4 h-4" />
-          Back
+          {uiI18n.t('app.back_b52b36b7')}
         </Button>
       )}
 
@@ -359,7 +366,7 @@ function NavButtons({
           className="w-full h-12 rounded-xl bg-gradient-to-r from-primary to-primary/80 hover:to-primary text-primary-foreground font-semibold shadow-[0_4px_14px_0_hsl(var(--primary)/30%)] border-t border-white/10 gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
         >
           {NextIcon && <NextIcon className="w-4 h-4" />}
-          {nextLabel ?? 'Continue'}
+          {nextLabel ?? uiI18n.t('app.continue_2e026239')}
           {!NextIcon && <ChevronRight className="w-4 h-4" />}
         </Button>
       </motion.div>
@@ -368,6 +375,7 @@ function NavButtons({
 }
 
 function SetupExtensionsList() {
+  useUiTranslation();
   const { items, isLoading, isServiceConfigured } = useStoreCatalogue({ limit: 100 });
   const installer = useExtensionInstaller();
   const top = useMemo(() => rankSetupExtensions(items).slice(0, 5), [items]);
@@ -377,7 +385,7 @@ function SetupExtensionsList() {
   return (
     <motion.div variants={itemVariants} className="space-y-3 pt-2">
       <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">
-        Popular Add-ons
+        {uiI18n.t('app.popular_add_ons_c08a98f9')}
       </p>
 
       {isLoading ? (
@@ -388,7 +396,7 @@ function SetupExtensionsList() {
         </div>
       ) : top.length === 0 ? (
         <p className="text-xs text-muted-foreground px-1">
-          No extensions available right now. Add them later from the Hub.
+          {uiI18n.t('app.no_extensions_available_right_now_add_them_later_23b7eebd')}
         </p>
       ) : (
         <div className="space-y-2 max-h-[220px] overflow-y-auto pr-2 custom-scrollbar">
@@ -413,7 +421,7 @@ function SetupExtensionsList() {
                 </div>
                 {ext.isFeatured && (
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-medium flex-shrink-0">
-                    Official
+                    {uiI18n.t('app.official_ac60fda7')}
                   </span>
                 )}
                 {state === 'installed' ? (
@@ -421,11 +429,11 @@ function SetupExtensionsList() {
                     variant="secondary"
                     size="sm"
                     className="h-8 px-2.5 text-xs gap-1 flex-shrink-0"
-                    title="Remove this extension"
+                    title={uiI18n.t('app.remove_this_extension_e70271d7')}
                     onClick={() => installer.toggle(ext)}
                   >
                     <Check className="w-3.5 h-3.5" />
-                    Added
+                    {uiI18n.t('app.added_b68734c2')}
                   </Button>
                 ) : (
                   <Button
@@ -439,7 +447,7 @@ function SetupExtensionsList() {
                     ) : (
                       <Download className="w-3.5 h-3.5" />
                     )}
-                    {busy ? 'Adding…' : 'Add'}
+                    {busy ? uiI18n.t('app.adding_ffb2e628') : uiI18n.t('app.add_61cc55aa')}
                   </Button>
                 )}
               </div>
@@ -460,6 +468,7 @@ function openExternalUrl(url: string) {
 // --- Main Page ---
 
 export default function SetupPage() {
+  useUiTranslation();
   const [savedStep, setStep] = usePersistentState('tatakai_setup_step', 1, 'local');
   const step = Number.isInteger(savedStep) ? Math.min(7, Math.max(1, savedStep)) : 1;
   const [dir, setDir] = useState(1);
@@ -585,19 +594,19 @@ export default function SetupPage() {
                 whileHover={{ scale: 1.05, rotate: 2 }}
                 className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-[0_8px_16px_hsl(var(--primary)/0.25)] border-t border-white/20 overflow-hidden"
               >
-                <img src={`${import.meta.env.BASE_URL}assets/logo/tatakai-logo-square.png`} alt="Tatakai" className="w-full h-full object-cover" />
+                <img src={`${import.meta.env.BASE_URL}assets/logo/tatakai-logo-square.png`} alt={uiI18n.t('app.tatakai_28bda6bd')} className="w-full h-full object-cover" />
               </motion.div>
               <div>
-                <h1 className="font-display text-2xl font-black tracking-tight text-foreground">Tatakai</h1>
-                <p className="text-sm text-muted-foreground font-medium">Setup Wizard</p>
+                <h1 className="font-display text-2xl font-black tracking-tight text-foreground">{uiI18n.t('app.tatakai_28bda6bd')}</h1>
+                <p className="text-sm text-muted-foreground font-medium">{uiI18n.t('app.setup_wizard_2d4c9fdb')}</p>
               </div>
             </div>
 
             <h2 className="text-3xl font-black text-foreground mb-2 tracking-tight">
-              {step === 1 ? 'Welcome!' : step === totalSteps ? 'Almost ready.' : `Step ${step} of ${totalSteps}`}
+              {step === 1 ? uiI18n.t('app.welcome_e52e5e6c') : step === totalSteps ? uiI18n.t('app.almost_ready_9ba8fa05') : uiI18n.t('app.step_i18n_value_0_of_i18n_value_1_c658e52f', { value0: step, value1: totalSteps })}
             </h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              {step === 1 ? 'Let’s configure Tatakai for the best experience. It only takes a minute.' : 'You can adjust these settings later in preferences.'}
+              {step === 1 ? uiI18n.t('app.let_s_configure_tatakai_for_the_best_experience__73cec18a') : uiI18n.t('app.you_can_adjust_these_settings_later_in_preferenc_ca99e89f')}
             </p>
           </div>
 
@@ -617,19 +626,19 @@ export default function SetupPage() {
                       <motion.div variants={itemVariants} className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-start gap-4">
                         <div className="p-2 bg-emerald-500/20 rounded-xl"><Check className="w-4 h-4 text-emerald-500" /></div>
                         <div>
-                          <p className="font-semibold text-sm text-emerald-50">App Storage</p>
-                          <p className="text-xs text-emerald-200/70 mt-1 leading-relaxed">Downloads are safely managed inside internal app storage.</p>
+                          <p className="font-semibold text-sm text-emerald-50">{uiI18n.t('app.app_storage_c4e44a5b')}</p>
+                          <p className="text-xs text-emerald-200/70 mt-1 leading-relaxed">{uiI18n.t('app.downloads_are_safely_managed_inside_internal_app_5eccd7b7')}</p>
                         </div>
                       </motion.div>
                     ) : (
                       <motion.div variants={itemVariants} className="space-y-3">
-                        <label className="text-sm font-semibold text-foreground ml-1">Download Directory</label>
+                        <label className="text-sm font-semibold text-foreground ml-1">{uiI18n.t('app.download_directory_d625f3b5')}</label>
                         <motion.div whileHover={{ scale: 1.01 }} className="flex items-center gap-2 p-1.5 rounded-2xl bg-card border border-border/60 shadow-sm transition-all focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/20">
                           <div className="p-2 bg-muted rounded-xl ml-1">
                             <HardDrive className="w-4 h-4 text-muted-foreground" />
                           </div>
                           <div className="flex-1 px-2 text-sm font-mono text-foreground truncate select-none">
-                            {downloadPath || 'Select a folder…'}
+                            {downloadPath || uiI18n.t('app.select_a_folder_d0ab0158')}
                           </div>
                           <Button
                             variant="secondary"
@@ -641,11 +650,11 @@ export default function SetupPage() {
                               }
                             }}
                           >
-                            Browse
+                            {uiI18n.t('app.browse_2f3b5c55')}
                           </Button>
                         </motion.div>
                         <p className="text-xs text-muted-foreground flex items-center gap-1.5 ml-1">
-                          <Zap className="w-3.5 h-3.5 text-amber-500" /> Requires ~2–4 GB per series in 1080p
+                          <Zap className="w-3.5 h-3.5 text-amber-500" /> {uiI18n.t('app.requires_2_4_gb_per_series_in_1080p_84bfefba')}
                         </p>
                       </motion.div>
                     )}
@@ -664,14 +673,14 @@ export default function SetupPage() {
                       <motion.div variants={itemVariants} className="p-4 rounded-2xl bg-card border border-border/50 flex items-start gap-4">
                         <div className="p-2 bg-primary/10 rounded-xl"><ShieldCheck className="w-4 h-4 text-primary" /></div>
                         <div>
-                          <p className="font-semibold text-sm text-foreground">Mobile privacy</p>
+                          <p className="font-semibold text-sm text-foreground">{uiI18n.t('app.mobile_privacy_4feafb46')}</p>
                           <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                            Tatakai only requests device permissions when a feature needs them, such as download notifications.
+                            {uiI18n.t('app.tatakai_only_requests_device_permissions_when_a__55525b1a')}
                           </p>
                         </div>
                       </motion.div>
                     ) : (
-                      <ToggleRow icon={Disc} title="Discord Rich Presence" desc="Display the anime you're watching on your Discord profile" value={discordEnabled} onChange={setDiscordEnabled} />
+                      <ToggleRow icon={Disc} title={uiI18n.t('app.discord_rich_presence_1ce59a08')} desc="Display the anime you're watching on your Discord profile" value={discordEnabled} onChange={setDiscordEnabled} />
                     )}
                     <NavButtons onBack={() => goTo(1)} onNext={() => goTo(3)} />
                   </motion.div>
@@ -687,22 +696,22 @@ export default function SetupPage() {
                       <motion.div variants={itemVariants} className="rounded-2xl bg-card border border-border/50 p-5 space-y-3 shadow-inner">
                         <div className="flex items-center gap-3">
                           <Globe className="w-5 h-5 text-primary" />
-                          <p className="text-sm font-medium text-foreground">Regional streaming settings</p>
+                          <p className="text-sm font-medium text-foreground">{uiI18n.t('app.regional_streaming_settings_8a2eafba')}</p>
                         </div>
                         <p className="text-xs text-muted-foreground leading-relaxed">
-                          Region: <span className="font-semibold text-foreground">{countryPolicy.countryName || countryPolicy.countryCode}</span>. Tatakai will use sources available for this region.
+                          {uiI18n.t('app.region_25cdc1ce')} <span className="font-semibold text-foreground">{countryPolicy.countryName || countryPolicy.countryCode}</span>{uiI18n.t('app.tatakai_will_use_sources_available_for_this_regi_b8193616')}
                         </p>
                       </motion.div>
                     ) : (
                     <motion.div variants={itemVariants} className="rounded-2xl bg-amber-500/10 border border-amber-500/20 p-5 space-y-4 shadow-inner">
                       <div className="flex items-center gap-3">
                         <Globe className="w-5 h-5 text-amber-500" />
-                        <p className="text-sm font-medium text-amber-50">Local Copyright Notice</p>
+                        <p className="text-sm font-medium text-amber-50">{uiI18n.t('app.local_copyright_notice_370c3938')}</p>
                       </div>
                       
                       <div className="flex items-center justify-between bg-black/20 p-3 rounded-xl border border-white/5">
                         <span className="text-xs text-muted-foreground">
-                          Region: <span className="font-bold text-foreground ml-1">{countryPolicy.countryName || countryPolicy.countryCode}</span>
+                          {uiI18n.t('app.region_25cdc1ce')} <span className="font-bold text-foreground ml-1">{countryPolicy.countryName || countryPolicy.countryCode}</span>
                         </span>
                         <span className={cn('text-[10px] px-2 py-1 rounded-md font-semibold uppercase tracking-wider', countryPolicy.badge.tone)}>
                           {countryPolicy.badge.label}
@@ -711,7 +720,7 @@ export default function SetupPage() {
 
                       <CustomCheckbox checked={countryAck} onChange={setCountryAck}>
                         <span className="text-sm text-foreground/90 leading-snug">
-                          I acknowledge my local region's policies regarding torrent and peer-to-peer usage.
+                          {uiI18n.t('app.i_acknowledge_my_local_region_s_policies_regardi_df3e17e1')}
                         </span>
                       </CustomCheckbox>
                     </motion.div>
@@ -726,13 +735,13 @@ export default function SetupPage() {
                 <motion.div key="s4" custom={dir} variants={slideVariants} initial="enter" animate="center" exit="exit" transition={{ type: 'spring', stiffness: 350, damping: 30 }}>
                   <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-4">
                     <StepHeader stepIndex={4} />
-                    <ToggleRow icon={Lock} title="WARP / DNS over HTTPS" desc="Enhance privacy and bypass ISP blocks with Cloudflare" value={enableWarp} onChange={setEnableWarp} />
+                    <ToggleRow icon={Lock} title={uiI18n.t('app.warp_dns_over_https_34b5ea5c')} desc="Enhance privacy and bypass ISP blocks with Cloudflare" value={enableWarp} onChange={setEnableWarp} />
                     <AnimatePresence>
                       {enableWarp && (
                         <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
                           <div className="p-3.5 mt-2 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-xs text-cyan-200 flex items-center gap-3">
                             <ShieldCheck className="w-4 h-4 flex-shrink-0" />
-                            <span>WARP auto-routing will be enabled for secure connections.</span>
+                            <span>{uiI18n.t('app.warp_auto_routing_will_be_enabled_for_secure_con_54220c65')}</span>
                           </div>
                         </motion.div>
                       )}
@@ -747,7 +756,7 @@ export default function SetupPage() {
                 <motion.div key="s5" custom={dir} variants={slideVariants} initial="enter" animate="center" exit="exit" transition={{ type: 'spring', stiffness: 350, damping: 30 }}>
                   <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-4">
                     <StepHeader stepIndex={5} />
-                    <ToggleRow icon={Puzzle} title="Enable Extensions" desc="Unlock more sources using curated community add-ons" value={enableExtensions} onChange={setEnableExtensions} />
+                    <ToggleRow icon={Puzzle} title={uiI18n.t('app.enable_extensions_94bbffe3')} desc="Unlock more sources using curated community add-ons" value={enableExtensions} onChange={setEnableExtensions} />
                     <AnimatePresence>
                       {enableExtensions && (
                         <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
@@ -782,8 +791,8 @@ export default function SetupPage() {
                     <motion.button variants={itemVariants} whileHover={{ y: -2, scale: 1.01 }} whileTap={{ scale: 0.99 }} onClick={() => openExternalUrl('https://github.com/snozxyx/tatakai')} className="w-full flex items-center gap-4 p-4 rounded-2xl bg-card border border-border/50 hover:border-amber-500/40 shadow-sm transition-all text-left group">
                       <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-400 group-hover:bg-amber-500 group-hover:text-amber-950 transition-colors"><Star className="w-4 h-4" /></div>
                       <div className="flex-1">
-                        <p className="text-sm font-semibold text-foreground">Star on GitHub</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">Support the open-source development.</p>
+                        <p className="text-sm font-semibold text-foreground">{uiI18n.t('app.star_on_github_9becc508')}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{uiI18n.t('app.support_the_open_source_development_8bdfafc3')}</p>
                       </div>
                       <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-amber-500 transition-colors" />
                     </motion.button>
@@ -791,8 +800,8 @@ export default function SetupPage() {
                     <motion.button variants={itemVariants} whileHover={{ y: -2, scale: 1.01 }} whileTap={{ scale: 0.99 }} onClick={() => openExternalUrl('https://discord.gg/Mt2jG5QuGP')} className="w-full flex items-center gap-4 p-4 rounded-2xl bg-card border border-border/50 hover:border-indigo-500/40 shadow-sm transition-all text-left group">
                       <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-400 group-hover:bg-indigo-500 group-hover:text-indigo-50 transition-colors"><MessageCircle className="w-4 h-4" /></div>
                       <div className="flex-1">
-                        <p className="text-sm font-semibold text-foreground">Join Discord</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">Get news, updates, and community help.</p>
+                        <p className="text-sm font-semibold text-foreground">{uiI18n.t('app.join_discord_7ec699b1')}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{uiI18n.t('app.get_news_updates_and_community_help_e2cff5e2')}</p>
                       </div>
                       <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-indigo-500 transition-colors" />
                     </motion.button>
@@ -801,10 +810,10 @@ export default function SetupPage() {
                       <div className="p-4 rounded-2xl bg-muted/40 border border-border/40">
                         <CustomCheckbox checked={tcAccepted} onChange={setTcAccepted}>
                           <span className="text-sm text-foreground/90">
-                            I accept the{' '}
-                            <button type="button" onClick={(e) => { e.preventDefault(); openExternalUrl('https://tatakai.me/terms'); }} className="text-primary font-medium hover:underline underline-offset-4">Terms</button>
-                            {' '}and{' '}
-                            <button type="button" onClick={(e) => { e.preventDefault(); openExternalUrl('https://tatakai.me/privacy'); }} className="text-primary font-medium hover:underline underline-offset-4">Privacy Policy</button>.
+                            {uiI18n.t('app.i_accept_the_74b561d2')}{' '}
+                            <button type="button" onClick={(e) => { e.preventDefault(); openExternalUrl('https://tatakai.me/terms'); }} className="text-primary font-medium hover:underline underline-offset-4">{uiI18n.t('app.terms_a55a275a')}</button>
+                            {' '}{uiI18n.t('app.and_cffa50a3')}{' '}
+                            <button type="button" onClick={(e) => { e.preventDefault(); openExternalUrl('https://tatakai.me/privacy'); }} className="text-primary font-medium hover:underline underline-offset-4">{uiI18n.t('app.privacy_policy_9db108ba')}</button>.
                           </span>
                         </CustomCheckbox>
                       </div>
@@ -836,7 +845,7 @@ export default function SetupPage() {
         <div className="absolute bottom-12 left-12 right-12 z-20 flex flex-col gap-2">
         
           <motion.h2 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6, duration: 0.8 }} className="text-3xl lg:text-5xl font-black text-white max-w-xl leading-[1.1] tracking-tight">
-            Stream, download, and organize your anime.
+            {uiI18n.t('app.stream_download_and_organize_your_anime_e8d26a7c')}
           </motion.h2>
         </div>
       </div>

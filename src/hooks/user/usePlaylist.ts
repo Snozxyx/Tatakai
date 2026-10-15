@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -40,6 +42,7 @@ export interface PlaylistItem {
 
 // Get all playlists for the current user
 export function usePlaylists() {
+  useUiTranslation();
   const { user } = useAuth();
 
   return useQuery({
@@ -62,6 +65,7 @@ export function usePlaylists() {
 
 // Get the public playlists of any user (for the profile Vaults tab).
 export function useUserPlaylists(userId: string | undefined) {
+  useUiTranslation();
   return useQuery({
     queryKey: ['user-playlists', userId],
     queryFn: async () => {
@@ -82,6 +86,7 @@ export function useUserPlaylists(userId: string | undefined) {
 // Get ALL playlists of a user for STAFF surfaces (admin user page) — drops the
 // is_public filter. Distinct queryKey so it never collides with the public cache.
 export function useUserPlaylistsStaff(userId: string | undefined) {
+  useUiTranslation();
   return useQuery({
     queryKey: ['user-playlists-staff', userId],
     queryFn: async () => {
@@ -100,6 +105,7 @@ export function useUserPlaylistsStaff(userId: string | undefined) {
 
 // Get a single playlist by ID
 export function usePlaylist(playlistId: string | undefined) {
+  useUiTranslation();
   return useQuery({
     queryKey: ['playlist', playlistId],
     queryFn: async () => {
@@ -120,6 +126,7 @@ export function usePlaylist(playlistId: string | undefined) {
 
 // Get items in a playlist
 export function usePlaylistItems(playlistId: string | undefined) {
+  useUiTranslation();
   return useQuery({
     queryKey: ['playlist_items', playlistId],
     queryFn: async () => {
@@ -140,12 +147,13 @@ export function usePlaylistItems(playlistId: string | undefined) {
 
 // Create a new playlist
 export function useCreatePlaylist() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
   return useMutation({
     mutationFn: async ({ name, description, isPublic }: { name: string; description?: string; isPublic?: boolean }) => {
-      if (!user) throw new Error('Not logged in');
+      if (!user) throw new Error(uiI18n.t('app.not_logged_in_53802e67'));
 
       // Sanitize inputs
       const sanitizedName = sanitizeTitle(name);
@@ -167,16 +175,17 @@ export function useCreatePlaylist() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['playlists'] });
-      toast.success('Playlist created!');
+      toast.success(uiI18n.t('app.playlist_created_c042000e'));
     },
     onError: (error: any) => {
-      toast.error(`Failed to create playlist: ${error.message}`);
+      toast.error(uiI18n.t('app.failed_to_create_playlist_i18n_value_0_b4db8a63', { value0: error.message }));
     },
   });
 }
 
 // Update a playlist
 export function useUpdatePlaylist() {
+  useUiTranslation();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -218,16 +227,17 @@ export function useUpdatePlaylist() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['playlists'] });
       queryClient.invalidateQueries({ queryKey: ['playlist', variables.id] });
-      toast.success('Playlist updated!');
+      toast.success(uiI18n.t('app.playlist_updated_691ea7bd'));
     },
     onError: (error: any) => {
-      toast.error(`Failed to update playlist: ${error.message}`);
+      toast.error(uiI18n.t('app.failed_to_update_playlist_i18n_value_0_0d56acd2', { value0: error.message }));
     },
   });
 }
 
 // Delete a playlist
 export function useDeletePlaylist() {
+  useUiTranslation();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -241,16 +251,17 @@ export function useDeletePlaylist() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['playlists'] });
-      toast.success('Playlist deleted!');
+      toast.success(uiI18n.t('app.playlist_deleted_fcb788dc'));
     },
     onError: (error: any) => {
-      toast.error(`Failed to delete playlist: ${error.message}`);
+      toast.error(uiI18n.t('app.failed_to_delete_playlist_i18n_value_0_d314b9b8', { value0: error.message }));
     },
   });
 }
 
 // Add anime to a playlist
 export function useAddToPlaylist() {
+  useUiTranslation();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -290,7 +301,7 @@ export function useAddToPlaylist() {
 
       if (error) {
         if (error.code === '23505') {
-          throw new Error('Anime already in playlist');
+          throw new Error(uiI18n.t('app.anime_already_in_playlist_8f6f3df2'));
         }
         throw error;
       }
@@ -301,7 +312,7 @@ export function useAddToPlaylist() {
       queryClient.invalidateQueries({ queryKey: ['playlist', variables.playlistId] });
       // Invalidate anime-in-playlists lookup so UI shows the "added" state quickly
       queryClient.invalidateQueries({ queryKey: ['anime_in_playlists', variables.animeId] });
-      toast.success('Added to playlist!');
+      toast.success(uiI18n.t('app.added_to_playlist_4c973202'));
     },
 
     onError: (error: any) => {
@@ -312,6 +323,7 @@ export function useAddToPlaylist() {
 
 // Remove anime from a playlist
 export function useRemoveFromPlaylist() {
+  useUiTranslation();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -328,16 +340,17 @@ export function useRemoveFromPlaylist() {
       queryClient.invalidateQueries({ queryKey: ['playlist_items', variables.playlistId] });
       queryClient.invalidateQueries({ queryKey: ['playlists'] });
       queryClient.invalidateQueries({ queryKey: ['playlist', variables.playlistId] });
-      toast.success('Removed from playlist!');
+      toast.success(uiI18n.t('app.removed_from_playlist_0b7501cd'));
     },
     onError: (error: any) => {
-      toast.error(`Failed to remove: ${error.message}`);
+      toast.error(uiI18n.t('app.failed_to_remove_i18n_value_0_54db62eb', { value0: error.message }));
     },
   });
 }
 
 // Reorder playlist items
 export function useReorderPlaylistItems() {
+  useUiTranslation();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -356,13 +369,14 @@ export function useReorderPlaylistItems() {
       queryClient.invalidateQueries({ queryKey: ['playlist_items', variables.playlistId] });
     },
     onError: (error: any) => {
-      toast.error(`Failed to reorder: ${error.message}`);
+      toast.error(uiI18n.t('app.failed_to_reorder_i18n_value_0_5701e8b5', { value0: error.message }));
     },
   });
 }
 
 // Get public playlists by user ID
 export function usePublicPlaylists(userId: string | undefined) {
+  useUiTranslation();
   return useQuery({
     queryKey: ['public_playlists', userId],
     queryFn: async () => {
@@ -394,6 +408,7 @@ export interface DiscoverPlaylist extends Playlist {
 
 // Browse everyone's public playlists (the Discover section) with search + sort.
 export function useDiscoverPlaylists({ search = '', sort = 'trending' }: { search?: string; sort?: DiscoverSort } = {}) {
+  useUiTranslation();
   return useQuery({
     queryKey: ['discover_playlists', search, sort],
     queryFn: async () => {
@@ -443,6 +458,7 @@ export function useDiscoverPlaylists({ search = '', sort = 'trending' }: { searc
 
 // Check if anime is in any of user's playlists
 export function useAnimeInPlaylists(animeId: string | undefined) {
+  useUiTranslation();
   const { user } = useAuth();
 
   return useQuery({

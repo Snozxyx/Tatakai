@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 "use client";
 
 import { useEffect, useState } from "react";
@@ -54,8 +56,8 @@ const flagships: Flagship[] = [
   {
     icon: Sparkles,
     kicker: "Recommendations",
-    title: "Picks that actually get you",
-    body: "A hybrid recommendation engine learns from everything you watch and read, then surfaces the next thing worth your time — without the endless scrolling.",
+    get title() { return uiI18n.t('app.picks_that_actually_get_you_e15e6e8d'); },
+    get body() { return uiI18n.t('app.a_hybrid_recommendation_engine_learns_from_every_6651bc2c'); },
     points: ["Personalized daily", "Learns as you go", "Anime & manga"],
     media: `https://res.cloudinary.com/hgytxblu/video/upload/v1791138049/Recommendation.mp4`,
     accent: "text-violet-200",
@@ -64,8 +66,8 @@ const flagships: Flagship[] = [
   {
     icon: Clapperboard,
     kicker: "Video player",
-    title: "Built for how you watch",
-    body: "A clean player for episodes you own — custom subtitles, mid-scene track switching, and background playback while you browse.",
+    get title() { return uiI18n.t('app.built_for_how_you_watch_7be46db6'); },
+    get body() { return uiI18n.t('app.a_clean_player_for_episodes_you_own_custom_subti_169631c6'); },
     points: ["Custom subtitles", "Background playback", "Remembers progress"],
     media: `https://res.cloudinary.com/hgytxblu/video/upload/v1791138043/Videoplayer.mp4`,
     accent: "text-cyan-200",
@@ -74,8 +76,8 @@ const flagships: Flagship[] = [
   {
     icon: BookOpen,
     kicker: "Manga reader",
-    title: "Read the way you like",
-    body: "A fast, comic-style reader with per-device settings, custom keybinds, and progress that follows you across every session.",
+    get title() { return uiI18n.t('app.read_the_way_you_like_e78bada9'); },
+    get body() { return uiI18n.t('app.a_fast_comic_style_reader_with_per_device_settin_05aa8296'); },
     points: ["Custom keybinds", "Saved progress", "Manga · Manhwa · Comics"],
     media: `https://res.cloudinary.com/hgytxblu/video/upload/v1791138030/MangaReader.mp4`,
     accent: "text-pink-200",
@@ -84,8 +86,8 @@ const flagships: Flagship[] = [
   {
     icon: BookMarked,
     kicker: "Novel reader · Listern",
-    title: "Get lost in every chapter",
-    body: "A focused light novel reader with a calm reading experience, flexible controls, and progress that stays with you.",
+    get title() { return uiI18n.t('app.get_lost_in_every_chapter_4121cc1b'); },
+    get body() { return uiI18n.t('app.a_focused_light_novel_reader_with_a_calm_reading_dd724057'); },
     points: ["Light novel support", "Custom keybinds", "Saved progress"],
     media:
       "https://res.cloudinary.com/hgytxblu/video/upload/v1791808194/export-1791807786726.mp4",
@@ -95,8 +97,8 @@ const flagships: Flagship[] = [
   {
     icon: BarChart3,
     kicker: "Profile & stats",
-    title: "Your taste, in numbers",
-    body: "Activity heatmaps, taste breakdowns, and rich insights that turn your history into a profile worth following.",
+    get title() { return uiI18n.t('app.your_taste_in_numbers_58a29751'); },
+    get body() { return uiI18n.t('app.activity_heatmaps_taste_breakdowns_and_rich_insi_88ac2d3a'); },
     points: ["Activity heatmaps", "Taste breakdown", "Shareable profile"],
     media: `https://res.cloudinary.com/hgytxblu/video/upload/v1791138031/Profile_with_stats.mp4`,
     accent: "text-amber-200",
@@ -116,24 +118,24 @@ interface OfflineCard {
 const offline: OfflineCard[] = [
   {
     icon: Archive,
-    title: "Offline library",
-    body: "Everything you've saved, organized in one place — ready with or without a connection.",
+    get title() { return uiI18n.t('app.offline_library_ac6cdd78'); },
+    get body() { return uiI18n.t('app.everything_you_ve_saved_organized_in_one_place_r_c9f1a372'); },
     media: `${BRAND}/mobile_download.jpg`,
     kind: "image",
     tag: "Always ready",
   },
   {
     icon: DownloadCloud,
-    title: "Download anime",
-    body: "Keep episodes on your device for the flight, the commute, or unreliable Wi-Fi.",
+    get title() { return uiI18n.t('app.download_anime_c3a1be15'); },
+    get body() { return uiI18n.t('app.keep_episodes_on_your_device_for_the_flight_the__8eca8f49'); },
     media: `https://res.cloudinary.com/hgytxblu/video/upload/v1791138041/Animedownload.mp4`,
     kind: "video",
     tag: "Offline ready",
   },
   {
     icon: DownloadCloud,
-    title: "Download manga",
-    body: "Take whole series offline and read directly from your library.",
+    get title() { return uiI18n.t('app.download_manga_5dcbeaab'); },
+    get body() { return uiI18n.t('app.take_whole_series_offline_and_read_directly_from_d19d3d85'); },
     media: `https://res.cloudinary.com/hgytxblu/video/upload/v1791138041/Mangadownload.mp4`,
     kind: "video",
     tag: "Read anywhere",
@@ -152,7 +154,7 @@ interface Tile {
 const community: Tile[] = [
   {
     icon: Users,
-    title: "A feed that feels alive",
+    get title() { return uiI18n.t('app.a_feed_that_feels_alive_2fdd9fb5'); },
     img: `${BRAND}/Community.png`,
     eyebrow: "Social feed",
     layout: "col-span-2 row-span-2",
@@ -160,56 +162,56 @@ const community: Tile[] = [
   },
   {
     icon: BarChart3,
-    title: "Profiles worth following",
+    get title() { return uiI18n.t('app.profiles_worth_following_fec2e75b'); },
     img: `${BRAND}/Profile.png`,
     eyebrow: "Profiles",
     layout: "col-span-2",
   },
   {
     icon: MessageSquare,
-    title: "Discuss every episode",
+    get title() { return uiI18n.t('app.discuss_every_episode_e300a508'); },
     img: `${BRAND}/Comment.png`,
     eyebrow: "Conversations",
     layout: "",
   },
   {
     icon: ListMusic,
-    title: "Curate & share playlists",
+    get title() { return uiI18n.t('app.curate_share_playlists_3ed754f8'); },
     img: `${BRAND}/Playlist.png`,
     eyebrow: "Collections",
     layout: "",
   },
   {
     icon: TrendingUp,
-    title: "See what's trending",
+    get title() { return uiI18n.t('app.see_what_s_trending_68817930'); },
     img: `${BRAND}/Trending.png`,
     eyebrow: "Discover",
     layout: "",
   },
   {
     icon: RefreshCw,
-    title: "Sync your anime history",
+    get title() { return uiI18n.t('app.sync_your_anime_history_d767489d'); },
     img: `${BRAND}/integration.png`,
     eyebrow: "Integrations",
     layout: "",
   },
   {
     icon: CalendarDays,
-    title: "Track your anime journey",
+    get title() { return uiI18n.t('app.track_your_anime_journey_1f4c5fc6'); },
     img: `${BRAND}/Calendar.png`,
     eyebrow: "Calendar",
     layout: "",
   },
   {
     icon: Trophy,
-    title: "Build your own tier lists",
+    get title() { return uiI18n.t('app.build_your_own_tier_lists_94dec8bb'); },
     img: `${BRAND}/Tierlist.png`,
     eyebrow: "Tier lists",
     layout: "",
   },
   {
     icon: Heart,
-    title: "Keep your favorites close",
+    get title() { return uiI18n.t('app.keep_your_favorites_close_2dc8b8cf'); },
     img: `${BRAND}/Favorites.png`,
     eyebrow: "Favorites",
     layout: "",
@@ -229,48 +231,48 @@ const highlightedFeatures: HighlightedFeature[] = [
   {
     icon: Clapperboard,
     eyebrow: "Watch",
-    title: "Anime support",
-    body: "Track episodes, discover what to watch next, and keep your progress in sync.",
+    get title() { return uiI18n.t('app.anime_support_81e29ece'); },
+    get body() { return uiI18n.t('app.track_episodes_discover_what_to_watch_next_and_k_ccd83305'); },
     accent: "text-violet-200",
     iconBackground: "bg-violet-400/10",
   },
   {
     icon: BookOpen,
     eyebrow: "Read",
-    title: "Manga support",
-    body: "Follow chapters and keep every series close, from manga to manhwa and comics.",
+    get title() { return uiI18n.t('app.manga_support_9519cf8b'); },
+    get body() { return uiI18n.t('app.follow_chapters_and_keep_every_series_close_from_26474c4f'); },
     accent: "text-cyan-200",
     iconBackground: "bg-cyan-400/10",
   },
   {
     icon: BookMarked,
     eyebrow: "Discover",
-    title: "Novel support",
-    body: "Build one library for the stories you watch, read, and come back to.",
+    get title() { return uiI18n.t('app.novel_support_6ba427ff'); },
+    get body() { return uiI18n.t('app.build_one_library_for_the_stories_you_watch_read_fd2ad593'); },
     accent: "text-pink-200",
     iconBackground: "bg-pink-400/10",
   },
   {
     icon: Gauge,
     eyebrow: "Performance",
-    title: "Fast by default",
-    body: "A focused interface that gets out of the way and keeps your library feeling instant.",
+    get title() { return uiI18n.t('app.fast_by_default_1a0e792e'); },
+    get body() { return uiI18n.t('app.a_focused_interface_that_gets_out_of_the_way_and_79debffc'); },
     accent: "text-amber-200",
     iconBackground: "bg-amber-400/10",
   },
   {
     icon: MousePointer2,
     eyebrow: "Experience",
-    title: "Easy to use",
-    body: "Simple controls, clear progress, and thoughtful details make Tatakai feel natural.",
+    get title() { return uiI18n.t('app.easy_to_use_a949e723'); },
+    get body() { return uiI18n.t('app.simple_controls_clear_progress_and_thoughtful_de_81d959a4'); },
     accent: "text-emerald-200",
     iconBackground: "bg-emerald-400/10",
   },
   {
     icon: Users,
     eyebrow: "Community",
-    title: "Find your people",
-    body: "Share recommendations, discuss favorites, and follow the fandom around you.",
+    get title() { return uiI18n.t('app.find_your_people_69ec6132'); },
+    get body() { return uiI18n.t('app.share_recommendations_discuss_favorites_and_foll_dcfdf409'); },
     accent: "text-blue-200",
     iconBackground: "bg-blue-400/10",
   },
@@ -287,6 +289,7 @@ function SectionHeading({
   title: string;
   sub?: string;
 }) {
+  useUiTranslation();
   return (
     <div className="mb-12 max-w-3xl lg:mb-16">
       <div className="mb-5 flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.18em] text-violet-200/80">
@@ -311,6 +314,7 @@ function SectionHeading({
 }
 
 export function FeatureShowcase() {
+  useUiTranslation();
   const navigate = useNavigate();
   const [previewTile, setPreviewTile] = useState<Tile | null>(null);
 
@@ -356,7 +360,7 @@ export function FeatureShowcase() {
             <SectionHeading
               id="flagship-features-heading"
               eyebrow="The complete experience"
-              title="Everything anime, manga & novels, done right"
+              title={uiI18n.t('app.everything_anime_manga_novels_done_right_e51a9c11')}
               sub="One app for discovering, tracking, and sharing the stories you love — designed to stay out of your way."
             />
           </Reveal>
@@ -375,9 +379,7 @@ export function FeatureShowcase() {
 
                     <div className="relative grid overflow-hidden lg:grid-cols-[0.9fr_1.1fr]">
                       <div
-                        className={`relative overflow-hidden p-7 sm:p-10 lg:p-12 ${
-                          reversed ? "lg:order-2" : ""
-                        }`}
+                        className={`relative overflow-hidden p-7 sm:p-10 lg:p-12 ${reversed ? "lg:order-2" : ""}`}
                       >
                         <span
                           aria-hidden="true"
@@ -406,7 +408,7 @@ export function FeatureShowcase() {
                           </p>
 
                           <ul
-                            aria-label={`${feature.title} capabilities`}
+                            aria-label={uiI18n.t('app.i18n_value_0_capabilities_f43c69af', { value0: feature.title })}
                             className="mt-7 grid gap-2 sm:grid-cols-2"
                           >
                             {feature.points.map((point) => (
@@ -428,11 +430,9 @@ export function FeatureShowcase() {
                       </div>
 
                       <div
-                        className={`relative flex items-center border-t border-white/[0.08] bg-black/10 p-3 sm:p-4 lg:border-t-0 ${
-                          reversed
+                        className={`relative flex items-center border-t border-white/[0.08] bg-black/10 p-3 sm:p-4 lg:border-t-0 ${reversed
                             ? "lg:order-1 lg:border-r"
-                            : "lg:border-l"
-                        }`}
+                            : "lg:border-l"}`}
                       >
                         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/[0.035] to-transparent" />
 
@@ -440,12 +440,12 @@ export function FeatureShowcase() {
                           <ShowcaseMedia
                             type="video"
                             src={feature.media}
-                            label={`${feature.title} — preview`}
+                            label={uiI18n.t('app.i18n_value_0_preview_86615b54', { value0: feature.title })}
                             className="rounded-[18px] border-white/10 bg-black/30 shadow-2xl"
                           />
 
                           <div className="pointer-events-none absolute bottom-4 left-4 rounded-full border border-white/10 bg-black/45 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-white/60 backdrop-blur-md">
-                            Feature preview
+                            {uiI18n.t('app.feature_preview_2ef2eb94')}
                           </div>
                         </div>
                       </div>
@@ -468,7 +468,7 @@ export function FeatureShowcase() {
             <SectionHeading
               id="highlighted-features-heading"
               eyebrow="Why Tatakai"
-              title="One home for everything you love"
+              title={uiI18n.t('app.one_home_for_everything_you_love_9cbdbc33')}
               sub="Anime, manga, and novels come together with the speed and simplicity to make keeping up feel effortless."
             />
           </Reveal>
@@ -485,9 +485,7 @@ export function FeatureShowcase() {
                   className={isPrimary ? "lg:col-span-2 lg:row-span-2" : "lg:col-span-2"}
                 >
                   <article
-                    className={`group relative flex h-full min-h-[220px] flex-col overflow-hidden rounded-[24px] border border-white/[0.1] bg-white/[0.035] p-6 shadow-[0_20px_60px_-35px_rgba(0,0,0,0.9)] transition-all duration-300 hover:-translate-y-1 hover:border-white/20 hover:bg-white/[0.055] ${
-                      isPrimary ? "lg:min-h-[456px] lg:p-8" : ""
-                    }`}
+                    className={`group relative flex h-full min-h-[220px] flex-col overflow-hidden rounded-[24px] border border-white/[0.1] bg-white/[0.035] p-6 shadow-[0_20px_60px_-35px_rgba(0,0,0,0.9)] transition-all duration-300 hover:-translate-y-1 hover:border-white/20 hover:bg-white/[0.055] ${isPrimary ? "lg:min-h-[456px] lg:p-8" : ""}`}
                   >
                     <div className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-white/[0.04] blur-3xl transition-opacity duration-500 group-hover:opacity-80" />
 
@@ -538,7 +536,7 @@ export function FeatureShowcase() {
             <SectionHeading
               id="offline-heading"
               eyebrow="Take it with you"
-              title="Your library, anywhere — even offline"
+              title={uiI18n.t('app.your_library_anywhere_even_offline_e7eabeeb')}
               sub="Keep your lists on-device for commutes, flights, and dead zones — your library travels with you."
             />
           </Reveal>
@@ -555,7 +553,7 @@ export function FeatureShowcase() {
                         <ShowcaseMedia
                           type={card.kind}
                           src={card.media}
-                          label={`${card.title} — preview`}
+                          label={uiI18n.t('app.i18n_value_0_preview_86615b54', { value0: card.title })}
                           ratio="16 / 10"
                           className="rounded-[14px] border-0 shadow-none"
                         />
@@ -599,7 +597,7 @@ export function FeatureShowcase() {
             <SectionHeading
               id="community-heading"
               eyebrow="More than a library"
-              title="Built for the community"
+              title={uiI18n.t('app.built_for_the_community_93d55238')}
               sub="Follow people, talk about what you're into, and bring your MyAnimeList or AniList history along."
             />
           </Reveal>
@@ -627,7 +625,7 @@ export function FeatureShowcase() {
                 >
                   <button
                     type="button"
-                    aria-label={`Preview ${tile.title}`}
+                    aria-label={uiI18n.t('app.preview_i18n_value_0_fc87427b', { value0: tile.title })}
                     onClick={() => setPreviewTile(tile)}
                     className="
                       group
@@ -789,18 +787,16 @@ export function FeatureShowcase() {
                             <span className="h-1 w-1 rounded-full bg-white/50" />
 
                             <span className="text-[9px] font-medium uppercase tracking-[0.16em] text-white/45">
-                              Tatakai community
+                              {uiI18n.t('app.tatakai_community_6adae502')}
                             </span>
                           </div>
 
                           <h3
-                            className={`font-display font-medium leading-[1.05] tracking-[-0.03em] text-white ${
-                              tile.featured
+                            className={`font-display font-medium leading-[1.05] tracking-[-0.03em] text-white ${tile.featured
                                 ? "max-w-xl text-xl sm:text-2xl lg:text-[2rem]"
                                 : tile.layout.includes("col-span-2")
                                   ? "max-w-md text-lg sm:text-xl"
-                                  : "max-w-[95%] text-sm sm:text-base"
-                            }`}
+                                  : "max-w-[95%] text-sm sm:text-base"}`}
                           >
                             {tile.title}
                           </h3>
@@ -899,29 +895,28 @@ export function FeatureShowcase() {
               <div className="relative mx-auto max-w-2xl">
                 <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5 text-xs font-medium text-white/70 backdrop-blur-md">
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-300 shadow-[0_0_12px_rgba(110,231,183,0.9)]" />
-                  Ready when you are
+                  {uiI18n.t('app.ready_when_you_are_aec13223')}
                 </div>
 
                 <h2 className="font-display text-[clamp(2rem,4vw,3.4rem)] font-medium leading-[1] tracking-[-0.045em] text-white">
-                  Up and running in minutes
+                  {uiI18n.t('app.up_and_running_in_minutes_929787b0')}
                 </h2>
 
                 <p className="mx-auto mt-5 max-w-xl text-base leading-relaxed text-white/60 lg:text-lg">
-                  Install the app, sign in, and pick up right where you left
-                  off. Everything after setup is just tracking and enjoying.
+                  {uiI18n.t('app.install_the_app_sign_in_and_pick_up_right_where__95ef3bd0')}
                 </p>
 
                 <div className="mx-auto mt-8 grid max-w-lg grid-cols-3 divide-x divide-white/10 rounded-2xl border border-white/[0.08] bg-white/[0.035] px-3 py-3 text-center">
                   <div className="px-2 text-xs font-medium text-white/60">
-                    Discover
+                    {uiI18n.t('app.discover_4827ea22')}
                   </div>
 
                   <div className="px-2 text-xs font-medium text-white/60">
-                    Track
+                    {uiI18n.t('app.track_b1c5a7af')}
                   </div>
 
                   <div className="px-2 text-xs font-medium text-white/60">
-                    Enjoy
+                    {uiI18n.t('app.enjoy_b8edd65d')}
                   </div>
                 </div>
 
@@ -932,7 +927,7 @@ export function FeatureShowcase() {
                     className="group h-12 rounded-full border border-white/20 bg-white px-7 text-sm font-semibold text-black shadow-[0_0_34px_-6px_rgba(255,255,255,0.45)] transition-all hover:scale-[1.02] hover:shadow-[0_0_45px_-6px_rgba(255,255,255,0.65)]"
                   >
                     <Download className="mr-2 h-4 w-4" />
-                    Download app
+                    {uiI18n.t('app.download_app_dd7b83d1')}
                     <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
                   </Button>
 
@@ -942,12 +937,12 @@ export function FeatureShowcase() {
                     onClick={() => navigate("/browse")}
                     className="h-12 rounded-full border border-white/15 bg-white/[0.05] px-7 text-sm font-semibold text-white backdrop-blur-md transition-all hover:border-white/30 hover:bg-white hover:text-black"
                   >
-                    Browse the library
+                    {uiI18n.t('app.browse_the_library_c6cfcdb1')}
                   </Button>
                 </div>
 
                 <p className="mt-6 text-xs text-white/40">
-                  Free &amp; open source — no account required to look around.
+                  {uiI18n.t('app.free_amp_open_source_no_account_required_to_look_1501838c')}
                 </p>
               </div>
             </div>
@@ -974,12 +969,12 @@ export function FeatureShowcase() {
           "
           role="dialog"
           aria-modal="true"
-          aria-label={`${previewTile.title} image preview`}
+          aria-label={uiI18n.t('app.i18n_value_0_image_preview_9735781d', { value0: previewTile.title })}
         >
           {/* Backdrop */}
           <button
             type="button"
-            aria-label="Close image preview"
+            aria-label={uiI18n.t('app.close_image_preview_c4d5897c')}
             className="absolute inset-0 h-full w-full cursor-default"
             onPointerDown={(event) => {
               event.preventDefault();
@@ -1007,7 +1002,7 @@ export function FeatureShowcase() {
           {/* Close button */}
           <button
             type="button"
-            aria-label="Close image preview"
+            aria-label={uiI18n.t('app.close_image_preview_c4d5897c')}
             onPointerDown={(event) => {
               event.preventDefault();
               event.stopPropagation();
@@ -1135,7 +1130,7 @@ export function FeatureShowcase() {
                 "
               >
                 <Maximize2 className="h-3.5 w-3.5" />
-                Preview
+                {uiI18n.t('app.preview_f1fbb2b4')}
               </div>
             </div>
           </div>

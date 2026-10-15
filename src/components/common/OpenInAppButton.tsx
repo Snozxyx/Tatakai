@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useCallback, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { ExternalLink } from 'lucide-react';
@@ -22,7 +24,7 @@ import { cn } from '@/lib/utils';
 export function OpenInAppButton({
   path,
   search,
-  label = 'Open in app',
+  label = uiI18n.t('app.open_in_app_07d911ac'),
   variant = 'outline',
   size = 'sm',
   className,
@@ -34,6 +36,7 @@ export function OpenInAppButton({
   size?: React.ComponentProps<typeof Button>['size'];
   className?: string;
 }) {
+  useUiTranslation();
   const isNative = useIsNativeApp();
   const location = useLocation();
   const [launching, setLaunching] = useState(false);
@@ -78,7 +81,7 @@ export function OpenInAppButton({
       onClick={openInApp}
       disabled={launching}
       className={cn('gap-2', className)}
-      title="Open this page in the Tatakai desktop app"
+      title={uiI18n.t('app.open_this_page_in_the_tatakai_desktop_app_e5485f7d')}
     >
       <ExternalLink className="h-4 w-4" />
       {label}

@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Layers, BookOpen, Flame, Clock3, Sparkles, ArrowRight } from "lucide-react";
@@ -25,8 +27,8 @@ const ALL_CARDS: FilterConfig[] = [
   // First card = LARGE featured (Popular Daily)
   {
     key: "feed-popular-daily",
-    title: "Popular Daily",
-    description: "Daily popularity lane — top titles heating up right now",
+    get title() { return uiI18n.t('app.popular_daily_1c40b5f1'); },
+    get description() { return uiI18n.t('app.daily_popularity_lane_top_titles_heating_up_righ_84c3dbc9'); },
     to: "/manga/discover?feed=popular&window=day",
     icon: Flame,
     poster: "https://s4.anilist.co/file/anilistcdn/media/manga/cover/large/bx173020-vqe5J7U1cizO.png",
@@ -39,8 +41,8 @@ const ALL_CARDS: FilterConfig[] = [
   // Small cards (col 2 + 3)
   {
     key: "manhwa",
-    title: "Only Manhwa",
-    description: "Korean-first catalog",
+    get title() { return uiI18n.t('app.only_manhwa_27aa09e7'); },
+    get description() { return uiI18n.t('app.korean_first_catalog_049c6229'); },
     to: "/manga/discover?type=manhwa",
     icon: Layers,
     poster: "https://s4.anilist.co/file/anilistcdn/media/manga/cover/large/bx119257-Pi21aq3ey9GG.jpg",
@@ -52,8 +54,8 @@ const ALL_CARDS: FilterConfig[] = [
   },
   {
     key: "comics",
-    title: "Only Comics",
-    description: "Western comic flow",
+    get title() { return uiI18n.t('app.only_comics_1f9cfc1f'); },
+    get description() { return uiI18n.t('app.western_comic_flow_07997b13'); },
     to: "/manga/discover?type=comics",
     icon: BookOpen,
     poster: "https://s4.anilist.co/file/anilistcdn/media/manga/cover/large/bx100805-3DCHMdZ5blWl.jpg",
@@ -65,8 +67,8 @@ const ALL_CARDS: FilterConfig[] = [
   },
   {
     key: "feed-foryou-weekly",
-    title: "For You",
-    description: "Weekly personalized picks",
+    get title() { return uiI18n.t('app.for_you_21f25753'); },
+    get description() { return uiI18n.t('app.weekly_personalized_picks_d54f2cd8'); },
     to: "/manga/discover?feed=foryou&window=week",
     icon: Sparkles,
     poster: "https://s4.anilist.co/file/anilistcdn/media/manga/cover/large/bx169904-6gvkXMNpq66N.jpg",
@@ -78,8 +80,8 @@ const ALL_CARDS: FilterConfig[] = [
   },
   {
     key: "feed-recent-monthly",
-    title: "Recent Monthly",
-    description: "Recently read this month",
+    get title() { return uiI18n.t('app.recent_monthly_b99b30ff'); },
+    get description() { return uiI18n.t('app.recently_read_this_month_2dfcbfec'); },
     to: "/manga/discover?feed=recent&window=month",
     icon: Clock3,
     poster: "https://s4.anilist.co/file/anilistcdn/media/manga/cover/large/bx144946-cscic3n2SwdY.jpg",
@@ -102,6 +104,7 @@ function TiltGlassFilterCard({
   onClick: () => void;
   isLarge?: boolean;
 }) {
+  useUiTranslation();
   const cardRef = useRef<HTMLButtonElement>(null);
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const [isHovered, setIsHovered] = useState(false);
@@ -146,10 +149,7 @@ function TiltGlassFilterCard({
           : "transform 0.45s cubic-bezier(0.23, 1, 0.32, 1)",
       }}
       data-mobile-browse-card
-      className={`relative w-full rounded-2xl overflow-hidden text-left
-        border border-white/10 shadow-xl
-        focus:outline-none focus:ring-2 focus:ring-white/30
-        ${isLarge ? "row-span-2" : ""}`}
+      className={`relative w-full rounded-2xl overflow-hidden text-left border border-white/10 shadow-xl focus:outline-none focus:ring-2 focus:ring-white/30 ${isLarge ? "row-span-2" : ""}`}
     >
       {/* Background Poster — random cover from this card's color family */}
       <img
@@ -229,6 +229,7 @@ function TiltGlassFilterCard({
 }
 
 export function MangaDiscoveryQuickFilters() {
+  useUiTranslation();
   const refreshed = useMobileAppearance();
   const navigate = useNavigate();
   // One random cover per card from its accent family, dealt once per visit
@@ -240,14 +241,14 @@ export function MangaDiscoveryQuickFilters() {
       {/* Section header */}
       <HomeSectionHeading
         icon={<Flame className="w-5 h-5 text-primary" />}
-        title="Discovery"
+        title={uiI18n.t('app.discovery_3b3290c7')}
         action={
           <button
             type="button"
             onClick={() => navigate("/manga/discover")}
             className="self-start sm:self-auto inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-xs font-semibold text-white/80 hover:text-white hover:bg-white/10 transition-all duration-200 backdrop-blur-sm shrink-0"
           >
-            Full Explorer
+            {uiI18n.t('app.full_explorer_29c6e82d')}
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         }

@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Globe } from 'lucide-react';
@@ -50,6 +52,7 @@ function toPath(ring: Array<[number, number]>): string {
 }
 
 export function WorldMap({ data, unknownCount = 0, maxListRows = 12 }: Props) {
+  useUiTranslation();
   const [hovered, setHovered] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
 
@@ -77,7 +80,7 @@ export function WorldMap({ data, unknownCount = 0, maxListRows = 12 }: Props) {
     return (
       <div className="text-center py-10 text-muted-foreground">
         <Globe className="w-8 h-8 mx-auto mb-3 opacity-40" />
-        <p className="text-sm">No country data yet — visits will appear here once geo tracking records them.</p>
+        <p className="text-sm">{uiI18n.t('app.no_country_data_yet_visits_will_appear_here_once_862e18b8')}</p>
       </div>
     );
   }
@@ -85,17 +88,17 @@ export function WorldMap({ data, unknownCount = 0, maxListRows = 12 }: Props) {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-muted-foreground">
-        <span><strong className="text-foreground text-sm">{data.length}</strong> countries</span>
-        <span><strong className="text-foreground text-sm">{total.toLocaleString()}</strong> geo-tagged visitors</span>
+        <span><strong className="text-foreground text-sm">{data.length}</strong> {uiI18n.t('app.countries_11ef521f')}</span>
+        <span><strong className="text-foreground text-sm">{total.toLocaleString(uiI18n.language)}</strong> {uiI18n.t('app.geo_tagged_visitors_ac47cc59')}</span>
         {top && (
-          <span className="truncate">Top: <strong className="text-foreground">{flagEmoji(top.coord.iso2)} {top.coord.label}</strong> ({top.value.toLocaleString()})</span>
+          <span className="truncate">{uiI18n.t('app.top_088caafd')} <strong className="text-foreground">{flagEmoji(top.coord.iso2)} {top.coord.label}</strong> ({top.value.toLocaleString(uiI18n.language)})</span>
         )}
-        {unknownCount > 0 && <span>{unknownCount.toLocaleString()} unknown region</span>}
+        {unknownCount > 0 && <span>{unknownCount.toLocaleString(uiI18n.language)} {uiI18n.t('app.unknown_region_abc711c7')}</span>}
       </div>
 
       {/* Map */}
       <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-[#0b1530] via-[#0a1226] to-[#070d1d]">
-        <svg viewBox="0 0 1000 500" className="block h-auto w-full" role="img" aria-label="World map of visitor countries">
+        <svg viewBox="0 0 1000 500" className="block h-auto w-full" role="img" aria-label={uiI18n.t('app.world_map_of_visitor_countries_9fe26f3c')}>
           {/* graticule */}
           {Array.from({ length: 11 }, (_, i) => (i + 1) * 100).map((x) => (
             <line key={`v${x}`} x1={x} y1={0} x2={x} y2={500} stroke="rgba(148,163,184,0.08)" strokeWidth={1} />
@@ -118,7 +121,7 @@ export function WorldMap({ data, unknownCount = 0, maxListRows = 12 }: Props) {
                 onMouseLeave={() => setHovered(null)}
                 className="cursor-pointer"
               >
-                <title>{`${m.coord.label}: ${m.value.toLocaleString()} visitors (${(m.share * 100).toFixed(1)}%)`}</title>
+                <title>{uiI18n.t('app.i18n_value_0_i18n_value_1_visitors_i18n_value_2_9d64b084', { value0: m.coord.label, value1: m.value.toLocaleString(uiI18n.language), value2: (m.share * 100).toFixed(1) })}</title>
                 {m === top && (
                   <circle r={m.r + 7} fill="none" stroke="rgba(139,92,246,0.5)" strokeWidth={1.5}>
                     <animate attributeName="r" values={`${m.r + 4};${m.r + 10};${m.r + 4}`} dur="2.4s" repeatCount="indefinite" />
@@ -145,7 +148,7 @@ export function WorldMap({ data, unknownCount = 0, maxListRows = 12 }: Props) {
                     strokeWidth={3}
                     paintOrder="stroke"
                   >
-                    {flagEmoji(m.coord.iso2)} {m.value.toLocaleString()}
+                    {flagEmoji(m.coord.iso2)} {m.value.toLocaleString(uiI18n.language)}
                   </text>
                 )}
               </g>
@@ -156,13 +159,13 @@ export function WorldMap({ data, unknownCount = 0, maxListRows = 12 }: Props) {
           <div className="pointer-events-none absolute left-3 top-3 rounded-xl border border-white/10 bg-black/70 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur">
             {(() => {
               const m = markers.find((k) => k.name === hovered);
-              return m ? `${flagEmoji(m.coord.iso2)} ${m.coord.label} — ${m.value.toLocaleString()} (${(m.share * 100).toFixed(1)}%)` : hovered;
+              return m ? `${flagEmoji(m.coord.iso2)} ${m.coord.label} — ${m.value.toLocaleString(uiI18n.language)} (${(m.share * 100).toFixed(1)}%)` : hovered;
             })()}
           </div>
         )}
         <div className="absolute bottom-3 right-3 flex items-center gap-2 rounded-full border border-white/10 bg-black/60 px-3 py-1 text-[10px] font-semibold text-muted-foreground backdrop-blur">
-          <span className="h-2 w-2 rounded-full bg-violet-500" /> top country
-          <span className="h-2 w-2 rounded-full bg-cyan-400" /> visitor hub
+          <span className="h-2 w-2 rounded-full bg-violet-500" /> {uiI18n.t('app.top_country_7ca36425')}
+          <span className="h-2 w-2 rounded-full bg-cyan-400" /> {uiI18n.t('app.visitor_hub_0138fa09')}
         </div>
       </div>
 
@@ -192,14 +195,14 @@ export function WorldMap({ data, unknownCount = 0, maxListRows = 12 }: Props) {
                 />
               </div>
               <span className="w-20 shrink-0 text-right text-xs text-muted-foreground">
-                {row.value.toLocaleString()} · {pct.toFixed(1)}%
+                {row.value.toLocaleString(uiI18n.language)} · {pct.toFixed(1)}%
               </span>
             </div>
           );
         })}
         {unmapped.length > 0 && (
           <p className="px-2 pt-1 text-[11px] text-muted-foreground">
-            {unmapped.length} region{unmapped.length === 1 ? '' : 's'} ({unmapped.map((u) => u.name).slice(0, 5).join(', ')}{unmapped.length > 5 ? '…' : ''}) listed but not pinned — no coordinates on file.
+            {unmapped.length} {uiI18n.t('app.region_a94a5840')}{unmapped.length === 1 ? '' : 's'} ({unmapped.map((u) => u.name).slice(0, 5).join(', ')}{unmapped.length > 5 ? '…' : ''}{uiI18n.t('app.listed_but_not_pinned_no_coordinates_on_file_74e29c70')}
           </p>
         )}
         {data.length > maxListRows && (
@@ -208,7 +211,7 @@ export function WorldMap({ data, unknownCount = 0, maxListRows = 12 }: Props) {
             onClick={() => setShowAll((v) => !v)}
             className="px-2 text-xs font-bold text-primary hover:underline"
           >
-            {showAll ? `Show top ${maxListRows}` : `Show all ${data.length} countries`}
+            {showAll ? uiI18n.t('app.show_top_i18n_value_0_e620c4fd', { value0: maxListRows }) : uiI18n.t('app.show_all_i18n_value_0_countries_6dd5875f', { value0: data.length })}
           </button>
         )}
       </div>

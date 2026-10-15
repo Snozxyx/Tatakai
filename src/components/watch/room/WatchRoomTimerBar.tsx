@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Users, Play, Clock, X } from 'lucide-react';
@@ -5,6 +7,7 @@ import { useWatchRoomContext } from './WatchRoomContext';
 
 /** Host-only thin strip: ready-count + start-timer presets/custom + start-now/cancel. */
 export function WatchRoomTimerBar() {
+  useUiTranslation();
     const {
         participants, isEditingCustomTimer, setIsEditingCustomTimer,
         customTimerMinutes, setCustomTimerMinutes, handleStartTimer,
@@ -20,20 +23,14 @@ export function WatchRoomTimerBar() {
             
             {/* Left: Ready Status Badge */}
             <div className="flex shrink-0 items-center gap-3">
-                <div className={`flex items-center gap-2.5 rounded-full border px-3.5 py-1.5 transition-all duration-500 ${
-                    isAllReady 
+                <div className={`flex items-center gap-2.5 rounded-full border px-3.5 py-1.5 transition-all duration-500 ${isAllReady
                     ? 'border-emerald-500/30 bg-emerald-500/10 shadow-[0_0_15px_rgba(16,185,129,0.15)]' 
-                    : 'border-white/[0.08] bg-white/[0.03]'
-                }`}>
-                    <span className={`grid h-6 w-6 place-items-center rounded-full transition-colors ${
-                        isAllReady ? 'bg-emerald-500/20' : 'bg-white/10'
-                    }`}>
+                    : 'border-white/[0.08] bg-white/[0.03]'}`}>
+                    <span className={`grid h-6 w-6 place-items-center rounded-full transition-colors ${isAllReady ? 'bg-emerald-500/20' : 'bg-white/10'}`}>
                         <Users className={`h-3 w-3 ${isAllReady ? 'text-emerald-400' : 'text-muted-foreground'}`} />
                     </span>
-                    <span className={`text-[13px] font-bold tracking-wide transition-colors ${
-                        isAllReady ? 'text-emerald-400' : 'text-foreground/90'
-                    }`}>
-                        {readyCount} / {totalCount} Ready
+                    <span className={`text-[13px] font-bold tracking-wide transition-colors ${isAllReady ? 'text-emerald-400' : 'text-foreground/90'}`}>
+                        {readyCount} / {totalCount} {uiI18n.t('app.ready_20c7c552')}
                     </span>
                 </div>
             </div>
@@ -42,7 +39,7 @@ export function WatchRoomTimerBar() {
             <div className="flex flex-wrap items-center gap-2">
                 <div className="hidden sm:flex items-center gap-1.5 mr-2 text-muted-foreground/50">
                     <Clock className="w-3.5 h-3.5" />
-                    <span className="text-[10px] font-bold uppercase tracking-wider">Host Controls</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider">{uiI18n.t('app.host_controls_339257f8')}</span>
                 </div>
 
                 {/* Preset Timer Buttons */}
@@ -54,7 +51,7 @@ export function WatchRoomTimerBar() {
                         className="h-8 rounded-full border border-white/5 bg-white/5 px-4 text-xs font-medium text-foreground/80 transition-all hover:bg-white/10 hover:text-foreground active:scale-95" 
                         onClick={() => handleStartTimer(s)}
                     >
-                        {s >= 60 ? `${s / 60}m` : `${s}s`}
+                        {s >= 60 ? uiI18n.t('app.i18n_value_0m_a5643c66', { value0: s / 60 }) : uiI18n.t('app.i18n_value_0s_87a78148', { value0: s })}
                     </Button>
                 ))}
 
@@ -66,7 +63,7 @@ export function WatchRoomTimerBar() {
                         className="h-8 rounded-full border border-white/5 bg-white/5 px-4 text-xs font-medium text-foreground/80 transition-all hover:bg-white/10 hover:text-foreground active:scale-95" 
                         onClick={() => setIsEditingCustomTimer(true)}
                     >
-                        Custom
+                        {uiI18n.t('app.custom_081ae3fd')}
                     </Button>
                 ) : (
                     <div className="flex items-center gap-1 rounded-full border border-white/10 bg-white/5 p-0.5 pr-1 shadow-inner transition-all animate-in fade-in slide-in-from-right-2">
@@ -74,7 +71,7 @@ export function WatchRoomTimerBar() {
                             type="number" 
                             value={customTimerMinutes} 
                             onChange={e => setCustomTimerMinutes(e.target.value)} 
-                            placeholder="Min"
+                            placeholder={uiI18n.t('app.min_7eb0cee8')}
                             className="h-7 w-14 border-0 bg-transparent px-2 text-center text-xs focus-visible:ring-0 placeholder:text-muted-foreground/40 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
                         />
                         <Button 
@@ -106,14 +103,14 @@ export function WatchRoomTimerBar() {
                             onClick={handleForceStart}
                         >
                             <Play className="h-3 w-3 fill-current" />
-                            Start Now
+                            {uiI18n.t('app.start_now_7ff050af')}
                         </Button>
                         <Button 
                             variant="ghost" 
                             className="h-8 rounded-full border border-red-500/20 bg-red-500/10 px-4 text-xs font-medium text-red-400 transition-all hover:bg-red-500/20 hover:text-red-300 active:scale-95" 
                             onClick={() => updateRoom.mutate({ roomId: roomId!, updates: { scheduled_start_at: null } as any })}
                         >
-                            Cancel
+                            {uiI18n.t('app.cancel_77dfd213')}
                         </Button>
                     </div>
                 )}

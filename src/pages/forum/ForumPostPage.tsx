@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useNavigate, useParams } from 'react-router-dom';
 import type { FC } from 'react';
 import { motion } from 'framer-motion';
@@ -24,6 +26,7 @@ import { HashtagsWidget } from '@/components/community/feed/HashtagsWidget';
 import { Seo } from '@/components/seo/Seo';
 
 export default function ForumPostPage() {
+  useUiTranslation();
   const { postId } = useParams<{ postId: string }>();
   const navigate = useNavigate();
   const isDesktopApp = useIsDesktopApp();
@@ -34,18 +37,18 @@ export default function ForumPostPage() {
   const pinPost = usePinForumPost();
   const confirm = useConfirm();
 
-  if (!postId) return <div className="p-8">Invalid post ID</div>;
+  if (!postId) return <div className="p-8">{uiI18n.t('app.invalid_post_id_cf34d942')}</div>;
 
   const canDelete = !!user && (post?.user_id === user.id || isAdmin);
 
   const handleDelete = async () => {
-    if (!(await confirm({ title: 'Delete this post?', destructive: true }))) return;
+    if (!(await confirm({ get title() { return uiI18n.t('app.delete_this_post_81bc1f2b'); }, destructive: true }))) return;
     try {
       await deletePost.mutateAsync(postId);
-      toast.success('Post deleted');
+      toast.success(uiI18n.t('app.post_deleted_fb8dc289'));
       navigate('/community');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to delete');
+      toast.error(err instanceof Error ? err.message : uiI18n.t('app.failed_to_delete_07931ff7'));
     }
   };
 
@@ -72,7 +75,7 @@ export default function ForumPostPage() {
     <div className="relative min-h-screen bg-background text-foreground antialiased">
       {post && (
         <Seo
-          title={(post as any).title || `Post by ${post.profiles?.display_name || 'a member'}`}
+          title={(post as any).title || uiI18n.t('app.post_by_i18n_value_0_fe9ad608', { value0: post.profiles?.display_name || 'a member' })}
           description={post.content || undefined}
           image={post.image_url || (post.metadata as any)?.images?.[0] || post.anime_poster || undefined}
           canonicalPath={`/community/forum/${postId}`}
@@ -93,7 +96,7 @@ export default function ForumPostPage() {
         <div className="mx-auto max-w-[1536px] px-4 pt-6 md:px-8 md:pt-10">
           <div className="mb-6 flex items-center justify-between">
             <Button variant="ghost" onClick={() => navigate('/community')} className="gap-2">
-              <ArrowLeft className="h-4 w-4" /> Community
+              <ArrowLeft className="h-4 w-4" /> {uiI18n.t('app.community_bfd58ee3')}
             </Button>
             {post && (
               <div className="flex items-center gap-1">
@@ -105,12 +108,12 @@ export default function ForumPostPage() {
                     onClick={() => pinPost.mutate({ postId, isPinned: !post.is_pinned })}
                   >
                     <Pin className={cn('h-4 w-4', post.is_pinned && 'fill-current text-primary')} />
-                    {post.is_pinned ? 'Unpin' : 'Pin'}
+                    {post.is_pinned ? uiI18n.t('app.unpin_2eba6a03') : uiI18n.t('app.pin_9c918414')}
                   </Button>
                 )}
                 {canDelete && (
                   <Button variant="ghost" size="sm" className="gap-1.5 text-destructive hover:text-destructive" onClick={handleDelete}>
-                    <Trash2 className="h-4 w-4" /> Delete
+                    <Trash2 className="h-4 w-4" /> {uiI18n.t('app.delete_f6fdbe48')}
                   </Button>
                 )}
                 {/* Shared moderation toolbar — report + staff flag toggles / ban / admin.
@@ -138,8 +141,8 @@ export default function ForumPostPage() {
                 <PostCard post={feedPost} defaultShowComments />
               ) : (
                 <GlassPanel className="rounded-[2rem] p-16 text-center">
-                  <h3 className="font-display text-lg font-bold tracking-tight">Post not found</h3>
-                  <p className="mt-1 text-sm text-muted-foreground">It may have been removed.</p>
+                  <h3 className="font-display text-lg font-bold tracking-tight">{uiI18n.t('app.post_not_found_2a87047b')}</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">{uiI18n.t('app.it_may_have_been_removed_295468e6')}</p>
                 </GlassPanel>
               )}
             </div>

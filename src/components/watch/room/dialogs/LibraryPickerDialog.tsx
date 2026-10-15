@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -6,6 +8,7 @@ import { useWatchRoomContext } from '../WatchRoomContext';
 
 /** Offline-library picker — host streams a downloaded episode to the party. */
 export function LibraryPickerDialog() {
+  useUiTranslation();
     const {
         showLibraryPicker, setShowLibraryPicker, selectedLibrarySeries, setSelectedLibrarySeries,
         loadingLibrary, library, publishingLocal, publishLocalFile,
@@ -17,18 +20,18 @@ export function LibraryPickerDialog() {
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2 font-semibold">
                         <HardDrive className="w-4 h-4 text-[hsl(var(--isshoni-accent))]" />
-                        {selectedLibrarySeries ? selectedLibrarySeries.name : 'Stream from your library'}
+                        {selectedLibrarySeries ? selectedLibrarySeries.name : uiI18n.t('app.stream_from_your_library_0da9bda8')}
                     </DialogTitle>
                 </DialogHeader>
 
                 {loadingLibrary ? (
                     <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
-                        <Loader2 className="w-4 h-4 animate-spin" /> Reading your downloads…
+                        <Loader2 className="w-4 h-4 animate-spin" /> {uiI18n.t('app.reading_your_downloads_3b88a3ce')}
                     </div>
                 ) : selectedLibrarySeries ? (
                     <div className="space-y-3">
                         <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs rounded-full -ml-1" onClick={() => setSelectedLibrarySeries(null)}>
-                            <ArrowLeft className="w-3.5 h-3.5" /> All series
+                            <ArrowLeft className="w-3.5 h-3.5" /> {uiI18n.t('app.all_series_7d612ab1')}
                         </Button>
                         <ScrollArea className="h-[320px] pr-2">
                             <div className="grid grid-cols-3 gap-1.5">
@@ -41,11 +44,11 @@ export function LibraryPickerDialog() {
                                         disabled={publishingLocal}
                                         onClick={() => publishLocalFile(`${selectedLibrarySeries.path}/${ep.file}`, `${selectedLibrarySeries.name} • Ep ${ep.number}`)}
                                     >
-                                        {publishingLocal ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : `Ep ${ep.number}`}
+                                        {publishingLocal ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : uiI18n.t('app.ep_i18n_value_0_1a0eea94', { value0: ep.number })}
                                     </Button>
                                 ))}
                                 {(selectedLibrarySeries.episodes || []).length === 0 && (
-                                    <p className="col-span-3 py-8 text-center text-xs text-muted-foreground">No downloaded episodes in this series.</p>
+                                    <p className="col-span-3 py-8 text-center text-xs text-muted-foreground">{uiI18n.t('app.no_downloaded_episodes_in_this_series_b69003ca')}</p>
                                 )}
                             </div>
                         </ScrollArea>
@@ -53,8 +56,8 @@ export function LibraryPickerDialog() {
                 ) : library.length === 0 ? (
                     <div className="py-12 text-center space-y-2">
                         <HardDrive className="w-10 h-10 mx-auto text-muted-foreground opacity-40" />
-                        <p className="text-sm text-muted-foreground">Your offline library is empty.</p>
-                        <p className="text-[11px] text-muted-foreground/70">Download episodes from an anime page, or pick any video file instead.</p>
+                        <p className="text-sm text-muted-foreground">{uiI18n.t('app.your_offline_library_is_empty_97818b99')}</p>
+                        <p className="text-[11px] text-muted-foreground/70">{uiI18n.t('app.download_episodes_from_an_anime_page_or_pick_any_3d024683')}</p>
                     </div>
                 ) : (
                     <ScrollArea className="h-[360px] pr-2">
@@ -76,7 +79,7 @@ export function LibraryPickerDialog() {
                                     <div className="min-w-0 flex-1">
                                         <p className="text-sm font-medium truncate text-foreground/90">{item.name}</p>
                                         <p className="text-[11px] text-muted-foreground tabular-nums">
-                                            {item.downloadedEpisodes ?? item.episodes?.length ?? 0} downloaded
+                                            {item.downloadedEpisodes ?? item.episodes?.length ?? 0} {uiI18n.t('app.downloaded_47265105')}
                                         </p>
                                     </div>
                                     <PlayCircle className="w-4 h-4 text-muted-foreground/60 shrink-0" />

@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Background } from '@/components/layout/Background';
@@ -21,56 +23,56 @@ const SUPPORT_URL     = 'https://dsc.gg/tatakai';
 const FEATURES = [
   {
     icon: <Sparkles className="w-5 h-5" />,
-    title: 'Gacha System',
+    get title() { return uiI18n.t('app.gacha_system_4a50b88e'); },
     desc:  'Pull anime characters across 6 rarity tiers. Build your dream collection with banners, pity, and fusion.',
     color: 'text-yellow-400',
     bg:    'bg-yellow-400/10 border-yellow-400/20',
   },
   {
     icon: <Swords className="w-5 h-5" />,
-    title: '1v1 PvP Battles',
+    get title() { return uiI18n.t('app.1v1_pvp_battles_badaa7f1'); },
     desc:  'Challenge others to turn-based fights using your gacha characters. Earn coins and climb ranks.',
     color: 'text-red-400',
     bg:    'bg-red-400/10 border-red-400/20',
   },
   {
     icon: <BookOpen className="w-5 h-5" />,
-    title: 'Solo RPG Story',
+    get title() { return uiI18n.t('app.solo_rpg_story_6162e203'); },
     desc:  'Play through 5 chapters of anime-inspired solo adventure with boss fights and loot.',
     color: 'text-sky-400',
     bg:    'bg-sky-400/10 border-sky-400/20',
   },
   {
     icon: <Trophy className="w-5 h-5" />,
-    title: 'Economy & Leveling',
+    get title() { return uiI18n.t('app.economy_leveling_1dc7063d'); },
     desc:  'Earn XP, coins, and gems. Daily rewards, streaks, a shop, gambling, and server leaderboards.',
     color: 'text-emerald-400',
     bg:    'bg-emerald-400/10 border-emerald-400/20',
   },
   {
     icon: <Dices className="w-5 h-5" />,
-    title: 'Quiz & Mini-Games',
+    get title() { return uiI18n.t('app.quiz_mini_games_5bbe1f4f'); },
     desc:  'Anime trivia, daily fortune, smash/pass, waifu wars, and more fun commands.',
     color: 'text-violet-400',
     bg:    'bg-violet-400/10 border-violet-400/20',
   },
   {
     icon: <Star className="w-5 h-5" />,
-    title: 'Anime Search',
+    get title() { return uiI18n.t('app.anime_search_0c5dd10d'); },
     desc:  'Look up any anime or character with rich embeds. Direct links to open on Tatakai.',
     color: 'text-orange-400',
     bg:    'bg-orange-400/10 border-orange-400/20',
   },
   {
     icon: <Shield className="w-5 h-5" />,
-    title: 'Moderation Suite',
+    get title() { return uiI18n.t('app.moderation_suite_bf7ff893'); },
     desc:  'Anti-spam, anti-link, warnings with auto-action, seal/exile/imprison — themed mod tools.',
     color: 'text-rose-400',
     bg:    'bg-rose-400/10 border-rose-400/20',
   },
   {
     icon: <Zap className="w-5 h-5" />,
-    title: 'Per-Server Settings',
+    get title() { return uiI18n.t('app.per_server_settings_b99dcc9a'); },
     desc:  'Toggle features per guild — welcome messages, auto-roles, log channels, and more.',
     color: 'text-cyan-400',
     bg:    'bg-cyan-400/10 border-cyan-400/20',
@@ -92,6 +94,7 @@ const COMMANDS = [
 ];
 
 export default function DiscordPage() {
+  useUiTranslation();
   const navigate = useNavigate();
   const isDesktopApp = useIsDesktopApp();
 
@@ -108,7 +111,7 @@ export default function DiscordPage() {
           className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-8"
         >
           <ArrowLeft className="w-4 h-4" />
-          Back
+          {uiI18n.t('app.back_b52b36b7')}
         </button>
 
         {/* ─── Hero ─────────────────────────────────────────────────── */}
@@ -140,18 +143,18 @@ export default function DiscordPage() {
             <div className="flex-1 text-center md:text-left">
               <div className="flex items-center justify-center md:justify-start gap-2 mb-2">
                 <h1 className="text-3xl md:text-4xl font-black tracking-tight">
-                  Tatakai Bot
+                  {uiI18n.t('app.tatakai_bot_b9c08690')}
                 </h1>
                 <Badge className="bg-[#5865F2]/20 text-[#7289DA] border-[#5865F2]/30 text-xs">
                   v3.0
                 </Badge>
                 <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-xs flex items-center gap-1">
                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  Online
+                  {uiI18n.t('app.online_c3e839df')}
                 </Badge>
               </div>
               <p className="text-muted-foreground text-base max-w-xl">
-                The ultimate anime Discord bot — gacha pulls, PvP battles, solo RPG, economy, trivia, moderation, and more. Built for Tatakai.
+                {uiI18n.t('app.the_ultimate_anime_discord_bot_gacha_pulls_pvp_b_1f97985e')}
               </p>
 
               {/* Quick stats */}
@@ -159,17 +162,17 @@ export default function DiscordPage() {
                 <div className="flex items-center gap-2 text-sm">
                   <MessageSquare className="w-4 h-4 text-[#5865F2]" />
                   <span className="font-semibold text-foreground">30+</span>
-                  <span className="text-muted-foreground">slash commands</span>
+                  <span className="text-muted-foreground">{uiI18n.t('app.slash_commands_0711b3e7')}</span>
                 </div>
                 <div className="flex items-center gap-2 text-sm">
                   <Crown className="w-4 h-4 text-yellow-400" />
                   <span className="font-semibold text-foreground">28</span>
-                  <span className="text-muted-foreground">collectible characters</span>
+                  <span className="text-muted-foreground">{uiI18n.t('app.collectible_characters_a10adb75')}</span>
                 </div>
                 <div className="flex items-center gap-2 text-sm">
                   <Heart className="w-4 h-4 text-rose-400" />
-                  <span className="font-semibold text-foreground">Free</span>
-                  <span className="text-muted-foreground">forever</span>
+                  <span className="font-semibold text-foreground">{uiI18n.t('app.free_75f52718')}</span>
+                  <span className="text-muted-foreground">{uiI18n.t('app.forever_e07f8c4a')}</span>
                 </div>
               </div>
             </div>
@@ -183,7 +186,7 @@ export default function DiscordPage() {
               >
                 <a href={BOT_INVITE_URL} target="_blank" rel="noopener noreferrer">
                   <ExternalLink className="w-4 h-4 mr-2" />
-                  Add to Server
+                  {uiI18n.t('app.add_to_server_18f4104f')}
                 </a>
               </Button>
 
@@ -194,7 +197,7 @@ export default function DiscordPage() {
                 className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
               >
                 <MessageSquare className="w-3 h-3" />
-                Support Server
+                {uiI18n.t('app.support_server_3a8e4f04')}
               </a>
             </div>
           </div>
@@ -211,7 +214,7 @@ export default function DiscordPage() {
           >
             <h2 className="font-bold flex items-center gap-2 mb-4">
               <Zap className="w-4 h-4 text-yellow-400" />
-              Popular Commands
+              {uiI18n.t('app.popular_commands_4ec222fd')}
             </h2>
 
             <div className="space-y-2">
@@ -236,7 +239,7 @@ export default function DiscordPage() {
           >
             <h2 className="font-bold mb-4 flex items-center gap-2">
               <Star className="w-4 h-4 text-yellow-400" />
-              Features
+              {uiI18n.t('app.features_fc338f87')}
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {FEATURES.map((f) => (
@@ -259,9 +262,9 @@ export default function DiscordPage() {
             {/* ── Invite CTA banner ─── */}
             <div className="mt-5 rounded-xl bg-[#5865F2]/10 border border-[#5865F2]/20 p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
               <div>
-                <p className="font-bold">Ready to power up your server?</p>
+                <p className="font-bold">{uiI18n.t('app.ready_to_power_up_your_server_9c1f8995')}</p>
                 <p className="text-sm text-muted-foreground">
-                  Add Tatakai Bot and unlock the full anime experience for your community.
+                  {uiI18n.t('app.add_tatakai_bot_and_unlock_the_full_anime_experi_dd1a9f1f')}
                 </p>
               </div>
               <Button
@@ -270,7 +273,7 @@ export default function DiscordPage() {
               >
                 <a href={BOT_INVITE_URL} target="_blank" rel="noopener noreferrer">
                   <ExternalLink className="w-4 h-4 mr-2" />
-                  Add Tatakai Bot
+                  {uiI18n.t('app.add_tatakai_bot_eb7bb7bf')}
                 </a>
               </Button>
             </div>

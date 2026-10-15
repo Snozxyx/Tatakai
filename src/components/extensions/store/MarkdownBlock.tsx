@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
  * A small markdown renderer for `readme_text` and version changelogs.
  *
@@ -693,6 +695,7 @@ function parseBlocks(lines: string[], baseUrl?: string, seed = 'b'): ReactNode[]
 }
 
 export function MarkdownBlock({ source, className, baseUrl }: MarkdownBlockProps) {
+  useUiTranslation();
   const text = String(source ?? '').replace(/\r\n/g, '\n').trim();
   if (!text) return null;
 

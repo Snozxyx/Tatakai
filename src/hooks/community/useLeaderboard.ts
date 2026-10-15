@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
  * Community leaderboard hooks
  */
@@ -25,6 +27,7 @@ export function useLeaderboard(
   type: LeaderboardType = 'watched',
   limit = 50
 ) {
+  useUiTranslation();
   return useQuery({
     queryKey: ['leaderboard', type, limit],
     queryFn: async (): Promise<LeaderboardEntry[]> => {
@@ -83,7 +86,7 @@ export function useLeaderboard(
           break;
 
         default:
-          throw new Error(`Unknown leaderboard type: ${type}`);
+          throw new Error(uiI18n.t('app.unknown_leaderboard_type_i18n_value_0_a431fe53', { value0: type }));
       }
 
       const { data, error } = await query;
@@ -288,6 +291,7 @@ async function getActiveLeaderboardFallback(limit: number): Promise<LeaderboardE
  * Get current user's rank
  */
 export function useUserRank(type: LeaderboardType = 'watched', userId?: string) {
+  useUiTranslation();
   const { data: leaderboard } = useLeaderboard(type, 1000);
 
   return useQuery({

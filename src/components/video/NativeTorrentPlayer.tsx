@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { usePlaybackCoordinator } from '@/core/player/usePlaybackCoordinator';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, ArrowLeft, Loader2, RotateCcw } from 'lucide-react';
@@ -93,6 +95,7 @@ export function NativeTorrentPlayer({
   onBack,
   onError,
 }: Props) {
+  useUiTranslation();
   const { coordinator } = usePlaybackCoordinator({ mediaId, episodeId, url, initialPosition: initialSeekSeconds,
     sink: (position, duration, completed) => progressRef.current?.(position, duration || 0, completed) });
   const { settings } = useVideoSettings();
@@ -177,9 +180,9 @@ export function NativeTorrentPlayer({
 
     completedRef.current = false;
     setStatus('opening');
-    setMessage('Opening native torrent player…');
+    setMessage(uiI18n.t('app.opening_native_torrent_player_133f5bbf'));
 
-    if (streamKind === 'debrid') setMessage('Opening debrid stream...');
+    if (streamKind === 'debrid') setMessage(uiI18n.t('app.opening_debrid_stream_f3282283'));
 
     const lease = coordinator.begin({ id: url, url, mode: streamKind, mediaId, episodeId }, initialSeekSeconds, 'native');
     unsubscribe = onNativePlayerEvent((event: any) => {
@@ -232,7 +235,7 @@ export function NativeTorrentPlayer({
         return;
       }
       setStatus('playing');
-      setMessage('Playing in the native player…');
+      setMessage(uiI18n.t('app.playing_in_the_native_player_8ea3c627'));
     });
 
     return () => {
@@ -253,9 +256,9 @@ export function NativeTorrentPlayer({
     openedUrlRef.current = null;
     completedRef.current = false;
     setStatus('opening');
-    setMessage('Opening native torrent player…');
+    setMessage(uiI18n.t('app.opening_native_torrent_player_133f5bbf'));
     const windows = windowsRef.current;
-    if (streamKind === 'debrid') setMessage('Opening debrid stream...');
+    if (streamKind === 'debrid') setMessage(uiI18n.t('app.opening_debrid_stream_f3282283'));
     void openNativePlayer({
       url,
       title,
@@ -276,7 +279,7 @@ export function NativeTorrentPlayer({
       }
       openedUrlRef.current = url;
       setStatus('playing');
-      setMessage('Playing in the native player…');
+      setMessage(uiI18n.t('app.playing_in_the_native_player_8ea3c627'));
     });
   };
 
@@ -306,18 +309,18 @@ export function NativeTorrentPlayer({
           <Loader2 className="mb-3 h-8 w-8 animate-spin text-primary" />
         )}
         <p className="text-sm font-medium text-white/90">
-          {status === 'closed' ? 'Native player closed.' : status === 'playing' ? 'Playing in the native player…' : message}
+          {status === 'closed' ? uiI18n.t('app.native_player_closed_09d0a6f5') : status === 'playing' ? uiI18n.t('app.playing_in_the_native_player_8ea3c627') : message}
         </p>
         {status === 'playing' && (
           <p className="mt-1 max-w-xs text-[11px] leading-relaxed text-white/50">
-            Subtitles &amp; alternate audio (incl. embedded MKV tracks) are in the player&apos;s subtitle / settings menu.
+            {uiI18n.t('app.subtitles_amp_alternate_audio_incl_embedded_mkv__e7d0bbc3')}
           </p>
         )}
         {status !== 'error' && torrentStats && (
           <p className="mt-1 text-xs text-white/60">
-            {progressPercent.toFixed(0)}%{Number(torrentStats?.seeders) > 0 ? ` • ${torrentStats?.seeders} seeders` : ''}
-            {Number(torrentStats?.numPeers) > 0 ? ` • ${torrentStats?.numPeers} peers` : ''}
-            {Number(torrentStats?.downloadSpeed) > 0 ? ` • ${formatRate(torrentStats?.downloadSpeed)}` : ''}
+            {progressPercent.toFixed(0)}%{Number(torrentStats?.seeders) > 0 ? uiI18n.t('app.i18n_value_0_seeders_1dd18126', { value0: torrentStats?.seeders }) : ''}
+            {Number(torrentStats?.numPeers) > 0 ? uiI18n.t('app.i18n_value_0_peers_b6741a72', { value0: torrentStats?.numPeers }) : ''}
+            {Number(torrentStats?.downloadSpeed) > 0 ? uiI18n.t('app.i18n_value_0_723b674d', { value0: formatRate(torrentStats?.downloadSpeed) }) : ''}
           </p>
         )}
         {status !== 'error' && torrentStats && progressPercent > 0 && (
@@ -332,7 +335,7 @@ export function NativeTorrentPlayer({
               className="flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white"
             >
               <RotateCcw className="h-4 w-4" />
-              {status === 'error' ? 'Retry' : 'Reopen player'}
+              {status === 'error' ? uiI18n.t('app.retry_9f5cd8a2') : uiI18n.t('app.reopen_player_06aa930a')}
             </button>
             {onBack && (
               <button
@@ -340,7 +343,7 @@ export function NativeTorrentPlayer({
                 className="flex items-center gap-2 rounded-xl bg-white/10 px-5 py-2.5 text-sm font-semibold text-white"
               >
                 <ArrowLeft className="h-4 w-4" />
-                Back
+                {uiI18n.t('app.back_b52b36b7')}
               </button>
             )}
           </div>

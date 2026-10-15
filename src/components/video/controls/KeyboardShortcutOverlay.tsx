@@ -1,17 +1,26 @@
 import { useState, useEffect } from "react";
 import { Keyboard } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { KeyboardShortcut } from "../VideoPlayer.types";
 
-const SHORTCUTS: KeyboardShortcut[] = [
-  { key: "Space / K", label: "Play / Pause", category: "playback" },
-  { key: "F", label: "Fullscreen", category: "playback" },
-  { key: "M", label: "Mute", category: "volume" },
-  { key: "←", label: "Seek -10s", category: "navigation" },
-  { key: "→", label: "Seek +10s", category: "navigation" },
-  { key: "↑", label: "Volume Up", category: "volume" },
-  { key: "↓", label: "Volume Down", category: "volume" },
-  { key: "I", label: "Picture-in-Picture", category: "other" },
+const SHORTCUT_DEFS: Array<{ key: string; labelKey: string; category: KeyboardShortcut["category"] }> = [
+  { key: "Space / K", labelKey: "player.shortcutPlayPause", category: "playback" },
+  { key: "F", labelKey: "player.shortcutFullscreen", category: "playback" },
+  { key: "M", labelKey: "player.shortcutMute", category: "volume" },
+  { key: "←", labelKey: "player.shortcutSeekBack", category: "navigation" },
+  { key: "→", labelKey: "player.shortcutSeekForward", category: "navigation" },
+  { key: "↑", labelKey: "player.shortcutVolumeUp", category: "volume" },
+  { key: "↓", labelKey: "player.shortcutVolumeDown", category: "volume" },
+  { key: "I", labelKey: "player.shortcutPip", category: "other" },
 ];
+
+const CATEGORY_LABEL_KEYS: Record<KeyboardShortcut["category"], string> = {
+  playback: "player.shortcutCategoryPlayback",
+  navigation: "player.shortcutCategoryNavigation",
+  volume: "player.shortcutCategoryVolume",
+  subtitles: "player.subtitles",
+  other: "player.shortcutCategoryOther",
+};
 
 interface KeyboardShortcutOverlayProps {
   isVisible: boolean;
@@ -19,6 +28,7 @@ interface KeyboardShortcutOverlayProps {
 }
 
 export function KeyboardShortcutOverlay({ isVisible, onClose }: KeyboardShortcutOverlayProps) {
+  const { t } = useTranslation();
   if (!isVisible) return null;
 
   return (
@@ -32,19 +42,19 @@ export function KeyboardShortcutOverlay({ isVisible, onClose }: KeyboardShortcut
       >
         <div className="flex items-center gap-3 mb-5">
           <Keyboard className="w-5 h-5 text-primary" />
-          <h3 className="text-lg font-semibold">Keyboard Shortcuts</h3>
+          <h3 className="text-lg font-semibold">{t('player.keyboardShortcuts')}</h3>
         </div>
 
         <div className="space-y-4">
           {(["playback", "navigation", "volume", "other"] as const).map((category) => (
             <div key={category}>
               <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">
-                {category}
+                {t(CATEGORY_LABEL_KEYS[category])}
               </div>
               <div className="space-y-1.5">
-                {SHORTCUTS.filter((s) => s.category === category).map((shortcut) => (
+                {SHORTCUT_DEFS.filter((s) => s.category === category).map((shortcut) => (
                   <div key={shortcut.key} className="flex items-center justify-between">
-                    <span className="text-sm text-foreground">{shortcut.label}</span>
+                    <span className="text-sm text-foreground">{t(shortcut.labelKey)}</span>
                     <kbd className="px-2 py-0.5 rounded bg-muted text-xs font-mono text-muted-foreground">
                       {shortcut.key}
                     </kbd>
@@ -59,7 +69,7 @@ export function KeyboardShortcutOverlay({ isVisible, onClose }: KeyboardShortcut
           onClick={onClose}
           className="mt-5 w-full py-2 rounded-xl bg-muted hover:bg-muted/80 text-sm font-medium transition-colors"
         >
-          Close (Press ? again)
+          {t('player.closeShortcutsHint')}
         </button>
       </div>
     </div>

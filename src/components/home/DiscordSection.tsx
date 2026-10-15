@@ -1,4 +1,7 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Check, ExternalLink, RefreshCw } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -8,9 +11,9 @@ import { getProxiedJsonUrl } from '@/lib/api/proxy-utils';
 const DISCORD_INVITE = 'https://dsc.gg/tatakai';
 
 const PERKS = [
-  'Exclusive roles and profile flair',
-  'Early access to new features',
-  'Direct line to the developers',
+  'home.discordPerk1',
+  'home.discordPerk2',
+  'home.discordPerk3',
 ];
 
 type Character = { url: string; source: string };
@@ -58,6 +61,7 @@ async function fetchCharacterImage(): Promise<Character | null> {
 }
 
 function DiscordLogo({ className }: { className?: string }) {
+  useUiTranslation();
   return (
     <svg viewBox="0 0 127.14 96.36" fill="currentColor" className={className} aria-hidden="true">
       <path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.7,77.7,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.25,105.25,0,0,0,126.6,80.22h0C129.24,52.84,122.09,29.11,107.7,8.07ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.25,60,73.25,53s5-12.74,11.44-12.74S96.23,46,96.12,53,91.08,65.69,84.69,65.69Z" />
@@ -66,6 +70,8 @@ function DiscordLogo({ className }: { className?: string }) {
 }
 
 export function DiscordSection() {
+  useUiTranslation();
+  const { t } = useTranslation();
   const [character, setCharacter] = useState<Character | null>(null);
   const [isFetching, setIsFetching] = useState(true);
   const [hasAttempted, setHasAttempted] = useState(false);
@@ -99,17 +105,16 @@ export function DiscordSection() {
             </div>
             <div>
               <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#5865F2]">
-                Community
+                {t('nav.community')}
               </p>
               <h2 className="font-display text-2xl font-semibold leading-none tracking-tight md:text-3xl">
-                Join our Discord
+                {t('home.discordTitle')}
               </h2>
             </div>
           </div>
 
           <p className="relative max-w-md leading-relaxed text-muted-foreground">
-            Chat with thousands of anime fans, catch release updates, join events,
-            and talk about what you're watching.
+            {t('home.discordDesc')}
           </p>
 
           {/* Stats */}
@@ -117,7 +122,7 @@ export function DiscordSection() {
             <div>
               <p className="text-2xl font-semibold leading-none tabular-nums">100+</p>
               <p className="mt-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                Members
+                {t('home.discordMembers')}
               </p>
             </div>
             <div className="h-9 w-px bg-white/10" />
@@ -130,7 +135,7 @@ export function DiscordSection() {
                 24/7
               </p>
               <p className="mt-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                Always active
+                {t('home.discordAlwaysActive')}
               </p>
             </div>
           </div>
@@ -142,7 +147,7 @@ export function DiscordSection() {
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#5865F2]/15 text-[#5865F2]">
                   <Check className="h-3 w-3" strokeWidth={3} />
                 </span>
-                {perk}
+                {t(perk)}
               </li>
             ))}
           </ul>
@@ -154,10 +159,10 @@ export function DiscordSection() {
               className="group h-12 rounded-xl bg-[#5865F2] px-6 text-sm font-semibold text-white shadow-lg shadow-[#5865F2]/20 transition-colors hover:bg-[#4752C4]"
             >
               <DiscordLogo className="mr-2.5 h-5 w-5" />
-              Join the server
+              {t('home.discordJoin')}
               <ExternalLink className="ml-2.5 h-4 w-4 opacity-70 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
             </Button>
-            <p className="mt-3 text-xs text-muted-foreground/70">Free to join · opens in a new tab</p>
+            <p className="mt-3 text-xs text-muted-foreground/70">{t('home.discordFreeNote')}</p>
           </div>
         </div>
 
@@ -185,7 +190,7 @@ export function DiscordSection() {
               >
                 <img
                   src={character.url}
-                  alt="Anime character artwork"
+                  alt={t('home.discordArtAlt')}
                   className="h-full w-full object-cover object-top"
                   onError={() => setCharacter(null)}
                 />
@@ -201,7 +206,7 @@ export function DiscordSection() {
                 className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[#5865F2]/5"
               >
                 <DiscordLogo className="h-12 w-12 text-[#5865F2]/30" />
-                <p className="text-xs text-muted-foreground">Artwork unavailable</p>
+                <p className="text-xs text-muted-foreground">{t('home.discordArtUnavailable')}</p>
               </motion.div>
             )}
           </AnimatePresence>
@@ -215,7 +220,7 @@ export function DiscordSection() {
           <div className="absolute inset-x-4 bottom-4 flex items-end justify-between gap-3 md:inset-x-5 md:bottom-5">
             {character ? (
               <span className="text-[10px] uppercase tracking-wider text-white/50">
-                Art via {character.source}
+                {t('home.discordArtVia', { source: character.source })}
               </span>
             ) : (
               <span />
@@ -224,14 +229,12 @@ export function DiscordSection() {
               type="button"
               onClick={refresh}
               disabled={isFetching}
-              aria-label="Show another character"
-              title="Show another character"
+              aria-label={t('home.discordShuffle')}
+              title={t('home.discordShuffle')}
               className="group rounded-xl border border-white/10 bg-black/40 p-2.5 text-white/70 backdrop-blur-md transition-colors hover:bg-black/60 hover:text-white disabled:cursor-wait disabled:opacity-50"
             >
               <RefreshCw
-                className={`h-4 w-4 ${
-                  isFetching ? 'animate-spin' : 'transition-transform duration-500 group-hover:rotate-180'
-                }`}
+                className={`h-4 w-4 ${isFetching ? 'animate-spin' : 'transition-transform duration-500 group-hover:rotate-180'}`}
               />
             </button>
           </div>

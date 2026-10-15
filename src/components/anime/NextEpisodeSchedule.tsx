@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useEffect } from 'react';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Clock, Calendar, Bell, BellOff, Globe } from 'lucide-react';
@@ -44,6 +46,7 @@ function formatTimeUntil(targetDate: Date): {
 }
 
 function CountdownTimer({ targetDate }: { targetDate: Date }) {
+  useUiTranslation();
   const [timeLeft, setTimeLeft] = useState(formatTimeUntil(targetDate));
 
   useEffect(() => {
@@ -57,7 +60,7 @@ function CountdownTimer({ targetDate }: { targetDate: Date }) {
   if (timeLeft.isOverdue) {
     return (
       <div className="text-center py-4">
-        <p className="text-primary font-bold text-lg animate-pulse">Episode Available Now!</p>
+        <p className="text-primary font-bold text-lg animate-pulse">{uiI18n.t('app.episode_available_now_0e8fc3c8')}</p>
       </div>
     );
   }
@@ -65,10 +68,10 @@ function CountdownTimer({ targetDate }: { targetDate: Date }) {
   return (
     <div className="flex gap-3 justify-center">
       {[
-        { value: timeLeft.days, label: 'Days' },
-        { value: timeLeft.hours, label: 'Hours' },
-        { value: timeLeft.minutes, label: 'Mins' },
-        { value: timeLeft.seconds, label: 'Secs' },
+        { value: timeLeft.days, get label() { return uiI18n.t('app.days_f6bb0f46'); } },
+        { value: timeLeft.hours, get label() { return uiI18n.t('app.hours_9e25a34e'); } },
+        { value: timeLeft.minutes, get label() { return uiI18n.t('app.mins_7f821763'); } },
+        { value: timeLeft.seconds, get label() { return uiI18n.t('app.secs_5503b624'); } },
       ].map((item, idx) => (
         <div
           key={idx}
@@ -94,6 +97,7 @@ export function NextEpisodeSchedule({
   overview,
   thumbnail,
 }: NextEpisodeScheduleProps) {
+  useUiTranslation();
   const [userTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone);
   const { data: trackedShows } = useTrackedShows();
   const toggleTracked = useToggleTrackedShow();
@@ -113,14 +117,14 @@ export function NextEpisodeSchedule({
   }
 
   // Format the date in user's local timezone
-  const localDateString = targetDate.toLocaleDateString(undefined, {
+  const localDateString = targetDate.toLocaleDateString(uiI18n.language, {
     weekday: 'long',
     year: 'numeric',
     month: 'long',
     day: 'numeric',
   });
 
-  const localTimeString = targetDate.toLocaleTimeString(undefined, {
+  const localTimeString = targetDate.toLocaleTimeString(uiI18n.language, {
     hour: '2-digit',
     minute: '2-digit',
     timeZoneName: 'short',
@@ -143,7 +147,7 @@ export function NextEpisodeSchedule({
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-display text-lg font-semibold flex items-center gap-2">
           <Clock className="w-5 h-5 text-primary" />
-          Next Episode
+          {uiI18n.t('app.next_episode_834ae0b1')}
         </h3>
         <Button
           variant="ghost"
@@ -158,12 +162,12 @@ export function NextEpisodeSchedule({
           {isTracked ? (
             <>
               <Bell className="w-4 h-4 fill-current" />
-              Tracking
+              {uiI18n.t('app.tracking_e81a151b')}
             </>
           ) : (
             <>
               <BellOff className="w-4 h-4" />
-              Notify Me
+              {uiI18n.t('app.notify_me_c3f30bf0')}
             </>
           )}
         </Button>
@@ -171,9 +175,9 @@ export function NextEpisodeSchedule({
 
       {nextEpisodeNumber && (
         <p className="text-center text-muted-foreground mb-4">
-          Episode {nextEpisodeNumber}
+          {uiI18n.t('app.episode_8669aa56')} {nextEpisodeNumber}
           {episodeTitle ? <span className="text-foreground font-medium"> · {episodeTitle}</span> : null}
-          {' '}airs in:
+          {' '}{uiI18n.t('app.airs_in_c90cfb83')}
         </p>
       )}
 
@@ -184,7 +188,7 @@ export function NextEpisodeSchedule({
           {thumbnail && (
             <img
               src={thumbnail}
-              alt={episodeTitle || `Episode ${nextEpisodeNumber ?? ''}`}
+              alt={episodeTitle || uiI18n.t('app.episode_i18n_value_0_f05acda8', { value0: nextEpisodeNumber ?? '' })}
               loading="lazy"
               className="w-32 aspect-video shrink-0 rounded-lg object-cover border border-white/10"
               // A missing screencap should leave the synopsis alone rather than
@@ -216,7 +220,7 @@ export function NextEpisodeSchedule({
       {dayOfWeek && (
         <div className="mt-4 pt-4 border-t border-white/10 text-center">
           <span className="text-xs text-muted-foreground">
-            This anime airs every <span className="text-foreground font-medium">{dayOfWeek}</span>
+            {uiI18n.t('app.this_anime_airs_every_bdd36620')} <span className="text-foreground font-medium">{dayOfWeek}</span>
           </span>
         </div>
       )}

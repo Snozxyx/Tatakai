@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
  * Followers / Following lists (docs/Plans.md §5 "Social Connections → navigates
  * to dedicated pages on click"). One page, two tabs, reached as
@@ -20,6 +22,7 @@ import { cn } from '@/lib/utils';
 type Tab = 'followers' | 'following';
 
 export default function FollowConnectionsPage() {
+  useUiTranslation();
   const { username } = useParams<{ username: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -67,7 +70,7 @@ export default function FollowConnectionsPage() {
           onClick={() => navigate(-1)}
           className="mb-4 flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
         >
-          <ArrowLeft className="h-4 w-4" /> Back
+          <ArrowLeft className="h-4 w-4" /> {uiI18n.t('app.back_b52b36b7')}
         </button>
 
         <div className="mb-5 flex items-center gap-3">
@@ -77,7 +80,7 @@ export default function FollowConnectionsPage() {
           </Avatar>
           <div>
             <h1 className="font-display text-xl font-black tracking-tight">
-              {profile?.display_name || cleanUsername || 'User'}
+              {profile?.display_name || cleanUsername || uiI18n.t('app.user_9f8a2389')}
             </h1>
             {profile?.username && <p className="text-sm text-muted-foreground">@{profile.username}</p>}
           </div>
@@ -94,7 +97,7 @@ export default function FollowConnectionsPage() {
               )}
             >
               {t === 'followers' ? <Users className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
-              {t}
+              {uiI18n.t(({"followers":"app.followers_09322a11","following":"app.following_6cbf68c5"})[t])}
             </button>
           ))}
         </div>
@@ -104,10 +107,10 @@ export default function FollowConnectionsPage() {
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : !profile ? (
-          <GlassPanel className="p-10 text-center text-muted-foreground">User not found.</GlassPanel>
+          <GlassPanel className="p-10 text-center text-muted-foreground">{uiI18n.t('app.user_not_found_9c986a39')}</GlassPanel>
         ) : list.length === 0 ? (
           <GlassPanel className="p-10 text-center text-muted-foreground">
-            {tab === 'followers' ? 'No followers yet.' : 'Not following anyone yet.'}
+            {tab === 'followers' ? uiI18n.t('app.no_followers_yet_ebdc1c64') : uiI18n.t('app.not_following_anyone_yet_88798663')}
           </GlassPanel>
         ) : (
           <div className="space-y-2">
@@ -122,7 +125,7 @@ export default function FollowConnectionsPage() {
                     <AvatarFallback>{(u.display_name || u.username || 'U')[0]?.toUpperCase()}</AvatarFallback>
                   </Avatar>
                   <div className="min-w-0">
-                    <p className="truncate font-semibold">{u.display_name || u.username || 'User'}</p>
+                    <p className="truncate font-semibold">{u.display_name || u.username || uiI18n.t('app.user_9f8a2389')}</p>
                     {u.username && <p className="truncate text-xs text-muted-foreground">@{u.username}</p>}
                   </div>
                 </Link>

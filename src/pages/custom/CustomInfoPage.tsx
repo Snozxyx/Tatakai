@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
  * Custom-source info page (`/x/:namespace/:sourceId/info/:id`).
  *
@@ -8,6 +10,7 @@
 
 import { useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { ArrowLeft, BookOpen, Loader2, Play } from "lucide-react";
 import { Background } from "@/components/layout/Background";
 import { Sidebar } from "@/components/layout/Sidebar";
@@ -23,6 +26,8 @@ import { isCapacitor } from "@/lib/platform/platform";
 import { registerMobileSource } from "@/core/extensions/mobile/mobileProxy";
 
 export default function CustomInfoPage() {
+  useUiTranslation();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const isNative = useIsNativeApp();
   const isDesktopApp = useIsDesktopApp();
@@ -61,18 +66,18 @@ export default function CustomInfoPage() {
           onClick={() => navigate(base)}
           className="mb-4 inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-white/15 px-3 py-2 text-sm font-semibold hover:bg-white/10 active:scale-95"
         >
-          <ArrowLeft className="h-4 w-4" /> {source?.name || "Back"}
+          <ArrowLeft className="h-4 w-4" /> {source?.name || uiI18n.t('app.back_b52b36b7')}
         </button>
 
         {isLoading ? (
           <div className="flex items-center justify-center gap-2 py-24 text-muted-foreground">
-            <Loader2 className="h-5 w-5 animate-spin" /> Loading…
+            <Loader2 className="h-5 w-5 animate-spin" /> {t('common.loading')}
           </div>
         ) : !info || isError ? (
           <GlassPanel className="mx-auto max-w-xl border border-white/10 p-6">
-            <h2 className="text-xl font-bold">Unable to load this title</h2>
+            <h2 className="text-xl font-bold">{t('discover.unableToLoadTitle')}</h2>
             <p className="mt-2 text-muted-foreground">
-              The source returned no info. Check that the extension is running and try again.
+              {t('discover.unableToLoadTitleDesc')}
             </p>
           </GlassPanel>
         ) : (
@@ -123,7 +128,7 @@ export default function CustomInfoPage() {
                     className="mt-5 inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground hover:bg-primary/85"
                   >
                     {kind === "read" ? <BookOpen className="h-4 w-4" /> : <Play className="h-4 w-4 fill-current" />}
-                    {kind === "read" ? "Start reading" : "Start watching"}
+                    {kind === "read" ? t("common.startReading") : t("common.startWatching")}
                   </button>
                 ) : null}
               </div>
@@ -131,7 +136,7 @@ export default function CustomInfoPage() {
 
             <section className="mt-10">
               <h2 className="mb-4 font-display text-xl font-semibold tracking-tight">
-                {kind === "read" ? "Chapters" : "Episodes"}{" "}
+                {kind === "read" ? t('animeDetail.chapters') : t('animeDetail.episodes')}{" "}
                 <span className="text-muted-foreground">({entries.length})</span>
               </h2>
               {entries.length > 0 ? (
@@ -158,7 +163,7 @@ export default function CustomInfoPage() {
                 </div>
               ) : (
                 <GlassPanel className="border border-white/10 p-6">
-                  <p className="text-sm text-muted-foreground">No entries available for this title.</p>
+                  <p className="text-sm text-muted-foreground">{t('discover.noEntries')}</p>
                 </GlassPanel>
               )}
             </section>

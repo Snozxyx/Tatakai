@@ -5,6 +5,7 @@ import { getHighQualityImage } from "@/lib/api/proxy-utils";
 import { fetchJikanEpisodes } from "@/core/content/jikan-client";
 import { fetchAniZipMapping } from "@/lib/mapping/anizip";
 import { resolveApiV3Base } from "@/lib/api/backendOrigin";
+import { withLocaleHeaders } from "@/lib/api/localeHeaders";
 
 // Canonical backend `/api/v3` base. Resolves VITE_BACKEND_ORIGIN → origin of
 // VITE_TATAKAI_API_URL → http page origin (see backendOrigin.ts).
@@ -23,11 +24,11 @@ function normalizeGenre(genre: string): string {
 }
 
 export function withClientHeaders(headers: Record<string, string> = {}) {
-  return {
+  return withLocaleHeaders({
     ...headers,
     "X-Tatakai-Client": "web",
     "X-Tatakai-Version": "6.0.1",
-  };
+  });
 }
 
 function shouldAttachClientHeaders(targetUrl: string): boolean {

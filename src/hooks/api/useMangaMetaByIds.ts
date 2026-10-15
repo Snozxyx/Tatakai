@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useQuery } from '@tanstack/react-query';
 
 /**
@@ -61,7 +63,7 @@ async function fetchMangaMeta(ids: number[]): Promise<Record<number, MangaMetaIn
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({ query: QUERY, variables: { ids: chunk } }),
     });
-    if (!res.ok) throw new Error(`AniList request failed (${res.status})`);
+    if (!res.ok) throw new Error(uiI18n.t('app.anilist_request_failed_i18n_value_0_9455a5b4', { value0: res.status }));
     const json = await res.json();
     const media: any[] = json?.data?.Page?.media ?? [];
     for (const m of media) {
@@ -94,6 +96,7 @@ async function fetchMangaMeta(ids: number[]): Promise<Record<number, MangaMetaIn
  * stays disabled (returns `{}`) when there's nothing to resolve.
  */
 export function useMangaMetaByIds(anilistIds: (string | number | null | undefined)[]) {
+  useUiTranslation();
   const ids = Array.from(
     new Set(
       anilistIds

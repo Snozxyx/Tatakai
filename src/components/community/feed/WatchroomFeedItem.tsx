@@ -1,7 +1,9 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from '@/lib/localeFormat';
 import { toast } from 'sonner';
 import { MessageCircle, Repeat2, Heart, Bookmark, Share, MoreHorizontal, Users, Play, Globe, Lock, Tv2 } from 'lucide-react';
 import { GlassPanel } from '@/components/ui/GlassPanel';
@@ -16,6 +18,7 @@ import type { WatchRoom } from '@/hooks/media/useWatchRoom';
  * Features a cinematic backdrop, glowing progress bar, and premium badges.
  */
 export function WatchroomLobbyCard({ room }: { room: WatchRoom }) {
+  useUiTranslation();
   const navigate = useNavigate();
   const seats = room.max_participants || 0;
   const filled = room.participant_count || 0;
@@ -42,7 +45,7 @@ export function WatchroomLobbyCard({ room }: { room: WatchRoom }) {
       {room.is_playing && (
         <div className="absolute right-3 top-3 z-10 flex items-center gap-1.5 rounded-md border border-rose-500/30 bg-rose-500/20 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-rose-400 backdrop-blur-md">
           <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.8)]" />
-          Live
+          {uiI18n.t('app.live_65c821a5')}
         </div>
       )}
 
@@ -50,11 +53,11 @@ export function WatchroomLobbyCard({ room }: { room: WatchRoom }) {
       <div className="relative z-10 p-4 sm:p-5">
         <div className="flex items-center gap-2 mb-2">
           <span className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80">
-            <Tv2 className="h-3.5 w-3.5" /> Watch Together
+            <Tv2 className="h-3.5 w-3.5" /> {uiI18n.t('app.watch_together_195732a6')}
           </span>
           <span className="inline-flex items-center gap-1 rounded-md border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">
             <AccessIcon className="h-2.5 w-2.5" />
-            Lobby
+            {uiI18n.t('app.lobby_fdb6d91a')}
           </span>
         </div>
 
@@ -69,7 +72,7 @@ export function WatchroomLobbyCard({ room }: { room: WatchRoom }) {
             </span>
             <span className="truncate">
               {room.anime_title}
-              {room.episode_number ? <span className="text-white/40"> • EP {room.episode_number}</span> : ''}
+              {room.episode_number ? <span className="text-white/40"> {uiI18n.t('app.ep_23aa37fe')} {room.episode_number}</span> : ''}
             </span>
           </p>
         )}
@@ -79,7 +82,7 @@ export function WatchroomLobbyCard({ room }: { room: WatchRoom }) {
             <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5 pr-2">
               <span className="flex items-center gap-1.5">
                 <Users className="h-3.5 w-3.5" />
-                {filled}/{seats} Joined
+                {filled}/{seats} {uiI18n.t('app.joined_43a1c626')}
               </span>
               <span>{pct}%</span>
             </div>
@@ -101,7 +104,7 @@ export function WatchroomLobbyCard({ room }: { room: WatchRoom }) {
               navigate(`/isshoni/room/${room.id}`);
             }}
           >
-            Join Room
+            {uiI18n.t('app.join_room_902fc2d9')}
           </Button>
         </div>
       </div>
@@ -112,6 +115,7 @@ export function WatchroomLobbyCard({ room }: { room: WatchRoom }) {
 function FeedAction({ icon: Icon, count, active, activeClass, hoverClass, label, onClick }: {
   icon: any; count?: number; active?: boolean; activeClass?: string; hoverClass: string; label: string; onClick: (e: React.MouseEvent) => void;
 }) {
+  useUiTranslation();
   return (
     <button
       type="button"
@@ -134,6 +138,7 @@ function FeedAction({ icon: Icon, count, active, activeClass, hoverClass, label,
 
 /** A watchroom rendered as a host-attributed feed post. */
 export function WatchroomFeedItem({ room }: { room: WatchRoom }) {
+  useUiTranslation();
   const host = room.host_profile;
   const hostName = host?.display_name || host?.username || 'Someone';
   const [liked, setLiked] = useState(false);
@@ -144,8 +149,8 @@ export function WatchroomFeedItem({ room }: { room: WatchRoom }) {
     e.stopPropagation();
     const url = `${window.location.origin}/isshoni/room/${room.id}`;
     navigator.clipboard?.writeText(url).then(
-      () => toast.success('Lobby link copied'),
-      () => toast.error('Could not copy link'),
+      () => toast.success(uiI18n.t('app.lobby_link_copied_134c404a')),
+      () => toast.error(uiI18n.t('app.could_not_copy_link_534e08ac')),
     );
   };
 
@@ -177,13 +182,13 @@ export function WatchroomFeedItem({ room }: { room: WatchRoom }) {
               <span className="whitespace-nowrap text-[13px] text-muted-foreground/80 hover:underline cursor-pointer">
                 {formatDistanceToNow(new Date(room.created_at), { addSuffix: true })}
               </span>
-              <button type="button" aria-label="More" className="ml-auto rounded-full p-2 text-muted-foreground hover:bg-white/10  transition-colors mt-[-8px] mr-[-8px]">
+              <button type="button" aria-label={uiI18n.t('app.more_4bab2d8f')} className="ml-auto rounded-full p-2 text-muted-foreground hover:bg-white/10  transition-colors mt-[-8px] mr-[-8px]">
                 <MoreHorizontal className="h-5 w-5" />
               </button>
             </div>
 
             <p className="mt-0.5 text-[15px] text-foreground/90 leading-relaxed">
-              Started a new Watch Together lobby.
+              {uiI18n.t('app.started_a_new_watch_together_lobby_95f710b8')}
             </p>
 
             {/* Embedded Lobby Card */}
@@ -200,14 +205,14 @@ export function WatchroomFeedItem({ room }: { room: WatchRoom }) {
                   active={liked} 
                   activeClass="text-rose-500" 
                   hoverClass="hover:text-rose-500 hover:bg-rose-500/10" 
-                  label="Like" 
+                  label={uiI18n.t('app.like_c7e02c95')}
                   onClick={(e) => { e.stopPropagation(); setLiked((v) => !v); }} 
                 />
                 <FeedAction 
                   icon={MessageCircle} 
                   count={0} 
                   hoverClass="hover:text-blue-400 hover:bg-blue-400/10" 
-                  label="Comment" 
+                  label={uiI18n.t('app.comment_153d7a58')}
                   onClick={(e) => e.stopPropagation()} 
                 />
                 <FeedAction 
@@ -216,7 +221,7 @@ export function WatchroomFeedItem({ room }: { room: WatchRoom }) {
                   active={reposted} 
                   activeClass="text-emerald-500" 
                   hoverClass="hover:text-emerald-500 hover:bg-emerald-500/10" 
-                  label="Repost" 
+                  label={uiI18n.t('app.repost_98dd4750')}
                   onClick={(e) => { e.stopPropagation(); setReposted((v) => !v); }} 
                 />
               </div>
@@ -227,13 +232,13 @@ export function WatchroomFeedItem({ room }: { room: WatchRoom }) {
                   active={bookmarked} 
                   activeClass="text-primary" 
                   hoverClass="hover:text-primary hover:bg-primary/10" 
-                  label="Bookmark" 
+                  label={uiI18n.t('app.bookmark_441da1bf')}
                   onClick={(e) => { e.stopPropagation(); setBookmarked((v) => !v); }} 
                 />
                 <FeedAction 
                   icon={Share} 
                   hoverClass="hover:text-sky-400 hover:bg-sky-400/10" 
-                  label="Share" 
+                  label={uiI18n.t('app.share_09ca55ca')}
                   onClick={share} 
                 />
               </div>

@@ -1,3 +1,5 @@
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
+import uiI18n from '@/lib/uiI18n';
 import { useEffect } from 'react';
 import { toast } from 'sonner';
 import {
@@ -41,6 +43,7 @@ function bridge(): ElectronUpdaterBridge | null {
 }
 
 export function useUpdateOrchestrator(): void {
+  useUiTranslation();
   useEffect(() => {
     const el = bridge();
     if (!el?.onUpdaterEvent) return;
@@ -53,7 +56,7 @@ export function useUpdateOrchestrator(): void {
       ingestUpdaterEvent(data);
 
       if (data.type === 'available' && data.manual) {
-        toast.info(`Tatakai ${data.info?.version ?? ''} is available`, {
+        toast.info(uiI18n.t('app.tatakai_i18n_value_0_is_available_ebdd15b3', { value0: data.info?.version ?? '' }), {
           id: 'mac-manual-update',
           description: 'Download the DMG for your Mac and replace Tatakai in Applications.',
           duration: Infinity,

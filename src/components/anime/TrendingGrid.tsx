@@ -1,5 +1,8 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { Play, Flame } from "lucide-react";
 import { memo } from "react";
+import { useTranslation } from "react-i18next";
 import { TrendingAnime } from "@/lib/api";
 import { Link, useNavigate } from "react-router-dom";
 import { useState, useRef, useEffect } from "react";
@@ -48,6 +51,7 @@ const getTrendingPoster = (poster: string) => {
 };
 
 const TrendingCard = memo(function TrendingCard({ anime, spanClass }: { anime: TrendingAnime; spanClass: string }) {
+  useUiTranslation();
   const navigate = useNavigate();
   const routeAnimeId = buildPreferredAnimeRouteId({
     id: anime.id,
@@ -63,6 +67,7 @@ const TrendingCard = memo(function TrendingCard({ anime, spanClass }: { anime: T
     resolveAniListId(anime.id) ??
     null;
   const [isHovering, setIsHovering] = useState(false);
+  const { t } = useTranslation();
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isPreviewM3U8, setIsPreviewM3U8] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -227,17 +232,13 @@ const TrendingCard = memo(function TrendingCard({ anime, spanClass }: { anime: T
         loading="lazy"
         decoding="async"
         fetchPriority="low"
-        className={`w-full h-full object-cover md:transition-all md:duration-700 ${
-          isHovering && previewUrl ? 'opacity-0' : 'md:group-hover:scale-110'
-        }`}
+        className={`w-full h-full object-cover md:transition-all md:duration-700 ${isHovering && previewUrl ? 'opacity-0' : 'md:group-hover:scale-110'}`}
       />
 
       {/* Video Preview — desktop hover only */}
       <video
         ref={videoRef}
-        className={`absolute inset-0 hidden w-full h-full object-cover transition-opacity duration-300 md:block ${
-          isHovering && previewUrl ? 'opacity-100' : 'opacity-0'
-        }`}
+        className={`absolute inset-0 hidden w-full h-full object-cover transition-opacity duration-300 md:block ${isHovering && previewUrl ? 'opacity-100' : 'opacity-0'}`}
         muted
         loop
         playsInline
@@ -256,7 +257,7 @@ const TrendingCard = memo(function TrendingCard({ anime, spanClass }: { anime: T
 
       <div className="absolute top-3 left-3 md:top-4 md:left-4 z-10">
         <span className="px-2.5 py-1 md:px-3 rounded-full bg-black/50 border border-white/10 text-[11px] md:text-xs font-bold uppercase tracking-wider">
-          #{anime.rank} Trending
+          #{anime.rank} {t('discover.trendingBadge')}
         </span>
       </div>
 
@@ -274,6 +275,8 @@ const TrendingCard = memo(function TrendingCard({ anime, spanClass }: { anime: T
 })
 
 export const TrendingGrid = memo(function TrendingGrid({ animes }: TrendingGridProps) {
+  useUiTranslation();
+  const { t } = useTranslation();
   const displayAnimes = animes.slice(0, 4);
 
   return (
@@ -281,10 +284,10 @@ export const TrendingGrid = memo(function TrendingGrid({ animes }: TrendingGridP
       <div className="flex items-center justify-between mb-5 md:mb-8 px-1 md:px-2">
         <h3 className="font-display text-xl md:text-2xl font-semibold tracking-tight flex items-center gap-2">
           <Flame className="w-5 h-5 text-orange" />
-          Trending Now
+          {t('discover.trendingNow')}
         </h3>
         <Link to="/trending" className="text-sm text-muted-foreground hover:text-foreground transition-colors border-b border-transparent hover:border-foreground pb-0.5">
-          View All
+          {t('discover.viewAll')}
         </Link>
       </div>
 

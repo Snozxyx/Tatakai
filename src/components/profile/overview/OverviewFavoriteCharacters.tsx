@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Heart } from 'lucide-react';
@@ -15,6 +17,7 @@ export function OverviewFavoriteCharacters({
   isLoading = false,
   isViewingOther = false,
 }: OverviewFavoriteCharactersProps) {
+  useUiTranslation();
   return (
     <GlassPanel className="relative overflow-hidden p-5 sm:p-7 flex flex-col justify-between border-white/[0.04] bg-background/40 backdrop-blur-2xl rounded-2xl">
       <div className="absolute -top-12 -right-12 w-48 h-48 bg-[hsl(var(--profile-accent)/0.10)] blur-[70px] rounded-full pointer-events-none" />
@@ -24,10 +27,10 @@ export function OverviewFavoriteCharacters({
           <div className="flex items-center gap-2 mb-1">
             <Heart className="w-4 h-4 text-primary/80" />
             <h3 className="font-display font-bold text-base sm:text-lg text-foreground tracking-tight">
-              {isViewingOther ? 'Favorite Characters' : 'Your Favorite Characters'}
+              {isViewingOther ? uiI18n.t('app.favorite_characters_19b43ee2') : uiI18n.t('app.your_favorite_characters_d44ef486')}
             </h3>
           </div>
-          <p className="text-xs text-muted-foreground/70">Characters pinned from across the catalog</p>
+          <p className="text-xs text-muted-foreground/70">{uiI18n.t('app.characters_pinned_from_across_the_catalog_6b6474c7')}</p>
         </div>
         {characters.length > 0 && (
           <span className="text-[10px] font-semibold text-muted-foreground/80 px-2.5 py-1 rounded-full bg-white/[0.04] border border-white/[0.05] uppercase tracking-wider shrink-0">
@@ -47,11 +50,11 @@ export function OverviewFavoriteCharacters({
           <div className="flex flex-col items-center justify-center h-[160px] text-center">
             <Heart className="w-10 h-10 text-muted-foreground/30 mb-3" />
             <p className="text-sm text-muted-foreground/60">
-              {isViewingOther ? 'No favorite characters yet.' : "You haven't favorited any characters yet."}
+              {isViewingOther ? uiI18n.t('app.no_favorite_characters_yet_1f903c95') : uiI18n.t('app.you_haven_t_favorited_any_characters_yet_a7864920')}
             </p>
             {!isViewingOther && (
               <p className="text-xs text-muted-foreground/40 mt-1">
-                Tap the heart on a character page to add them here.
+                {uiI18n.t('app.tap_the_heart_on_a_character_page_to_add_them_he_67633ad4')}
               </p>
             )}
           </div>

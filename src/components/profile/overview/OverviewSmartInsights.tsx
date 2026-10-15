@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { motion } from 'framer-motion';
 import { Lightbulb } from 'lucide-react';
 import { GlassPanel } from '@/components/ui/GlassPanel';
@@ -8,6 +10,7 @@ export interface OverviewSmartInsightsProps {
 }
 
 export function OverviewSmartInsights({ insights = [] }: OverviewSmartInsightsProps) {
+  useUiTranslation();
   if (insights.length === 0) return null;
 
   return (
@@ -19,10 +22,10 @@ export function OverviewSmartInsights({ insights = [] }: OverviewSmartInsightsPr
         <div className="flex items-center gap-2 mb-1">
           <Lightbulb className="w-4 h-4 text-primary/80" />
           <h3 className="font-display font-bold text-base sm:text-lg text-foreground tracking-tight">
-            Insights
+            {uiI18n.t('app.insights_b4510362')}
           </h3>
         </div>
-        <p className="text-xs text-muted-foreground/70">Observations drawn from your own activity</p>
+        <p className="text-xs text-muted-foreground/70">{uiI18n.t('app.observations_drawn_from_your_own_activity_a86b9f94')}</p>
       </div>
 
       <div className="relative z-10 grid grid-cols-1 sm:grid-cols-2 gap-3">

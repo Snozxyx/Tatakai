@@ -17,6 +17,7 @@ import {
 import { NavIcon } from "@/components/ui/NavIcon";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { celebrate } from "@/components/effects/Celebrate";
 import { useAuth } from "@/contexts/AuthContext";
@@ -36,12 +37,13 @@ import type { CustomSourceEntry } from "@/core/content/custom-source-runtime";
 import { cn } from "@/lib/utils";
 
 const OVERFLOW_ITEMS = [
-  { icon: TrendingUp, label: "Trending", path: "/trending" },
-  { icon: CalendarDays, label: "Calendar", path: "/calendar" },
-  { icon: Heart, label: "Favorites", path: "/favorites" },
+  { icon: TrendingUp, labelKey: "nav.trending", path: "/trending" },
+  { icon: CalendarDays, labelKey: "nav.calendar", path: "/calendar" },
+  { icon: Heart, labelKey: "nav.favorites", path: "/favorites" },
 ] as const;
 
 export function Sidebar() {
+  const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const { user, profile, isBanned } = useAuth();
@@ -87,7 +89,7 @@ export function Sidebar() {
         variant: "petal",
         count: 16,
       });
-      toast("🌸 Tatakai! You really like that logo.", { duration: 3000 });
+      toast(t("sidebar.logoToast"), { duration: 3000 });
     }
   };
 
@@ -127,7 +129,7 @@ export function Sidebar() {
         <div className="absolute inset-0 bg-primary/30 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
         <img
           src={`${import.meta.env.BASE_URL}assets/logo/tatakai-logo-square.png`}
-          alt="Tatakai Logo"
+          alt={t("sidebar.logoAlt")}
           className={cn(
             "relative z-10 object-contain transition-[color,background-color,opacity,transform] duration-150",
             isDesktopApp ? "w-11 h-11 rounded-2xl shadow-sm" : "w-10 h-10 rounded-xl shadow-sm"
@@ -138,24 +140,24 @@ export function Sidebar() {
 
       {/* 2. Primary Navigation Group — vertically centered between logo and footer */}
       <div className="flex flex-col gap-3 w-full items-center flex-1 justify-center">
-        <NavIcon icon={LayoutGrid} active={isActive("/")} onClick={() => navigate("/")} label="Home" />
-        <NavIcon icon={Search} active={isActive("/search")} onClick={() => navigate("/search")} label="Search" />
-        <NavIcon icon={BookOpen} active={isMangaActive} onClick={() => navigate("/manga")} label="Manga" />
-        <NavIcon icon={ScrollText} active={isNovelActive} onClick={() => navigate("/novel")} label="Novels" />
+        <NavIcon icon={LayoutGrid} active={isActive("/")} onClick={() => navigate("/")} label={t("nav.home")} />
+        <NavIcon icon={Search} active={isActive("/search")} onClick={() => navigate("/search")} label={t("nav.search")} />
+        <NavIcon icon={BookOpen} active={isMangaActive} onClick={() => navigate("/manga")} label={t("nav.manga")} />
+        <NavIcon icon={ScrollText} active={isNovelActive} onClick={() => navigate("/novel")} label={t('nav.novels')} />
 
         {/* Separator Line */}
         <div className="w-8 h-[1px] bg-border/50 my-1 rounded-full" />
 
         {/* 3. Secondary/Social Group */}
-        <NavIcon icon={Users} active={isActive("/community")} onClick={() => navigate("/community")} label="Community" />
+        <NavIcon icon={Users} active={isActive("/community")} onClick={() => navigate("/community")} label={t("nav.community")} />
 
         {/* Custom sources ("+") — extension-provided verticals; hidden when none installed. */}
         {hasCustomSources && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
-                aria-label="Custom sources"
-                title="Custom sources"
+                aria-label={t("nav.customSources")}
+                title={t("nav.customSources")}
                 className={cn(
                   "group relative flex h-10 w-10 items-center justify-center rounded-xl outline-none transition-[color,background-color,opacity,transform] duration-200",
                   "hover:bg-accent/80 hover:text-accent-foreground",
@@ -208,8 +210,8 @@ export function Sidebar() {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
-              aria-label="More"
-              title="More"
+              aria-label={t("nav.more")}
+              title={t("nav.more")}
               className={cn(
                 "group relative flex h-10 w-10 items-center justify-center rounded-xl transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                 "hover:bg-accent/80 hover:text-accent-foreground",
@@ -228,7 +230,7 @@ export function Sidebar() {
             sideOffset={20} 
             className="w-48 p-1.5 rounded-xl border-border/40 bg-background/80 backdrop-blur-xl shadow-xl"
           >
-            {OVERFLOW_ITEMS.map(({ icon: Icon, label, path }) => {
+            {OVERFLOW_ITEMS.map(({ icon: Icon, labelKey, path }) => {
               const active = isActive(path);
               return (
                 <DropdownMenuItem
@@ -240,7 +242,7 @@ export function Sidebar() {
                   )}
                 >
                   <Icon className={cn("h-4 w-4", active ? "text-primary" : "text-muted-foreground")} />
-                  {label}
+                  {t(labelKey)}
                 </DropdownMenuItem>
               );
             })}
@@ -248,7 +250,7 @@ export function Sidebar() {
         </DropdownMenu>
 
         {isDesktopApp && (
-          <NavIcon icon={Download} active={isActive("/offline")} onClick={() => navigate("/offline")} label="Downloads" />
+          <NavIcon icon={Download} active={isActive("/offline")} onClick={() => navigate("/offline")} label={t("nav.downloads")} />
         )}
       </div>
 
@@ -260,8 +262,8 @@ export function Sidebar() {
         {user && !isBanned ? (
           <button
             onClick={() => navigate(profile?.username ? `/@${profile.username}` : "/profile")}
-            aria-label="Profile"
-            title="Profile"
+            aria-label={t("nav.profile")}
+            title={t("nav.profile")}
             className="group relative"
           >
             <span
@@ -273,7 +275,7 @@ export function Sidebar() {
               {profile?.avatar_url ? (
                 <img
                   src={profile.avatar_url}
-                  alt={profile.display_name || profile.username || "Profile"}
+                  alt={profile.display_name || profile.username || t('nav.profile')}
                   className="h-full w-full object-cover group-hover:scale-105"
                 />
               ) : (
@@ -287,10 +289,10 @@ export function Sidebar() {
             ) : null}
           </button>
         ) : (
-          <NavIcon icon={LogIn} active={isActive("/auth")} onClick={() => navigate("/auth")} label="Sign In" />
+          <NavIcon icon={LogIn} active={isActive("/auth")} onClick={() => navigate("/auth")} label={t("nav.signIn")} />
         )}
 
-        <NavIcon icon={Settings} active={isActive("/settings")} onClick={() => openSettings()} label="Settings" />
+        <NavIcon icon={Settings} active={isActive("/settings")} onClick={() => openSettings()} label={t("nav.settings")} />
       </div>
     </nav>
   );

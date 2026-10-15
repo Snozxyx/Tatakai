@@ -1,4 +1,7 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWatchlistItem, useAddToWatchlist, useRemoveFromWatchlist, WatchlistStatus } from '@/hooks/user/useWatchlist';
 import { Button } from '@/components/ui/button';
@@ -20,15 +23,17 @@ interface WatchlistButtonProps {
   anilistId?: number | null;
 }
 
-const STATUS_OPTIONS: { value: WatchlistStatus; label: string }[] = [
-  { value: 'plan_to_watch', label: 'Plan to Watch' },
-  { value: 'watching', label: 'Watching' },
-  { value: 'completed', label: 'Completed' },
-  { value: 'on_hold', label: 'On Hold' },
-  { value: 'dropped', label: 'Dropped' },
+const STATUS_OPTIONS: { value: WatchlistStatus; labelKey: string }[] = [
+  { value: 'plan_to_watch', labelKey: 'watchlist.planToWatch' },
+  { value: 'watching', labelKey: 'watchlist.watching' },
+  { value: 'completed', labelKey: 'watchlist.completed' },
+  { value: 'on_hold', labelKey: 'watchlist.onHold' },
+  { value: 'dropped', labelKey: 'watchlist.dropped' },
 ];
 
 export function WatchlistButton({ animeId, animeName, animePoster, variant = 'default', malId, anilistId }: WatchlistButtonProps) {
+  useUiTranslation();
+  const { t } = useTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
@@ -82,7 +87,7 @@ export function WatchlistButton({ animeId, animeName, animePoster, variant = 'de
         ) : (
           <>
             <BookmarkPlus className="w-4 h-4 mr-2" />
-            Add to List
+            {t("watchlist.addToList")}
           </>
         )}
       </Button>
@@ -108,8 +113,7 @@ export function WatchlistButton({ animeId, animeName, animePoster, variant = 'de
         <Button
           variant={watchlistItem ? 'default' : variant === 'icon' ? 'outline' : 'secondary'}
           size={variant === 'icon' ? 'icon' : 'default'}
-          className={`${variant === 'icon' ? 'h-14 w-14 rounded-full' : ''} ${watchlistItem ? 'bg-primary hover:bg-primary/90' : ''
-            }`}
+          className={`${variant === 'icon' ? 'h-14 w-14 rounded-full' : ''} ${watchlistItem ? 'bg-primary hover:bg-primary/90' : ''}`}
         >
           {watchlistItem ? (
             variant === 'icon' ? (
@@ -117,7 +121,7 @@ export function WatchlistButton({ animeId, animeName, animePoster, variant = 'de
             ) : (
               <>
                 <Check className="w-4 h-4 mr-2" />
-                {STATUS_OPTIONS.find(s => s.value === watchlistItem.status)?.label || 'In List'}
+                {STATUS_OPTIONS.find(s => s.value === watchlistItem.status)?.labelKey ? t(STATUS_OPTIONS.find(s => s.value === watchlistItem.status)!.labelKey) : t("watchlist.inList")}
               </>
             )
           ) : variant === 'icon' ? (
@@ -125,7 +129,7 @@ export function WatchlistButton({ animeId, animeName, animePoster, variant = 'de
           ) : (
             <>
               <BookmarkPlus className="w-4 h-4 mr-2" />
-              Add to List
+              {t("watchlist.addToList")}
             </>
           )}
         </Button>
@@ -137,7 +141,7 @@ export function WatchlistButton({ animeId, animeName, animePoster, variant = 'de
             onClick={() => handleAddToWatchlist(option.value)}
             className={watchlistItem?.status === option.value ? 'bg-primary/20' : ''}
           >
-            {option.label}
+            {t(option.labelKey)}
           </DropdownMenuItem>
         ))}
         {watchlistItem && (
@@ -146,7 +150,7 @@ export function WatchlistButton({ animeId, animeName, animePoster, variant = 'de
               onClick={handleRemove}
               className="text-destructive focus:text-destructive"
             >
-              Remove from List
+              {t("watchlist.removeFromList")}
             </DropdownMenuItem>
           </>
         )}

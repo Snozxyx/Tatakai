@@ -1,3 +1,5 @@
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
+import uiI18n from '@/lib/uiI18n';
 import { SourceDebug } from '@/components/extensions/SourceDebug';
 /**
  * Custom-source watch page (`kind: 'watch'`).
@@ -10,6 +12,7 @@ import { SourceDebug } from '@/components/extensions/SourceDebug';
  */
 
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, ChevronLeft, ChevronRight, Loader2, Server } from "lucide-react";
 import { VideoPlayer } from "@/components/video/VideoPlayer";
@@ -39,7 +42,7 @@ function groupByServer(sources: SourceResult[]): ServerGroup[] {
   const groups: ServerGroup[] = [];
   const byKey = new Map<string, ServerGroup>();
   sources.forEach((s, i) => {
-    const label = (s.server || s.source || `Server ${i + 1}`).trim() || `Server ${i + 1}`;
+    const label = (s.server || s.source || `Server ${i + 1}`).trim() || uiI18n.t('app.server_i18n_value_0_0aa32107', { value0: i + 1 });
     let group = byKey.get(label);
     if (!group) {
       group = { key: label, label, sources: [] };
@@ -86,6 +89,8 @@ function toHeaders(sources: SourceResult[]): PlaybackHeaders | undefined {
 }
 
 export default function CustomWatchPage() {
+  useUiTranslation();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const isMobileApp = useIsMobileApp();
   const { namespace, sourceId, id, episodeId } = useParams<{
@@ -142,7 +147,7 @@ export default function CustomWatchPage() {
         <button
           onClick={() => navigate(`${base}/info/${encodeURIComponent(id || "")}`)}
           className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 px-2.5 py-1.5 text-sm font-semibold hover:bg-white/10"
-          title="Back to info"
+          title={t('animeDetail.backToInfo')}
         >
           <ArrowLeft className="h-4 w-4" />
         </button>
@@ -151,10 +156,10 @@ export default function CustomWatchPage() {
           onClick={() => prev && goEntry(prev.id)}
           className="inline-flex items-center gap-1 rounded-lg border border-white/15 px-2.5 py-1.5 text-sm font-semibold hover:bg-white/10 disabled:opacity-40"
         >
-          <ChevronLeft className="h-4 w-4" /> Prev
+          <ChevronLeft className="h-4 w-4" /> {t('common.previous')}
         </button>
         <div className="flex min-w-0 flex-1 flex-col items-center px-2 text-center">
-          <span className="w-full truncate text-sm font-bold">{info?.title || source?.name || "Watch"}</span>
+          <span className="w-full truncate text-sm font-bold">{info?.title || source?.name || t('animeDetail.watch')}</span>
           <span className="w-full truncate text-xs text-muted-foreground">{currentLabel}</span>
         </div>
         <button
@@ -162,7 +167,7 @@ export default function CustomWatchPage() {
           onClick={() => next && goEntry(next.id)}
           className="inline-flex items-center gap-1 rounded-lg border border-white/15 px-2.5 py-1.5 text-sm font-semibold hover:bg-white/10 disabled:opacity-40"
         >
-          Next <ChevronRight className="h-4 w-4" />
+          {t('common.next')} <ChevronRight className="h-4 w-4" />
         </button>
       </div>
 
@@ -170,20 +175,20 @@ export default function CustomWatchPage() {
         <SourceDebug kind="custom" sources={sources.map(s => ({ providerKey: namespace, providerName: s.source || source?.name }))} />
         {isLoading ? (
           <div className="flex items-center justify-center gap-2 py-24 text-muted-foreground">
-            <Loader2 className="h-5 w-5 animate-spin" /> Loading sources…
+            <Loader2 className="h-5 w-5 animate-spin" /> {t('discover.loadingSources')}
           </div>
         ) : (!activeEmbed && playbackSources.length === 0) || isError || failed ? (
           <GlassPanel className="mx-auto max-w-xl border border-white/10 p-6">
-            <h2 className="text-xl font-bold">Unable to load this episode</h2>
+            <h2 className="text-xl font-bold">{t('discover.unableToLoadEpisode')}</h2>
             <p className="mt-2 text-muted-foreground">
               {failed && playbackSources.length > 0
-                ? "The stream was found, but playback failed. Retry it or choose another server."
+                ? t('migration.streamFailed')
                 : servers.length > 1
-                ? "This server returned no playable stream. Try another server below, or a different episode."
-                : "The source returned no playable streams. Try another episode or check that the extension is running."}
+                ? t('migration.noStream')
+                : t('discover.unableToLoadEpisodeDesc')}
             </p>
             {failed && (playbackSources.length > 0 || activeEmbed) && (
-              <button type="button" onClick={() => setFailed(false)} className="mt-4 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Retry playback</button>
+              <button type="button" onClick={() => setFailed(false)} className="mt-4 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">{t('migration.retryPlayback')}</button>
             )}
             {servers.length > 1 && (
               <div className="mt-4 flex flex-wrap gap-2">
@@ -253,7 +258,7 @@ export default function CustomWatchPage() {
             {servers.length > 1 && (
               <GlassPanel className="border border-white/10 p-4">
                 <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-muted-foreground">
-                  <Server className="h-4 w-4" /> Servers
+                  <Server className="h-4 w-4" /> {t('migration.servers')}
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {servers.map((srv, idx) => (

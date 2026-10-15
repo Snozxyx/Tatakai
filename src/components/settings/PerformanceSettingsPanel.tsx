@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
  * src/components/settings/PerformanceSettingsPanel.tsx
  * ------------------------------------------------------------------------------
@@ -39,6 +41,7 @@ const PROFILE_DESCRIPTIONS: Record<MemoryProfile, string> = {
 };
 
 export function PerformanceSettingsPanel() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const [profile, setProfile] = useState<MemoryProfile>(() => getMemoryProfile());
   const [reclaiming, setReclaiming] = useState(false);
@@ -50,8 +53,8 @@ export function PerformanceSettingsPanel() {
     const next = value as MemoryProfile;
     setProfile(next);
     setMemoryProfile(next);
-    toast.success(`Memory profile set to ${next}`, {
-      description: 'Buffers and caches update right away. Restart the app to apply the memory cap.',
+    toast.success(uiI18n.t('app.memory_profile_set_to_i18n_value_0_27b39b9c', { value0: next }), {
+      get description() { return uiI18n.t('app.buffers_and_caches_update_right_away_restart_the_359069b7'); },
     });
   };
 
@@ -60,14 +63,14 @@ export function PerformanceSettingsPanel() {
     try {
       const result = await reclaimRendererMemory(queryClient);
       const closed = result.main?.contextsClosed ?? 0;
-      toast.success('Memory reclaimed', {
+      toast.success(uiI18n.t('app.memory_reclaimed_b33745c4'), {
         description:
           closed > 0
             ? `Cleared in-memory caches and closed ${closed} idle browser context${closed === 1 ? '' : 's'}.`
             : 'Cleared in-memory caches and dropped inactive data.',
       });
     } catch {
-      toast.error('Could not reclaim memory');
+      toast.error(uiI18n.t('app.could_not_reclaim_memory_0cce931b'));
     } finally {
       setReclaiming(false);
     }
@@ -77,12 +80,12 @@ export function PerformanceSettingsPanel() {
     <SettingsSection
       icon={Cpu}
       eyebrow="Performance"
-      title="Memory & performance"
-      description="Control how much RAM Tatakai uses. Lower profiles shrink media buffers and in-memory caches; nothing is removed — Unlimited restores the original behaviour."
+      title={uiI18n.t('app.memory_performance_56805311')}
+      description={uiI18n.t('app.control_how_much_ram_tatakai_uses_lower_profiles_97ccd009')}
     >
       <div className="space-y-1">
         <SettingRow
-          title="Memory profile"
+          title={uiI18n.t('app.memory_profile_bbe89630')}
           description={PROFILE_DESCRIPTIONS[profile]}
           control={({ labelId, descriptionId }) => (
             <Select value={profile} onValueChange={handleProfileChange}>
@@ -94,17 +97,17 @@ export function PerformanceSettingsPanel() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="low">Low</SelectItem>
-                <SelectItem value="balanced">Balanced</SelectItem>
-                <SelectItem value="unlimited">Unlimited</SelectItem>
+                <SelectItem value="low">{uiI18n.t('app.low_a124947c')}</SelectItem>
+                <SelectItem value="balanced">{uiI18n.t('app.balanced_03342dbb')}</SelectItem>
+                <SelectItem value="unlimited">{uiI18n.t('app.unlimited_b8bef37b')}</SelectItem>
               </SelectContent>
             </Select>
           )}
         />
 
         <SettingRow
-          title="Free memory now"
-          description="Clear rebuildable in-memory caches, drop off-screen data, and close idle browser contexts. Playback and the current page are unaffected."
+          title={uiI18n.t('app.free_memory_now_30e6cd3c')}
+          description={uiI18n.t('app.clear_rebuildable_in_memory_caches_drop_off_scre_4dab99f3')}
           control={
             <Button
               variant="outline"
@@ -114,7 +117,7 @@ export function PerformanceSettingsPanel() {
               className="gap-2"
             >
               <Trash2 className="h-4 w-4" />
-              {reclaiming ? 'Freeing…' : 'Free memory now'}
+              {reclaiming ? uiI18n.t('app.freeing_86bb725c') : uiI18n.t('app.free_memory_now_30e6cd3c')}
             </Button>
           }
         />

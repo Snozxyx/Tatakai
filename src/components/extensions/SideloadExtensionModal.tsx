@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useEffect } from 'react';
 import JSZip from 'jszip';
 import { toast } from 'sonner';
@@ -12,6 +14,7 @@ import type { ExtensionManifest } from '@/pages/base/ExtensionHubPage';
 
 interface Props { isOpen: boolean; onClose(): void; onSuccess?(extension: ExtensionManifest): void }
 export function AddExtensionModal({ isOpen, onClose, onSuccess }: Props) {
+  useUiTranslation();
   const [url, setUrl] = useState('');
   const [preferences, setPreferences] = useState<Record<string, unknown>>({});
   const [buffer, setBuffer] = useState<ArrayBuffer | null>(null);
@@ -23,28 +26,28 @@ export function AddExtensionModal({ isOpen, onClose, onSuccess }: Props) {
   const ecosystem = manifest ? detectEcosystem(manifest) : null;
   const close = () => { setUrl(''); setBuffer(null); setManifest(null); setOrigin(''); setError(''); onClose(); };
   const inspect = async (data: ArrayBuffer, endpoint = '') => {
-    if (data.byteLength > 30 * 1024 * 1024) throw new Error('Extension must be under 30 MB');
+    if (data.byteLength > 30 * 1024 * 1024) throw new Error(uiI18n.t('app.extension_must_be_under_30_mb_5d742e85'));
     const bytes = new Uint8Array(data);
     const archive = bytes[0] === 80 && bytes[1] === 75;
     let parsed: Record<string, any>;
     if (archive) {
       const zip = await JSZip.loadAsync(data);
-      const entry = zip.file('manifest.json'); if (!entry) throw new Error('Package is missing manifest.json');
+      const entry = zip.file('manifest.json'); if (!entry) throw new Error(uiI18n.t('app.package_is_missing_manifest_json_9c8df761'));
       parsed = JSON.parse(await entry.async('string'));
     } else parsed = JSON.parse(new TextDecoder().decode(data));
-    if (!parsed.id || !parsed.name || !parsed.version) throw new Error('Manifest needs id, name, and version');
+    if (!parsed.id || !parsed.name || !parsed.version) throw new Error(uiI18n.t('app.manifest_needs_id_name_and_version_c2a74f2a'));
     setPreferences(Object.fromEntries((parsed.userConfig?.fields || []).map((f: any) => [f.name, f.default || ""])));
     setBuffer(data); setManifest(parsed); setOrigin(endpoint); setIsKai(archive);
   };
   const read = async (action: () => Promise<void>) => {
     setBusy(true); setError(''); setManifest(null);
-    try { await action(); } catch (e) { setError(e instanceof Error ? e.message : 'Could not read extension'); }
+    try { await action(); } catch (e) { setError(e instanceof Error ? e.message : uiI18n.t('app.could_not_read_extension_1fc1a37c')); }
     finally { setBusy(false); }
   };
   const previewUrl = (value: string) => read(async () => {
     const endpoint = normalizeManifestUrl(value);
     const response = await extensionFetch(endpoint);
-    if (!response.ok) throw new Error(`Manifest download failed (${response.status})`);
+    if (!response.ok) throw new Error(uiI18n.t('app.manifest_download_failed_i18n_value_0_3fd30c4e', { value0: response.status }));
     await inspect(new TextEncoder().encode(await response.text()).buffer, endpoint);
   });
   useEffect(() => {
@@ -62,8 +65,8 @@ export function AddExtensionModal({ isOpen, onClose, onSuccess }: Props) {
         const installed = await installRemoteExtension(manifest, origin || manifest.manifestURI, undefined, preferences);
         canonicalId = installed.id;
       } else {
-        if (ecosystem !== 'tatakai') throw new Error('This ecosystem requires its original application');
-        if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/.test(canonicalId) || canonicalId.includes('..')) throw new Error('Invalid extension identifier');
+        if (ecosystem !== 'tatakai') throw new Error(uiI18n.t('app.this_ecosystem_requires_its_original_application_6a67a66e'));
+        if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/.test(canonicalId) || canonicalId.includes('..')) throw new Error(uiI18n.t('app.invalid_extension_identifier_f02729e5'));
         const runtime = (window as any).tatakaiRuntime;
         let result: any;
         if (isKai) {
@@ -74,7 +77,7 @@ export function AddExtensionModal({ isOpen, onClose, onSuccess }: Props) {
           }
         } else {
           const executable = manifest.apiServer || manifest.contributes?.rendererEntry || manifest.capabilities?.some((c: string) => ['manga','custom-source','service','module'].includes(c));
-          if (executable) throw new Error('Install the .kai package containing this extension’s executable bundle');
+          if (executable) throw new Error(uiI18n.t('app.install_the_kai_package_containing_this_extensio_356ffd6b'));
           const installManifest = runtime?.installManifest || runtime?.sideloadManifest;
           result = installManifest ? await installManifest(manifest) : { success: true };
         }
@@ -91,36 +94,36 @@ export function AddExtensionModal({ isOpen, onClose, onSuccess }: Props) {
       const ids = JSON.parse(localStorage.getItem('tatakai_installed_extensions') || '[]');
       localStorage.setItem('tatakai_installed_extensions', JSON.stringify([...new Set([...ids, canonicalId])]));
       window.dispatchEvent(new CustomEvent(EXTENSION_INSTALLED_EVENT));
-      onSuccess?.(installed); toast.success('Extension installed'); close();
-    } catch (e) { setError(e instanceof Error ? e.message : 'Installation failed'); }
+      onSuccess?.(installed); toast.success(uiI18n.t('app.extension_installed_f2a980fc')); close();
+    } catch (e) { setError(e instanceof Error ? e.message : uiI18n.t('app.installation_failed_346500a9')); }
     finally { setBusy(false); }
   };
   const configure = async () => {
     if (!origin) return;
     const target = new URL(origin); target.pathname = target.pathname.replace(/manifest.json$/, 'configure');
     const native = (window as any).electron?.configureExtension;
-    if (native) { try { await native(target.href); } catch { setError('Could not open addon configuration'); } }
+    if (native) { try { await native(target.href); } catch { setError(uiI18n.t('app.could_not_open_addon_configuration_7d290941')); } }
     else window.open(target.href, '_blank', 'noopener,noreferrer');
   };
   return <Dialog open={isOpen} onOpenChange={open => { if (!open && !busy) close(); }}>
-    <DialogContent><DialogHeader><DialogTitle>Add extension</DialogTitle>
-      <DialogDescription>Choose a Tatakai package or a Stremio/Seanime manifest. Review the extension, then install it.</DialogDescription></DialogHeader>
-      <label className="space-y-2 text-sm">Extension file<Input type="file" accept=".kai,.json" disabled={busy} onChange={event => { const file = event.target.files?.[0]; if (file) void read(async () => inspect(await file.arrayBuffer())); }} /></label>
-      <label className="space-y-2 text-sm">Manifest or package URL<Input value={url} onChange={event => { setUrl(event.target.value); setManifest(null); }} placeholder="https://…/manifest.json" disabled={busy} /></label>
+    <DialogContent><DialogHeader><DialogTitle>{uiI18n.t('app.add_extension_11500bcc')}</DialogTitle>
+      <DialogDescription>{uiI18n.t('app.choose_a_tatakai_package_or_a_stremio_seanime_ma_c3bb252a')}</DialogDescription></DialogHeader>
+      <label className="space-y-2 text-sm">{uiI18n.t('app.extension_file_8c5c396c')}<Input type="file" accept=".kai,.json" disabled={busy} onChange={event => { const file = event.target.files?.[0]; if (file) void read(async () => inspect(await file.arrayBuffer())); }} /></label>
+      <label className="space-y-2 text-sm">{uiI18n.t('app.manifest_or_package_url_cfe49ad9')}<Input value={url} onChange={event => { setUrl(event.target.value); setManifest(null); }} placeholder="https://…/manifest.json" disabled={busy} /></label>
       <Button variant="outline" disabled={busy || !url.trim()} onClick={() => void read(async () => {
         const endpoint = normalizeManifestUrl(url);
         if (new URL(endpoint).pathname.endsWith('.json')) {
           const response = await extensionFetch(endpoint);
-          if (!response.ok) throw new Error(`Manifest download failed (${response.status})`);
+          if (!response.ok) throw new Error(uiI18n.t('app.manifest_download_failed_i18n_value_0_3fd30c4e', { value0: response.status }));
           await inspect(new TextEncoder().encode(await response.text()).buffer, endpoint);
         } else await inspect(await downloadExtensionKai(endpoint), endpoint);
-      })}>{busy ? 'Reading extension…' : 'Read extension'}</Button>
+      })}>{busy ? uiI18n.t('app.reading_extension_537266ad') : uiI18n.t('app.read_extension_38c19101')}</Button>
       {manifest && <div className="space-y-2 rounded-lg border border-border p-4"><p className="font-semibold">{manifest.name} <span className="text-sm text-muted-foreground">{manifest.version}</span></p><p className="text-sm capitalize">{ecosystem}</p><p className="text-sm text-muted-foreground">{manifest.description}</p>
         {(manifest.userConfig?.fields || []).map((field: any) => <label key={field.name} className="block text-sm">{field.label || field.name}<Input value={String(preferences[field.name] || '')} onChange={e => setPreferences(p => ({ ...p, [field.name]: e.target.value }))} /></label>)}
-        {manifest.behaviorHints?.configurable && <Button variant="outline" onClick={configure}>Configure addon</Button>}
-        {manifest.behaviorHints?.configurationRequired && <p className="text-sm">Configure this addon, then paste its configured manifest URL.</p>}</div>}
+        {manifest.behaviorHints?.configurable && <Button variant="outline" onClick={configure}>{uiI18n.t('app.configure_addon_2aa4830c')}</Button>}
+        {manifest.behaviorHints?.configurationRequired && <p className="text-sm">{uiI18n.t('app.configure_this_addon_then_paste_its_configured_m_0e3d6bac')}</p>}</div>}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-      <div className="flex justify-end gap-2"><Button variant="ghost" disabled={busy} onClick={close}>Cancel</Button><Button disabled={busy || !manifest || !!manifest.behaviorHints?.configurationRequired} onClick={() => void install()}>{busy ? 'Installing…' : 'Install'}</Button></div>
+      <div className="flex justify-end gap-2"><Button variant="ghost" disabled={busy} onClick={close}>{uiI18n.t('app.cancel_77dfd213')}</Button><Button disabled={busy || !manifest || !!manifest.behaviorHints?.configurationRequired} onClick={() => void install()}>{busy ? uiI18n.t('app.installing_8d278823') : uiI18n.t('app.install_fd6c3ebf')}</Button></div>
     </DialogContent>
   </Dialog>;
 }

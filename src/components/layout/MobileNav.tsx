@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import {
   Download,
   Heart,
@@ -18,6 +20,7 @@ import { useMobileDownload } from "@/hooks/media/useMobileDownload";
 import { useCustomSources } from "@/hooks/api/useCustomSource";
 import type { CustomSourceEntry } from "@/core/content/custom-source-runtime";
 import { useState, useCallback, useEffect, type ComponentType } from "react";
+import { useTranslation } from "react-i18next";
 import { createPortal } from "react-dom";
 import {
   DropdownMenu,
@@ -83,12 +86,14 @@ function MobileNavButton({
   /** Aggregate 0-100 progress, rendered as a compact status rail. */
   progress?: number;
 }) {
+  useUiTranslation();
+  const { t } = useTranslation();
   const safeProgress = progress == null ? undefined : Math.max(0, Math.min(100, Math.round(progress)));
   return (
     <button
       type="button"
       onClick={onClick}
-      aria-label={badge ? `${label}, ${badge} active${safeProgress != null ? `, ${safeProgress}%` : ''}` : label}
+      aria-label={badge ? uiI18n.t('app.i18n_value_0i18n_value_1_bb0b4be1', { value0: t('migration.activeDownloads', { label, count: badge }), value1: safeProgress != null ? `, ${safeProgress}%` : '' }) : label}
       title={label}
       aria-current={active ? 'page' : undefined}
       className={cn(
@@ -121,6 +126,8 @@ function MobileNavButton({
 }
 
 export function MobileNav() {
+  useUiTranslation();
+  const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const isMobileApp = useIsMobileApp();
@@ -237,20 +244,20 @@ export function MobileNav() {
       data-mobile-nav
       className="md:hidden fixed inset-x-0 bottom-0 z-[60]"
       role="navigation"
-      aria-label="Main navigation"
+      aria-label={t("nav.mainNavigation")}
     >
       {/* Solid, edge-to-edge chrome with safe-area padding for thumb reach. */}
       <div className="mobile-nav-dock relative flex items-center">
-        <MobileNavButton icon={LayoutGrid} label="Home" active={isActive('/')} onClick={() => hapticNavigate('/')} />
-        <MobileNavButton icon={Search} label="Search" active={isActive('/search')} onClick={() => hapticNavigate('/search')} />
+        <MobileNavButton icon={LayoutGrid} label={t('nav.home')} active={isActive('/')} onClick={() => hapticNavigate('/')} />
+        <MobileNavButton icon={Search} label={t('nav.search')} active={isActive('/search')} onClick={() => hapticNavigate('/search')} />
 
         {/* Favorites/Trending Dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              aria-label="Open favorites and trending"
-              title="Saved"
+              aria-label={t('migration.favoritesMenu')}
+              title={t('comments.savedTab')}
               aria-current={favActive ? 'page' : undefined}
               className={cn(
                 'ui-mobile-nav-button group relative flex flex-1 items-center justify-center rounded-xl py-2 outline-none transition-[transform,color] duration-150 motion-safe:active:scale-[.97] focus-visible:ring-2 focus-visible:ring-primary/60',
@@ -268,11 +275,11 @@ export function MobileNav() {
           <DropdownMenuContent align="center" side="top" className="mb-3 w-52 rounded-2xl border-border bg-card p-1.5 shadow-2xl">
             <DropdownMenuItem onClick={() => hapticNavigate('/favorites')} className="gap-2 rounded-xl px-3 py-2.5 font-medium">
               <Heart className="w-4 h-4 mr-1 text-muted-foreground" />
-              Favorites
+              {t("nav.favorites")}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => hapticNavigate('/trending')} className="gap-2 rounded-xl px-3 py-2.5 font-medium">
               <TrendingUp className="w-4 h-4 mr-1 text-muted-foreground" />
-              Trending
+              {t("nav.trending")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -287,8 +294,8 @@ export function MobileNav() {
                   'ui-mobile-nav-button group relative flex flex-1 items-center justify-center rounded-xl py-2 outline-none transition-[transform,color] duration-150 motion-safe:active:scale-[.97] focus-visible:ring-2 focus-visible:ring-primary/60',
                   customActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
                 )}
-                aria-label="Custom sources"
-                title="More"
+                aria-label={t("nav.customSources")}
+                title={t('nav.more')}
                 aria-current={customActive ? 'page' : undefined}
               >
                 <span className={cn(
@@ -326,12 +333,12 @@ export function MobileNav() {
           </DropdownMenu>
         )}
 
-        <MobileNavButton icon={Users} label="Social" active={isActive('/community')} onClick={() => hapticNavigate('/community')} />
+        <MobileNavButton icon={Users} label={t('migration.social')} active={isActive('/community')} onClick={() => hapticNavigate('/community')} />
 
         {isMobileApp && (
           <MobileNavButton
             icon={Download}
-            label="Saved"
+            label={t('comments.savedTab')}
             active={isActive('/downloads')}
             onClick={() => hapticNavigate('/downloads')}
             badge={activeDownloadCount}
@@ -339,7 +346,7 @@ export function MobileNav() {
           />
         )}
 
-        <MobileNavButton icon={Settings} label="Settings" onClick={hapticOpenSettings} />
+        <MobileNavButton icon={Settings} label={t('nav.settings')} onClick={hapticOpenSettings} />
       </div>
     </div>
   );

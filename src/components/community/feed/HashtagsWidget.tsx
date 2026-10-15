@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { Link } from 'react-router-dom';
 import { Hash } from 'lucide-react';
 import { useAllHashtags } from '@/hooks/community/useTrending';
@@ -5,6 +7,7 @@ import { cn } from '@/lib/utils';
 
 /** All community hashtags with their usage counts (item 8). Scrolls when long. */
 export function HashtagsWidget({ className }: { className?: string }) {
+  useUiTranslation();
   const { data: tags = [], isLoading } = useAllHashtags(100);
   if (!isLoading && tags.length === 0) return null;
 
@@ -28,7 +31,7 @@ export function HashtagsWidget({ className }: { className?: string }) {
             <Hash className="h-3.5 w-3.5 text-violet-400" />
           </div>
           <span className="text-[11px] font-bold uppercase tracking-widest text-violet-400">
-            All Hashtags
+            {uiI18n.t('app.all_hashtags_80ff463a')}
           </span>
         </div>
         <span className="text-[10px] font-medium tabular-nums text-zinc-600">

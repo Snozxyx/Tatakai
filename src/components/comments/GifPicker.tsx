@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -35,6 +36,7 @@ function GifGrid({
   onToggleBookmark: (g: GiphyGif, bookmarked: boolean) => void;
   empty: React.ReactNode;
 }) {
+  const { t } = useTranslation();
   if (gifs.length === 0) return <div className="py-10 text-center text-sm text-muted-foreground">{empty}</div>;
   return (
     <div className="grid grid-cols-2 gap-2">
@@ -53,7 +55,7 @@ function GifGrid({
             <button
               type="button"
               onClick={() => onToggleBookmark(gif, bookmarked)}
-              title={bookmarked ? 'Remove bookmark' : 'Bookmark GIF'}
+              title={bookmarked ? t('comments.gifRemoveBookmark') : t('comments.gifSaveBookmark')}
               className="absolute right-1 top-1 rounded-full bg-black/60 p-1.5 text-white opacity-0 transition-opacity group-hover:opacity-100"
             >
               <Star className={cn('h-3.5 w-3.5', bookmarked && 'fill-yellow-400 text-yellow-400')} />
@@ -66,6 +68,7 @@ function GifGrid({
 }
 
 export function GifPicker({ onSelect, trigger }: GifPickerProps) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<Tab>('trending');
   const [rawQuery, setRawQuery] = useState('');
@@ -125,16 +128,16 @@ export function GifPicker({ onSelect, trigger }: GifPickerProps) {
       <PopoverContent className="w-80 p-3" align="start">
         {!configured ? (
           <div className="py-8 text-center text-sm text-muted-foreground">
-            GIF search isn't configured.
+            {t('comments.gifNotConfigured')}
             <br />
-            <span className="text-xs">Set VITE_GIPHY_API_KEY to enable it.</span>
+            <span className="text-xs">{t('comments.gifNeedKey')}</span>
           </div>
         ) : (
           <div className="space-y-3">
             <div className="flex gap-1 rounded-lg bg-muted/40 p-1">
-              <TabButton value="trending" icon={TrendingUp} label="Trending" />
-              <TabButton value="search" icon={Search} label="Search" />
-              <TabButton value="saved" icon={Bookmark} label="Saved" />
+              <TabButton value="trending" icon={TrendingUp} label={t('anime.trending')} />
+              <TabButton value="search" icon={Search} label={t('common.search')} />
+              <TabButton value="saved" icon={Bookmark} label={t('comments.savedTab')} />
             </div>
 
             {tab === 'search' && (
@@ -150,7 +153,7 @@ export function GifPicker({ onSelect, trigger }: GifPickerProps) {
                   autoFocus
                   value={rawQuery}
                   onChange={(e) => setRawQuery(e.target.value)}
-                  placeholder="Search GIFs..."
+                  placeholder={t('comments.gifSearchPlaceholder')}
                   className="h-9 pl-8 text-sm"
                 />
               </form>
@@ -168,13 +171,13 @@ export function GifPicker({ onSelect, trigger }: GifPickerProps) {
                     onSelect={pick}
                     bookmarkedUrls={bookmarkedUrls}
                     onToggleBookmark={(g, b) => toggleBookmark.mutate({ gif: g, bookmarked: b })}
-                    empty="No trending GIFs right now."
+                    empty={t('comments.gifNoTrending')}
                   />
                 ))}
 
               {tab === 'search' &&
                 (query.trim().length === 0 ? (
-                  <div className="py-10 text-center text-sm text-muted-foreground">Type to search GIFs.</div>
+                  <div className="py-10 text-center text-sm text-muted-foreground">{t('comments.gifTypeToSearch')}</div>
                 ) : searchResults.isLoading ? (
                   <div className="flex justify-center py-10">
                     <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -185,7 +188,7 @@ export function GifPicker({ onSelect, trigger }: GifPickerProps) {
                     onSelect={pick}
                     bookmarkedUrls={bookmarkedUrls}
                     onToggleBookmark={(g, b) => toggleBookmark.mutate({ gif: g, bookmarked: b })}
-                    empty="No GIFs found."
+                    empty={t('common.noResults')}
                   />
                 ))}
 
@@ -195,7 +198,7 @@ export function GifPicker({ onSelect, trigger }: GifPickerProps) {
                   onSelect={pick}
                   bookmarkedUrls={bookmarkedUrls}
                   onToggleBookmark={(g, b) => toggleBookmark.mutate({ gif: g, bookmarked: b })}
-                  empty="No bookmarked GIFs yet. Tap the star on a GIF to save it."
+                  empty={t('comments.gifEmptySaved')}
                 />
               )}
             </ScrollArea>

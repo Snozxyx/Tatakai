@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -18,6 +20,7 @@ import { BADGES, RARITY_STYLES } from '@/lib/badges';
  * from role flags and are not manually managed here (shown as read-only).
  */
 export function BadgeManager() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [selectedUser, setSelectedUser] = useState<{ user_id: string; display_name: string; username: string; avatar_url: string | null } | null>(null);
@@ -67,7 +70,7 @@ export function BadgeManager() {
       } as any);
       if (error) throw error;
     },
-    onSuccess: () => { invalidate(); toast.success('Badge granted'); setNote(''); },
+    onSuccess: () => { invalidate(); toast.success(uiI18n.t('app.badge_granted_e3b32b02')); setNote(''); },
     onError: (e: any) => toast.error('Grant failed: ' + e.message),
   });
 
@@ -79,7 +82,7 @@ export function BadgeManager() {
       } as any);
       if (error) throw error;
     },
-    onSuccess: () => { invalidate(); toast.success('Badge revoked'); },
+    onSuccess: () => { invalidate(); toast.success(uiI18n.t('app.badge_revoked_ca4583ac')); },
     onError: (e: any) => toast.error('Revoke failed: ' + e.message),
   });
 
@@ -90,7 +93,7 @@ export function BadgeManager() {
       } as any);
       if (error) throw error;
     },
-    onSuccess: () => { invalidate(); toast.success('Auto badges recomputed'); },
+    onSuccess: () => { invalidate(); toast.success(uiI18n.t('app.auto_badges_recomputed_d9a69d79')); },
     onError: (e: any) => toast.error('Recompute failed: ' + e.message),
   });
 
@@ -100,7 +103,7 @@ export function BadgeManager() {
     <div className="space-y-6">
       <div className="flex items-center gap-2">
         <Award className="w-5 h-5 text-violet-400" />
-        <h2 className="text-lg font-bold font-display">Badge Manager</h2>
+        <h2 className="text-lg font-bold font-display">{uiI18n.t('app.badge_manager_affd2f8e')}</h2>
       </div>
 
       {/* User search */}
@@ -109,7 +112,7 @@ export function BadgeManager() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             className="pl-9"
-            placeholder="Search user by name or @username…"
+            placeholder={uiI18n.t('app.search_user_by_name_or_username_b2c44b88')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -153,7 +156,7 @@ export function BadgeManager() {
             </div>
             <Button size="sm" variant="outline" disabled={isPending} onClick={() => recomputeMutation.mutate()}>
               <RefreshCw className={cn('w-4 h-4 mr-1', recomputeMutation.isPending && 'animate-spin')} />
-              Recompute auto
+              {uiI18n.t('app.recompute_auto_eaf8568f')}
             </Button>
             <Button size="sm" variant="ghost" onClick={() => setSelectedUser(null)}>
               <X className="w-4 h-4" />
@@ -162,11 +165,11 @@ export function BadgeManager() {
 
           <GlassPanel className="p-4">
             <label className="text-xs font-medium text-muted-foreground mb-1 block">
-              Grant note (optional, attached to next grant)
+              {uiI18n.t('app.grant_note_optional_attached_to_next_grant_4b78a1c7')}
             </label>
             <Textarea
               rows={2}
-              placeholder="e.g. Season 1 event reward"
+              placeholder={uiI18n.t('app.e_g_season_1_event_reward_e80627f4')}
               value={note}
               onChange={(e) => setNote(e.target.value)}
             />
@@ -188,9 +191,9 @@ export function BadgeManager() {
                   )}
                 >
                   <div className="absolute top-2 left-2 flex gap-1">
-                    {grant?.source === 'auto' && <Badge variant="secondary" className="text-[9px] px-1 py-0">auto</Badge>}
-                    {grant?.source === 'admin' && <Badge className="text-[9px] px-1 py-0 bg-amber-500/80">admin</Badge>}
-                    {isDerived && <Badge variant="secondary" className="text-[9px] px-1 py-0">role</Badge>}
+                    {grant?.source === 'auto' && <Badge variant="secondary" className="text-[9px] px-1 py-0">{uiI18n.t('app.auto_0d612c12')}</Badge>}
+                    {grant?.source === 'admin' && <Badge className="text-[9px] px-1 py-0 bg-amber-500/80">{uiI18n.t('app.admin_d033e22a')}</Badge>}
+                    {isDerived && <Badge variant="secondary" className="text-[9px] px-1 py-0">{uiI18n.t('app.role_8dca4642')}</Badge>}
                   </div>
                   <span className={cn('absolute top-2 right-2 text-[9px] font-bold uppercase', rarity.text)}>{rarity.label}</span>
 
@@ -203,16 +206,16 @@ export function BadgeManager() {
 
                   <div className="w-full mt-auto pt-1 flex gap-1">
                     {isDerived ? (
-                      <span className="flex-1 text-[10px] text-muted-foreground py-1">from role</span>
+                      <span className="flex-1 text-[10px] text-muted-foreground py-1">{uiI18n.t('app.from_role_529b6791')}</span>
                     ) : !held ? (
                       <Button size="sm" variant="outline" className="flex-1 h-6 text-[10px]" disabled={isPending}
                         onClick={() => grantMutation.mutate(b.key)}>
-                        <CheckCircle className="w-3 h-3 mr-1" /> Grant
+                        <CheckCircle className="w-3 h-3 mr-1" /> {uiI18n.t('app.grant_c02329c4')}
                       </Button>
                     ) : (
                       <Button size="sm" variant="destructive" className="flex-1 h-6 text-[10px]" disabled={isPending}
                         onClick={() => revokeMutation.mutate(b.key)}>
-                        <Lock className="w-3 h-3 mr-1" /> Revoke
+                        <Lock className="w-3 h-3 mr-1" /> {uiI18n.t('app.revoke_0be72075')}
                       </Button>
                     )}
                   </div>

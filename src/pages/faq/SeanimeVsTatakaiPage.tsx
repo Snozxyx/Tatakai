@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
@@ -226,14 +228,14 @@ interface ScoreBar {
 }
 
 const SCOREBOARD: ScoreBar[] = [
-  { label: "Community & Social", icon: Users, tatakai: 100, seanime: 8, note: "Feeds, forums & social rooms vs basic party chat" },
-  { label: "Tracking & Sync", icon: Check, tatakai: 95, seanime: 55, note: "3 trackers with 2-way sync vs AniList-first approach" },
-  { label: "Discovery & Taste", icon: Heart, tatakai: 90, seanime: 35, note: "Hybrid taste engine vs basic relation proxies" },
-  { label: "Playback Depth", icon: Play, tatakai: 62, seanime: 95, note: "Versatile adapters vs robust mpv coordinator & shaders" },
-  { label: "Local Library", icon: Library, tatakai: 40, seanime: 95, note: "Lightweight sync vs deep tolerant file scanning" },
-  { label: "Server Power", icon: Server, tatakai: 45, seanime: 100, note: "Cloud-backed platform vs single-binary self-hosting" },
-  { label: "Downloads & Debrid", icon: Download, tatakai: 60, seanime: 92, note: "Handy managers vs advanced rules engine & torrent core" },
-  { label: "Everywhere Apps", icon: Clapperboard, tatakai: 92, seanime: 60, note: "Polished PWA & Capacitor apps vs Denshi & Tenji" },
+  { get label() { return uiI18n.t('app.community_social_64787f21'); }, icon: Users, tatakai: 100, seanime: 8, note: "Feeds, forums & social rooms vs basic party chat" },
+  { get label() { return uiI18n.t('app.tracking_sync_9b6e2576'); }, icon: Check, tatakai: 95, seanime: 55, note: "3 trackers with 2-way sync vs AniList-first approach" },
+  { get label() { return uiI18n.t('app.discovery_taste_f77f7238'); }, icon: Heart, tatakai: 90, seanime: 35, note: "Hybrid taste engine vs basic relation proxies" },
+  { get label() { return uiI18n.t('app.playback_depth_00905bff'); }, icon: Play, tatakai: 62, seanime: 95, note: "Versatile adapters vs robust mpv coordinator & shaders" },
+  { get label() { return uiI18n.t('app.local_library_a4b3e0f3'); }, icon: Library, tatakai: 40, seanime: 95, note: "Lightweight sync vs deep tolerant file scanning" },
+  { get label() { return uiI18n.t('app.server_power_a5ea3a1f'); }, icon: Server, tatakai: 45, seanime: 100, note: "Cloud-backed platform vs single-binary self-hosting" },
+  { get label() { return uiI18n.t('app.downloads_debrid_a3c2505d'); }, icon: Download, tatakai: 60, seanime: 92, note: "Handy managers vs advanced rules engine & torrent core" },
+  { get label() { return uiI18n.t('app.everywhere_apps_47c60056'); }, icon: Clapperboard, tatakai: 92, seanime: 60, note: "Polished PWA & Capacitor apps vs Denshi & Tenji" },
 ];
 
 const ROADMAP: Array<{ tier: string; items: string[]; cls: string }> = [
@@ -255,26 +257,28 @@ const ROADMAP: Array<{ tier: string; items: string[]; cls: string }> = [
 ];
 
 function EdgeBadge({ edge }: { edge: Edge }) {
+  useUiTranslation();
   if (edge === "tatakai")
     return (
       <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-primary/15 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-primary border border-primary/20">
-        <Check className="h-3 w-3" /> Tatakai Wins
+        <Check className="h-3 w-3" /> {uiI18n.t('app.tatakai_wins_07833704')}
       </span>
     );
   if (edge === "seanime")
     return (
       <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-white/90 border border-white/10">
-        <X className="h-3 w-3" /> Seanime Wins
+        <X className="h-3 w-3" /> {uiI18n.t('app.seanime_wins_71c749fc')}
       </span>
     );
   return (
     <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white/5 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground border border-white/5">
-      <Equal className="h-3 w-3" /> Tie / Different
+      <Equal className="h-3 w-3" /> {uiI18n.t('app.tie_different_3d9bde33')}
     </span>
   );
 }
 
 export default function SeanimeVsTatakaiPage() {
+  useUiTranslation();
   const isDesktopApp = useIsDesktopApp();
   const isMobile = useIsMobile();
   const reduceMotion = useReducedMotion();
@@ -294,7 +298,7 @@ export default function SeanimeVsTatakaiPage() {
   return (
     <>
       <Helmet>
-        <title>Tatakai vs Seanime — Honest Feature Comparison</title>
+        <title>{uiI18n.t('app.tatakai_vs_seanime_honest_feature_comparison_e5492f2c')}</title>
         <meta
           name="description"
           content="An honest, verified comparison between Tatakai (community tracking platform, MPL-2.0) and Seanime (self-hosted media server, GPL-3.0). Complete dimension breakdown and scoreboard."
@@ -322,7 +326,7 @@ export default function SeanimeVsTatakaiPage() {
             to="/welcome"
             className="mb-8 inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground motion-safe:active:scale-[0.98]"
           >
-            <ArrowLeft className="h-4 w-4" /> Back to Welcome
+            <ArrowLeft className="h-4 w-4" /> {uiI18n.t('app.back_to_welcome_ba6df5aa')}
           </Link>
 
           {/* ── Hero Section ── */}
@@ -333,23 +337,22 @@ export default function SeanimeVsTatakaiPage() {
             className="motion-reduce:animate-none"
           >
             <span className="inline-block rounded-full bg-primary/10 px-3 py-1 text-[11px] font-black uppercase tracking-[0.2em] text-primary border border-primary/20">
-              Honest Developer FAQ
+              {uiI18n.t('app.honest_developer_faq_a6cda0a7')}
             </span>
             <h1 className="font-display mt-4 text-4xl font-black tracking-tight sm:text-6xl">
-              Tatakai <span className="text-muted-foreground font-light">vs</span> Seanime
+              {uiI18n.t('app.tatakai_28bda6bd')} <span className="text-muted-foreground font-light">{uiI18n.t('app.vs_691a77cd')}</span> {uiI18n.t('app.seanime_7dcb7ceb')}
             </h1>
             <p className="mt-4 max-w-2xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-              They are built for entirely different workflows. Seanime is the definitive choice for your{" "}
-              <span className="font-semibold text-foreground">local personal media server</span>, while Tatakai is engineered to be your{" "}
-              <span className="font-semibold text-foreground">social tracking platform and community home</span>. 
-              We've checked every single feature against Seanime v3.10.3 and our own repository to give you the unvarnished truth.
+              {uiI18n.t('app.they_are_built_for_entirely_different_workflows__97a791c5')}{" "}
+              <span className="font-semibold text-foreground">{uiI18n.t('app.local_personal_media_server_13839447')}</span>{uiI18n.t('app.while_tatakai_is_engineered_to_be_your_6bd18882')}{" "}
+              <span className="font-semibold text-foreground">{uiI18n.t('app.social_tracking_platform_and_community_home_5e89b97a')}</span>{uiI18n.t('app.we_ve_checked_every_single_feature_against_seani_e75bc4b4')}
             </p>
             <div className="mt-6 flex flex-wrap gap-2.5 text-xs">
               <span className="rounded-full border border-white/10 bg-white/5 px-3.5 py-2 font-medium text-white/80">
-                Seanime v3.10.3 · GPL-3.0 · Go & React
+                {uiI18n.t('app.seanime_v3_10_3_gpl_3_0_go_react_aa5271e5')}
               </span>
               <span className="rounded-full border border-primary/30 bg-primary/10 px-3.5 py-2 font-semibold text-primary">
-                Tatakai v6.1.0 · MPL-2.0 · TypeScript & Supabase
+                {uiI18n.t('app.tatakai_v6_1_0_mpl_2_0_typescript_supabase_4b3a54f7')}
               </span>
             </div>
           </motion.div>
@@ -367,7 +370,7 @@ export default function SeanimeVsTatakaiPage() {
                   <div className="rounded-xl bg-primary/20 p-2.5 text-primary">
                     <Users className="h-5 w-5" />
                   </div>
-                  <h2 className="font-display text-xl font-black">Go with Tatakai if…</h2>
+                  <h2 className="font-display text-xl font-black">{uiI18n.t('app.go_with_tatakai_if_f3fbbca2')}</h2>
                 </div>
                 <ul className="mt-5 space-y-3.5 text-sm leading-relaxed text-muted-foreground">
                   {[
@@ -396,7 +399,7 @@ export default function SeanimeVsTatakaiPage() {
                   <div className="rounded-xl bg-white/10 p-2.5 text-white/80">
                     <HardDrive className="h-5 w-5" />
                   </div>
-                  <h2 className="font-display text-xl font-black">Go with Seanime if…</h2>
+                  <h2 className="font-display text-xl font-black">{uiI18n.t('app.go_with_seanime_if_905e0281')}</h2>
                 </div>
                 <ul className="mt-5 space-y-3.5 text-sm leading-relaxed text-muted-foreground">
                   {[
@@ -416,22 +419,22 @@ export default function SeanimeVsTatakaiPage() {
           </div>
 
           {/* ── Scoreboard Section ── */}
-          <section className="mt-16" aria-label="Scoreboard">
+          <section className="mt-16" aria-label={uiI18n.t('app.scoreboard_5fbd163f')}>
             <div className="mb-4 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
               <div>
                 <h2 className="font-display flex items-center gap-2.5 text-2xl font-black tracking-tight">
-                  <Trophy className="h-6 w-6 text-primary" /> Feature Scoreboard
+                  <Trophy className="h-6 w-6 text-primary" /> {uiI18n.t('app.feature_scoreboard_559f1854')}
                 </h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Tatakai leads in {tally.t} categories, Seanime leads in {tally.s}, and {tally.tie} are tied across {tally.total} dimensions checked.
+                  {uiI18n.t('app.tatakai_leads_in_940c3aad')} {tally.t} {uiI18n.t('app.categories_seanime_leads_in_11bacfb4')} {tally.s}{uiI18n.t('app.and_8278d2ad')} {tally.tie} {uiI18n.t('app.are_tied_across_8d7098c4')} {tally.total} {uiI18n.t('app.dimensions_checked_fd651955')}
                 </p>
               </div>
               <div className="flex items-center gap-5 text-xs font-bold">
                 <span className="flex items-center gap-2">
-                  <span className="h-3 w-3 rounded-full bg-primary shadow-sm shadow-primary/50" /> Tatakai
+                  <span className="h-3 w-3 rounded-full bg-primary shadow-sm shadow-primary/50" /> {uiI18n.t('app.tatakai_28bda6bd')}
                 </span>
                 <span className="flex items-center gap-2 text-muted-foreground">
-                  <span className="h-3 w-3 rounded-full bg-white/30" /> Seanime
+                  <span className="h-3 w-3 rounded-full bg-white/30" /> {uiI18n.t('app.seanime_7dcb7ceb')}
                 </span>
               </div>
             </div>
@@ -446,7 +449,7 @@ export default function SeanimeVsTatakaiPage() {
                     </span>
                     <span className="text-xs tabular-nums text-muted-foreground">
                       <span className="font-black text-primary">{row.tatakai}%</span>
-                      {" vs "}
+                      {uiI18n.t('app.vs_691a77cd')}
                       <span className="font-bold text-white/70">{row.seanime}%</span>
                     </span>
                   </div>
@@ -477,12 +480,12 @@ export default function SeanimeVsTatakaiPage() {
           </section>
 
           {/* ── Full Chart Section ── */}
-          <section className="mt-16" aria-label="Full comparison chart">
+          <section className="mt-16" aria-label={uiI18n.t('app.full_comparison_chart_f1e187ef')}>
             <h2 className="font-display flex items-center gap-2.5 text-2xl font-black tracking-tight">
-              <Library className="h-6 w-6 text-primary" /> Dimension-by-Dimension Breakdown
+              <Library className="h-6 w-6 text-primary" /> {uiI18n.t('app.dimension_by_dimension_breakdown_d3e71db9')}
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Ties indicate different design philosophies rather than a draw—inspect individual cells for details.
+              {uiI18n.t('app.ties_indicate_different_design_philosophies_rath_7d54ebef')}
             </p>
 
             {/* Desktop Table View */}
@@ -490,10 +493,10 @@ export default function SeanimeVsTatakaiPage() {
               <table className="w-full border-collapse text-left text-sm">
                 <thead className="sticky top-0 z-20">
                   <tr className="border-b border-white/10 bg-black/60 text-[11px] font-black uppercase tracking-[0.16em] backdrop-blur-xl">
-                    <th className="px-6 py-4 text-muted-foreground">Category</th>
-                    <th className="px-6 py-4 text-primary">Tatakai</th>
-                    <th className="px-6 py-4 text-white/80">Seanime</th>
-                    <th className="px-6 py-4 text-right text-muted-foreground">Advantage</th>
+                    <th className="px-6 py-4 text-muted-foreground">{uiI18n.t('app.category_a3c686e7')}</th>
+                    <th className="px-6 py-4 text-primary">{uiI18n.t('app.tatakai_28bda6bd')}</th>
+                    <th className="px-6 py-4 text-white/80">{uiI18n.t('app.seanime_7dcb7ceb')}</th>
+                    <th className="px-6 py-4 text-right text-muted-foreground">{uiI18n.t('app.advantage_5bf78ecb')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
@@ -531,11 +534,11 @@ export default function SeanimeVsTatakaiPage() {
                   </div>
                   <div className="mt-4 space-y-3 text-[13px] leading-relaxed">
                     <div className="rounded-lg bg-primary/[0.04] p-3 border border-primary/10">
-                      <span className="font-bold text-primary block mb-1">Tatakai</span>
+                      <span className="font-bold text-primary block mb-1">{uiI18n.t('app.tatakai_28bda6bd')}</span>
                       <span className="text-muted-foreground">{d.tatakai}</span>
                     </div>
                     <div className="rounded-lg bg-white/[0.02] p-3 border border-white/5">
-                      <span className="font-bold text-white/85 block mb-1">Seanime</span>
+                      <span className="font-bold text-white/85 block mb-1">{uiI18n.t('app.seanime_7dcb7ceb')}</span>
                       <span className="text-muted-foreground">{d.seanime}</span>
                     </div>
                   </div>
@@ -545,12 +548,12 @@ export default function SeanimeVsTatakaiPage() {
           </section>
 
           {/* ── Roadmap / Borrowings Section ── */}
-          <section className="mt-16" aria-label="Roadmap borrowings">
+          <section className="mt-16" aria-label={uiI18n.t('app.roadmap_borrowings_1075ea34')}>
             <h2 className="font-display flex items-center gap-2.5 text-2xl font-black tracking-tight">
-              <Cpu className="h-6 w-6 text-primary" /> What Tatakai is Borrowing
+              <Cpu className="h-6 w-6 text-primary" /> {uiI18n.t('app.what_tatakai_is_borrowing_4a3959a1')}
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Credit where credit is due—we are actively bringing Seanime's best server and desktop wins into Tatakai without losing our social roots.
+              {uiI18n.t('app.credit_where_credit_is_due_we_are_actively_bring_48523135')}
             </p>
             <div className="mt-6 grid gap-5 md:grid-cols-3">
               {ROADMAP.map((lane, i) => (
@@ -580,7 +583,7 @@ export default function SeanimeVsTatakaiPage() {
           {/* ── Closing Call to Action ── */}
           <motion.section
             className="mt-16"
-            aria-label="Why Tatakai"
+            aria-label={uiI18n.t('app.why_tatakai_8a938622')}
             initial={reduceMotion ? false : { opacity: 0, y: 24 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-80px" }}
@@ -593,23 +596,23 @@ export default function SeanimeVsTatakaiPage() {
               />
               <BookOpen className="mx-auto h-12 w-12 text-primary" />
               <h2 className="font-display mx-auto mt-5 max-w-2xl text-3xl font-black tracking-tight sm:text-4xl">
-                Tatakai is built for the community.
+                {uiI18n.t('app.tatakai_is_built_for_the_community_53eb5eb6')}
               </h2>
               <p className="mx-auto mt-4 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
-                Tracking lists are table stakes—every app can mark episodes as watched. Tatakai exists for everything that happens <span className="font-semibold text-foreground">around</span> the list: watch rooms shared with friends, recommendation feeds that match your vibe, lively forums debating series finales at 2 AM, and badges worth earning. Seanime masters the server in your closet; Tatakai builds the festival outside it. Come for the tracker—stay for the people.
+                {uiI18n.t('app.tracking_lists_are_table_stakes_every_app_can_ma_c7d26923')} <span className="font-semibold text-foreground">{uiI18n.t('app.around_405928ee')}</span> {uiI18n.t('app.the_list_watch_rooms_shared_with_friends_recomme_9a1215ac')}
               </p>
               <div className="mt-8 flex flex-wrap items-center justify-center gap-3.5">
                 <Link
                   to="/download"
                   className="inline-flex items-center gap-2.5 rounded-full bg-primary px-7 py-3.5 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/25 transition-[background-color,transform] hover:brightness-110 motion-safe:active:scale-[0.97]"
                 >
-                  <Download className="h-4 w-4" /> Get Tatakai
+                  <Download className="h-4 w-4" /> {uiI18n.t('app.get_tatakai_e325f5d4')}
                 </Link>
                 <Link
                   to="/community"
                   className="inline-flex items-center gap-2.5 rounded-full border border-white/15 bg-white/5 px-7 py-3.5 text-sm font-bold transition-[background-color,color,transform] hover:bg-white/10 motion-safe:active:scale-[0.97]"
                 >
-                  <Users className="h-4 w-4" /> Join Community <ArrowRight className="h-4 w-4" />
+                  <Users className="h-4 w-4" /> {uiI18n.t('app.join_community_207f07a9')} <ArrowRight className="h-4 w-4" />
                 </Link>
                 <a
                   href={GITHUB_REPO_URL}
@@ -617,11 +620,11 @@ export default function SeanimeVsTatakaiPage() {
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2.5 rounded-full border border-white/10 px-7 py-3.5 text-sm font-bold text-muted-foreground transition-[color,transform] hover:text-foreground motion-safe:active:scale-[0.97]"
                 >
-                  <Github className="h-4 w-4" /> Star on GitHub
+                  <Github className="h-4 w-4" /> {uiI18n.t('app.star_on_github_9becc508')}
                 </a>
               </div>
               <p className="mt-8 text-[11px] leading-relaxed text-muted-foreground/60 max-w-xl mx-auto">
-                Verified against Seanime v3.10.3 source code (Go backend, extensions, debrid, and Nakama packages, Oct 2026) and Tatakai v6.1.0 (MPL-2.0, 27 themes, 16 Mitsu ranks, 4-provider debrid core, trace.moe, Capacitor & Electron shells). Spotted a discrepancy? Open an issue on GitHub.
+                {uiI18n.t('app.verified_against_seanime_v3_10_3_source_code_go__025dc702')}
               </p>
             </GlassPanel>
           </motion.section>

@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -20,6 +22,7 @@ export interface AdminLog {
 
 // Fetch admin logs
 export function useAdminLogs(limit = 100, filters?: { action?: string; entityType?: string }) {
+  useUiTranslation();
   const { user, isAdmin } = useAuth();
 
   return useQuery<AdminLog[]>({
@@ -77,6 +80,7 @@ export function useAdminLogs(limit = 100, filters?: { action?: string; entityTyp
 
 // Create admin log
 export function useCreateAdminLog() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
@@ -92,7 +96,7 @@ export function useCreateAdminLog() {
       entityId?: string | null;
       details?: any;
     }) => {
-      if (!user) throw new Error('Must be logged in');
+      if (!user) throw new Error(uiI18n.t('app.must_be_logged_in_9cf435d8'));
 
       const { data, error } = await supabase
         .from('admin_logs')
@@ -139,6 +143,7 @@ export async function logAdminAction(
 
 // Delete admin logs by filter or explicit list of ids
 export function useDeleteAdminLogs() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
@@ -150,7 +155,7 @@ export function useDeleteAdminLogs() {
       created_before?: string;
       created_after?: string;
     }) => {
-      if (!user) throw new Error('Must be logged in');
+      if (!user) throw new Error(uiI18n.t('app.must_be_logged_in_9cf435d8'));
 
       const { ids, action, entity_type, created_before, created_after } = opts;
 

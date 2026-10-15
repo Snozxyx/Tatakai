@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -72,6 +74,7 @@ String.prototype.hashCode = function() {
 };
 
 export function useNotifications() {
+  useUiTranslation();
     const { user } = useAuth();
     const queryClient = useQueryClient();
     const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -176,7 +179,7 @@ export function useNotifications() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['notifications'] });
-            toast.success('Notification deleted');
+            toast.success(uiI18n.t('app.notification_deleted_e61bb6c4'));
         },
     });
 

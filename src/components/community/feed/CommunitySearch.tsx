@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, X, User, Music2, Layers, MessageSquare, Loader2 } from 'lucide-react';
@@ -19,6 +21,7 @@ export interface CommunitySearchProps {
 
 /** Debounce a changing value by `delay` ms. */
 function useDebounced<T>(value: T, delay = 250): T {
+  useUiTranslation();
   const [debounced, setDebounced] = useState(value);
   useEffect(() => {
     const t = setTimeout(() => setDebounced(value), delay);
@@ -29,6 +32,7 @@ function useDebounced<T>(value: T, delay = 250): T {
 
 /** Section label + rows wrapper. */
 function Section({ icon: Icon, label, children }: { icon: any; label: string; children: React.ReactNode }) {
+  useUiTranslation();
   return (
     <div className="py-1.5">
       <div className="flex items-center gap-1.5 px-3 pb-1 pt-1 text-[10px] font-bold uppercase tracking-widest text-zinc-500">
@@ -51,6 +55,7 @@ export function CommunitySearch({
   suppressDropdown = false,
   expandOnFocus = false,
 }: CommunitySearchProps) {
+  useUiTranslation();
   const navigate = useNavigate();
   const controlled = value !== undefined;
   const [internalQuery, setInternalQuery] = useState('');
@@ -102,7 +107,7 @@ export function CommunitySearch({
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => { setOpen(true); setFocused(true); }}
           onBlur={() => setFocused(false)}
-          placeholder="Search community…"
+          placeholder={uiI18n.t('app.search_community_8c8450e5')}
           className="w-full bg-transparent text-sm text-white placeholder:text-muted-foreground/70 focus:outline-none"
         />
         {query && (
@@ -120,14 +125,14 @@ export function CommunitySearch({
         <div className="absolute left-0 right-0 top-12 z-50 max-h-[70vh] overflow-y-auto rounded-2xl border border-white/[0.08] bg-[#08090b]/95 p-1 shadow-[0_20px_60px_rgba(0,0,0,0.5)] backdrop-blur-2xl animate-in fade-in slide-in-from-top-1">
           {isFetching && !hasResults ? (
             <div className="flex items-center justify-center gap-2 px-3 py-8 text-sm text-zinc-500">
-              <Loader2 className="h-4 w-4 animate-spin" /> Searching…
+              <Loader2 className="h-4 w-4 animate-spin" /> {uiI18n.t('app.searching_1a6a5ba8')}
             </div>
           ) : !hasResults ? (
-            <div className="px-3 py-8 text-center text-sm text-zinc-500">No results for “{query.trim()}”.</div>
+            <div className="px-3 py-8 text-center text-sm text-zinc-500">{uiI18n.t('app.no_results_for_2a5f91d1')}{query.trim()}”.</div>
           ) : (
             <>
               {r!.users.length > 0 && (
-                <Section icon={User} label="Users">
+                <Section icon={User} label={uiI18n.t('app.users_57f2b181')}>
                   {r!.users.map((u) => (
                     <button
                       key={u.user_id}
@@ -151,7 +156,7 @@ export function CommunitySearch({
               )}
 
               {r!.playlists.length > 0 && (
-                <Section icon={Music2} label="Playlists">
+                <Section icon={Music2} label={uiI18n.t('app.playlists_77b69f32')}>
                   {r!.playlists.map((p) => (
                     <button
                       key={p.id}
@@ -168,7 +173,7 @@ export function CommunitySearch({
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-[13px] font-semibold text-zinc-100">{p.name}</p>
-                        <p className="truncate text-[11px] text-zinc-500 tabular-nums">{p.items_count ?? 0} anime</p>
+                        <p className="truncate text-[11px] text-zinc-500 tabular-nums">{p.items_count ?? 0} {uiI18n.t('app.anime_11a3e059')}</p>
                       </div>
                     </button>
                   ))}
@@ -176,7 +181,7 @@ export function CommunitySearch({
               )}
 
               {r!.tierlists.length > 0 && (
-                <Section icon={Layers} label="Tier Lists">
+                <Section icon={Layers} label={uiI18n.t('app.tier_lists_86752701')}>
                   {r!.tierlists.map((t) => (
                     <button
                       key={t.id}
@@ -194,7 +199,7 @@ export function CommunitySearch({
               )}
 
               {r!.posts.length > 0 && (
-                <Section icon={MessageSquare} label="Posts">
+                <Section icon={MessageSquare} label={uiI18n.t('app.posts_a0ca0c31')}>
                   {r!.posts.map((po) => (
                     <button
                       key={po.id}

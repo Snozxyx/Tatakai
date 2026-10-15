@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
  * AnimePage.tsx
  * Dynamic Anime detail and episode listing page.
@@ -93,6 +95,7 @@ import { AdultWarningGate } from "@/components/content/AdultWarningGate";
 // title + format · year meta below) so related-media reads consistently across
 // the page. Relations carry no rating, so that segment is simply omitted.
 function RelationTree({ relations }: { relations: MediaRelation[] }) {
+  useUiTranslation();
   const scrollRef = useRef<HTMLDivElement>(null);
 
   if (relations.length === 0) return null;
@@ -106,7 +109,7 @@ function RelationTree({ relations }: { relations: MediaRelation[] }) {
       <button
         type="button"
         onClick={() => scroll('left')}
-        aria-label="Scroll series tree left"
+        aria-label={uiI18n.t('app.scroll_series_tree_left_b8db9779')}
         className="absolute -left-3 top-1/2 -translate-y-8 z-20 w-10 h-10 rounded-full bg-black/80 hover:bg-black text-white border border-white/10 hidden md:flex items-center justify-center opacity-0 group-hover/rail:opacity-100 transition-all shadow-xl backdrop-blur-md"
       >
         <ChevronLeft className="w-5 h-5" />
@@ -118,7 +121,7 @@ function RelationTree({ relations }: { relations: MediaRelation[] }) {
         const isNovel = fmt.includes('NOVEL');
         const isManga = fmt.includes('MANGA') || fmt.includes('ONE_SHOT');
         const to = isNovel ? '/novel/comingsoon' : isManga ? `/manga/${rel.id}` : `/anime/${rel.id}`;
-        const title = rel.titleEnglish || rel.titleRomaji || 'Untitled';
+        const title = rel.titleEnglish || rel.titleRomaji || uiI18n.t('app.untitled_621521f9');
         const relLabel = (rel.relationType || 'RELATED').replace(/_/g, ' ');
         const year = rel.seasonYear || rel.startDate?.year;
 
@@ -147,7 +150,7 @@ function RelationTree({ relations }: { relations: MediaRelation[] }) {
               {/* Episode count badge — bottom-right */}
               {rel.episodes ? (
                 <div className="absolute bottom-2.5 right-2.5 px-2 py-0.5 rounded-md bg-black/80 text-white text-[10px] font-bold uppercase tracking-wider backdrop-blur-md border border-white/10 shadow-md">
-                  {rel.episodes} EPS
+                  {rel.episodes} {uiI18n.t('app.eps_65884e31')}
                 </div>
               ) : null}
             </div>
@@ -161,7 +164,7 @@ function RelationTree({ relations }: { relations: MediaRelation[] }) {
                 {title}
               </h4>
               <div className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground font-medium">
-                <span>{rel.format || 'TV'}</span>
+                <span>{rel.format || uiI18n.t('app.tv_56ab49a5')}</span>
                 {year && (
                   <>
                     <span>·</span>
@@ -178,7 +181,7 @@ function RelationTree({ relations }: { relations: MediaRelation[] }) {
       <button
         type="button"
         onClick={() => scroll('right')}
-        aria-label="Scroll series tree right"
+        aria-label={uiI18n.t('app.scroll_series_tree_right_37e703d6')}
         className="absolute -right-3 top-1/2 -translate-y-8 z-20 w-10 h-10 rounded-full bg-black/80 hover:bg-black text-white border border-white/10 hidden md:flex items-center justify-center opacity-0 group-hover/rail:opacity-100 transition-all shadow-xl backdrop-blur-md"
       >
         <ChevronRight className="w-5 h-5" />
@@ -188,6 +191,7 @@ function RelationTree({ relations }: { relations: MediaRelation[] }) {
 }
 
 export default function AnimePage() {
+  useUiTranslation();
   const { animeId } = useParams<{ animeId: string }>();
   const navigate = useNavigate();
   const routeAnimeId = animeId;
@@ -716,15 +720,15 @@ export default function AnimePage() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold mb-2">Anime details not available</h1>
-          <p className="text-muted-foreground mb-4">We couldn't retrieve the information for this anime ID.</p>
+          <h1 className="text-2xl font-bold mb-2">{uiI18n.t('app.anime_details_not_available_c1c40973')}</h1>
+          <p className="text-muted-foreground mb-4">{uiI18n.t('app.we_couldn_t_retrieve_the_information_for_this_an_81c6f502')}</p>
           {import.meta.env.DEV && animeError instanceof Error && (
             <pre className="text-xs text-destructive/80 max-w-md mx-auto mb-4 whitespace-pre-wrap break-words">
-              {`id: ${routeAnimeId}\n${animeError.message}`}
+              {uiI18n.t('app.id_i18n_value_0_i18n_value_1_d09e28bf', { value0: routeAnimeId, value1: animeError.message })}
             </pre>
           )}
           <button onClick={() => navigate("/")} className="px-6 py-2 bg-primary text-primary-foreground rounded-full hover:brightness-110">
-            Go back home
+            {uiI18n.t('app.go_back_home_6b131224')}
           </button>
         </div>
       </div>
@@ -786,7 +790,7 @@ export default function AnimePage() {
     <>
       {/* SEO Meta Tags */}
       <Helmet>
-        <title>{info.name} — Anime on Tatakai</title>
+        <title>{info.name} {uiI18n.t('app.anime_on_tatakai_168819b7')}</title>
         <meta name="description" content={info.description?.slice(0, 160) || `Track ${info.name}, rate it, and add it to your lists on Tatakai.`} />
         <meta property="og:title" content={`${info.name} — Anime on Tatakai`} />
         <meta property="og:description" content={info.description?.slice(0, 160) || `Track and discuss ${info.name} on Tatakai — the otaku community.`} />
@@ -830,7 +834,7 @@ export default function AnimePage() {
               className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-8"
             >
               <ArrowLeft className="w-5 h-5" />
-              <span>Back</span>
+              <span>{uiI18n.t('app.back_b52b36b7')}</span>
             </button>
 
             {/* Hero Section */}
@@ -857,12 +861,12 @@ export default function AnimePage() {
                     {moreInfo?.inDb ? (
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-400 text-xs font-medium">
                         <CheckCircle2 className="w-3.5 h-3.5" />
-                        In Tatakai DB
+                        {uiI18n.t('app.in_tatakai_db_41c5d242')}
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted text-muted-foreground text-xs font-medium">
                         <Database className="w-3.5 h-3.5" />
-                        Not in DB yet
+                        {uiI18n.t('app.not_in_db_yet_f43185d4')}
                       </span>
                     )}
                     {isAdmin && (
@@ -873,7 +877,7 @@ export default function AnimePage() {
                         onClick={() => setEditOpen(true)}
                       >
                         <Pencil className="w-3.5 h-3.5" />
-                        Edit content
+                        {uiI18n.t('app.edit_content_0eea86f9')}
                       </Button>
                     )}
                   </div>
@@ -938,12 +942,12 @@ export default function AnimePage() {
                     </div>
                     <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary/20 text-primary">
                       <Film className="w-4 h-4" />
-                      <span>SUB: {info.stats.episodes.sub}</span>
+                      <span>{uiI18n.t('app.sub_7c63b7df')} {info.stats.episodes.sub}</span>
                     </div>
                     {info.stats.episodes.dub > 0 && (
                       <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-secondary/20 text-secondary">
                         <Film className="w-4 h-4" />
-                        <span>DUB: {info.stats.episodes.dub}</span>
+                        <span>{uiI18n.t('app.dub_61fd0276')} {info.stats.episodes.dub}</span>
                       </div>
                     )}
                   </div>
@@ -966,7 +970,7 @@ export default function AnimePage() {
                     <div className="flex flex-wrap items-center gap-1.5 mb-6">
                       <span className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mr-1 flex items-center gap-1">
                         <Tag className="w-3 h-3 text-primary" />
-                        Tags:
+                        {uiI18n.t('app.tags_b5ddd4e8')}
                       </span>
                       {animeTags.slice(0, 16).map((tag: any) => (
                         <button
@@ -974,7 +978,7 @@ export default function AnimePage() {
                           type="button"
                           onClick={() => navigate(`/search?animeTag=${encodeURIComponent(tag.name)}&type=anime`)}
                           className="px-2.5 py-0.5 rounded-full bg-white/5 hover:bg-primary/20 border border-white/10 hover:border-primary/40 text-xs text-muted-foreground hover:text-primary transition-all flex items-center gap-1 group"
-                          title={tag.category ? `${tag.category} • Click to search` : 'Click to search'}
+                          title={tag.category ? uiI18n.t('app.i18n_value_0_click_to_search_befc3ac0', { value0: tag.category }) : uiI18n.t('app.click_to_search_8e81d4fa')}
                         >
                           <span>{tag.name}</span>
                           {typeof tag.rank === 'number' && (
@@ -998,7 +1002,7 @@ export default function AnimePage() {
                   {titleAliases.length > 0 && (
                     <details className="mt-4 group">
                       <summary className="text-xs uppercase tracking-wider text-muted-foreground cursor-pointer hover:text-foreground transition-colors list-none inline-flex items-center gap-1">
-                        Also known as
+                        {uiI18n.t('app.also_known_as_3ffda41e')}
                         <span className="text-[10px] opacity-60">({titleAliases.length})</span>
                       </summary>
                       <div className="mt-2 flex flex-wrap gap-1.5">
@@ -1019,7 +1023,7 @@ export default function AnimePage() {
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   {moreInfo.aired && (
                     <div>
-                      <span className="text-xs text-muted-foreground uppercase tracking-wider">Aired</span>
+                      <span className="text-xs text-muted-foreground uppercase tracking-wider">{uiI18n.t('app.aired_7487695a')}</span>
                       <p className="font-medium flex items-center gap-2 mt-1">
                         <Calendar className="w-4 h-4" />
                         {moreInfo.aired}
@@ -1028,13 +1032,13 @@ export default function AnimePage() {
                   )}
                   {moreInfo.status && (
                     <div>
-                      <span className="text-xs text-muted-foreground uppercase tracking-wider">Status</span>
+                      <span className="text-xs text-muted-foreground uppercase tracking-wider">{uiI18n.t('app.status_bae7d5be')}</span>
                       <p className="font-medium mt-1">{moreInfo.status}</p>
                     </div>
                   )}
                   {moreInfo.studios && (
                     <div>
-                      <span className="text-xs text-muted-foreground uppercase tracking-wider">Studios</span>
+                      <span className="text-xs text-muted-foreground uppercase tracking-wider">{uiI18n.t('app.studios_97f7c6f7')}</span>
                       <p 
                         className="font-medium mt-1 hover:text-primary cursor-pointer transition-colors"
                         onClick={() => navigate(`/search/producer/${encodeURIComponent(moreInfo.studios)}`)}
@@ -1045,55 +1049,55 @@ export default function AnimePage() {
                   )}
                   {(moreInfo.season || moreInfo.year) && (
                     <div>
-                      <span className="text-xs text-muted-foreground uppercase tracking-wider">Season</span>
+                      <span className="text-xs text-muted-foreground uppercase tracking-wider">{uiI18n.t('app.season_62255f56')}</span>
                       <p className="font-medium mt-1 capitalize">{moreInfo.season} {moreInfo.year}</p>
                     </div>
                   )}
                   {moreInfo.source && (
                     <div>
-                      <span className="text-xs text-muted-foreground uppercase tracking-wider">Source</span>
+                      <span className="text-xs text-muted-foreground uppercase tracking-wider">{uiI18n.t('app.source_6da13add')}</span>
                       <p className="font-medium mt-1 capitalize">{String(moreInfo.source).toLowerCase().replace(/_/g, " ")}</p>
                     </div>
                   )}
                   {moreInfo.duration && moreInfo.duration !== "Unknown" && (
                     <div>
-                      <span className="text-xs text-muted-foreground uppercase tracking-wider">Duration</span>
+                      <span className="text-xs text-muted-foreground uppercase tracking-wider">{uiI18n.t('app.duration_1370004d')}</span>
                       <p className="font-medium mt-1 flex items-center gap-2"><Clock className="w-4 h-4" />{moreInfo.duration}</p>
                     </div>
                   )}
                   {moreInfo.countryOfOrigin && (
                     <div>
-                      <span className="text-xs text-muted-foreground uppercase tracking-wider">Country</span>
+                      <span className="text-xs text-muted-foreground uppercase tracking-wider">{uiI18n.t('app.country_d523ebbd')}</span>
                       <p className="font-medium mt-1">{moreInfo.countryOfOrigin}</p>
                     </div>
                   )}
                   {typeof moreInfo.meanScore === "number" && moreInfo.meanScore > 0 && (
                     <div>
-                      <span className="text-xs text-muted-foreground uppercase tracking-wider">Mean score</span>
+                      <span className="text-xs text-muted-foreground uppercase tracking-wider">{uiI18n.t('app.mean_score_7062f0d8')}</span>
                       <p className="font-medium mt-1">{moreInfo.meanScore}%</p>
                     </div>
                   )}
                   {typeof moreInfo.popularity === "number" && moreInfo.popularity > 0 && (
                     <div>
-                      <span className="text-xs text-muted-foreground uppercase tracking-wider">Popularity</span>
-                      <p className="font-medium mt-1">#{moreInfo.popularity.toLocaleString()}</p>
+                      <span className="text-xs text-muted-foreground uppercase tracking-wider">{uiI18n.t('app.popularity_be6c200f')}</span>
+                      <p className="font-medium mt-1">#{moreInfo.popularity.toLocaleString(uiI18n.language)}</p>
                     </div>
                   )}
                   {typeof moreInfo.favourites === "number" && moreInfo.favourites > 0 && (
                     <div>
-                      <span className="text-xs text-muted-foreground uppercase tracking-wider">Favourites</span>
-                      <p className="font-medium mt-1">{moreInfo.favourites.toLocaleString()}</p>
+                      <span className="text-xs text-muted-foreground uppercase tracking-wider">{uiI18n.t('app.favourites_e6ccc0fd')}</span>
+                      <p className="font-medium mt-1">{moreInfo.favourites.toLocaleString(uiI18n.language)}</p>
                     </div>
                   )}
                   {moreInfo.endDate && (
                     <div>
-                      <span className="text-xs text-muted-foreground uppercase tracking-wider">Ended</span>
+                      <span className="text-xs text-muted-foreground uppercase tracking-wider">{uiI18n.t('app.ended_90303d8d')}</span>
                       <p className="font-medium mt-1 flex items-center gap-2"><Calendar className="w-4 h-4" />{moreInfo.endDate}</p>
                     </div>
                   )}
                   {producerNames.length > 0 && (
                     <div className="col-span-2 md:col-span-3">
-                      <span className="text-xs text-muted-foreground uppercase tracking-wider">Producers</span>
+                      <span className="text-xs text-muted-foreground uppercase tracking-wider">{uiI18n.t('app.producers_a44fa04f')}</span>
                       <div className="mt-2 flex flex-wrap gap-2">
                         {producerNames.map((producer) => (
                           <button
@@ -1138,7 +1142,7 @@ export default function AnimePage() {
                     className="h-12 sm:h-14 px-6 sm:px-8 rounded-full bg-foreground text-background font-bold text-base sm:text-lg hover:scale-105 active:scale-95 transition-all flex items-center gap-2 glow-primary disabled:opacity-50"
                   >
                     <Play className="w-4 h-4 sm:w-5 sm:h-5 fill-background" />
-                    Watch Now
+                    {uiI18n.t('app.watch_now_fe70cb6e')}
                   </button>
                   <WatchlistButton
                     animeId={contentAnimeId!}
@@ -1160,12 +1164,12 @@ export default function AnimePage() {
                     animePoster={info.poster}
                     description={info.description}
                   />
-                  <OpenInAppButton size="lg" className="h-12 sm:h-14 rounded-full" label="Open in app" />
+                  <OpenInAppButton size="lg" className="h-12 sm:h-14 rounded-full" label={uiI18n.t('app.open_in_app_07d911ac')} />
                   <button
                     onClick={() => navigate(`/isshoni?anime=${encodeURIComponent(contentAnimeId!)}&title=${encodeURIComponent(info.name)}&poster=${encodeURIComponent(info.poster)}`)}
                     className="group flex h-14 w-14 items-center justify-center rounded-full bg-[hsl(var(--isshoni-accent))] text-black ring-1 ring-inset ring-white/25 shadow-[0_10px_30px_-8px_hsl(var(--isshoni-accent)/0.6)] transition-all hover:scale-105 hover:bg-[hsl(var(--isshoni-accent)/0.9)] hover:shadow-[0_0_28px_hsl(var(--isshoni-accent)/0.5)] active:scale-95"
-                    title="Watch Together"
-                    aria-label="Start a Watch Together party"
+                    title={uiI18n.t('app.watch_together_195732a6')}
+                    aria-label={uiI18n.t('app.start_a_watch_together_party_c96182e8')}
                   >
                     <Users className="w-5 h-5 transition-transform group-hover:scale-110" />
                   </button>
@@ -1174,7 +1178,7 @@ export default function AnimePage() {
                     <button
                       onClick={() => setIsDownloadModalOpen(true)}
                       className="h-14 w-14 rounded-full bg-primary/20 hover:bg-primary/30 text-primary flex items-center justify-center transition-all hover:scale-105"
-                      title="Download Season"
+                      title={uiI18n.t('app.download_season_37e47278')}
                     >
                       <Download className="w-6 h-6" />
                     </button>
@@ -1211,12 +1215,12 @@ export default function AnimePage() {
           <section className="mb-16">
             <div className="flex flex-col gap-4 mb-6">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="font-display text-2xl font-semibold">Episodes</h2>
+                <h2 className="font-display text-2xl font-semibold">{uiI18n.t('app.episodes_49d641ba')}</h2>
                 <div className="flex flex-wrap items-center gap-3">
                   <span className="text-sm text-muted-foreground">
                     {isFilteringEpisodes
-                      ? `${matchedEpisodes} of ${totalEpisodes}`
-                      : `${totalEpisodes} total`}
+                      ? uiI18n.t('app.i18n_value_0_of_i18n_value_1_fc894332', { value0: matchedEpisodes, value1: totalEpisodes })
+                      : uiI18n.t('app.i18n_value_0_total_83839703', { value0: totalEpisodes })}
                   </span>
 
                   {showEpisodeToolbar && (
@@ -1227,15 +1231,15 @@ export default function AnimePage() {
                           type="search"
                           value={episodeQuery}
                           onChange={(event) => setEpisodeQuery(event.target.value)}
-                          placeholder="Search number or title..."
-                          aria-label="Search episodes"
+                          placeholder={uiI18n.t('app.search_number_or_title_d78dfd53')}
+                          aria-label={uiI18n.t('app.search_episodes_53e727c8')}
                           className="h-9 w-48 md:w-60 pl-8 pr-3 rounded-full bg-muted/50 border border-border text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
                         />
                       </div>
                       <div className="flex items-center rounded-full border border-border overflow-hidden">
                         <button
                           onClick={() => setEpisodeLayout("grid")}
-                          aria-label="Thumbnail view"
+                          aria-label={uiI18n.t('app.thumbnail_view_8ab530e9')}
                           aria-pressed={episodeLayout === "grid"}
                           className={cn(
                             "px-3 h-9 transition-colors",
@@ -1248,7 +1252,7 @@ export default function AnimePage() {
                         </button>
                         <button
                           onClick={() => setEpisodeLayout("compact")}
-                          aria-label="Compact view"
+                          aria-label={uiI18n.t('app.compact_view_e3719eae')}
                           aria-pressed={episodeLayout === "compact"}
                           className={cn(
                             "px-3 h-9 transition-colors",
@@ -1280,8 +1284,7 @@ export default function AnimePage() {
                         onClick={() => setSelectedEpisodeGroup(index)}
                         className={`px-4 py-2 rounded-full text-sm font-semibold transition-all border ${isActive
                           ? "bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20"
-                          : "bg-muted/50 text-muted-foreground border-border hover:bg-muted hover:text-foreground"
-                        }`}
+                          : "bg-muted/50 text-muted-foreground border-border hover:bg-muted hover:text-foreground"}`}
                       >
                         {start}-{end}
                       </button>
@@ -1291,8 +1294,8 @@ export default function AnimePage() {
               )}
               {hasEpisodeGroups && (
                 <p className="text-xs text-muted-foreground">
-                  Showing {visibleEpisodes.length} of {matchedEpisodes}
-                  {isFilteringEpisodes ? ` matching episodes` : ` episodes`}
+                  {uiI18n.t('app.showing_163d8174')} {visibleEpisodes.length} {uiI18n.t('app.of_de04fa0e')} {matchedEpisodes}
+                  {isFilteringEpisodes ? uiI18n.t('app.matching_episodes_971fc34f') : uiI18n.t('app.episodes_d5e17736')}
                 </p>
               )}
             </div>
@@ -1304,7 +1307,7 @@ export default function AnimePage() {
               </div>
             ) : !episodesData ? null : visibleEpisodes.length === 0 ? (
               <GlassPanel className="p-6 text-center text-sm text-muted-foreground">
-                No episode matches "{episodeQuery.trim()}".
+                {uiI18n.t('app.no_episode_matches_60efd06a')}{episodeQuery.trim()}".
               </GlassPanel>
             ) : episodeLayout === "grid" ? (
               /* Thumbnail cards. The screencap, air date, runtime and synopsis all
@@ -1315,7 +1318,7 @@ export default function AnimePage() {
                     <ContextMenuTrigger>
                       <button
                         onClick={() => handleEpisodeClick(ep.episodeId)}
-                        title={ep.hasAired === false ? `${ep.title} — not yet aired` : ep.title}
+                        title={ep.hasAired === false ? uiI18n.t('app.i18n_value_0_not_yet_aired_23234e78', { value0: ep.title }) : ep.title}
                         disabled={ep.hasAired === false}
                         aria-disabled={ep.hasAired === false}
                         className={cn(
@@ -1345,16 +1348,16 @@ export default function AnimePage() {
                           )}
                           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
                           <span className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-black/70 text-white text-xs font-bold backdrop-blur-sm">
-                            EP {ep.number}
+                            {uiI18n.t('app.ep_00c1bff9')} {ep.number}
                           </span>
                           {ep.isFiller && (
                             <span className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-orange/90 text-black text-[10px] font-bold uppercase tracking-wide">
-                              Filler
+                              {uiI18n.t('app.filler_e0a62127')}
                             </span>
                           )}
                           {ep.hasAired === false ? (
                             <span className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-primary/90 text-primary-foreground text-[10px] font-bold uppercase tracking-wide">
-                              Upcoming
+                              {uiI18n.t('app.upcoming_523baab9')}
                             </span>
                           ) : (
                             <span className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1397,7 +1400,7 @@ export default function AnimePage() {
                         className="gap-2 cursor-pointer"
                       >
                         <Play className="w-4 h-4" />
-                        {ep.hasAired === false ? "Not yet aired" : "Play Episode"}
+                        {ep.hasAired === false ? uiI18n.t('app.not_yet_aired_031c663f') : uiI18n.t('app.play_episode_806e6dd8')}
                       </ContextMenuItem>
                     </ContextMenuContent>
                   </ContextMenu>
@@ -1420,9 +1423,8 @@ export default function AnimePage() {
                                 // Dated in the future: still listed (ani.zip knows
                                 // about it) but visibly not playable yet.
                                 ? "bg-muted/40 text-muted-foreground border border-dashed border-white/15 hover:bg-muted/60"
-                                : "bg-muted hover:bg-primary hover:text-primary-foreground"
-                              }`}
-                            title={ep.hasAired === false ? `${ep.title} — not yet aired` : ep.title}
+                                : "bg-muted hover:bg-primary hover:text-primary-foreground"}`}
+                            title={ep.hasAired === false ? uiI18n.t('app.i18n_value_0_not_yet_aired_23234e78', { value0: ep.title }) : ep.title}
                           >
                             {ep.number}
                           </button>
@@ -1455,9 +1457,9 @@ export default function AnimePage() {
                                 </span>
                               ) : null}
                               {ep.hasAired === false && (
-                                <span className="text-primary font-medium">Not yet aired</span>
+                                <span className="text-primary font-medium">{uiI18n.t('app.not_yet_aired_031c663f')}</span>
                               )}
-                              {ep.isFiller && <span className="text-orange font-medium">Filler</span>}
+                              {ep.isFiller && <span className="text-orange font-medium">{uiI18n.t('app.filler_e0a62127')}</span>}
                             </div>
                             {ep.overview && (
                               <p className="text-xs text-muted-foreground leading-relaxed line-clamp-5 pt-1">
@@ -1481,7 +1483,7 @@ export default function AnimePage() {
                         className="gap-2 cursor-pointer"
                       >
                         <Play className="w-4 h-4" />
-                        {ep.hasAired === false ? "Not yet aired" : "Play Episode"}
+                        {ep.hasAired === false ? uiI18n.t('app.not_yet_aired_031c663f') : uiI18n.t('app.play_episode_806e6dd8')}
                       </ContextMenuItem>
                     </ContextMenuContent>
                   </ContextMenu>
@@ -1496,7 +1498,7 @@ export default function AnimePage() {
               <div className="flex items-center gap-2.5 mb-5">
                 <div className="w-1.5 h-5 md:h-6 rounded-full bg-primary" />
                 <h2 className="font-display text-xl md:text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-                  Watch Order
+                  {uiI18n.t('app.watch_order_7aadca87')}
                 </h2>
               </div>
 
@@ -1507,7 +1509,7 @@ export default function AnimePage() {
                   onClick={() => {
                     watchOrderScrollRef.current?.scrollBy({ left: -450, behavior: 'smooth' });
                   }}
-                  aria-label="Scroll left"
+                  aria-label={uiI18n.t('app.scroll_left_2c9e5a60')}
                   className="absolute -left-3 top-1/2 -translate-y-8 z-20 w-10 h-10 rounded-full bg-black/80 hover:bg-black text-white border border-white/10 flex items-center justify-center opacity-0 group-hover/rail:opacity-100 transition-all shadow-xl backdrop-blur-md"
                 >
                   <ChevronLeft className="w-5 h-5" />
@@ -1546,11 +1548,11 @@ export default function AnimePage() {
                         <div className="absolute top-2.5 left-2.5">
                           {season.isCurrent ? (
                             <span className="px-2.5 py-1 rounded-md bg-white text-black text-[11px] font-black uppercase tracking-wider shadow-md">
-                              CURRENT
+                              {uiI18n.t('app.current_e6303ccf')}
                             </span>
                           ) : (
                             <span className="px-2.5 py-1 rounded-md bg-black/80 text-white text-[11px] font-bold uppercase tracking-wider backdrop-blur-md border border-white/10 shadow-md">
-                              {season.classification || `SEASON ${season.seasonNumber}`}
+                              {season.classification || uiI18n.t('app.season_i18n_value_0_cf2c99e5', { value0: season.seasonNumber })}
                             </span>
                           )}
                         </div>
@@ -1558,7 +1560,7 @@ export default function AnimePage() {
                         {/* Episode count badge — bottom-right */}
                         {season.episodeCount && (
                           <div className="absolute bottom-2.5 right-2.5 px-2 py-0.5 rounded-md bg-black/80 text-white text-[10px] font-bold uppercase tracking-wider backdrop-blur-md border border-white/10 shadow-md">
-                            {season.episodeCount} EPS
+                            {season.episodeCount} {uiI18n.t('app.eps_65884e31')}
                           </div>
                         )}
                       </div>
@@ -1575,7 +1577,7 @@ export default function AnimePage() {
                           {season.name}
                         </h4>
                         <div className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground font-medium">
-                          <span>{season.format || 'TV'}</span>
+                          <span>{season.format || uiI18n.t('app.tv_56ab49a5')}</span>
                           {season.year && (
                             <>
                               <span>·</span>
@@ -1603,7 +1605,7 @@ export default function AnimePage() {
                   onClick={() => {
                     watchOrderScrollRef.current?.scrollBy({ left: 450, behavior: 'smooth' });
                   }}
-                  aria-label="Scroll right"
+                  aria-label={uiI18n.t('app.scroll_right_2994b49c')}
                   className="absolute -right-3 top-1/2 -translate-y-8 z-20 w-10 h-10 rounded-full bg-black/80 hover:bg-black text-white border border-white/10 flex items-center justify-center opacity-85 group-hover/rail:opacity-100 transition-all shadow-xl backdrop-blur-md"
                 >
                   <ChevronRight className="w-5 h-5" />
@@ -1619,7 +1621,7 @@ export default function AnimePage() {
               <div className="flex items-center gap-2.5 mb-5">
                 <div className="w-1.5 h-5 md:h-6 rounded-full bg-primary" />
                 <h2 className="font-display text-xl md:text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-                  Official Streams
+                  {uiI18n.t('app.official_streams_70f0a531')}
                 </h2>
               </div>
               <div className="flex gap-3 overflow-x-auto pb-3 -mx-1 px-1">
@@ -1632,7 +1634,7 @@ export default function AnimePage() {
                       href={ep.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      title={ep.title || ep.site || 'Watch'}
+                      title={ep.title || ep.site || uiI18n.t('app.watch_d91ebf58')}
                       className="group flex-shrink-0 w-44 rounded-xl overflow-hidden border border-border bg-card hover:border-primary/40 transition-colors"
                     >
                       {ep.thumbnail ? (
@@ -1653,7 +1655,7 @@ export default function AnimePage() {
                         </div>
                       )}
                       <div className="p-2.5">
-                        <p className="text-xs font-medium line-clamp-2">{ep.title || 'Episode'}</p>
+                        <p className="text-xs font-medium line-clamp-2">{ep.title || uiI18n.t('app.episode_8669aa56')}</p>
                         {ep.site && (
                           <p className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground">
                             <ExternalLinkIcon className="w-3 h-3" />
@@ -1673,7 +1675,7 @@ export default function AnimePage() {
               <div className="flex items-center gap-2.5 mb-5">
                 <div className="w-1.5 h-5 md:h-6 rounded-full bg-primary" />
                 <h2 className="font-display text-xl md:text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-                  Series Tree
+                  {uiI18n.t('app.series_tree_31ecaced')}
                 </h2>
               </div>
               <RelationTree relations={moreInfo.relations} />
@@ -1685,7 +1687,7 @@ export default function AnimePage() {
             <section className="mb-16">
               <h2 className="font-display text-2xl font-semibold mb-6 flex items-center gap-2">
                 <Users className="w-5 h-5 text-primary" />
-                Characters
+                {uiI18n.t('app.characters_b6f59f08')}
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {info.characterVoiceActor.slice(0, 12).map((cva, index) => (
@@ -1701,11 +1703,11 @@ export default function AnimePage() {
                     />
                     <div className="min-w-0 flex-1">
                       <p className="font-bold text-sm truncate group-hover:text-primary transition-colors">{cva.character.name}</p>
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{cva.character.cast || "Character"}</p>
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{cva.character.cast || uiI18n.t('app.character_ee9946c8')}</p>
                     </div>
                     {cva.voiceActor.name !== "Unknown" && (
                        <div className="text-right border-l border-white/10 pl-3 hidden sm:block">
-                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Voice</p>
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{uiI18n.t('app.voice_3091c844')}</p>
                           <p className="text-[11px] font-medium truncate max-w-[80px]">{cva.voiceActor.name}</p>
                        </div>
                     )}
@@ -1720,7 +1722,7 @@ export default function AnimePage() {
             <section className="mb-16">
               <h2 className="font-display text-2xl font-semibold mb-6 flex items-center gap-2">
                 <PenTool className="w-5 h-5 text-primary" />
-                Staff
+                {uiI18n.t('app.staff_a4730a22')}
               </h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                 {moreInfo.staff.map((s, index) => (
@@ -1732,7 +1734,7 @@ export default function AnimePage() {
                     />
                     <div className="min-w-0">
                       <p className="font-bold text-xs truncate">{s.name}</p>
-                      <p className="text-[9px] text-muted-foreground uppercase tracking-wider">{s.role || "Staff"}</p>
+                      <p className="text-[9px] text-muted-foreground uppercase tracking-wider">{s.role || uiI18n.t('app.staff_a4730a22')}</p>
                     </div>
                   </GlassPanel>
                 ))}
@@ -1767,23 +1769,23 @@ export default function AnimePage() {
           {producerAnimes.length > 0 && (
             <AnimeGrid
               animes={producerAnimes}
-              title={`More from ${producerAnimeData?.producerName || producerNames[0] || 'this producer'}`}
+              title={uiI18n.t('app.more_from_i18n_value_0_85f565d6', { value0: producerAnimeData?.producerName || producerNames[0] || 'this producer' })}
             />
           )}
 
           {/* Related Anime */}
           {relatedAnime.length > 0 && (
-            <AnimeGrid animes={relatedAnime.slice(0, 6)} title="Related Anime" />
+            <AnimeGrid animes={relatedAnime.slice(0, 6)} title={uiI18n.t('app.related_anime_9464e1db')} />
           )}
 
           {/* Related Manga */}
           {relatedManga.length > 0 && (
-            <AnimeGrid animes={relatedManga.slice(0, 6)} title="Related Manga" />
+            <AnimeGrid animes={relatedManga.slice(0, 6)} title={uiI18n.t('app.related_manga_2f034b0a')} />
           )}
 
           {/* Recommended */}
           {recommendedAnimes.length > 0 && (
-            <AnimeGrid animes={recommendedAnimes} title="Recommended" icon={<Sparkles className="w-5 h-5 text-primary" />} />
+            <AnimeGrid animes={recommendedAnimes} title={uiI18n.t('app.recommended_9ef93755')} icon={<Sparkles className="w-5 h-5 text-primary" />} />
           )}
 
         </main>

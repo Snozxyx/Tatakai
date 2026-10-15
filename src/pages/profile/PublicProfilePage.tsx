@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Background } from '@/components/layout/Background';
 import { Sidebar } from '@/components/layout/Sidebar';
@@ -15,11 +17,12 @@ import {
 import { useFollow } from '@/hooks/community/useFollow';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from '@/lib/localeFormat';
 import { cn } from '@/lib/utils';
 import { useIsDesktopApp } from '@/hooks/ui/useIsNativeApp';
 
 export default function PublicProfilePage() {
+  useUiTranslation();
   const { username: usernameParam, atUsername, slug } = useParams<{ username?: string; atUsername?: string; slug?: string }>();
   const navigate = useNavigate();
   const isDesktopApp = useIsDesktopApp();
@@ -46,7 +49,7 @@ export default function PublicProfilePage() {
   if (loadingProfile) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-muted-foreground">Loading profile...</div>
+        <div className="text-muted-foreground">{uiI18n.t('app.loading_profile_a9e1eeaf')}</div>
       </div>
     );
   }
@@ -63,17 +66,17 @@ export default function PublicProfilePage() {
               className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
             >
               <ArrowLeft className="w-5 h-5" />
-              <span>Back</span>
+              <span>{uiI18n.t('app.back_b52b36b7')}</span>
             </button>
           </div>
 
           <div className="text-center py-20">
             <Lock className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-            <h1 className="text-2xl font-bold mb-2">Profile Not Available</h1>
+            <h1 className="text-2xl font-bold mb-2">{uiI18n.t('app.profile_not_available_d9c0b785')}</h1>
             <p className="text-muted-foreground mb-6">
-              This profile is private or doesn't exist.
+              {uiI18n.t('app.this_profile_is_private_or_doesn_t_exist_1df87e34')}
             </p>
-            <Button onClick={() => navigate('/')}>Go Home</Button>
+            <Button onClick={() => navigate('/')}>{uiI18n.t('app.go_home_19445d72')}</Button>
           </div>
         </main>
         <MobileNav />
@@ -97,7 +100,7 @@ export default function PublicProfilePage() {
             className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
-            <span>Back</span>
+            <span>{uiI18n.t('app.back_b52b36b7')}</span>
           </button>
         </div>
 
@@ -117,7 +120,7 @@ export default function PublicProfilePage() {
                 {/* Main banner - fit without cropping */}
                 <img
                   src={(profile as any).banner_url}
-                  alt="Profile banner"
+                  alt={uiI18n.t('app.profile_banner_7ed6014d')}
                   className="absolute inset-0 w-full h-full object-contain"
                 />
               </>
@@ -143,17 +146,17 @@ export default function PublicProfilePage() {
                     {profile?.role === 'admin' && (
                       <span className="flex items-center gap-1 px-3 py-1 rounded-full text-[12px] font-bold bg-violet-500/20 text-violet-400 border border-violet-500/30">
                         <ShieldCheck className="w-4 h-4" />
-                        ADMIN
+                        {uiI18n.t('app.admin_b521caa6')}
                       </span>
                     )}
                     {profile?.role === 'moderator' && (
                       <span className="flex items-center gap-1 px-3 py-1 rounded-full text-[12px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
                         <Shield className="w-4 h-4" />
-                        MODERATOR
+                        {uiI18n.t('app.moderator_df90a166')}
                       </span>
                     )}
                   </h1>
-                  <span title="Public Profile">
+                  <span title={uiI18n.t('app.public_profile_0da61f53')}>
                     <Globe className="w-4 h-4 text-green-500" />
                   </span>
                 </div>
@@ -161,15 +164,15 @@ export default function PublicProfilePage() {
                 <div className="flex items-center gap-4 text-sm text-muted-foreground">
                   <span className="flex items-center gap-1">
                     <Calendar className="w-4 h-4" />
-                    Joined {formatDistanceToNow(new Date(profile.created_at), { addSuffix: true })}
+                    {uiI18n.t('app.joined_43a1c626')} {formatDistanceToNow(new Date(profile.created_at), { addSuffix: true })}
                   </span>
                   <span className="flex items-center gap-1">
                     <UserPlus className="w-4 h-4" />
-                    {followStats?.followers || 0} followers
+                    {followStats?.followers || 0} {uiI18n.t('app.followers_09322a11')}
                   </span>
                   <span className="flex items-center gap-1">
                     <User className="w-4 h-4" />
-                    {followStats?.following || 0} following
+                    {followStats?.following || 0} {uiI18n.t('app.following_6cbf68c5')}
                   </span>
                 </div>
               </div>
@@ -185,12 +188,12 @@ export default function PublicProfilePage() {
                     {isFollowing ? (
                       <>
                         <UserMinus className="w-4 h-4" />
-                        Unfollow
+                        {uiI18n.t('app.unfollow_e3a6fe56')}
                       </>
                     ) : (
                       <>
                         <UserPlus className="w-4 h-4" />
-                        Follow
+                        {uiI18n.t('app.follow_66587a7a')}
                       </>
                     )}
                   </Button>
@@ -205,28 +208,28 @@ export default function PublicProfilePage() {
                   <Heart className="w-4 h-4 text-primary" />
                   <span className="text-2xl font-bold">{watchlist.length}</span>
                 </div>
-                <p className="text-sm text-muted-foreground">Favorites</p>
+                <p className="text-sm text-muted-foreground">{uiI18n.t('app.favorites_07b3e447')}</p>
               </div>
               <div className="text-center p-3 rounded-xl bg-muted/30">
                 <div className="flex items-center justify-center gap-2 mb-1">
                   <Play className="w-4 h-4 text-primary" />
                   <span className="text-2xl font-bold">{totalEpisodesWatched}</span>
                 </div>
-                <p className="text-sm text-muted-foreground">Episodes</p>
+                <p className="text-sm text-muted-foreground">{uiI18n.t('app.episodes_49d641ba')}</p>
               </div>
               <div className="text-center p-3 rounded-xl bg-muted/30">
                 <div className="flex items-center justify-center gap-2 mb-1">
                   <Clock className="w-4 h-4 text-primary" />
                   <span className="text-2xl font-bold">{estimatedWatchTimeHours}h</span>
                 </div>
-                <p className="text-sm text-muted-foreground">Watch Time</p>
+                <p className="text-sm text-muted-foreground">{uiI18n.t('app.watch_time_c49f058c')}</p>
               </div>
               <div className="text-center p-3 rounded-xl bg-muted/30">
                 <div className="flex items-center justify-center gap-2 mb-1">
                   <Trophy className="w-4 h-4 text-primary" />
                   <span className="text-2xl font-bold">{publicTierLists.length}</span>
                 </div>
-                <p className="text-sm text-muted-foreground">Tier Lists</p>
+                <p className="text-sm text-muted-foreground">{uiI18n.t('app.tier_lists_86752701')}</p>
               </div>
             </div>
 
@@ -241,7 +244,7 @@ export default function PublicProfilePage() {
               */}
             {Array.isArray((profile as any).showcase_anime_ids) && (profile as any).showcase_anime_ids.length > 0 && (
               <div className="mt-6 pt-6 border-t border-muted">
-                <h3 className="text-sm font-medium text-muted-foreground mb-3">Showcase</h3>
+                <h3 className="text-sm font-medium text-muted-foreground mb-3">{uiI18n.t('app.showcase_5577e487')}</h3>
                 <div className="flex gap-3 overflow-x-auto pb-2">
                   {(profile as any).showcase_anime_ids.map((animeId: string) => (
                     <Link
@@ -265,15 +268,15 @@ export default function PublicProfilePage() {
           <TabsList className="bg-muted/50 p-1 flex-wrap h-auto gap-1">
             <TabsTrigger value="watchlist" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Heart className="w-4 h-4" />
-              Watchlist
+              {uiI18n.t('app.watchlist_48a616d9')}
             </TabsTrigger>
             <TabsTrigger value="history" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Clock className="w-4 h-4" />
-              History
+              {uiI18n.t('app.history_90ccd649')}
             </TabsTrigger>
             <TabsTrigger value="tierlists" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Trophy className="w-4 h-4" />
-              Tier Lists
+              {uiI18n.t('app.tier_lists_86752701')}
             </TabsTrigger>
           </TabsList>
 
@@ -284,7 +287,7 @@ export default function PublicProfilePage() {
             ) : watchlist.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <Heart className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>No favorites yet</p>
+                <p>{uiI18n.t('app.no_favorites_yet_95bc6801')}</p>
               </div>
             ) : (
               <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-4">
@@ -317,7 +320,7 @@ export default function PublicProfilePage() {
             ) : watchHistory.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <Clock className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>No watch history</p>
+                <p>{uiI18n.t('app.no_watch_history_f0c8a58e')}</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -339,7 +342,7 @@ export default function PublicProfilePage() {
                         {item.anime_name}
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        Episode {item.episode_number}
+                        {uiI18n.t('app.episode_8669aa56')} {item.episode_number}
                       </p>
                       {item.progress_seconds > 0 && item.duration_seconds > 0 && (
                         <div className="mt-2 h-1 bg-muted rounded-full overflow-hidden">
@@ -366,7 +369,7 @@ export default function PublicProfilePage() {
             ) : publicTierLists.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <Trophy className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>No public tier lists</p>
+                <p>{uiI18n.t('app.no_public_tier_lists_5c0d9889')}</p>
               </div>
             ) : (
               <TierListGrid tierLists={publicTierLists} showAuthor={false} />

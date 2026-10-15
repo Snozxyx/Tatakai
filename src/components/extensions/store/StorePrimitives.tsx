@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
  * The store's building blocks, in the Microsoft Store idiom: a wide gradient
  * hero, stacked promo tiles beside it, shelves with a chevron-linked header and
@@ -63,6 +65,7 @@ export function ExtensionIcon({
   size?: keyof typeof ICON_SIZES;
   className?: string;
 }) {
+  useUiTranslation();
   const visual = typeVisual(extension.type);
 
   return (
@@ -129,6 +132,7 @@ export function InstallButton({
   className?: string;
   label?: string;
 }) {
+  useUiTranslation();
   const Icon = INSTALL_ICONS[state];
 
   return (
@@ -165,12 +169,13 @@ export function ExtensionChips({
   className?: string;
   showHealth?: boolean;
 }) {
+  useUiTranslation();
   const visual = typeVisual(extension.type);
   const health = showHealth ? formatHealth(extension.healthScore) : undefined;
 
   return (
     <div className={cn('flex flex-wrap items-center gap-1.5', className)}>
-      <span className="rounded-full border border-border px-2 py-0.5 text-[11px] capitalize">{extension.ecosystem || 'tatakai'}</span>
+      <span className="rounded-full border border-border px-2 py-0.5 text-[11px] capitalize">{extension.ecosystem || uiI18n.t('app.tatakai_633ebb6b')}</span>
       {extension.compatibility && extension.compatibility !== 'supported' && <span className="rounded-full border border-border px-2 py-0.5 text-[11px] capitalize">{extension.compatibility}</span>}
       <span
         className={cn(
@@ -184,12 +189,12 @@ export function ExtensionChips({
       {extension.isFeatured ? (
         <span className="inline-flex items-center gap-1 rounded-full border border-amber/30 bg-amber/15 px-2 py-0.5 text-[11px] font-bold text-amber">
           <Sparkles className="h-3 w-3" />
-          Featured
+          {uiI18n.t('app.featured_ae31ad5d')}
         </span>
       ) : null}
       {health ? (
         <span className="inline-flex items-center rounded-full border border-border bg-muted/50 px-2 py-0.5 text-[11px] font-bold text-muted-foreground">
-          {health} healthy
+          {health} {uiI18n.t('app.healthy_de18ccfa')}
         </span>
       ) : null}
     </div>
@@ -212,6 +217,7 @@ export function ExtensionHeroCard({
   onInstall: () => void;
   className?: string;
 }) {
+  useUiTranslation();
   const visual = typeVisual(extension.type);
   const href = detailHref(extension);
 
@@ -244,16 +250,16 @@ export function ExtensionHeroCard({
             <h3 className="font-display truncate text-2xl font-black tracking-tight text-foreground sm:text-4xl">
               {extension.name}
             </h3>
-            <p className="mt-1 text-sm font-medium text-muted-foreground">by {extension.author}</p>
+            <p className="mt-1 text-sm font-medium text-muted-foreground">{uiI18n.t('app.by_40815864')} {extension.author}</p>
           </div>
         </div>
         <p className="max-w-xl text-sm leading-relaxed text-muted-foreground line-clamp-2">
-          {extension.description || 'No description provided.'}
+          {extension.description || uiI18n.t('app.no_description_provided_fe3f10ae')}
         </p>
         <div className="flex flex-wrap items-center gap-3">
-          <InstallButton state={state} label={extension.compatibility === "external" ? "Open externally" : extension.compatibility === "unavailable" ? "Unavailable" : undefined} onClick={onInstall} size="lg" />
+          <InstallButton state={state} label={extension.compatibility === "external" ? uiI18n.t('app.open_externally_d666a3ea') : extension.compatibility === "unavailable" ? uiI18n.t('app.unavailable_2c9c1f79') : undefined} onClick={onInstall} size="lg" />
           <span className="text-xs font-semibold text-muted-foreground">
-            {formatCompact(extension.installs || extension.downloads)} installs · v{extension.version}
+            {formatCompact(extension.installs || extension.downloads)} {uiI18n.t('app.installs_v_45093ddd')}{extension.version}
           </span>
         </div>
       </div>
@@ -273,6 +279,7 @@ export function ExtensionPromoTile({
   onInstall: () => void;
   className?: string;
 }) {
+  useUiTranslation();
   const visual = typeVisual(extension.type);
   const href = detailHref(extension);
 
@@ -289,10 +296,10 @@ export function ExtensionPromoTile({
       <div className="relative min-w-0 flex-1">
         <p className="truncate text-sm font-bold text-foreground">{extension.name}</p>
         <p className="mt-0.5 truncate text-xs font-medium text-muted-foreground">
-          {visual.label} · {formatCompact(extension.installs || extension.downloads)} installs
+          {visual.label} · {formatCompact(extension.installs || extension.downloads)} {uiI18n.t('app.installs_b7a92138')}
         </p>
       </div>
-      <InstallButton state={state} label={extension.compatibility === "external" ? "Open externally" : extension.compatibility === "unavailable" ? "Unavailable" : undefined} onClick={onInstall} size="sm" className="relative" />
+      <InstallButton state={state} label={extension.compatibility === "external" ? uiI18n.t('app.open_externally_d666a3ea') : extension.compatibility === "unavailable" ? uiI18n.t('app.unavailable_2c9c1f79') : undefined} onClick={onInstall} size="sm" className="relative" />
     </Link>
   );
 }
@@ -314,6 +321,7 @@ export function ExtensionRow({
   rank?: number;
   className?: string;
 }) {
+  useUiTranslation();
   const visual = typeVisual(extension.type);
   const href = detailHref(extension);
 
@@ -338,7 +346,7 @@ export function ExtensionRow({
           {formatCompact(extension.installs || extension.downloads)}
         </p>
       </div>
-      <InstallButton state={state} label={extension.compatibility === "external" ? "Open externally" : extension.compatibility === "unavailable" ? "Unavailable" : undefined} onClick={onInstall} size="sm" />
+      <InstallButton state={state} label={extension.compatibility === "external" ? uiI18n.t('app.open_externally_d666a3ea') : extension.compatibility === "unavailable" ? uiI18n.t('app.unavailable_2c9c1f79') : undefined} onClick={onInstall} size="sm" />
     </Link>
   );
 }
@@ -355,6 +363,7 @@ export function ExtensionTile({
   onInstall: () => void;
   className?: string;
 }) {
+  useUiTranslation();
   const visual = typeVisual(extension.type);
   const href = detailHref(extension);
 
@@ -381,13 +390,13 @@ export function ExtensionTile({
         </div>
       </div>
       <p className="relative mt-3 text-xs leading-relaxed text-muted-foreground line-clamp-2">
-        {extension.description || 'No description provided.'}
+        {extension.description || uiI18n.t('app.no_description_provided_fe3f10ae')}
       </p>
       <div className="relative mt-4 flex items-center justify-between gap-2">
         <span className="text-[11px] font-semibold text-muted-foreground">
-          v{extension.version} · {formatCompact(extension.installs || extension.downloads)} installs
+          v{extension.version} · {formatCompact(extension.installs || extension.downloads)} {uiI18n.t('app.installs_b7a92138')}
         </span>
-        <InstallButton state={state} label={extension.compatibility === "external" ? "Open externally" : extension.compatibility === "unavailable" ? "Unavailable" : undefined} onClick={onInstall} size="sm" />
+        <InstallButton state={state} label={extension.compatibility === "external" ? uiI18n.t('app.open_externally_d666a3ea') : extension.compatibility === "unavailable" ? uiI18n.t('app.unavailable_2c9c1f79') : undefined} onClick={onInstall} size="sm" />
       </div>
     </Link>
   );
@@ -416,6 +425,7 @@ export const StoreShelf = forwardRef<
   { title, eyebrow, href, action, scrollable = true, children, className, trackClassName },
   ref,
 ) {
+  useUiTranslation();
   const track = useRef<HTMLDivElement | null>(null);
 
   const scrollBy = useCallback((direction: -1 | 1) => {
@@ -476,12 +486,13 @@ export const StoreShelf = forwardRef<
 });
 
 function ShelfArrow({ direction, onClick }: { direction: -1 | 1; onClick: () => void }) {
+  useUiTranslation();
   const Icon = direction === -1 ? ChevronLeft : ChevronRight;
   return (
     <button
       type="button"
       onClick={onClick}
-      aria-label={direction === -1 ? 'Scroll left' : 'Scroll right'}
+      aria-label={direction === -1 ? uiI18n.t('app.scroll_left_2c9e5a60') : uiI18n.t('app.scroll_right_2994b49c')}
       className="flex h-11 w-11 items-center justify-center rounded-full border border-border bg-muted/50 text-muted-foreground transition-colors hover:border-border hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
     >
       <Icon className="h-4 w-4" />

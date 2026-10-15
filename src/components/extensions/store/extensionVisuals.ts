@@ -1,3 +1,4 @@
+import uiI18n from '@/lib/uiI18n';
 /**
  * Shared visual vocabulary for the extension store.
  *
@@ -32,7 +33,7 @@ export interface ExtensionTypeVisual {
 
 export const EXTENSION_TYPE_VISUALS: Record<StoreExtensionType, ExtensionTypeVisual> = {
   onlinestream: {
-    label: 'Streaming source',
+    get label() { return uiI18n.t('app.streaming_source_695ea2b2'); },
     short: 'Streaming',
     icon: Globe,
     chipClass: 'bg-primary/15 text-primary border-primary/30',
@@ -41,7 +42,7 @@ export const EXTENSION_TYPE_VISUALS: Record<StoreExtensionType, ExtensionTypeVis
     textClass: 'text-primary',
   },
   torrent: {
-    label: 'Torrent provider',
+    get label() { return uiI18n.t('app.torrent_provider_eb990fed'); },
     short: 'Torrent',
     icon: Zap,
     chipClass: 'bg-orange/15 text-orange border-orange/30',
@@ -50,7 +51,7 @@ export const EXTENSION_TYPE_VISUALS: Record<StoreExtensionType, ExtensionTypeVis
     textClass: 'text-orange',
   },
   custom: {
-    label: 'Utility',
+    get label() { return uiI18n.t('app.utility_89189507'); },
     short: 'Utility',
     icon: Puzzle,
     chipClass: 'bg-secondary/20 text-secondary border-secondary/30',

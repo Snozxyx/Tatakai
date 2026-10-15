@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -17,6 +19,7 @@ interface Redirect {
 }
 
 export function RedirectManager() {
+  useUiTranslation();
     const queryClient = useQueryClient();
     const confirm = useConfirm();
     const [isAdding, setIsAdding] = useState(false);
@@ -43,7 +46,7 @@ export function RedirectManager() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['admin_redirects'] });
-            toast.success('Redirect created');
+            toast.success(uiI18n.t('app.redirect_created_46d3a004'));
             setIsAdding(false);
             setNewRedirect({ slug: '', target_url: '' });
         },
@@ -62,7 +65,7 @@ export function RedirectManager() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['admin_redirects'] });
-            toast.success('Redirect deleted');
+            toast.success(uiI18n.t('app.redirect_deleted_6bc9855c'));
         }
     });
 
@@ -85,15 +88,15 @@ export function RedirectManager() {
                 <div>
                     <h2 className="text-xl font-bold flex items-center gap-2">
                         <LinkIcon className="w-6 h-6 text-primary" />
-                        URL Redirects
+                        {uiI18n.t('app.url_redirects_d48ca0be')}
                     </h2>
                     <p className="text-sm text-muted-foreground mt-1">
-                        Manage custom short links and redirects
+                        {uiI18n.t('app.manage_custom_short_links_and_redirects_15d8741d')}
                     </p>
                 </div>
                 {!isAdding && (
                     <Button onClick={() => setIsAdding(true)} className="gap-2">
-                        <Plus className="w-4 h-4" /> Add Redirect
+                        <Plus className="w-4 h-4" /> {uiI18n.t('app.add_redirect_781f9ad4')}
                     </Button>
                 )}
             </div>
@@ -102,18 +105,18 @@ export function RedirectManager() {
                 <GlassPanel className="p-4 border-primary/20 bg-primary/5">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div>
-                            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1 block">Slug (e.g. discord)</label>
+                            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1 block">{uiI18n.t('app.slug_e_g_discord_d1510dc5')}</label>
                             <div className="flex items-center gap-2">
                                 <span className="text-muted-foreground font-medium">/</span>
                                 <Input
-                                    placeholder="slug"
+                                    placeholder={uiI18n.t('app.slug_63007774')}
                                     value={newRedirect.slug}
                                     onChange={(e) => setNewRedirect({ ...newRedirect, slug: e.target.value })}
                                 />
                             </div>
                         </div>
                         <div>
-                            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1 block">Target URL</label>
+                            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1 block">{uiI18n.t('app.target_url_b7d8a4de')}</label>
                             <Input
                                 placeholder="https://example.com"
                                 value={newRedirect.target_url}
@@ -122,13 +125,13 @@ export function RedirectManager() {
                         </div>
                     </div>
                     <div className="flex justify-end gap-2">
-                        <Button variant="ghost" onClick={() => setIsAdding(false)}>Cancel</Button>
+                        <Button variant="ghost" onClick={() => setIsAdding(false)}>{uiI18n.t('app.cancel_77dfd213')}</Button>
                         <Button
                             onClick={() => createRedirect.mutate(newRedirect)}
                             disabled={createRedirect.isPending || !newRedirect.slug || !newRedirect.target_url}
                             className="gap-2"
                         >
-                            <Save className="w-4 h-4" /> Create Redirect
+                            <Save className="w-4 h-4" /> {uiI18n.t('app.create_redirect_6ce6be7c')}
                         </Button>
                     </div>
                 </GlassPanel>
@@ -138,7 +141,7 @@ export function RedirectManager() {
                 {isLoading ? (
                     <div className="flex justify-center py-10"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
                 ) : redirects?.length === 0 ? (
-                    <p className="text-center py-10 text-muted-foreground">No redirects configured</p>
+                    <p className="text-center py-10 text-muted-foreground">{uiI18n.t('app.no_redirects_configured_76bc375e')}</p>
                 ) : (
                     redirects?.map((r) => (
                         <GlassPanel key={r.id} className="p-4 hover:bg-white/5 transition-colors">
@@ -177,7 +180,7 @@ export function RedirectManager() {
                                         size="icon"
                                         className="h-9 w-9 p-0 rounded-lg hover:text-destructive text-muted-foreground"
                                         onClick={async () => {
-                                            if (await confirm({ title: 'Delete this redirect?', destructive: true })) deleteRedirect.mutate(r.id);
+                                            if (await confirm({ get title() { return uiI18n.t('app.delete_this_redirect_959d9f9b'); }, destructive: true })) deleteRedirect.mutate(r.id);
                                         }}
                                     >
                                         <Trash2 className="w-4 h-4" />
@@ -193,6 +196,7 @@ export function RedirectManager() {
 }
 
 function ArrowRight({ className }: { className?: string }) {
+  useUiTranslation();
     return (
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
             <path d="M5 12h14" />
@@ -202,6 +206,7 @@ function ArrowRight({ className }: { className?: string }) {
 }
 
 function CheckCircle({ className }: { className?: string }) {
+  useUiTranslation();
     return (
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
             <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />

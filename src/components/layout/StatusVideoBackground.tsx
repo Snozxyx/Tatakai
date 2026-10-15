@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 
@@ -16,6 +18,7 @@ interface StatusVideoBackgroundProps {
 export function StatusVideoBackground({ 
   overlayColor = "from-background/95 via-background/90 to-background/80" 
 }: StatusVideoBackgroundProps) {
+  useUiTranslation();
   const videoRef = useRef<HTMLVideoElement>(null);
   const [source, setSource] = useState<string>('');
 

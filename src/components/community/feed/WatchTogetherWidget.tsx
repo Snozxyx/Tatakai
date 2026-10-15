@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Play, Users, Radio, ArrowRight } from 'lucide-react';
@@ -17,6 +19,7 @@ export interface WatchTogetherWidgetProps {
 }
 
 export function WatchTogetherWidget({ className }: WatchTogetherWidgetProps) {
+  useUiTranslation();
   const navigate = useNavigate();
   const { data: publicRooms = [] } = usePublicWatchRooms();
 
@@ -41,7 +44,7 @@ export function WatchTogetherWidget({ className }: WatchTogetherWidgetProps) {
   // With no live rooms, keep one neutral card so the composition holds.
   const slots: PosterSlot[] = displayPosters.length
     ? displayPosters
-    : [{ id: 'empty', title: 'No live rooms', image: null }];
+    : [{ id: 'empty', get title() { return uiI18n.t('app.no_live_rooms_6d1c9acb'); }, image: null }];
 
   const handleNavigate = () => {
     navigate(mainRoom ? `/isshoni/room/${mainRoom.id}` : '/isshoni');
@@ -65,7 +68,7 @@ export function WatchTogetherWidget({ className }: WatchTogetherWidgetProps) {
           <div className="flex h-7 w-7 items-center justify-center rounded-full border border-primary/20 bg-primary/10">
             <Radio className="h-3.5 w-3.5 text-primary" />
           </div>
-          <span className="text-[11px] font-bold uppercase tracking-widest text-primary">Isshoni</span>
+          <span className="text-[11px] font-bold uppercase tracking-widest text-primary">{uiI18n.t('app.isshoni_514e78fa')}</span>
         </div>
 
         {activeRoomsCount > 0 && (
@@ -74,7 +77,7 @@ export function WatchTogetherWidget({ className }: WatchTogetherWidgetProps) {
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-500 opacity-75" />
               <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-rose-500" />
             </span>
-            <span className="text-[10px] font-semibold text-white/80">{activeRoomsCount} Live</span>
+            <span className="text-[10px] font-semibold text-white/80">{activeRoomsCount} {uiI18n.t('app.live_65c821a5')}</span>
           </div>
         )}
       </div>
@@ -120,13 +123,13 @@ export function WatchTogetherWidget({ className }: WatchTogetherWidgetProps) {
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0 flex-1">
               <h3 className="truncate text-sm font-bold text-white transition-colors group-hover:text-primary">
-                {mainRoom?.anime_title || mainRoom?.name || 'Start a Room'}
+                {mainRoom?.anime_title || mainRoom?.name || uiI18n.t('app.start_a_room_fc6f5273')}
               </h3>
               <p className="mt-1 flex items-center gap-2 text-[11px] font-medium text-muted-foreground">
                 {mainRoom ? (
                   <>
                     <Users className="h-3 w-3" />
-                    <span>{watching} watching</span>
+                    <span>{watching} {uiI18n.t('app.watching_874e70e6')}</span>
                   </>
                 ) : (
                   'Watch anime with friends'

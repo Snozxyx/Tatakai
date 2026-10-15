@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import {
     Dialog,
     DialogContent,
@@ -9,7 +11,7 @@ import { GlassPanel } from "@/components/ui/GlassPanel";
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Bell, Check, Trash2, Loader2, CheckCircle2 } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow } from '@/lib/localeFormat';
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -19,6 +21,7 @@ interface NotificationModalProps {
 }
 
 export function NotificationModal({ open, onOpenChange }: NotificationModalProps) {
+  useUiTranslation();
     const { data: notifications = [], isLoading, unreadCount, markAsRead, markAllAsRead, deleteNotification } = useNotifications();
     const confirm = useConfirm();
 
@@ -29,10 +32,10 @@ export function NotificationModal({ open, onOpenChange }: NotificationModalProps
                     <div className="flex items-center justify-between">
                         <DialogTitle className="text-2xl font-bold flex items-center gap-2">
                             <Bell className="w-6 h-6 text-primary" />
-                            Notifications
+                            {uiI18n.t('app.notifications_753a22b2')}
                             {unreadCount > 0 && (
                                 <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full font-bold ml-2">
-                                    {unreadCount} NEW
+                                    {unreadCount} {uiI18n.t('app.new_66aabd91')}
                                 </span>
                             )}
                         </DialogTitle>
@@ -45,7 +48,7 @@ export function NotificationModal({ open, onOpenChange }: NotificationModalProps
                                 disabled={unreadCount === 0 || markAllAsRead.isPending}
                             >
                                 <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
-                                Mark all as read
+                                {uiI18n.t('app.mark_all_as_read_1b83163b')}
                             </Button>
                         )}
                     </div>
@@ -55,15 +58,15 @@ export function NotificationModal({ open, onOpenChange }: NotificationModalProps
                     {isLoading ? (
                         <div className="flex flex-col items-center justify-center py-20 gap-3">
                             <Loader2 className="w-8 h-8 animate-spin text-primary opacity-50" />
-                            <p className="text-xs text-muted-foreground font-medium uppercase tracking-widest">Loading Transmission...</p>
+                            <p className="text-xs text-muted-foreground font-medium uppercase tracking-widest">{uiI18n.t('app.loading_transmission_bfcab46e')}</p>
                         </div>
                     ) : notifications.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-20 px-10 text-center">
                             <div className="w-16 h-16 rounded-full bg-muted/30 flex items-center justify-center mb-4">
                                 <Bell className="w-8 h-8 text-muted-foreground/30" />
                             </div>
-                            <h3 className="text-lg font-bold mb-1">Silence is Golden</h3>
-                            <p className="text-muted-foreground text-sm max-w-xs">You have no new notifications. We'll let you know when something interesting happens!</p>
+                            <h3 className="text-lg font-bold mb-1">{uiI18n.t('app.silence_is_golden_e16c24fa')}</h3>
+                            <p className="text-muted-foreground text-sm max-w-xs">{uiI18n.t('app.you_have_no_new_notifications_we_ll_let_you_know_f4667764')}</p>
                         </div>
                     ) : (
                         <div className="divide-y divide-white/5">
@@ -98,7 +101,7 @@ export function NotificationModal({ open, onOpenChange }: NotificationModalProps
                                                 {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
                                             </span>
                                             {!notification.read && (
-                                                <span className="text-[10px] uppercase font-black tracking-widest text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded">NEW</span>
+                                                <span className="text-[10px] uppercase font-black tracking-widest text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded">{uiI18n.t('app.new_66aabd91')}</span>
                                             )}
                                         </div>
                                     </div>
@@ -117,7 +120,7 @@ export function NotificationModal({ open, onOpenChange }: NotificationModalProps
                                             variant="ghost"
                                             size="icon"
                                             onClick={async () => {
-                                                if (await confirm({ title: 'Delete notification?', destructive: true })) deleteNotification.mutate(notification.id);
+                                                if (await confirm({ get title() { return uiI18n.t('app.delete_notification_dc40269b'); }, destructive: true })) deleteNotification.mutate(notification.id);
                                             }}
                                             className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/20 bg-destructive/5 rounded-lg"
                                         >
@@ -131,7 +134,7 @@ export function NotificationModal({ open, onOpenChange }: NotificationModalProps
                 </ScrollArea>
 
                 <div className="p-4 border-t border-white/5 bg-black/20 flex justify-center">
-                    <p className="text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em]">Transmission Protocol Active</p>
+                    <p className="text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em]">{uiI18n.t('app.transmission_protocol_active_39456337')}</p>
                 </div>
             </DialogContent>
         </Dialog>

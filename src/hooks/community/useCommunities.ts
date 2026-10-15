@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -27,6 +29,7 @@ export type CommunityRole = 'owner' | 'mod' | 'member';
 
 /** List communities with member counts + the viewer's membership. */
 export function useCommunities() {
+  useUiTranslation();
   const { user } = useAuth();
   return useQuery({
     queryKey: ['communities', user?.id],
@@ -73,6 +76,7 @@ export function useCommunities() {
 }
 
 export function useCommunityBySlug(slug: string | undefined) {
+  useUiTranslation();
   const { user } = useAuth();
   return useQuery({
     queryKey: ['community', slug, user?.id],
@@ -104,6 +108,7 @@ export interface CommunityMember {
 }
 
 export function useCommunityMembers(communityId: string | undefined) {
+  useUiTranslation();
   return useQuery({
     queryKey: ['community-members', communityId],
     enabled: !!communityId,
@@ -133,6 +138,7 @@ export function useCommunityMembers(communityId: string | undefined) {
  * rather than only `communities.created_by`. [[tatakai-two-id-spaces-in-profiles]]
  */
 export function useMyCommunityRole(communityId: string | undefined) {
+  useUiTranslation();
   const { user } = useAuth();
   return useQuery({
     queryKey: ['my-community-role', communityId, user?.id],
@@ -152,11 +158,12 @@ export function useMyCommunityRole(communityId: string | undefined) {
 }
 
 export function useCreateCommunity() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   return useMutation({
     mutationFn: async (input: { name: string; slug: string; description?: string; icon_url?: string; banner_url?: string; anime_id?: string }) => {
-      if (!user) throw new Error('Must be logged in');
+      if (!user) throw new Error(uiI18n.t('app.must_be_logged_in_9cf435d8'));
       const db = supabase as any;
       // SECURITY DEFINER RPC: creates the community + owner membership in one
       // transaction, immune to per-table RLS/grant ordering.
@@ -177,6 +184,7 @@ export function useCreateCommunity() {
 }
 
 export function useUpdateCommunity() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...patch }: { id: string; name?: string; description?: string; icon_url?: string; banner_url?: string; rules?: string; about?: string }) => {
@@ -213,6 +221,7 @@ export function useUpdateCommunity() {
 
 /** Delete a community (owner | creator | platform staff) via SECURITY DEFINER RPC. */
 export function useDeleteCommunity() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
@@ -228,6 +237,7 @@ export function useDeleteCommunity() {
 }
 
 export function useUpdateMemberRole() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ communityId, userId, role }: { communityId: string; userId: string; role: 'member' | 'mod' | 'owner' }) => {
@@ -240,11 +250,12 @@ export function useUpdateMemberRole() {
 }
 
 export function useToggleCommunityMembership() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   return useMutation({
     mutationFn: async ({ communityId, isMember }: { communityId: string; isMember: boolean }) => {
-      if (!user) throw new Error('Must be logged in');
+      if (!user) throw new Error(uiI18n.t('app.must_be_logged_in_9cf435d8'));
       const db = supabase as any;
       if (isMember) {
         const { error } = await db.from('community_members').delete().eq('community_id', communityId).eq('user_id', user.id);

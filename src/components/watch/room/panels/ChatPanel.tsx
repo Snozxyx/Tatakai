@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,6 +18,7 @@ function timeLabel(iso: string) {
 }
 
 export function ChatPanel() {
+  useUiTranslation();
     const {
         messages, messagesEndRef, isHost, isParticipant, message, setMessage,
         handleExportChat, handleReaction, handleSendMessage, handleJoin, user,
@@ -31,7 +34,7 @@ export function ChatPanel() {
                     <span className="grid h-6 w-6 place-items-center rounded-full bg-[hsl(var(--isshoni-accent)/0.15)] ring-1 ring-[hsl(var(--isshoni-accent)/0.3)] shadow-[0_0_10px_hsl(var(--isshoni-accent)/0.2)]">
                         <MessageSquare className="h-3 w-3 text-[hsl(var(--isshoni-accent))]" />
                     </span>
-                    Live Chat
+                    {uiI18n.t('app.live_chat_b102aaac')}
                 </h3>
                 {isHost && messages.length > 0 && (
                     <button 
@@ -39,7 +42,7 @@ export function ChatPanel() {
                         className="flex items-center gap-1.5 rounded-full border border-white/5 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-muted-foreground/80 transition-all hover:bg-white/10 hover:text-foreground active:scale-95"
                     >
                         <DownloadCloud className="h-3.5 w-3.5" /> 
-                        Export
+                        {uiI18n.t('app.export_f3e4fadb')}
                     </button>
                 )}
             </div>
@@ -52,9 +55,9 @@ export function ChatPanel() {
                         <MessageSquare className="relative h-6 w-6 text-muted-foreground/50" />
                     </div>
                     <div className="space-y-1.5">
-                        <p className="text-sm font-medium text-foreground/90">No messages yet</p>
+                        <p className="text-sm font-medium text-foreground/90">{uiI18n.t('app.no_messages_yet_c04921f8')}</p>
                         <p className="text-xs text-muted-foreground/60 max-w-[200px]">
-                            Say hi and get the watch party talking.
+                            {uiI18n.t('app.say_hi_and_get_the_watch_party_talking_055c3df5')}
                         </p>
                     </div>
                 </div>
@@ -101,16 +104,11 @@ export function ChatPanel() {
                                     <div className={`flex min-w-0 max-w-[75%] flex-col ${mine ? 'items-end' : 'items-start'}`}>
                                         {!grouped && (
                                             <div className={`mb-1 flex items-baseline gap-2 px-1 ${mine ? 'flex-row-reverse' : ''}`}>
-                                                <span className={`text-[11px] font-medium ${mine ? 'text-foreground/60' : 'text-[hsl(var(--isshoni-accent))]'}`}>{mine ? 'You' : m.display_name}</span>
+                                                <span className={`text-[11px] font-medium ${mine ? 'text-foreground/60' : 'text-[hsl(var(--isshoni-accent))]'}`}>{mine ? uiI18n.t('app.you_905cb326') : m.display_name}</span>
                                                 <span className="text-[10px] text-muted-foreground/40">{timeLabel(m.created_at)}</span>
                                             </div>
                                         )}
-                                        <div className={`break-words px-3.5 py-2 text-[13px] leading-relaxed shadow-sm
-                                            ${mine ? 'bg-[hsl(var(--isshoni-accent)/0.25)] text-foreground border border-[hsl(var(--isshoni-accent)/0.2)]' : 'bg-white/[0.06] text-foreground/90 border border-white/[0.04]'}
-                                            ${mine ? 'rounded-l-2xl' : 'rounded-r-2xl'}
-                                            ${!grouped ? (mine ? 'rounded-tr-2xl' : 'rounded-tl-2xl') : (mine ? 'rounded-tr-md' : 'rounded-tl-md')}
-                                            ${isLast ? (mine ? 'rounded-br-sm' : 'rounded-bl-sm') : (mine ? 'rounded-br-md' : 'rounded-bl-md')}
-                                        `}>
+                                        <div className={`break-words px-3.5 py-2 text-[13px] leading-relaxed shadow-sm ${mine ? 'bg-[hsl(var(--isshoni-accent)/0.25)] text-foreground border border-[hsl(var(--isshoni-accent)/0.2)]' : 'bg-white/[0.06] text-foreground/90 border border-white/[0.04]'} ${mine ? 'rounded-l-2xl' : 'rounded-r-2xl'} ${!grouped ? (mine ? 'rounded-tr-2xl' : 'rounded-tl-2xl') : (mine ? 'rounded-tr-md' : 'rounded-tl-md')} ${isLast ? (mine ? 'rounded-br-sm' : 'rounded-bl-sm') : (mine ? 'rounded-br-md' : 'rounded-bl-md')}`}>
                                             {m.message}
                                         </div>
                                     </div>
@@ -135,15 +133,15 @@ export function ChatPanel() {
                         </div>
                     </div>
                     <form onSubmit={handleSendMessage} className="flex items-center gap-2">
-                        <Input value={message} onChange={e => setMessage(e.target.value)} placeholder="Type a message..." className="h-10 flex-1 rounded-full border-white/[0.1] bg-white/[0.04] px-4 text-[13px] placeholder:text-muted-foreground/50 hover:bg-white/[0.06] focus-visible:ring-1 focus-visible:ring-[hsl(var(--isshoni-accent))] transition-colors shadow-inner" />
-                        <Button type="submit" size="icon" className={`h-10 w-10 shrink-0 rounded-full transition-all duration-300 ${message.trim() ? 'bg-[hsl(var(--isshoni-accent))] text-black hover:bg-[hsl(var(--isshoni-accent)/0.9)] hover:scale-105 shadow-[0_0_15px_hsl(var(--isshoni-accent)/0.4)]' : 'bg-white/5 text-muted-foreground cursor-not-allowed'}`} disabled={!message.trim()} aria-label="Send message">
+                        <Input value={message} onChange={e => setMessage(e.target.value)} placeholder={uiI18n.t('app.type_a_message_09bdffe9')} className="h-10 flex-1 rounded-full border-white/[0.1] bg-white/[0.04] px-4 text-[13px] placeholder:text-muted-foreground/50 hover:bg-white/[0.06] focus-visible:ring-1 focus-visible:ring-[hsl(var(--isshoni-accent))] transition-colors shadow-inner" />
+                        <Button type="submit" size="icon" className={`h-10 w-10 shrink-0 rounded-full transition-all duration-300 ${message.trim() ? 'bg-[hsl(var(--isshoni-accent))] text-black hover:bg-[hsl(var(--isshoni-accent)/0.9)] hover:scale-105 shadow-[0_0_15px_hsl(var(--isshoni-accent)/0.4)]' : 'bg-white/5 text-muted-foreground cursor-not-allowed'}`} disabled={!message.trim()} aria-label={uiI18n.t('app.send_message_c70a890d')}>
                             <Send className={`h-4 w-4 ${message.trim() ? 'ml-0.5' : ''}`} />
                         </Button>
                     </form>
                 </div>
             ) : (
                 <div className="shrink-0 border-t border-white/[0.06] bg-background/80 p-4 backdrop-blur-xl">
-                    <Button className="h-10 w-full rounded-full bg-[hsl(var(--isshoni-accent))] text-black text-sm font-bold shadow-[0_0_15px_hsl(var(--isshoni-accent)/0.2)] hover:bg-[hsl(var(--isshoni-accent)/0.9)] transition-all" onClick={handleJoin}>Join to chat</Button>
+                    <Button className="h-10 w-full rounded-full bg-[hsl(var(--isshoni-accent))] text-black text-sm font-bold shadow-[0_0_15px_hsl(var(--isshoni-accent)/0.2)] hover:bg-[hsl(var(--isshoni-accent)/0.9)] transition-all" onClick={handleJoin}>{uiI18n.t('app.join_to_chat_920f7217')}</Button>
                 </div>
             )}
         </div>

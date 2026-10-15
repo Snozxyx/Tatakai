@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -24,6 +26,7 @@ const MAX_SECTIONS = 30;
 // Mobile Card — no backdrop-blur, no transition-all
 // ----------------------------------------------------------------------
 const MobileAnimeCard = memo(function MobileAnimeCard({ anime }: { anime: AnimeCard }) {
+  useUiTranslation();
   const routeId = buildPreferredAnimeRouteId({ ...anime }) || anime.id;
   return <UnifiedMediaCard item={{ ...anime, id: routeId, mediaType: 'anime', isAdult: inferAnimeAdultFlag(anime), href: routeId ? `/anime/${routeId}` : `/search?q=${encodeURIComponent(anime.name)}` }} />;
 });
@@ -32,6 +35,7 @@ const MobileAnimeCard = memo(function MobileAnimeCard({ anime }: { anime: AnimeC
 // Skeleton
 // ----------------------------------------------------------------------
 function SectionSkeleton({ layout }: { layout: SectionLayout }) {
+  useUiTranslation();
   return (
     <div className="mb-14 md:mb-20">
       <div className="flex items-center justify-between mb-6 px-1">
@@ -73,6 +77,7 @@ const Card = ({ anime, isMobile }: { anime: AnimeCard; isMobile: boolean }) =>
     : <AnimeCardWithPreview anime={anime} showPreview={true} />;
 
 const GridLayout = memo(function GridLayout({ animes, isMobile }: LayoutProps) {
+  useUiTranslation();
   const items = animes.slice(0, isMobile ? 4 : 6);
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 md:gap-5">
@@ -82,6 +87,7 @@ const GridLayout = memo(function GridLayout({ animes, isMobile }: LayoutProps) {
 });
 
 const CarouselLayout = memo(function CarouselLayout({ animes, isMobile }: LayoutProps) {
+  useUiTranslation();
   const items = animes.slice(0, isMobile ? 8 : 12);
   return (
     <div className={scrollContainerStyles}>
@@ -96,6 +102,7 @@ const CarouselLayout = memo(function CarouselLayout({ animes, isMobile }: Layout
 });
 
 const FeaturedLayout = memo(function FeaturedLayout({ animes, isMobile }: LayoutProps) {
+  useUiTranslation();
   const navigate = useNavigate();
   if (animes.length === 0) return null;
   const featured = animes[0];
@@ -124,7 +131,7 @@ const FeaturedLayout = memo(function FeaturedLayout({ animes, isMobile }: Layout
           </div>
           <div className="absolute bottom-0 inset-x-0 p-6 md:p-8">
             <span className="inline-block px-2.5 py-1 mb-4 rounded-md bg-primary/30 border border-primary/30 text-primary-foreground text-[10px] font-black uppercase tracking-widest">
-              Featured Pick
+              {uiI18n.t('app.featured_pick_634ec104')}
             </span>
             <h3 className="font-display font-bold text-2xl md:text-3xl text-white mb-3 leading-tight line-clamp-3">{featured.name}</h3>
             <div className="flex items-center gap-3 text-xs font-semibold text-white/70">
@@ -147,6 +154,7 @@ const FeaturedLayout = memo(function FeaturedLayout({ animes, isMobile }: Layout
 });
 
 const CompactLayout = memo(function CompactLayout({ animes, isMobile }: LayoutProps) {
+  useUiTranslation();
   const items = animes.slice(0, isMobile ? 6 : 8);
   return (
     <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3 md:gap-4">
@@ -156,6 +164,7 @@ const CompactLayout = memo(function CompactLayout({ animes, isMobile }: LayoutPr
 });
 
 const MasonryLayout = memo(function MasonryLayout({ animes, isMobile }: LayoutProps) {
+  useUiTranslation();
   if (animes.length < 6) return <GridLayout animes={animes} isMobile={isMobile} />;
   const items = animes.slice(0, isMobile ? 4 : 6);
   return (
@@ -183,6 +192,7 @@ function getLayoutComponent(layout: SectionLayout) {
 // Section — memoized, CSS entrance, content-visibility
 // ----------------------------------------------------------------------
 const HomeSectionBlock = memo(function HomeSectionBlock({ section }: { section: HomeSection }) {
+  useUiTranslation();
   const isMobile = useIsMobile();
   const navigate = useNavigate();
   const LayoutComponent = getLayoutComponent(section.layout);
@@ -204,7 +214,7 @@ const HomeSectionBlock = memo(function HomeSectionBlock({ section }: { section: 
               onClick={() => navigate(`/genre/${section.genre}`)}
               className="group h-8 rounded-full px-4 text-xs font-semibold bg-white/5 text-muted-foreground hover:bg-white/10 hover:text-white shrink-0"
             >
-              View All
+              {uiI18n.t('app.view_all_efd83559')}
               <ChevronRight className="w-3.5 h-3.5 ml-1 transition-transform group-hover:translate-x-0.5" />
             </Button>
           ) : undefined
@@ -217,6 +227,7 @@ const HomeSectionBlock = memo(function HomeSectionBlock({ section }: { section: 
 
 // Suggestion banner — radial gradients instead of blur filters
 const SuggestionBanner = memo(function SuggestionBanner() {
+  useUiTranslation();
   const navigate = useNavigate();
   return (
     <div className="home-section my-16 md:my-24">
@@ -230,16 +241,16 @@ const SuggestionBanner = memo(function SuggestionBanner() {
       >
         <div className="relative flex flex-col md:flex-row items-center justify-between gap-8">
           <div className="text-center md:text-left space-y-2 max-w-lg">
-            <h3 className="text-2xl md:text-3xl font-display font-bold text-white tracking-tight">Help shape the future</h3>
+            <h3 className="text-2xl md:text-3xl font-display font-bold text-white tracking-tight">{uiI18n.t('app.help_shape_the_future_283f9d40')}</h3>
             <p className="text-white/60 text-sm md:text-base leading-relaxed">
-              Got a feature in mind? Missing a specific anime? Drop us a suggestion and watch the platform evolve.
+              {uiI18n.t('app.got_a_feature_in_mind_missing_a_specific_anime_d_eaf60653')}
             </p>
           </div>
           <Button
             onClick={() => navigate('/suggestions')}
             className="w-full md:w-auto px-8 h-14 rounded-full font-bold bg-white text-black hover:bg-gray-200 transition-transform hover:scale-105 active:scale-95"
           >
-            Send Suggestion <ArrowRight className="ml-2 w-4 h-4" />
+            {uiI18n.t('app.send_suggestion_8206c460')} <ArrowRight className="ml-2 w-4 h-4" />
           </Button>
         </div>
       </div>
@@ -251,6 +262,7 @@ const SuggestionBanner = memo(function SuggestionBanner() {
 // Main
 // ----------------------------------------------------------------------
 export function InfiniteHomeSections() {
+  useUiTranslation();
   const isMobile = useIsMobile();
   const { data: homeFallbackData } = useHomeData();
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, error } = useInfiniteHomeSections();
@@ -287,13 +299,13 @@ export function InfiniteHomeSections() {
     if (!isMobile || !homeFallbackData) return [];
     const sections: HomeSection[] = [];
     if (homeFallbackData.mostPopularAnimes?.length) {
-      sections.push({ id: 'mobile-fallback-popular', title: 'Popular Picks', genre: '', layout: 'grid', animes: homeFallbackData.mostPopularAnimes.slice(0, 8) });
+      sections.push({ id: 'mobile-fallback-popular', get title() { return uiI18n.t('app.popular_picks_4e813ccc'); }, genre: '', layout: 'grid', animes: homeFallbackData.mostPopularAnimes.slice(0, 8) });
     }
     if (homeFallbackData.latestEpisodeAnimes?.length) {
-      sections.push({ id: 'mobile-fallback-latest', title: 'Latest Episodes', genre: '', layout: 'carousel', animes: homeFallbackData.latestEpisodeAnimes.slice(0, 10) });
+      sections.push({ id: 'mobile-fallback-latest', get title() { return uiI18n.t('app.latest_episodes_428b6c7b'); }, genre: '', layout: 'carousel', animes: homeFallbackData.latestEpisodeAnimes.slice(0, 10) });
     }
     return sections;
-  }, [homeFallbackData, isMobile]);
+  }, [homeFallbackData, isMobile, uiI18n.language]);
 
   const visibleSections = allSections.length > 0 ? allSections : mobileFallbackSections;
 
@@ -318,8 +330,8 @@ export function InfiniteHomeSections() {
             <Sparkles className="h-5 w-5 text-primary" strokeWidth={1.5} />
           </div>
           <div className="space-y-1">
-            <h2 className="text-2xl sm:text-3xl font-display font-semibold tracking-tight text-white">Discover the Multiverse</h2>
-            <p className="text-sm text-white/50 font-medium">Endless curations tailored for your journey.</p>
+            <h2 className="text-2xl sm:text-3xl font-display font-semibold tracking-tight text-white">{uiI18n.t('app.discover_the_multiverse_e645d7b4')}</h2>
+            <p className="text-sm text-white/50 font-medium">{uiI18n.t('app.endless_curations_tailored_for_your_journey_1a30c311')}</p>
           </div>
         </div>
       </section>
@@ -335,13 +347,13 @@ export function InfiniteHomeSections() {
       {hasQueryError && (
         <div className="mb-14">
           <GlassPanel className="p-8 text-center border-red-500/20 bg-red-500/5 rounded-[2rem]">
-            <p className="text-lg font-semibold text-white mb-1">Connection Interrupted</p>
-            <p className="text-sm text-white/50 mb-6 max-w-md mx-auto">We couldn't pull the latest curations. Check your network and try again.</p>
+            <p className="text-lg font-semibold text-white mb-1">{uiI18n.t('app.connection_interrupted_853de809')}</p>
+            <p className="text-sm text-white/50 mb-6 max-w-md mx-auto">{uiI18n.t('app.we_couldn_t_pull_the_latest_curations_check_your_0ba899ce')}</p>
             <Button
               onClick={() => { bootstrapAttemptRef.current = 0; void fetchNextPage(); }}
               className="rounded-full bg-red-500/20 text-red-200 hover:bg-red-500/30 border border-red-500/20 font-semibold px-8"
             >
-              Retry Connection
+              {uiI18n.t('app.retry_connection_27717695')}
             </Button>
           </GlassPanel>
         </div>
@@ -366,7 +378,7 @@ export function InfiniteHomeSections() {
             variant="outline"
             className="rounded-full border-white/10 bg-transparent px-6 text-xs font-semibold uppercase tracking-wider hover:bg-white/5 text-white/50 hover:text-white"
           >
-            Load More
+            {uiI18n.t('app.load_more_9ecde875')}
           </Button>
         ) : null}
       </div>
@@ -380,7 +392,7 @@ export function InfiniteHomeSections() {
               <div className="w-5 h-5 rounded-full bg-pink-500/20 flex items-center justify-center border border-[#0a0a0a]"><Heart className="w-2.5 h-2.5 text-pink-400" /></div>
             </div>
             <span className="text-xs font-medium text-white/50 tracking-wide">
-              {reachedCap ? "That's plenty for one session" : 'End of the line'}
+              {reachedCap ? uiI18n.t('app.that_s_plenty_for_one_session_c11452c1') : uiI18n.t('app.end_of_the_line_829f8081')}
             </span>
           </div>
         </div>

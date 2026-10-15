@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { Link } from 'react-router-dom';
 import { Layers, Music2, Radio, Trophy, Bookmark, ArrowUpRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -15,11 +17,12 @@ interface RailItem {
 }
 
 export function CommunitiesRail({ onLeaderboard }: { onLeaderboard?: () => void }) {
+  useUiTranslation();
   const items: RailItem[] = [
     {
       key: 'tierlists',
       to: '/tierlists',
-      label: 'Tier Lists',
+      get label() { return uiI18n.t('app.tier_lists_86752701'); },
       hint: 'Rank your favorites',
       icon: Layers,
       accentText: 'group-hover:text-indigo-400',
@@ -29,7 +32,7 @@ export function CommunitiesRail({ onLeaderboard }: { onLeaderboard?: () => void 
     {
       key: 'playlists',
       to: '/playlists',
-      label: 'Playlists',
+      get label() { return uiI18n.t('app.playlists_77b69f32'); },
       hint: 'Curated collections',
       icon: Music2,
       accentText: 'group-hover:text-violet-400',
@@ -39,7 +42,7 @@ export function CommunitiesRail({ onLeaderboard }: { onLeaderboard?: () => void 
     {
       key: 'isshoni',
       to: '/isshoni',
-      label: 'Watch2Together',
+      get label() { return uiI18n.t('app.watch2together_cde01fad'); },
       hint: 'Watch in sync',
       icon: Radio,
       accentText: 'group-hover:text-rose-400',
@@ -49,7 +52,7 @@ export function CommunitiesRail({ onLeaderboard }: { onLeaderboard?: () => void 
     {
       key: 'bookmarks',
       to: '/community/bookmarks',
-      label: 'Bookmarks',
+      get label() { return uiI18n.t('app.bookmarks_ca3cddd2'); },
       hint: 'Your saved posts',
       icon: Bookmark,
       accentText: 'group-hover:text-emerald-400',
@@ -59,7 +62,7 @@ export function CommunitiesRail({ onLeaderboard }: { onLeaderboard?: () => void 
     {
       key: 'leaderboard',
       onClick: onLeaderboard,
-      label: 'Leaderboard',
+      get label() { return uiI18n.t('app.leaderboard_0381247a'); },
       hint: 'Top members',
       icon: Trophy,
       accentText: 'group-hover:text-amber-400',

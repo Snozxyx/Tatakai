@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Heart, Share2, Eye, Lock, Globe, User, Layers } from 'lucide-react';
@@ -7,7 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useUserBadges } from '@/hooks/community/useUserBadges';
 import { UserBadges } from '@/components/ui/UserBadges';
 import { toast } from 'sonner';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from '@/lib/localeFormat';
 import { cn } from '@/lib/utils';
 
 interface TierListCardProps {
@@ -17,25 +18,26 @@ interface TierListCardProps {
 }
 
 export function TierListCard({ tierList, showAuthor = true, onShare }: TierListCardProps) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const likeMutation = useLikeTierList();
   const { data: authorBadges } = useUserBadges(tierList.user_id);
 
   const handleLike = async () => {
     if (!user) {
-      toast.error('Sign in to like tier lists');
+      toast.error(t('tierlist.signInToLike'));
       return;
     }
     try {
       await likeMutation.mutateAsync({ tierListId: tierList.id, liked: tierList.user_liked || false });
     } catch {
-      toast.error('Failed to like tier list');
+      toast.error(t('tierlist.likeFailed'));
     }
   };
 
   const handleShare = () => {
     navigator.clipboard.writeText(`${window.location.origin}/tierlist/${tierList.share_code}`);
-    toast.success('Link copied to clipboard!');
+    toast.success(t('tierlist.linkCopied'));
     onShare?.();
   };
 
@@ -79,18 +81,18 @@ export function TierListCard({ tierList, showAuthor = true, onShare }: TierListC
             {tierList.is_public ? (
               <>
                 <Globe className="w-3 h-3 text-emerald-400" />
-                Public
+                {t('privacy.public')}
               </>
             ) : (
               <>
                 <Lock className="w-3 h-3 text-amber-400" />
-                Private
+                {t('privacy.private')}
               </>
             )}
           </span>
           <span className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/15  text-primary text-xs font-semibold">
             <Layers className="w-3.5 h-3.5" />
-            {items.length} {items.length === 1 ? 'entry' : 'entries'}
+            {t('tierlist.entryCount', { count: items.length })}
           </span>
         </div>
       </Link>
@@ -116,7 +118,7 @@ export function TierListCard({ tierList, showAuthor = true, onShare }: TierListC
                   </AvatarFallback>
                 </Avatar>
                 <span className="text-sm text-muted-foreground truncate group-hover/author:text-foreground transition-colors">
-                  {tierList.profiles.username || tierList.profiles.display_name || 'Anonymous'}
+                  {tierList.profiles.username || tierList.profiles.display_name || t('tierlist.anonymous')}
                 </span>
               </Link>
               <UserBadges badges={authorBadges} size={14} max={3} />
@@ -153,7 +155,7 @@ export function TierListCard({ tierList, showAuthor = true, onShare }: TierListC
             className="rounded-full gap-1.5 text-muted-foreground hover:text-foreground"
           >
             <Share2 className="w-4 h-4" />
-            Share
+            {t('social.share')}
           </Button>
         </div>
       </div>
@@ -167,11 +169,12 @@ interface TierListGridProps {
   emptyMessage?: string;
 }
 
-export function TierListGrid({ tierLists, showAuthor = true, emptyMessage = 'No tier lists yet' }: TierListGridProps) {
+export function TierListGrid({ tierLists, showAuthor = true, emptyMessage }: TierListGridProps) {
+  const { t } = useTranslation();
   if (tierLists.length === 0) {
     return (
       <div className="text-center py-12 text-muted-foreground">
-        <p>{emptyMessage}</p>
+        <p>{emptyMessage ?? t('tierlist.noTierLists')}</p>
       </div>
     );
   }

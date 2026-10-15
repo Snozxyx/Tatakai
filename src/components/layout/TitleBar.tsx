@@ -1,11 +1,16 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useIsNativeApp, useIsMacOS } from "@/hooks/ui/useIsNativeApp";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useLocation } from "react-router-dom";
 import { Minus, Square, X, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DynamicIsland } from "./DynamicIsland";
 
 export function TitleBar() {
+  useUiTranslation();
+  const { t } = useTranslation();
   const isNative = useIsNativeApp();
   const isMac = useIsMacOS();
   const [title, setTitle] = useState("Tatakai");
@@ -15,9 +20,9 @@ export function TitleBar() {
   useEffect(() => {
     const updateTitle = () => {
         if (location.pathname === '/') setTitle('Tatakai');
-        else if (location.pathname === '/setup') setTitle('Setup');
-        else if (location.pathname === '/offline') setTitle('Downloads');
-        else if (location.pathname === '/settings') setTitle('Settings');
+        else if (location.pathname === '/setup') setTitle(t('layout.titleBarSetup'));
+        else if (location.pathname === '/offline') setTitle(t('nav.downloads'));
+        else if (location.pathname === '/settings') setTitle(t('settings.title'));
         else setTitle(document.title?.replace(' | Tatakai', '') || 'Tatakai');
     };
 
@@ -31,7 +36,7 @@ export function TitleBar() {
         observer.observe(titleElement, { childList: true });
     }
     return () => observer.disconnect();
-  }, [location]);
+  }, [location, t]);
 
   // Track the real window state instead of a local toggle, so double-click,
   // OS snap, and keyboard maximize keep the restore/maximize glyph correct.
@@ -65,7 +70,7 @@ export function TitleBar() {
         {!isMac && (
           <img
             src={`${import.meta.env.BASE_URL}assets/logo/icon-32.png`}
-            alt="Tatakai"
+            alt={uiI18n.t('app.tatakai_28bda6bd')}
             className="w-4 h-4"
             onError={(e) => {
               (e.target as HTMLImageElement).style.display = 'none';
@@ -88,14 +93,14 @@ export function TitleBar() {
           <button
             onClick={() => (window as any).electron?.minimize()}
             className="h-[32px] w-[46px] flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
-            title="Minimize"
+            title={t('layout.titleBarMinimize')}
           >
             <Minus size={16} strokeWidth={1.5} />
           </button>
           <button
             onClick={() => (window as any).electron?.maximize()}
             className="h-[32px] w-[46px] flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
-            title={isMaximized ? "Restore" : "Maximize"}
+            title={isMaximized ? t('layout.titleBarRestore') : t('layout.titleBarMaximize')}
           >
             {isMaximized ? (
               <Copy size={12} strokeWidth={1.5} className="rotate-180" />
@@ -106,7 +111,7 @@ export function TitleBar() {
           <button
             onClick={() => (window as any).electron?.close()}
             className="h-[32px] w-[46px] flex items-center justify-center text-muted-foreground hover:text-white hover:bg-destructive transition-all"
-            title="Close"
+            title={t('common.close')}
           >
             <X size={16} strokeWidth={1.5} />
           </button>

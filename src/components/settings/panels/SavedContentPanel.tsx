@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -28,13 +30,14 @@ import { SettingsEmptyState } from '@/components/settings/SettingsPrimitives';
 type SavedTab = 'bookmarks' | 'tierlists' | 'playlists' | 'media';
 
 const TABS: { id: SavedTab; label: string; icon: React.ReactNode }[] = [
-  { id: 'bookmarks', label: 'Bookmarks', icon: <Bookmark className="w-4 h-4" /> },
-  { id: 'tierlists', label: 'Tier Lists', icon: <ListChecks className="w-4 h-4" /> },
-  { id: 'playlists', label: 'Playlists', icon: <ListMusic className="w-4 h-4" /> },
-  { id: 'media', label: 'Media', icon: <ImageIcon className="w-4 h-4" /> },
+  { id: 'bookmarks', get label() { return uiI18n.t('app.bookmarks_ca3cddd2'); }, icon: <Bookmark className="w-4 h-4" /> },
+  { id: 'tierlists', get label() { return uiI18n.t('app.tier_lists_86752701'); }, icon: <ListChecks className="w-4 h-4" /> },
+  { id: 'playlists', get label() { return uiI18n.t('app.playlists_77b69f32'); }, icon: <ListMusic className="w-4 h-4" /> },
+  { id: 'media', get label() { return uiI18n.t('app.media_0c77aeec'); }, icon: <ImageIcon className="w-4 h-4" /> },
 ];
 
 function Loading() {
+  useUiTranslation();
   return (
     <div className="flex items-center justify-center py-16 text-muted-foreground">
       <Loader2 className="w-5 h-5 animate-spin" />
@@ -44,6 +47,7 @@ function Loading() {
 
 /** "X of Y used" media-storage meter shown atop Saved Content. */
 function StorageUsageBar() {
+  useUiTranslation();
   const { data, isLoading } = useStorageUsage();
   if (isLoading || !data) return null;
   const { usedBytes, quotaBytes } = data;
@@ -52,9 +56,9 @@ function StorageUsageBar() {
   return (
     <div className="rounded-xl bg-muted/30 border border-white/10 p-3.5">
       <div className="flex items-center justify-between text-sm">
-        <span className="font-medium">Storage</span>
+        <span className="font-medium">{uiI18n.t('app.storage_9e092dda')}</span>
         <span className="text-muted-foreground tabular-nums">
-          {formatBytes(usedBytes) ?? '0 B'} of {formatBytes(quotaBytes) ?? '25 MB'} used
+          {formatBytes(usedBytes) ?? '0 B'} {uiI18n.t('app.of_de04fa0e')} {formatBytes(quotaBytes) ?? uiI18n.t('app.25_mb_1e1747c4')} {uiI18n.t('app.used_192a5675')}
         </span>
       </div>
       <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-white/10">
@@ -73,6 +77,7 @@ function StorageUsageBar() {
  * uploaded. A `section` of one of the tab ids opens straight to that tab.
  */
 export function SavedContentPanel({ section }: { section?: string }) {
+  useUiTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -94,8 +99,8 @@ export function SavedContentPanel({ section }: { section?: string }) {
     return (
       <SettingsEmptyState
         icon={Bookmark}
-        title="Sign in to see your saved content"
-        description="Your bookmarks, tier lists, playlists, and uploaded media live here once you're signed in."
+        title={uiI18n.t('app.sign_in_to_see_your_saved_content_f89eedae')}
+        description={uiI18n.t('app.your_bookmarks_tier_lists_playlists_and_uploaded_fba51e9e')}
       />
     );
   }
@@ -118,9 +123,9 @@ export function SavedContentPanel({ section }: { section?: string }) {
       queryClient.setQueryData<any[]>(['user-media', user.id], (prev) =>
         (prev || []).filter((f) => !(f.bucket === file.bucket && f.path === file.path)),
       );
-      toast.success('Deleted');
+      toast.success(uiI18n.t('app.deleted_441bda6c'));
     } catch (err: any) {
-      toast.error(err?.message || 'Failed to delete file');
+      toast.error(err?.message || uiI18n.t('app.failed_to_delete_file_860d5b28'));
     }
   };
 
@@ -161,10 +166,11 @@ export function SavedContentPanel({ section }: { section?: string }) {
 }
 
 function BookmarksSection({ query }: { query: ReturnType<typeof useBookmarkedPosts> }) {
+  useUiTranslation();
   if (query.isLoading) return <Loading />;
   const posts = query.data || [];
   if (!posts.length) {
-    return <SettingsEmptyState icon={Bookmark} title="No bookmarks yet" description="Tap the bookmark icon on a community post to save it here." />;
+    return <SettingsEmptyState icon={Bookmark} title={uiI18n.t('app.no_bookmarks_yet_aaf8c327')} description={uiI18n.t('app.tap_the_bookmark_icon_on_a_community_post_to_sav_09d9d090')} />;
   }
   return (
     <div className="space-y-4">
@@ -182,10 +188,11 @@ function TierListsSection({
   query: ReturnType<typeof useUserTierLists>;
   onOpen: (to: string) => void;
 }) {
+  useUiTranslation();
   if (query.isLoading) return <Loading />;
   const lists = query.data || [];
   if (!lists.length) {
-    return <SettingsEmptyState icon={ListChecks} title="No tier lists yet" description="You haven't made any tier lists yet." />;
+    return <SettingsEmptyState icon={ListChecks} title={uiI18n.t('app.no_tier_lists_yet_d5de8a7a')} description={uiI18n.t('app.you_haven_t_made_any_tier_lists_yet_617c3920')} />;
   }
   return (
     <div className="grid gap-4 sm:grid-cols-2">
@@ -197,10 +204,10 @@ function TierListsSection({
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="font-medium truncate">{list.title || list.name}</p>
-                <p className="text-xs text-muted-foreground">{items.length} title{items.length === 1 ? '' : 's'}</p>
+                <p className="text-xs text-muted-foreground">{items.length} {uiI18n.t('app.title_3c6de1b7')}{items.length === 1 ? '' : 's'}</p>
               </div>
               <Button size="sm" variant="ghost" className="gap-1.5 shrink-0" onClick={() => onOpen(to)}>
-                <ExternalLink className="w-3.5 h-3.5" /> Open
+                <ExternalLink className="w-3.5 h-3.5" /> {uiI18n.t('app.open_cf9b7706')}
               </Button>
             </div>
             <div className="mt-3 flex -space-x-2">
@@ -217,7 +224,7 @@ function TierListsSection({
             <div className="mt-3 flex items-center gap-4 text-xs text-muted-foreground">
               <span className="flex items-center gap-1"><Heart className="w-3.5 h-3.5" /> {list.likes_count ?? 0}</span>
               <span className="flex items-center gap-1"><Eye className="w-3.5 h-3.5" /> {list.views_count ?? 0}</span>
-              <span>{list.is_public ? 'Public' : 'Private'}</span>
+              <span>{list.is_public ? uiI18n.t('app.public_dc5eb704') : uiI18n.t('app.private_237dfa0a')}</span>
             </div>
           </div>
         );
@@ -233,10 +240,11 @@ function PlaylistsSection({
   query: ReturnType<typeof usePlaylists>;
   onOpen: (to: string) => void;
 }) {
+  useUiTranslation();
   if (query.isLoading) return <Loading />;
   const playlists = query.data || [];
   if (!playlists.length) {
-    return <SettingsEmptyState icon={ListMusic} title="No playlists yet" description="You haven't created any playlists yet." />;
+    return <SettingsEmptyState icon={ListMusic} title={uiI18n.t('app.no_playlists_yet_c0b0ca76')} description={uiI18n.t('app.you_haven_t_created_any_playlists_yet_8c4b20c1')} />;
   }
   return (
     <div className="grid gap-4 sm:grid-cols-2">
@@ -259,7 +267,7 @@ function PlaylistsSection({
             <p className="font-medium truncate">{pl.name}</p>
             {pl.description && <p className="text-xs text-muted-foreground line-clamp-2">{pl.description}</p>}
             <p className="mt-1 text-xs text-muted-foreground">
-              {pl.items_count} item{pl.items_count === 1 ? '' : 's'} · {pl.is_public ? 'Public' : 'Private'}
+              {pl.items_count} {uiI18n.t('app.item_3a7d9767')}{pl.items_count === 1 ? '' : 's'} · {pl.is_public ? uiI18n.t('app.public_dc5eb704') : uiI18n.t('app.private_237dfa0a')}
             </p>
           </div>
         </button>
@@ -281,10 +289,11 @@ function MediaSection({
   query: { isLoading: boolean; data?: UserMediaFile[] };
   onDelete: (file: { bucket: string; path: string }) => void;
 }) {
+  useUiTranslation();
   if (query.isLoading) return <Loading />;
   const files = query.data || [];
   if (!files.length) {
-    return <SettingsEmptyState icon={ImageIcon} title="No media yet" description="Images you attach to comments and posts show up here." />;
+    return <SettingsEmptyState icon={ImageIcon} title={uiI18n.t('app.no_media_yet_6e10bb8f')} description={uiI18n.t('app.images_you_attach_to_comments_and_posts_show_up__f1a12769')} />;
   }
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
@@ -300,14 +309,14 @@ function MediaSection({
               target="_blank"
               rel="noopener noreferrer"
               className="rounded-md bg-white/15 p-1.5 text-white hover:bg-white/25"
-              title="Open"
+              title={uiI18n.t('app.open_cf9b7706')}
             >
               <ExternalLink className="w-3.5 h-3.5" />
             </a>
             <button
               onClick={() => onDelete({ bucket: file.bucket, path: file.path })}
               className="rounded-md bg-destructive/80 p-1.5 text-white hover:bg-destructive"
-              title="Delete"
+              title={uiI18n.t('app.delete_f6fdbe48')}
             >
               <Trash2 className="w-3.5 h-3.5" />
             </button>

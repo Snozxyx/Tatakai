@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useEffect, useState, useCallback } from 'react';
 import { Play, Square, Copy, Users, Shield, Share2, Check, X, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -66,7 +68,7 @@ function getHomeServerApi() {
         return invoke(channel, ...args);
       }
       throw new Error(
-        `${camel} is unavailable. Restart the Tatakai desktop app to load the updated preload bridge.`,
+        uiI18n.t('app.i18n_value_0_is_unavailable_restart_the_tatakai__0eb93bc4', { value0: camel }),
       );
     };
   };
@@ -86,6 +88,7 @@ function getHomeServerApi() {
 }
 
 export function HomeServerSettings() {
+  useUiTranslation();
   const isDesktop = useIsDesktopApp();
   const [status, setStatus] = useState<HomeStatus>({});
   const [port, setPort] = useState(8787);
@@ -137,7 +140,7 @@ export function HomeServerSettings() {
     setBusy(true);
     try {
       const api = getHomeServerApi();
-      if (!api) throw new Error('Home Server bridge missing — restart the app');
+      if (!api) throw new Error(uiI18n.t('app.home_server_bridge_missing_restart_the_app_0df6c41d'));
       await api.setConfig({
         port,
         bindMode,
@@ -148,10 +151,10 @@ export function HomeServerSettings() {
         password: password || undefined,
       });
       setPassword('');
-      toast.success('Home Server settings saved');
+      toast.success(uiI18n.t('app.home_server_settings_saved_6072945f'));
       await refresh();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to save');
+      toast.error(err instanceof Error ? err.message : uiI18n.t('app.failed_to_save_23778b5f'));
     } finally {
       setBusy(false);
     }
@@ -161,7 +164,7 @@ export function HomeServerSettings() {
     setBusy(true);
     try {
       const api = getHomeServerApi();
-      if (!api) throw new Error('Home Server bridge missing — restart the app');
+      if (!api) throw new Error(uiI18n.t('app.home_server_bridge_missing_restart_the_app_0df6c41d'));
       await api.setConfig({
         port,
         bindMode,
@@ -173,10 +176,10 @@ export function HomeServerSettings() {
       });
       const res = await api.start({ port, bindMode });
       if (res && res.success === false) throw new Error(res.error || 'Start failed');
-      toast.success('Home Server started');
+      toast.success(uiI18n.t('app.home_server_started_a3b53fbb'));
       await refresh();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Start failed');
+      toast.error(err instanceof Error ? err.message : uiI18n.t('app.start_failed_ef434c64'));
     } finally {
       setBusy(false);
     }
@@ -187,10 +190,10 @@ export function HomeServerSettings() {
     try {
       const api = getHomeServerApi();
       await api?.stop();
-      toast.success('Home Server stopped');
+      toast.success(uiI18n.t('app.home_server_stopped_bed7163a'));
       await refresh();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Stop failed');
+      toast.error(err instanceof Error ? err.message : uiI18n.t('app.stop_failed_3dfcbc0f'));
     } finally {
       setBusy(false);
     }
@@ -198,10 +201,10 @@ export function HomeServerSettings() {
 
   const createToken = async () => {
     const api = getHomeServerApi();
-    const res = await api?.createToken({ userId: 'admin', label: 'phone' });
+    const res = await api?.createToken({ userId: 'admin', get label() { return uiI18n.t('app.phone_f6be6ca9'); } });
     if (res?.token) {
       setDeviceToken(res.token);
-      toast.success('Device token created');
+      toast.success(uiI18n.t('app.device_token_created_07db7bbd'));
     }
   };
 
@@ -215,17 +218,17 @@ export function HomeServerSettings() {
       password: viewerPassword || undefined,
     });
     if (res?.success) {
-      toast.success('Household user saved');
+      toast.success(uiI18n.t('app.household_user_saved_0e48dc1c'));
       setViewerPassword('');
     } else {
-      toast.error(res?.error || 'Failed to save user');
+      toast.error(res?.error || uiI18n.t('app.failed_to_save_user_f0ec5737'));
     }
   };
 
   const decideConsent = async (id: string, approve: boolean) => {
     const api = getHomeServerApi();
     await api?.decideConsent({ id, approve });
-    toast.success(approve ? 'Access approved' : 'Access denied');
+    toast.success(approve ? uiI18n.t('app.access_approved_3b89815a') : uiI18n.t('app.access_denied_64343a83'));
     await refresh();
   };
 
@@ -233,23 +236,23 @@ export function HomeServerSettings() {
 
   return (
     <SettingsSection
-      title="Tatakai Home Server"
-      description="Share your download catalog so household devices can browse and watch — with optional consent approval."
+      title={uiI18n.t('app.tatakai_home_server_6be8a5a3')}
+      description={uiI18n.t('app.share_your_download_catalog_so_household_devices_f42d610c')}
       bodyClassName="space-y-6"
       action={
         <div className="flex items-center gap-2">
           <SettingsBadge tone={status.running ? 'success' : 'muted'}>
-            {status.running ? 'Running' : 'Stopped'}
+            {status.running ? uiI18n.t('app.running_73989d9c') : uiI18n.t('app.stopped_51e9111b')}
           </SettingsBadge>
           {status.running ? (
             <Button variant="outline" size="sm" disabled={busy} onClick={stop} className="gap-2">
               <Square className="h-3.5 w-3.5" />
-              Stop
+              {uiI18n.t('app.stop_9e253470')}
             </Button>
           ) : (
             <Button size="sm" disabled={busy} onClick={start} className="gap-2">
               <Play className="h-3.5 w-3.5" />
-              Start server
+              {uiI18n.t('app.start_server_201c97df')}
             </Button>
           )}
         </div>
@@ -258,8 +261,8 @@ export function HomeServerSettings() {
       <div className="flex flex-col">
 
         <SettingRow
-          title="Port"
-          description="TCP port the Home Server listens on."
+          title={uiI18n.t('app.port_fe035157')}
+          description={uiI18n.t('app.tcp_port_the_home_server_listens_on_8978a2d8')}
           control={
             <Input
               type="number"
@@ -270,29 +273,29 @@ export function HomeServerSettings() {
           }
         />
         <SettingRow
-          title="Bind mode"
-          description="Which network interfaces the server accepts connections from."
+          title={uiI18n.t('app.bind_mode_bedd6fca')}
+          description={uiI18n.t('app.which_network_interfaces_the_server_accepts_conn_eba2fa0f')}
           control={(ids) => (
             <Select value={bindMode} onValueChange={(v) => setBindMode(v as 'localhost' | 'lan' | 'all')}>
               <SelectTrigger aria-labelledby={ids.labelId} aria-describedby={ids.descriptionId} className="h-9 w-52">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="localhost">Localhost only</SelectItem>
-                <SelectItem value="lan">LAN (recommended)</SelectItem>
-                <SelectItem value="all">All interfaces (explicit)</SelectItem>
+                <SelectItem value="localhost">{uiI18n.t('app.localhost_only_07a01419')}</SelectItem>
+                <SelectItem value="lan">{uiI18n.t('app.lan_recommended_c34c15ba')}</SelectItem>
+                <SelectItem value="all">{uiI18n.t('app.all_interfaces_explicit_acfc71b0')}</SelectItem>
               </SelectContent>
             </Select>
           )}
         />
         <SettingRow
-          title="Admin password"
+          title={uiI18n.t('app.admin_password_b2cee170')}
           icon={Shield}
-          description={status.passwordConfigured ? 'A password is set. Leave blank to keep it.' : 'Set a password before sharing.'}
+          description={status.passwordConfigured ? uiI18n.t('app.a_password_is_set_leave_blank_to_keep_it_26b8e655') : uiI18n.t('app.set_a_password_before_sharing_d9f0b5a0')}
         >
           <Input
             type="password"
-            placeholder={status.passwordConfigured ? '•••••••• (leave blank to keep)' : 'Set a password before sharing'}
+            placeholder={status.passwordConfigured ? uiI18n.t('app.leave_blank_to_keep_a2bf4757') : uiI18n.t('app.set_a_password_before_sharing_6bfa5f5f')}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className="bg-white/5 border-white/10"
@@ -301,40 +304,40 @@ export function HomeServerSettings() {
 
         <SettingRow
           tone="accent"
-          title="Share download catalog"
+          title={uiI18n.t('app.share_download_catalog_b05abf3f')}
           icon={Share2}
-          description="Other authenticated users can list your offline library and stream episodes."
-          control={<Switch checked={shareCatalog} onCheckedChange={setShareCatalog} aria-label="Share download catalog" />}
+          description={uiI18n.t('app.other_authenticated_users_can_list_your_offline__e0b1ecf0')}
+          control={<Switch checked={shareCatalog} onCheckedChange={setShareCatalog} aria-label={uiI18n.t('app.share_download_catalog_b05abf3f')} />}
         />
         <SettingRow
-          title="Require host consent"
-          description="Viewers must request access; you approve before they can watch."
-          control={<Switch checked={requireConsent} onCheckedChange={setRequireConsent} disabled={!shareCatalog} aria-label="Require host consent" />}
+          title={uiI18n.t('app.require_host_consent_780d2b08')}
+          description={uiI18n.t('app.viewers_must_request_access_you_approve_before_t_e452d02c')}
+          control={<Switch checked={requireConsent} onCheckedChange={setRequireConsent} disabled={!shareCatalog} aria-label={uiI18n.t('app.require_host_consent_780d2b08')} />}
         />
         <div className="pt-2">
           <Button variant="outline" size="sm" disabled={busy} onClick={saveConfig}>
-            Save settings
+            {uiI18n.t('app.save_settings_913aba9f')}
           </Button>
         </div>
       </div>
 
       {consentRequests.filter((r) => r.status === 'pending').length > 0 ? (
         <div className="rounded-xl border border-amber/30 bg-amber/5 p-4 space-y-3">
-          <div className="text-sm font-semibold">Pending consent requests</div>
+          <div className="text-sm font-semibold">{uiI18n.t('app.pending_consent_requests_1ee3dabf')}</div>
           {consentRequests
             .filter((r) => r.status === 'pending')
             .map((req) => (
               <div key={req.id} className="flex items-center justify-between gap-3 text-sm">
                 <div>
                   <div className="font-medium">{req.userId}</div>
-                  <div className="text-xs text-muted-foreground">{req.label || 'device'} · {new Date(req.createdAt).toLocaleString()}</div>
+                  <div className="text-xs text-muted-foreground">{req.label || uiI18n.t('app.device_f3a929b3')} · {new Date(req.createdAt).toLocaleString(uiI18n.language)}</div>
                 </div>
                 <div className="flex gap-2">
                   <Button size="sm" variant="outline" className="gap-1" onClick={() => decideConsent(req.id, true)}>
-                    <Check className="h-3.5 w-3.5" /> Approve
+                    <Check className="h-3.5 w-3.5" /> {uiI18n.t('app.approve_7b2c7f14')}
                   </Button>
                   <Button size="sm" variant="ghost" className="gap-1" onClick={() => decideConsent(req.id, false)}>
-                    <X className="h-3.5 w-3.5" /> Deny
+                    <X className="h-3.5 w-3.5" /> {uiI18n.t('app.deny_53577bb5')}
                   </Button>
                 </div>
               </div>
@@ -343,7 +346,7 @@ export function HomeServerSettings() {
       ) : null}
 
       <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 space-y-3">
-        <div className="text-sm font-semibold">Connect from phone, TV, or browser</div>
+        <div className="text-sm font-semibold">{uiI18n.t('app.connect_from_phone_tv_or_browser_54248ecc')}</div>
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <code className="min-w-0 max-w-full break-all rounded bg-black/30 px-2 py-1">{primaryUrl}</code>
           <Button
@@ -352,11 +355,11 @@ export function HomeServerSettings() {
             className="gap-1"
             onClick={() => {
               void navigator.clipboard.writeText(primaryUrl);
-              toast.success('URL copied');
+              toast.success(uiI18n.t('app.url_copied_73a9becc'));
             }}
           >
             <Copy className="h-3.5 w-3.5" />
-            Copy
+            {uiI18n.t('app.copy_af74f7c5')}
           </Button>
           <Button
             size="sm"
@@ -366,15 +369,14 @@ export function HomeServerSettings() {
             onClick={() => window.open(primaryUrl, '_blank', 'noopener,noreferrer')}
           >
             <ExternalLink className="h-3.5 w-3.5" />
-            Open Home UI
+            {uiI18n.t('app.open_home_ui_ac6ed5ce')}
           </Button>
         </div>
         <p className="text-xs text-muted-foreground">
-          Opens the Tatakai-branded web app at that URL — browse your download library and stream episodes.
-          Enable <strong>Share download catalog</strong> above so remote devices can watch.
+          {uiI18n.t('app.opens_the_tatakai_branded_web_app_at_that_url_br_6fa14a5d')} <strong>{uiI18n.t('app.share_download_catalog_b05abf3f')}</strong> {uiI18n.t('app.above_so_remote_devices_can_watch_4de50a43')}
         </p>
         <Button size="sm" variant="secondary" onClick={createToken}>
-          Create device token
+          {uiI18n.t('app.create_device_token_2a635111')}
         </Button>
         {deviceToken ? (
           <code className="block text-xs break-all rounded bg-black/30 p-2">{deviceToken}</code>
@@ -384,12 +386,12 @@ export function HomeServerSettings() {
       <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 space-y-4">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <div className="text-sm font-semibold">Remote access</div>
+            <div className="text-sm font-semibold">{uiI18n.t('app.remote_access_d78a6045')}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              Enable only behind a reverse proxy (Caddy/nginx) with TLS.
+              {uiI18n.t('app.enable_only_behind_a_reverse_proxy_caddy_nginx_w_0d7dab1b')}
             </p>
           </div>
-          <Switch checked={remoteEnabled} onCheckedChange={setRemoteEnabled} aria-label="Enable remote access" />
+          <Switch checked={remoteEnabled} onCheckedChange={setRemoteEnabled} aria-label={uiI18n.t('app.enable_remote_access_11d88d53')} />
         </div>
         <Input
           placeholder="https://home.example.com"
@@ -402,19 +404,19 @@ export function HomeServerSettings() {
       <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 space-y-3">
         <div className="flex items-center gap-2 text-sm font-semibold">
           <Users className="h-4 w-4" />
-          Household user (viewer)
+          {uiI18n.t('app.household_user_viewer_1fce5046')}
         </div>
         <div className="grid gap-3 md:grid-cols-2">
-          <Input placeholder="Username" value={viewerName} onChange={(e) => setViewerName(e.target.value)} />
+          <Input placeholder={uiI18n.t('app.username_84c29015')} value={viewerName} onChange={(e) => setViewerName(e.target.value)} />
           <Input
             type="password"
-            placeholder="Password"
+            placeholder={uiI18n.t('app.password_8be3c943')}
             value={viewerPassword}
             onChange={(e) => setViewerPassword(e.target.value)}
           />
         </div>
         <Button size="sm" variant="outline" onClick={upsertViewer}>
-          Save viewer
+          {uiI18n.t('app.save_viewer_62f09c77')}
         </Button>
       </div>
     </SettingsSection>

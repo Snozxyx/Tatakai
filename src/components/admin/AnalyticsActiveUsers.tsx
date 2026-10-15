@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -5,7 +7,7 @@ import { GlassPanel } from "@/components/ui/GlassPanel";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Users, Globe, Loader2, Activity, ExternalLink, Radio } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow } from '@/lib/localeFormat';
 import { useOnlinePresence } from "@/hooks/api/usePresence";
 
 const GA4_REALTIME_URL = "https://analytics.google.com/analytics/web/#/reports/realtime";
@@ -18,6 +20,7 @@ const GA4_REALTIME_URL = "https://analytics.google.com/analytics/web/#/reports/r
  * below so they are still counted, just marked as idle.
  */
 export function AnalyticsActiveUsers() {
+  useUiTranslation();
     const live = useOnlinePresence(true);
 
     const liveUserIds = useMemo(
@@ -82,7 +85,7 @@ export function AnalyticsActiveUsers() {
                                 {live.length}
                                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                             </p>
-                            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Live right now</p>
+                            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">{uiI18n.t('app.live_right_now_12d15775')}</p>
                         </div>
                     </div>
                 </GlassPanel>
@@ -94,7 +97,7 @@ export function AnalyticsActiveUsers() {
                         </div>
                         <div>
                             <p className="text-3xl font-black">{liveMembers.length}</p>
-                            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Live members</p>
+                            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">{uiI18n.t('app.live_members_76db116a')}</p>
                         </div>
                     </div>
                 </GlassPanel>
@@ -106,7 +109,7 @@ export function AnalyticsActiveUsers() {
                         </div>
                         <div>
                             <p className="text-3xl font-black">{liveGuests}</p>
-                            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Live guests</p>
+                            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">{uiI18n.t('app.live_guests_022344a7')}</p>
                         </div>
                     </div>
                 </GlassPanel>
@@ -116,7 +119,7 @@ export function AnalyticsActiveUsers() {
                 <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
                     <h3 className="text-lg font-bold flex items-center gap-2">
                         <Activity className="w-5 h-5 text-primary" />
-                        Live User Activity
+                        {uiI18n.t('app.live_user_activity_8ee3a8a1')}
                     </h3>
                     <a
                         href={GA4_REALTIME_URL}
@@ -124,7 +127,7 @@ export function AnalyticsActiveUsers() {
                         rel="noreferrer"
                         className="text-xs font-semibold text-muted-foreground hover:text-primary flex items-center gap-1"
                     >
-                        Open GA4 Realtime <ExternalLink className="w-3 h-3" />
+                        {uiI18n.t('app.open_ga4_realtime_58369591')} <ExternalLink className="w-3 h-3" />
                     </a>
                 </div>
 
@@ -151,8 +154,8 @@ export function AnalyticsActiveUsers() {
                                     <div className="flex flex-col items-end gap-1">
                                         <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                                         {entry.user_id
-                                            ? <Badge variant="outline" className="text-[9px] px-1.5 py-0">member</Badge>
-                                            : <Badge variant="secondary" className="text-[9px] px-1.5 py-0">guest</Badge>}
+                                            ? <Badge variant="outline" className="text-[9px] px-1.5 py-0">{uiI18n.t('app.member_6467baa3')}</Badge>
+                                            : <Badge variant="secondary" className="text-[9px] px-1.5 py-0">{uiI18n.t('app.guest_35675e68')}</Badge>}
                                     </div>
                                 </div>
                             );
@@ -162,14 +165,14 @@ export function AnalyticsActiveUsers() {
                     <div className="py-10 text-center border-2 border-dashed border-white/5 rounded-3xl">
                         {loadingFallback
                             ? <Loader2 className="w-6 h-6 animate-spin text-primary mx-auto" />
-                            : <p className="text-muted-foreground text-sm">No live tabs right now — presence connects when a visitor has the site open.</p>}
+                            : <p className="text-muted-foreground text-sm">{uiI18n.t('app.no_live_tabs_right_now_presence_connects_when_a__f60e2f26')}</p>}
                     </div>
                 )}
 
                 {fallbackOnly.length > 0 && (
                     <div className="mt-6">
                         <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">
-                            Recently active (backgrounded tabs, last 5 min) — {fallbackOnly.length}
+                            {uiI18n.t('app.recently_active_backgrounded_tabs_last_5_min_3cc8b66d')} {fallbackOnly.length}
                         </p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 opacity-70">
                             {fallbackOnly.slice(0, 9).map((user) => (
@@ -181,9 +184,9 @@ export function AnalyticsActiveUsers() {
                                         </AvatarFallback>
                                     </Avatar>
                                     <div className="flex-1 min-w-0">
-                                        <p className="font-bold text-sm truncate">{user.display_name || 'Anonymous'}</p>
+                                        <p className="font-bold text-sm truncate">{user.display_name || uiI18n.t('app.anonymous_9bed5104')}</p>
                                         <p className="text-[10px] text-muted-foreground truncate">
-                                            {user.last_seen ? formatDistanceToNow(new Date(user.last_seen), { addSuffix: true }) : 'recently'}
+                                            {user.last_seen ? formatDistanceToNow(new Date(user.last_seen), { addSuffix: true }) : uiI18n.t('app.recently_fd92cc85')}
                                         </p>
                                     </div>
                                     <div className="w-2 h-2 rounded-full bg-amber-500" />

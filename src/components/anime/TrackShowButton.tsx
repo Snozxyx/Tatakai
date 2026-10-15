@@ -1,4 +1,5 @@
 import { CalendarPlus, CalendarCheck } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTrackedShows, useToggleTrackedShow } from '@/hooks/user/useTrackedShows';
@@ -16,6 +17,7 @@ interface TrackShowButtonProps {
  * Share. Filled when the show is already tracked.
  */
 export function TrackShowButton({ animeId, animeName, animePoster, anilistId }: TrackShowButtonProps) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { data: tracked = [] } = useTrackedShows();
   const toggle = useToggleTrackedShow();
@@ -36,7 +38,7 @@ export function TrackShowButton({ animeId, animeName, animePoster, anilistId }: 
         })
       }
       disabled={toggle.isPending}
-      title={isTracked ? 'Tracking on your calendar' : 'Track on your calendar'}
+      title={isTracked ? t('discover.trackingOnCalendar') : t('discover.trackOnCalendar')}
       className={cn(
         'h-14 w-14 rounded-full flex items-center justify-center transition-all hover:scale-105',
         isTracked

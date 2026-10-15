@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -58,6 +60,7 @@ export function ImportMappingModal({
   initialPaths,
   onImportComplete,
 }: ImportMappingModalProps) {
+  useUiTranslation();
   const [analyzing, setAnalyzing] = useState(false);
   const [importing, setImporting] = useState(false);
   const [items, setItems] = useState<MappingItem[]>([]);
@@ -110,12 +113,12 @@ export function ImportMappingModal({
           void searchBulkAnime(firstTitle);
         }
       } else {
-        toast.error(res.error || 'Failed to parse import files');
+        toast.error(res.error || uiI18n.t('app.failed_to_parse_import_files_e9c311d0'));
         onClose();
       }
     } catch (err: any) {
       console.error(err);
-      toast.error('Error analyzing files');
+      toast.error(uiI18n.t('app.error_analyzing_files_19b53793'));
       onClose();
     } finally {
       setAnalyzing(false);
@@ -155,7 +158,7 @@ export function ImportMappingModal({
       posterUrl: poster,
       anilistId: anime.anilistId ?? null,
     })));
-    toast.success(`Applied "${officialTitle}" to all files!`);
+    toast.success(uiI18n.t('app.applied_i18n_value_0_to_all_files_33c864bb', { value0: officialTitle }));
     setBulkSearchResults([]);
   };
 
@@ -248,8 +251,8 @@ export function ImportMappingModal({
     // would silently overwrite one another during finalize-import.
     const collisions = findCollisions();
     if (collisions.length > 0) {
-      toast.error('Duplicate episode slots detected', {
-        description: `${collisions.slice(0, 3).join(', ')}${collisions.length > 3 ? ` +${collisions.length - 3} more` : ''}. Adjust the season/episode numbers so each file is unique.`,
+      toast.error(uiI18n.t('app.duplicate_episode_slots_detected_33fdd2e7'), {
+        get description() { return uiI18n.t('app.i18n_value_0i18n_value_1_adjust_the_season_episo_c6934866', { value0: collisions.slice(0, 3).join(', '), value1: collisions.length > 3 ? ` +${collisions.length - 3} more` : '' }); },
         duration: 8000,
       });
       return;
@@ -281,15 +284,15 @@ export function ImportMappingModal({
       });
 
       if (res.success) {
-        toast.success(res.message || 'Import successful!');
+        toast.success(res.message || uiI18n.t('app.import_successful_abb02447'));
         onImportComplete();
         onClose();
       } else {
-        toast.error(res.error || 'Failed to finalize import');
+        toast.error(res.error || uiI18n.t('app.failed_to_finalize_import_605e9780'));
       }
     } catch (err: any) {
       console.error(err);
-      toast.error('Error importing videos');
+      toast.error(uiI18n.t('app.error_importing_videos_d2f592ee'));
     } finally {
       setImporting(false);
     }
@@ -301,17 +304,17 @@ export function ImportMappingModal({
         <DialogHeader className="pb-2">
           <DialogTitle className="flex items-center gap-2 text-2xl font-bold font-display">
             <FolderOpen className="w-6 h-6 text-primary" />
-            Media Import & Metadata Mapping
+            {uiI18n.t('app.media_import_metadata_mapping_1719463b')}
           </DialogTitle>
           <DialogDescription>
-            Map your local files to canonical AniList anime metadata before importing them into Tatakai's local library.
+            {uiI18n.t('app.map_your_local_files_to_canonical_anilist_anime__b9644466')}
           </DialogDescription>
         </DialogHeader>
 
         {analyzing ? (
           <div className="flex-1 flex flex-col items-center justify-center py-20 space-y-4">
             <Loader2 className="w-10 h-10 animate-spin text-primary" />
-            <p className="text-muted-foreground text-sm font-medium">Analyzing video files and extracting metadata...</p>
+            <p className="text-muted-foreground text-sm font-medium">{uiI18n.t('app.analyzing_video_files_and_extracting_metadata_918a3632')}</p>
           </div>
         ) : (
           <div className="flex-1 flex flex-col min-h-0 space-y-4 py-2">
@@ -321,12 +324,12 @@ export function ImportMappingModal({
               <div className="flex-1 space-y-1.5 w-full">
                 <Label className="text-xs font-bold text-muted-foreground uppercase flex items-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5 text-primary" />
-                  Bulk Match Series
+                  {uiI18n.t('app.bulk_match_series_3e2f9c43')}
                 </Label>
                 <div className="relative w-full">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
-                    placeholder="Search AniList to match all files to a single show..."
+                    placeholder={uiI18n.t('app.search_anilist_to_match_all_files_to_a_single_sh_a3d71d3f')}
                     value={bulkQuery}
                     onChange={(e) => handleBulkSearchChange(e.target.value)}
                     className="pl-9 bg-black/20"
@@ -355,7 +358,7 @@ export function ImportMappingModal({
               </div>
 
               <div className="w-full md:w-32 space-y-1.5">
-                <Label className="text-xs font-bold text-muted-foreground uppercase">Bulk Season</Label>
+                <Label className="text-xs font-bold text-muted-foreground uppercase">{uiI18n.t('app.bulk_season_02d28b4b')}</Label>
                 <Input
                   type="number"
                   min={1}
@@ -388,9 +391,9 @@ export function ImportMappingModal({
                           {item.displayTitle}
                         </span>
                         <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                          <span className="px-2 py-0.5 rounded-full bg-white/5 border border-white/10">{item.totalFiles} file(s)</span>
+                          <span className="px-2 py-0.5 rounded-full bg-white/5 border border-white/10">{item.totalFiles} {uiI18n.t('app.file_s_4bc4cc05')}</span>
                           {item.releaseGroup ? <span className="px-2 py-0.5 rounded-full bg-white/5 border border-white/10">{item.releaseGroup}</span> : null}
-                          {item.seasonNumber ? <span className="px-2 py-0.5 rounded-full bg-white/5 border border-white/10">Season {item.seasonNumber}</span> : null}
+                          {item.seasonNumber ? <span className="px-2 py-0.5 rounded-full bg-white/5 border border-white/10">{uiI18n.t('app.season_62255f56')} {item.seasonNumber}</span> : null}
                         </div>
                         
                         {/* Title Match/Search */}
@@ -440,14 +443,14 @@ export function ImportMappingModal({
                               {file.fileName}
                             </span>
                           ))}
-                          {item.files.length > 4 ? <span className="px-2 py-0.5 rounded-full bg-white/5 border border-white/10">+{item.files.length - 4} more</span> : null}
+                          {item.files.length > 4 ? <span className="px-2 py-0.5 rounded-full bg-white/5 border border-white/10">+{item.files.length - 4} {uiI18n.t('app.more_e7c95b4c')}</span> : null}
                         </div>
                       </div>
 
                       {/* Inputs */}
                       <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
                         <div className="flex flex-col space-y-1 w-20">
-                          <span className="text-[9px] font-bold text-muted-foreground uppercase">Season</span>
+                          <span className="text-[9px] font-bold text-muted-foreground uppercase">{uiI18n.t('app.season_62255f56')}</span>
                           <Input
                             type="number"
                             min={1}
@@ -457,7 +460,7 @@ export function ImportMappingModal({
                           />
                         </div>
                         <div className="flex flex-col space-y-1 w-20">
-                          <span className="text-[9px] font-bold text-muted-foreground uppercase">Episode</span>
+                          <span className="text-[9px] font-bold text-muted-foreground uppercase">{uiI18n.t('app.episode_8669aa56')}</span>
                           <Input
                             type="number"
                             min={1}
@@ -469,7 +472,7 @@ export function ImportMappingModal({
                         <div className="flex flex-col space-y-1 w-32 flex-1 md:flex-initial">
                           <span className="text-[9px] font-bold text-muted-foreground uppercase">Group/Version</span>
                           <Input
-                            placeholder="e.g. Erai-raws"
+                            placeholder={uiI18n.t('app.e_g_erai_raws_b25ebd2b')}
                             value={item.releaseGroup}
                             onChange={(e) => updateItemField(idx, 'releaseGroup', e.target.value)}
                             className="h-8 text-xs"
@@ -485,7 +488,7 @@ export function ImportMappingModal({
             {/* Import options */}
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between p-2">
               <div className="flex items-center gap-3">
-                <span className="text-xs text-muted-foreground font-semibold uppercase">Import Mode:</span>
+                <span className="text-xs text-muted-foreground font-semibold uppercase">{uiI18n.t('app.import_mode_4736f6c3')}</span>
                 <div className="flex border border-white/10 rounded-lg p-0.5 bg-black/20">
                   <Button
                     variant={importMode === 'copy' ? 'default' : 'ghost'}
@@ -494,7 +497,7 @@ export function ImportMappingModal({
                     onClick={() => setImportMode('copy')}
                   >
                     <Copy className="w-3 h-3" />
-                    Copy Files (Safe)
+                    {uiI18n.t('app.copy_files_safe_d9cd3a9f')}
                   </Button>
                   <Button
                     variant={importMode === 'move' ? 'default' : 'ghost'}
@@ -503,13 +506,13 @@ export function ImportMappingModal({
                     onClick={() => setImportMode('move')}
                   >
                     <Move className="w-3.5 h-3.5" />
-                    Move Files (Saves Disk)
+                    {uiI18n.t('app.move_files_saves_disk_dfbd6a95')}
                   </Button>
                 </div>
               </div>
               <div className="text-xs text-muted-foreground flex items-center gap-1.5">
                 <Info className="w-3.5 h-3.5 text-primary" />
-                <span>Files will be organized and manifests created automatically.</span>
+                <span>{uiI18n.t('app.files_will_be_organized_and_manifests_created_au_b4ec3537')}</span>
               </div>
             </div>
 
@@ -518,7 +521,7 @@ export function ImportMappingModal({
 
         <DialogFooter className="border-t border-white/10 pt-4 gap-2 sm:gap-0">
           <Button variant="outline" onClick={onClose} disabled={importing}>
-            Cancel
+            {uiI18n.t('app.cancel_77dfd213')}
           </Button>
           <Button 
             onClick={handleImport} 
@@ -533,7 +536,7 @@ export function ImportMappingModal({
             ) : (
               <>
                 <Check className="w-4 h-4" />
-                Confirm Import ({items.length} Files)
+                {uiI18n.t('app.confirm_import_016d6806')}{items.length} {uiI18n.t('app.files_8104ad74')}
               </>
             )}
           </Button>

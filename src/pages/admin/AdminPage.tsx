@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMemo, useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -66,6 +68,7 @@ import {
 } from 'lucide-react';
 
 export default function AdminPage() {
+  useUiTranslation();
   const navigate = useNavigate();
   const isDesktopApp = useIsDesktopApp();
   const { isAdmin, isModerator, profile, isLoading, rolesResolved } = useAuth();
@@ -114,7 +117,7 @@ export default function AdminPage() {
 
   /** Names the open section on the mobile trigger, which used to read "Dashboard Menu" whichever panel was showing. */
   const activeLabel =
-    navSections.find((item) => item.value === activeTab)?.label ?? 'Dashboard Menu';
+    navSections.find((item) => item.value === activeTab)?.label ?? uiI18n.t('app.dashboard_menu_d8c7b5a5');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [viewingActivityUserId, setViewingActivityUserId] = useState<string | null>(null);
   const { deleteMessage } = useAdminMessages();
@@ -225,10 +228,10 @@ export default function AdminPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['recent-comments-detailed'] });
-      toast.success('Comment deleted');
+      toast.success(uiI18n.t('app.comment_deleted_ff337dce'));
     },
     onError: () => {
-      toast.error('Failed to delete comment');
+      toast.error(uiI18n.t('app.failed_to_delete_comment_39118d67'));
     },
   });
 
@@ -249,10 +252,10 @@ export default function AdminPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['maintenance_mode'] });
-      toast.success(maintenanceMode?.is_active ? 'Maintenance mode disabled' : 'Maintenance mode enabled');
+      toast.success(maintenanceMode?.is_active ? uiI18n.t('app.maintenance_mode_disabled_93fde808') : uiI18n.t('app.maintenance_mode_enabled_4fb4a37d'));
     },
     onError: () => {
-      toast.error('Failed to toggle maintenance mode');
+      toast.error(uiI18n.t('app.failed_to_toggle_maintenance_mode_1b0af2d9'));
     },
   });
 
@@ -273,7 +276,7 @@ export default function AdminPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin_sent_messages'] });
-      toast.success('Message sent successfully');
+      toast.success(uiI18n.t('app.message_sent_successfully_264885ab'));
       setMessageTitle('');
       setMessageContent('');
       setNotifyRecipient('');
@@ -281,11 +284,11 @@ export default function AdminPage() {
     onError: (error: any) => {
       console.error('Failed to send message:', error);
       if (error?.code === '42P01') {
-        toast.error('Admin messages table not found. Please run the migration.');
+        toast.error(uiI18n.t('app.admin_messages_table_not_found_please_run_the_mi_b8991ce5'));
       } else if (error?.message?.includes('permission denied') || error?.code === '42501') {
-        toast.error('Permission denied. Make sure you are an admin.');
+        toast.error(uiI18n.t('app.permission_denied_make_sure_you_are_an_admin_0ec86e0b'));
       } else {
-        toast.error('Failed to send message: ' + (error?.message || 'Unknown error'));
+        toast.error('Failed to send message: ' + (error?.message || uiI18n.t('app.unknown_error_e5fd9aa2')));
       }
     },
   });
@@ -346,7 +349,7 @@ export default function AdminPage() {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+    return new Date(dateString).toLocaleDateString(uiI18n.language, {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
@@ -374,21 +377,21 @@ export default function AdminPage() {
             <button
               type="button"
               onClick={() => navigate(-1)}
-              aria-label="Go back"
+              aria-label={uiI18n.t('app.go_back_e84712fb')}
               className="mt-1.5 rounded-full border border-white/[0.07] bg-white/[0.03] p-2 text-muted-foreground transition-colors hover:border-white/25 hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             >
               <ArrowLeft className="h-4 w-4" />
             </button>
             <div>
               <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-primary">
-                {isAdmin ? 'Administrator' : 'Moderator'}
+                {isAdmin ? uiI18n.t('app.administrator_1eda2375') : uiI18n.t('app.moderator_ad3b15c3')}
               </p>
               <h1 className="font-display mt-1.5 text-2xl font-black tracking-tight sm:text-[1.75rem]">
-                Admin Dashboard
+                {uiI18n.t('app.admin_dashboard_9f1362cd')}
               </h1>
               <p className="mt-1 text-sm text-muted-foreground">
-                {navSections.length} sections · signed in as{' '}
-                {profile?.display_name || profile?.username || 'staff'}
+                {navSections.length} {uiI18n.t('app.sections_signed_in_as_de580e1a')}{' '}
+                {profile?.display_name || profile?.username || uiI18n.t('app.staff_6ccb4b7c')}
               </p>
             </div>
           </div>
@@ -407,16 +410,16 @@ export default function AdminPage() {
               )}
             >
               <span className={cn('h-1.5 w-1.5 rounded-full', maintenanceMode?.is_active ? 'bg-orange' : 'animate-pulse bg-primary')} />
-              {maintenanceMode?.is_active ? 'Maintenance mode' : 'Site online'}
+              {maintenanceMode?.is_active ? uiI18n.t('app.maintenance_mode_98cca5c6') : uiI18n.t('app.site_online_9957a2ce')}
             </button>
           )}
         </div>
 
         {/* Stats */}
         <div className="mb-8 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4">
-          <StatTile icon={Users} tone="primary" value={(totalUsersCount ?? 0).toLocaleString()} label="Total users" />
-          <StatTile icon={MessageSquare} tone="secondary" value={(totalCommentsCount ?? recentComments?.length ?? 0).toLocaleString()} label="Comments" />
-          <StatTile icon={Ban} tone="destructive" value={(bannedUsersCount ?? 0).toLocaleString()} label="Banned users" />
+          <StatTile icon={Users} tone="primary" value={(totalUsersCount ?? 0).toLocaleString(uiI18n.language)} label={uiI18n.t('app.total_users_a8f7afe6')} />
+          <StatTile icon={MessageSquare} tone="secondary" value={(totalCommentsCount ?? recentComments?.length ?? 0).toLocaleString(uiI18n.language)} label={uiI18n.t('app.comments_fce06e20')} />
+          <StatTile icon={Ban} tone="destructive" value={(bannedUsersCount ?? 0).toLocaleString(uiI18n.language)} label={uiI18n.t('app.banned_users_360da438')} />
           {/* The rail's badges each show one queue; this is the three of them
               added up, so "is anything waiting on me?" is answerable without
               walking the nav. System status moved to the header chip, which can
@@ -428,8 +431,8 @@ export default function AdminPage() {
               (badgeCounts?.reports ?? 0) +
               (badgeCounts?.suggestions ?? 0) +
               (badgeCounts?.posts ?? 0)
-            ).toLocaleString()}
-            label="Awaiting review"
+            ).toLocaleString(uiI18n.language)}
+            label={uiI18n.t('app.awaiting_review_5a5a12dc')}
           />
         </div>
 
@@ -463,7 +466,7 @@ export default function AdminPage() {
                 <SheetHeader className="border-b border-white/5 p-6 text-left">
                   <SheetTitle className="flex items-center gap-2">
                     <Shield className="h-5 w-5 text-primary" />
-                    Admin Panel
+                    {uiI18n.t('app.admin_panel_93711db9')}
                   </SheetTitle>
                 </SheetHeader>
                 <div className="max-h-[calc(100vh-88px)] overflow-y-auto p-4">
@@ -561,7 +564,7 @@ export default function AdminPage() {
               <GlassPanel className="p-6">
                 <h2 className="font-display text-xl font-semibold mb-6 flex items-center gap-2">
                   <MessageSquare className="w-5 h-5 text-primary" />
-                  Recent Comments
+                  {uiI18n.t('app.recent_comments_510d584b')}
                 </h2>
 
                 {loadingComments ? (
@@ -580,11 +583,11 @@ export default function AdminPage() {
                                 to={`/admin/user/${comment.user_id}`}
                                 className="font-medium hover:text-primary transition-colors"
                               >
-                                {comment.author?.display_name || comment.author?.username || 'Unknown'}
+                                {comment.author?.display_name || comment.author?.username || uiI18n.t('app.unknown_bc7819b3')}
                               </Link>
                               {comment.is_spoiler && (
                                 <span className="px-2 py-0.5 rounded-full bg-orange/20 text-orange text-xs">
-                                  Spoiler
+                                  {uiI18n.t('app.spoiler_875786ee')}
                                 </span>
                               )}
                               <span className="text-xs text-muted-foreground">
@@ -598,7 +601,7 @@ export default function AdminPage() {
                               <Link to={comment.target} className="hover:text-primary transition-colors">
                                 {comment.title}
                               </Link>
-                              {comment.hasEpisode && ' • Episode'}
+                              {comment.hasEpisode && uiI18n.t('app.episode_35a1d209')}
                             </p>
                           </div>
                           <Button
@@ -616,7 +619,7 @@ export default function AdminPage() {
                 ) : (
                   <div className="text-center py-12">
                     <MessageSquare className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                    <p className="text-muted-foreground">No comments yet</p>
+                    <p className="text-muted-foreground">{uiI18n.t('app.no_comments_yet_d14da379')}</p>
                   </div>
                 )}
               </GlassPanel>
@@ -644,22 +647,22 @@ export default function AdminPage() {
                   <GlassPanel className="p-6">
                     <h3 className="font-display text-xl font-bold mb-6 flex items-center gap-2">
                       <BellRing className="w-5 h-5 text-primary" />
-                      Create System Notification
+                      {uiI18n.t('app.create_system_notification_1dfdef7b')}
                     </h3>
                     <div className="space-y-4">
                       <div>
-                        <label className="text-sm font-medium mb-1.5 block">Notification Title</label>
+                        <label className="text-sm font-medium mb-1.5 block">{uiI18n.t('app.notification_title_60df62be')}</label>
                         <Input
-                          placeholder="Maintenance, Update, etc."
+                          placeholder={uiI18n.t('app.maintenance_update_etc_91df9813')}
                           value={messageTitle}
                           onChange={(e) => setMessageTitle(e.target.value)}
                           className="bg-muted/30"
                         />
                       </div>
                       <div>
-                        <label className="text-sm font-medium mb-1.5 block">Message Content</label>
+                        <label className="text-sm font-medium mb-1.5 block">{uiI18n.t('app.message_content_36923587')}</label>
                         <Textarea
-                          placeholder="Write your message here..."
+                          placeholder={uiI18n.t('app.write_your_message_here_cf473c47')}
                           value={messageContent}
                           onChange={(e) => setMessageContent(e.target.value)}
                           className="bg-muted/30 min-h-[120px]"
@@ -668,21 +671,21 @@ export default function AdminPage() {
 
                       <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <label className="text-sm font-medium mb-1.5 block">Target Type</label>
+                          <label className="text-sm font-medium mb-1.5 block">{uiI18n.t('app.target_type_4266916b')}</label>
                           <select
                             className="w-full bg-muted/30 border border-input rounded-md px-3 py-2 text-sm"
                             value={notifyTarget}
                             onChange={(e) => setNotifyTarget(e.target.value === 'user' ? 'user' : 'all')}
                           >
-                            <option value="all">Broadcast (All Users)</option>
-                            <option value="user">Specific User</option>
+                            <option value="all">{uiI18n.t('app.broadcast_all_users_4bc5a93d')}</option>
+                            <option value="user">{uiI18n.t('app.specific_user_ce8985a1')}</option>
                           </select>
                         </div>
                         {notifyTarget === 'user' && (
                           <div>
-                            <label className="text-sm font-medium mb-1.5 block">Username or user ID</label>
+                            <label className="text-sm font-medium mb-1.5 block">{uiI18n.t('app.username_or_user_id_e015fc92')}</label>
                             <Input
-                              placeholder="e.g. snozxyx"
+                              placeholder={uiI18n.t('app.e_g_snozxyx_55a8ce50')}
                               value={notifyRecipient}
                               onChange={(e) => setNotifyRecipient(e.target.value)}
                               className="bg-muted/30"
@@ -703,7 +706,7 @@ export default function AdminPage() {
                           }
                           const recipientId = await resolveRecipientId(notifyRecipient);
                           if (!recipientId) {
-                            toast.error('No user matches that username or id');
+                            toast.error(uiI18n.t('app.no_user_matches_that_username_or_id_0e322ab8'));
                             return;
                           }
                           sendMessage.mutate({
@@ -724,14 +727,14 @@ export default function AdminPage() {
                         {sendMessage.isPending
                           ? 'Sending...'
                           : notifyTarget === 'user'
-                            ? 'Send to user'
-                            : 'Send broadcast'}
+                            ? uiI18n.t('app.send_to_user_9f55b02d')
+                            : uiI18n.t('app.send_broadcast_8673a552')}
                       </Button>
                     </div>
                   </GlassPanel>
 
                   <GlassPanel className="p-6">
-                    <h3 className="font-medium mb-4">Sent Notifications History</h3>
+                    <h3 className="font-medium mb-4">{uiI18n.t('app.sent_notifications_history_33b3d17b')}</h3>
                     {loadingSentMessages ? (
                       <div className="animate-pulse space-y-3">
                         {[1, 2, 3].map(i => <div key={i} className="h-10 bg-muted/50 rounded-lg" />)}
@@ -749,7 +752,7 @@ export default function AdminPage() {
                                 variant="ghost"
                                 size="sm"
                                 onClick={async () => {
-                                  if (await confirm({ title: 'Delete this notification?', destructive: true })) deleteMessage.mutate(msg.id);
+                                  if (await confirm({ get title() { return uiI18n.t('app.delete_this_notification_0b1333a5'); }, destructive: true })) deleteMessage.mutate(msg.id);
                                 }}
                                 className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
                               >
@@ -804,12 +807,12 @@ export default function AdminPage() {
             <TabsContent value="pending">
               <div className="space-y-6">
                 <GlassPanel className="p-6">
-                  <h2 className="font-display text-xl font-semibold mb-6">Pending Forum Posts</h2>
+                  <h2 className="font-display text-xl font-semibold mb-6">{uiI18n.t('app.pending_forum_posts_88849904')}</h2>
                   <PendingForumPosts />
                 </GlassPanel>
 
                 <GlassPanel className="p-6">
-                  <h2 className="font-display text-xl font-semibold mb-6">User Suggestions</h2>
+                  <h2 className="font-display text-xl font-semibold mb-6">{uiI18n.t('app.user_suggestions_60936666')}</h2>
                   <PendingSuggestions />
                 </GlassPanel>
               </div>
@@ -821,16 +824,16 @@ export default function AdminPage() {
                 <GlassPanel className="p-6">
                   <h2 className="font-display text-xl font-semibold mb-6 flex items-center gap-2">
                     <Power className="w-5 h-5 text-primary" />
-                    Maintenance Mode
+                    {uiI18n.t('app.maintenance_mode_a99b9edf')}
                   </h2>
 
                   <div className="flex items-center justify-between p-4 rounded-xl bg-muted/30">
                     <div>
-                      <p className="font-medium">System Maintenance</p>
+                      <p className="font-medium">{uiI18n.t('app.system_maintenance_f4698ea7')}</p>
                       <p className="text-sm text-muted-foreground">
                         {maintenanceMode?.is_active
-                          ? 'Site is currently in maintenance mode. Users cannot access the platform.'
-                          : 'Site is currently online and accessible to all users.'}
+                          ? uiI18n.t('app.site_is_currently_in_maintenance_mode_users_cann_184480ff')
+                          : uiI18n.t('app.site_is_currently_online_and_accessible_to_all_u_5c361738')}
                       </p>
                     </div>
                     <Button
@@ -840,7 +843,7 @@ export default function AdminPage() {
                       className="gap-2"
                     >
                       <Power className="w-4 h-4" />
-                      {maintenanceMode?.is_active ? 'Disable Maintenance' : 'Enable Maintenance'}
+                      {maintenanceMode?.is_active ? uiI18n.t('app.disable_maintenance_6a84e92d') : uiI18n.t('app.enable_maintenance_edd4d30b')}
                     </Button>
                   </div>
                 </GlassPanel>
@@ -876,7 +879,7 @@ export default function AdminPage() {
           <SheetHeader className="p-6 border-b border-white/5">
             <SheetTitle className="flex items-center gap-2">
               <Activity className="w-5 h-5 text-secondary" />
-              User Activity Log
+              {uiI18n.t('app.user_activity_log_d17f6308')}
             </SheetTitle>
           </SheetHeader>
           <div className="p-6 overflow-y-auto h-[calc(100vh-80px)]">
@@ -891,23 +894,23 @@ export default function AdminPage() {
           <SheetHeader className="mb-6">
             <SheetTitle className="flex items-center gap-2 text-primary font-bold">
               <Send className="w-6 h-6" />
-              Direct Message
+              {uiI18n.t('app.direct_message_c1e90030')}
             </SheetTitle>
           </SheetHeader>
           <div className="space-y-6">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground uppercase tracking-widest text-[10px]">Subject</label>
+              <label className="text-sm font-medium text-muted-foreground uppercase tracking-widest text-[10px]">{uiI18n.t('app.subject_8d183dbd')}</label>
               <Input
-                placeholder="Enter subject..."
+                placeholder={uiI18n.t('app.enter_subject_fe02ded4')}
                 value={messageTitle}
                 onChange={(e) => setMessageTitle(e.target.value)}
                 className="bg-muted/30 border-white/5 focus:border-primary/50 transition-colors"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground uppercase tracking-widest text-[10px]">Message</label>
+              <label className="text-sm font-medium text-muted-foreground uppercase tracking-widest text-[10px]">{uiI18n.t('app.message_68f4145f')}</label>
               <Textarea
-                placeholder="What would you like to say?..."
+                placeholder={uiI18n.t('app.what_would_you_like_to_say_ba2aef56')}
                 value={messageContent}
                 onChange={(e) => setMessageContent(e.target.value)}
                 className="bg-muted/30 border-white/5 min-h-[300px] focus:border-primary/50 transition-colors"
@@ -923,13 +926,13 @@ export default function AdminPage() {
                 setMessagingUserId(null);
                 setMessageTitle('');
                 setMessageContent('');
-                toast.success('Message sent successfully.');
+                toast.success(uiI18n.t('app.message_sent_successfully_79c98337'));
               }}
               disabled={sendMessage.isPending || !messageTitle || !messageContent}
               className="w-full gap-2 font-bold py-6 group"
             >
               <Send className="w-5 h-5 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
-              {sendMessage.isPending ? 'Sending...' : 'Send Message Now'}
+              {sendMessage.isPending ? 'Sending...' : uiI18n.t('app.send_message_now_96b7e2c0')}
             </Button>
           </div>
         </SheetContent>

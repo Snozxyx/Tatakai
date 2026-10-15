@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useEffect, useMemo, useState } from 'react';
 import {
   Sheet,
@@ -113,6 +115,7 @@ export function ContentEditSheet({
   initial,
   title,
 }: ContentEditSheetProps) {
+  useUiTranslation();
   const update = useUpdateContent();
   const [reason, setReason] = useState('');
 
@@ -166,16 +169,16 @@ export function ContentEditSheet({
     }
 
     if (Object.keys(fields).length === 0) {
-      toast.info('No changes to save.');
+      toast.info(uiI18n.t('app.no_changes_to_save_cfe5b87d'));
       return;
     }
 
     try {
       await update.mutateAsync({ id, fields, reason: reason.trim() || undefined });
-      toast.success('Content updated — changes are now live for everyone.');
+      toast.success(uiI18n.t('app.content_updated_changes_are_now_live_for_everyon_175cda91'));
       onOpenChange(false);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to save content.');
+      toast.error(err instanceof Error ? err.message : uiI18n.t('app.failed_to_save_content_40169911'));
     }
   }
 
@@ -183,10 +186,9 @@ export function ContentEditSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-xl p-0 flex flex-col">
         <SheetHeader className="p-6 pb-3 border-b border-border/50">
-          <SheetTitle>Edit content{title ? `: ${title}` : ''}</SheetTitle>
+          <SheetTitle>{uiI18n.t('app.edit_content_0eea86f9')}{title ? uiI18n.t('app.i18n_value_0_6963047e', { value0: title }) : ''}</SheetTitle>
           <SheetDescription>
-            Changes save to the Tatakai database and are visible to all visitors.
-            Only edited fields are written; re-syncs from AniList will not overwrite them.
+            {uiI18n.t('app.changes_save_to_the_tatakai_database_and_are_vis_5a33a99d')}
           </SheetDescription>
         </SheetHeader>
 
@@ -230,12 +232,12 @@ export function ContentEditSheet({
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="ce-reason">Reason (optional, for the audit log)</Label>
+              <Label htmlFor="ce-reason">{uiI18n.t('app.reason_optional_for_the_audit_log_71132437')}</Label>
               <Input
                 id="ce-reason"
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
-                placeholder="e.g. fixed wrong poster"
+                placeholder={uiI18n.t('app.e_g_fixed_wrong_poster_d0169a76')}
               />
             </div>
           </div>
@@ -243,10 +245,10 @@ export function ContentEditSheet({
 
         <SheetFooter className="p-6 pt-3 border-t border-border/50">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={update.isPending}>
-            Cancel
+            {uiI18n.t('app.cancel_77dfd213')}
           </Button>
           <Button onClick={handleSave} disabled={update.isPending}>
-            {update.isPending ? 'Saving…' : 'Save changes'}
+            {update.isPending ? uiI18n.t('app.saving_56a2285c') : uiI18n.t('app.save_changes_179359b3')}
           </Button>
         </SheetFooter>
       </SheetContent>

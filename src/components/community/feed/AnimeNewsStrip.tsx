@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { Newspaper, ExternalLink, Star } from 'lucide-react';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { getProxiedImageUrl } from '@/lib/api';
@@ -5,6 +7,7 @@ import { useAnimeNews } from '@/hooks/community/useAnimeNews';
 
 /** "New this season" news cards from Jikan, shown atop the News tab. */
 export function AnimeNewsStrip() {
+  useUiTranslation();
   const { data: news = [], isLoading, isError } = useAnimeNews();
   if (isError) return null;
 
@@ -13,7 +16,7 @@ export function AnimeNewsStrip() {
       <div className="pointer-events-none absolute -top-10 -right-10 h-40 w-40 rounded-full bg-primary/10 blur-[60px]" />
       <div className="relative mb-3 flex items-center gap-2">
         <Newspaper className="h-4 w-4 text-primary/80" />
-        <h3 className="font-display text-base font-bold tracking-tight">New this season</h3>
+        <h3 className="font-display text-base font-bold tracking-tight">{uiI18n.t('app.new_this_season_21d3d558')}</h3>
       </div>
       {isLoading ? (
         <div className="flex gap-3 overflow-hidden">

@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useEffect, useCallback } from 'react';
 import { clearMediaMetadataCache } from '@/lib/queryClient';
 import {
@@ -51,6 +53,7 @@ function formatBytes(bytes: number): string {
 }
 
 export function StorageSettingsPanel() {
+  useUiTranslation();
   const isNative = useIsNativeApp();
   const confirm = useConfirm();
 
@@ -135,11 +138,11 @@ export function StorageSettingsPanel() {
       if (selected) {
         setDownloadsPath(selected);
         localStorage.setItem('tatakai_download_path', selected);
-        toast.success(`Updated video download folder to ${selected}`);
+        toast.success(uiI18n.t('app.updated_video_download_folder_to_i18n_value_0_d3ca591a', { value0: selected }));
         fetchStorageInfo();
       }
     } else {
-      toast.info('Directory selection is managed through your browser in web mode.');
+      toast.info(uiI18n.t('app.directory_selection_is_managed_through_your_brow_10bf0d09'));
     }
   };
 
@@ -149,11 +152,11 @@ export function StorageSettingsPanel() {
       if (selected) {
         setTorrentCachePath(selected);
         localStorage.setItem('tatakai_torrent_cache_path', selected);
-        toast.success(`Updated torrent cache location to ${selected}`);
+        toast.success(uiI18n.t('app.updated_torrent_cache_location_to_i18n_value_0_62691aa0', { value0: selected }));
         fetchStorageInfo();
       }
     } else {
-      toast.info('Directory selection is available in the desktop app.');
+      toast.info(uiI18n.t('app.directory_selection_is_available_in_the_desktop__77ff4bfb'));
     }
   };
 
@@ -161,7 +164,7 @@ export function StorageSettingsPanel() {
     if (isNative && (window as any).electron?.openDownloadsFolder) {
       await (window as any).electron.openDownloadsFolder(downloadsPath);
     } else {
-      toast.info('Folder explorer is available in the desktop app.');
+      toast.info(uiI18n.t('app.folder_explorer_is_available_in_the_desktop_app_71109c48'));
     }
   };
 
@@ -171,7 +174,7 @@ export function StorageSettingsPanel() {
       video_downloads: 'Video Downloads',
       app_cache: 'App & Media Cache',
     };
-    if (!(await confirm({ title: `Are you sure you want to clear ${labels[category]}? This cannot be undone.`, destructive: true }))) {
+    if (!(await confirm({ get title() { return uiI18n.t('app.are_you_sure_you_want_to_clear_i18n_value_0_this_d1c9449d', { value0: labels[category] }); }, destructive: true }))) {
       return;
     }
 
@@ -182,16 +185,16 @@ export function StorageSettingsPanel() {
         const path = category === 'torrent_cache' ? torrentCachePath : category === 'video_downloads' ? downloadsPath : undefined;
         const res = await (window as any).electron.clearStorageCategory(category, path);
         if (res.success) {
-          toast.success(`Cleared ${labels[category]} successfully`);
+          toast.success(uiI18n.t('app.cleared_i18n_value_0_successfully_74a02207', { value0: labels[category] }));
           fetchStorageInfo();
         } else {
-          toast.error(`Failed to clear: ${res.error || 'Unknown error'}`);
+          toast.error(uiI18n.t('app.failed_to_clear_i18n_value_0_078d5e90', { value0: res.error || 'Unknown error' }));
         }
       } else {
-        toast.success(category === 'app_cache' ? 'Cleared cached title metadata' : `Cleared virtual ${labels[category]}`);
+        toast.success(category === 'app_cache' ? uiI18n.t('app.cleared_cached_title_metadata_6849e648') : uiI18n.t('app.cleared_virtual_i18n_value_0_1f80d69d', { value0: labels[category] }));
       }
     } catch (err: any) {
-      toast.error(`Error: ${err.message}`);
+      toast.error(uiI18n.t('app.error_i18n_value_0_6c651f8a', { value0: err.message }));
     } finally {
       setClearingCategory(null);
     }
@@ -200,7 +203,7 @@ export function StorageSettingsPanel() {
   const handleStorageLimitChange = (value: string) => {
     setStorageLimitGb(value);
     localStorage.setItem('tatakai_storage_limit_gb', value);
-    toast.success(`Max storage allocation set to ${value === 'unlimited' ? 'Unlimited' : `${value} GB`}`);
+    toast.success(uiI18n.t('app.max_storage_allocation_set_to_i18n_value_0_4b363d91', { value0: value === 'unlimited' ? 'Unlimited' : `${value} GB` }));
   };
 
   // Calculations for storage bar
@@ -219,8 +222,8 @@ export function StorageSettingsPanel() {
     <div className="space-y-6">
       {/* Computer Drive & App Storage Visualizer */}
       <SettingsSection
-        title="Disk allocation"
-        description={`How Tatakai's storage sits on ${storageInfo?.drive?.root || 'your system drive'}.`}
+        title={uiI18n.t('app.disk_allocation_4c509236')}
+        description={uiI18n.t('app.how_tatakai_s_storage_sits_on_i18n_value_0_9ebb10be', { value0: storageInfo?.drive?.root || 'your system drive' })}
         action={
           <Button
             size="sm"
@@ -230,7 +233,7 @@ export function StorageSettingsPanel() {
             className="rounded-xl text-xs gap-1.5 border-white/10"
           >
             <RefreshCw className={cn('h-3.5 w-3.5', isLoading && 'animate-spin')} />
-            Refresh Storage
+            {uiI18n.t('app.refresh_storage_24852d36')}
           </Button>
         }
       >
@@ -241,31 +244,31 @@ export function StorageSettingsPanel() {
             <div
               style={{ width: `${Math.max(1, (torrentSize / totalDrive) * 100)}%` }}
               className="bg-purple-500 transition-all"
-              title={`Torrent Cache: ${formatBytes(torrentSize)}`}
+              title={uiI18n.t('app.torrent_cache_i18n_value_0_03765112', { value0: formatBytes(torrentSize) })}
             />
             {/* App Video Downloads */}
             <div
               style={{ width: `${Math.max(1, (downloadsSize / totalDrive) * 100)}%` }}
               className="bg-amber-500 transition-all"
-              title={`Video Downloads: ${formatBytes(downloadsSize)}`}
+              title={uiI18n.t('app.video_downloads_i18n_value_0_f1270ab4', { value0: formatBytes(downloadsSize) })}
             />
             {/* App Temp Cache */}
             <div
               style={{ width: `${Math.max(1, (cacheSize / totalDrive) * 100)}%` }}
               className="bg-cyan-500 transition-all"
-              title={`App & Temp Cache: ${formatBytes(cacheSize)}`}
+              title={uiI18n.t('app.app_temp_cache_i18n_value_0_bd8cf31c', { value0: formatBytes(cacheSize) })}
             />
             {/* Other used disk space */}
             <div
               style={{ width: `${otherDriveUsed}%` }}
               className="bg-white/15 transition-all"
-              title="Other OS & User Files"
+              title={uiI18n.t('app.other_os_user_files_16745ed8')}
             />
             {/* Free space */}
             <div
               style={{ width: `${freePercent}%` }}
               className="bg-emerald-500/40 transition-all"
-              title={`Available Free Space: ${formatBytes(freeDrive)}`}
+              title={uiI18n.t('app.available_free_space_i18n_value_0_eb259b6c', { value0: formatBytes(freeDrive) })}
             />
           </div>
 
@@ -273,26 +276,26 @@ export function StorageSettingsPanel() {
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs pt-1">
             <div className="flex items-center gap-1.5">
               <span className="h-2.5 w-2.5 rounded-full bg-purple-500" />
-              <span className="text-muted-foreground">Torrent Cache:</span>
+              <span className="text-muted-foreground">{uiI18n.t('app.torrent_cache_c327b696')}</span>
               <span className="font-semibold text-foreground">{formatBytes(torrentSize)}</span>
             </div>
             <div className="flex items-center gap-1.5">
               <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
-              <span className="text-muted-foreground">Video Downloads:</span>
+              <span className="text-muted-foreground">{uiI18n.t('app.video_downloads_e66820ee')}</span>
               <span className="font-semibold text-foreground">{formatBytes(downloadsSize)}</span>
             </div>
             <div className="flex items-center gap-1.5">
               <span className="h-2.5 w-2.5 rounded-full bg-cyan-500" />
-              <span className="text-muted-foreground">App & Media Cache:</span>
+              <span className="text-muted-foreground">{uiI18n.t('app.app_media_cache_0280c958')}</span>
               <span className="font-semibold text-foreground">{formatBytes(cacheSize)}</span>
             </div>
             <div className="flex items-center gap-1.5">
               <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
-              <span className="text-muted-foreground">Free Disk Space:</span>
+              <span className="text-muted-foreground">{uiI18n.t('app.free_disk_space_c642fb96')}</span>
               <span className="font-semibold text-emerald-400">{formatBytes(freeDrive)}</span>
             </div>
             <div className="flex items-center gap-1.5 ml-auto text-muted-foreground">
-              <span>Total Capacity: {formatBytes(totalDrive)}</span>
+              <span>{uiI18n.t('app.total_capacity_77261cb1')} {formatBytes(totalDrive)}</span>
             </div>
           </div>
         </div>
@@ -302,32 +305,32 @@ export function StorageSettingsPanel() {
       <SettingsSection
         icon={Database}
         eyebrow="Storage Cap"
-        title="App Storage Quota"
-        description="Limit the maximum amount of computer storage Tatakai can reserve for offline content, torrent chunks, and media caches."
+        title={uiI18n.t('app.app_storage_quota_efa538cd')}
+        description={uiI18n.t('app.limit_the_maximum_amount_of_computer_storage_tat_4dbca672')}
         action={
           <Select value={storageLimitGb} onValueChange={handleStorageLimitChange}>
             <SelectTrigger className="w-36 h-9 rounded-xl border-white/10 bg-background/50 text-xs font-bold">
-              <SelectValue placeholder="Select Limit" />
+              <SelectValue placeholder={uiI18n.t('app.select_limit_3418f0e1')} />
             </SelectTrigger>
             <SelectContent className="bg-card/95 border-white/10">
-              <SelectItem value="5">5 GB</SelectItem>
-              <SelectItem value="10">10 GB</SelectItem>
-              <SelectItem value="25">25 GB</SelectItem>
-              <SelectItem value="50">50 GB (Default)</SelectItem>
-              <SelectItem value="100">100 GB</SelectItem>
-              <SelectItem value="200">200 GB</SelectItem>
-              <SelectItem value="unlimited">Unlimited</SelectItem>
+              <SelectItem value="5">{uiI18n.t('app.5_gb_227edb6a')}</SelectItem>
+              <SelectItem value="10">{uiI18n.t('app.10_gb_ca3389aa')}</SelectItem>
+              <SelectItem value="25">{uiI18n.t('app.25_gb_80175caa')}</SelectItem>
+              <SelectItem value="50">{uiI18n.t('app.50_gb_default_cd664c43')}</SelectItem>
+              <SelectItem value="100">{uiI18n.t('app.100_gb_e4a96b60')}</SelectItem>
+              <SelectItem value="200">{uiI18n.t('app.200_gb_822250ca')}</SelectItem>
+              <SelectItem value="unlimited">{uiI18n.t('app.unlimited_b8bef37b')}</SelectItem>
             </SelectContent>
           </Select>
         }
       >
         <p className="text-xs text-muted-foreground">
-          Current Tatakai usage:{' '}
-          <span className="font-bold text-foreground">{formatBytes(appTotal)}</span> of{' '}
+          {uiI18n.t('app.current_tatakai_usage_259298d6')}{' '}
+          <span className="font-bold text-foreground">{formatBytes(appTotal)}</span> {uiI18n.t('app.of_de04fa0e')}{' '}
           <span className="font-bold text-foreground">
-            {storageLimitGb === 'unlimited' ? 'Unlimited' : `${storageLimitGb} GB`}
+            {storageLimitGb === 'unlimited' ? uiI18n.t('app.unlimited_b8bef37b') : uiI18n.t('app.i18n_value_0_gb_c298ee84', { value0: storageLimitGb })}
           </span>{' '}
-          allocated. Oldest stream chunks will be safely trimmed when the cap is reached.
+          {uiI18n.t('app.allocated_oldest_stream_chunks_will_be_safely_tr_cc4cf5b5')}
         </p>
       </SettingsSection>
 
@@ -335,8 +338,8 @@ export function StorageSettingsPanel() {
       <SettingsSection
         icon={FolderOpen}
         eyebrow="Directories"
-        title="Storage Locations"
-        description="Customize where Tatakai saves torrent chunks, downloaded episodes, and application caches on your computer."
+        title={uiI18n.t('app.storage_locations_452f80e1')}
+        description={uiI18n.t('app.customize_where_tatakai_saves_torrent_chunks_dow_0a8d7842')}
       >
         <div className="space-y-4">
           {/* 1. Torrent Cache Location */}
@@ -344,12 +347,12 @@ export function StorageSettingsPanel() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="space-y-0.5">
                 <div className="flex items-center gap-2">
-                  <span className="font-semibold text-sm">Torrent Cache Directory</span>
-                  <SettingsBadge tone="primary">torrent_cache</SettingsBadge>
+                  <span className="font-semibold text-sm">{uiI18n.t('app.torrent_cache_directory_6e1dacd3')}</span>
+                  <SettingsBadge tone="primary">{uiI18n.t('app.torrent_cache_120a0db3')}</SettingsBadge>
                   <span className="text-xs text-muted-foreground">({formatBytes(torrentSize)})</span>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Holds temporary pieces while streaming WebTorrent & peer-to-peer releases.
+                  {uiI18n.t('app.holds_temporary_pieces_while_streaming_webtorren_5211094f')}
                 </p>
               </div>
 
@@ -360,7 +363,7 @@ export function StorageSettingsPanel() {
                   className="h-8 text-xs font-semibold border-white/10 rounded-xl"
                   onClick={handleSelectTorrentFolder}
                 >
-                  Change Location
+                  {uiI18n.t('app.change_location_ee94ea23')}
                 </Button>
                 <Button
                   size="sm"
@@ -370,12 +373,12 @@ export function StorageSettingsPanel() {
                   onClick={() => handleClearCategory('torrent_cache')}
                 >
                   <Trash2 className="h-3.5 w-3.5 mr-1" />
-                  Clear
+                  {uiI18n.t('app.clear_719ea396')}
                 </Button>
               </div>
             </div>
             <p className="font-mono text-xs text-muted-foreground/80 bg-background/60 p-2 rounded-lg border border-white/5 truncate">
-              {torrentCachePath || 'Default user application cache'}
+              {torrentCachePath || uiI18n.t('app.default_user_application_cache_fa07254c')}
             </p>
           </div>
 
@@ -384,12 +387,12 @@ export function StorageSettingsPanel() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="space-y-0.5">
                 <div className="flex items-center gap-2">
-                  <span className="font-semibold text-sm">Offline Video Downloads</span>
-                  <SettingsBadge tone="warning">video_downloads</SettingsBadge>
+                  <span className="font-semibold text-sm">{uiI18n.t('app.offline_video_downloads_2086d228')}</span>
+                  <SettingsBadge tone="warning">{uiI18n.t('app.video_downloads_de9f0d9d')}</SettingsBadge>
                   <span className="text-xs text-muted-foreground">({formatBytes(downloadsSize)})</span>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Where full offline anime episodes and downloaded seasons are stored.
+                  {uiI18n.t('app.where_full_offline_anime_episodes_and_downloaded_49557df9')}
                 </p>
               </div>
 
@@ -401,7 +404,7 @@ export function StorageSettingsPanel() {
                   onClick={handleOpenDownloadsFolder}
                 >
                   <FolderOpen className="h-3.5 w-3.5 mr-1" />
-                  Open Folder
+                  {uiI18n.t('app.open_folder_027760ff')}
                 </Button>
                 <Button
                   size="sm"
@@ -409,7 +412,7 @@ export function StorageSettingsPanel() {
                   className="h-8 text-xs font-semibold border-white/10 rounded-xl"
                   onClick={handleSelectDownloadFolder}
                 >
-                  Change Location
+                  {uiI18n.t('app.change_location_ee94ea23')}
                 </Button>
                 <Button
                   size="sm"
@@ -419,7 +422,7 @@ export function StorageSettingsPanel() {
                   onClick={() => handleClearCategory('video_downloads')}
                 >
                   <Trash2 className="h-3.5 w-3.5 mr-1" />
-                  Clear
+                  {uiI18n.t('app.clear_719ea396')}
                 </Button>
               </div>
             </div>
@@ -433,12 +436,12 @@ export function StorageSettingsPanel() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="space-y-0.5">
                 <div className="flex items-center gap-2">
-                  <span className="font-semibold text-sm">Other Cache & Web Data</span>
-                  <SettingsBadge tone="muted">app_cache</SettingsBadge>
+                  <span className="font-semibold text-sm">{uiI18n.t('app.other_cache_web_data_839b931c')}</span>
+                  <SettingsBadge tone="muted">{uiI18n.t('app.app_cache_d261e1fc')}</SettingsBadge>
                   <span className="text-xs text-muted-foreground">({formatBytes(cacheSize)})</span>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Chromium GPU cache, cover thumbnails, subtitle blobs, and transient API responses.
+                  {uiI18n.t('app.chromium_gpu_cache_cover_thumbnails_subtitle_blo_7e060b50')}
                 </p>
               </div>
 
@@ -451,7 +454,7 @@ export function StorageSettingsPanel() {
                   onClick={() => handleClearCategory('app_cache')}
                 >
                   <Trash2 className="h-3.5 w-3.5 mr-1" />
-                  Clear Cache
+                  {uiI18n.t('app.clear_cache_52217508')}
                 </Button>
               </div>
             </div>

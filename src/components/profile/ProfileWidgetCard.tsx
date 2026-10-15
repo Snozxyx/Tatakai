@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { CachedProfileImage } from '@/components/ui/cached-profile-image';
 import { useProfileWatchTime } from '@/hooks/user/useProfileWatchTime';
 import { useEffect, useMemo, useState } from 'react';
@@ -45,6 +47,7 @@ interface ProfileWidgetCardProps {
 
 /** Lightweight, privacy-safe profile lookup by user_id (does NOT throw on private). */
 function useWidgetProfile(userId?: string | null, enabled = false) {
+  useUiTranslation();
   return useQuery({
     queryKey: ['profile_widget', userId],
     enabled: enabled && !!userId,
@@ -63,6 +66,7 @@ function useWidgetProfile(userId?: string | null, enabled = false) {
 
 /** Counts plus a cached, narrow watch-history total shared with full profiles. */
 function useWidgetStats(userId?: string | null, enabled = false, watchAllowed = false) {
+  useUiTranslation();
   const watched = useProfileWatchTime(userId, enabled && watchAllowed);
   const stats = useQuery({
     queryKey: ['profile_widget_stats', userId],
@@ -103,6 +107,7 @@ function useWidgetStats(userId?: string | null, enabled = false, watchAllowed = 
  * gradient under `prefers-reduced-motion`.
  */
 function WidgetAmbient() {
+  useUiTranslation();
   const reduce = useMotionPreference();
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden">
@@ -135,9 +140,10 @@ function WidgetAmbient() {
  * once follow counts load). Respects `prefers-reduced-motion` by snapping.
  */
 function CountUp({ value }: { value: number }) {
+  useUiTranslation();
   const reduce = useReducedMotion();
   const mv = useMotionValue(0);
-  const text = useTransform(mv, (v) => Math.round(v).toLocaleString());
+  const text = useTransform(mv, (v) => Math.round(v).toLocaleString(uiI18n.language));
 
   useEffect(() => {
     if (reduce) {
@@ -155,7 +161,7 @@ function formatWatchTime(seconds: number): string {
   const totalMinutes = Math.max(0, Math.floor(Number(seconds || 0) / 60));
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
-  if (hours > 0) return `${hours.toLocaleString()}h ${minutes}m`;
+  if (hours > 0) return `${hours.toLocaleString(uiI18n.language)}h ${minutes}m`;
   return `${minutes}m`;
 }
 
@@ -175,6 +181,7 @@ export function ProfileWidgetCard({
   side = 'right',
   className,
 }: ProfileWidgetCardProps) {
+  useUiTranslation();
   const navigate = useNavigate();
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
@@ -240,7 +247,7 @@ export function ProfileWidgetCard({
       {/* Single refined close — top-left so it never collides with moderation kebab */}
       <button
         type="button"
-        aria-label="Close profile preview"
+        aria-label={uiI18n.t('app.close_profile_preview_fb08f6b3')}
         onClick={close}
         className="absolute left-2.5 top-2.5 z-20 flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-black/40 text-white/80 shadow-lg backdrop-blur-md transition-colors hover:bg-black/60 hover:text-white active:scale-95"
       >
@@ -337,7 +344,7 @@ export function ProfileWidgetCard({
                   ) : (
                     <UserPlus className="h-3.5 w-3.5" />
                   )}
-                  {isFollowing ? 'Following' : 'Follow'}
+                  {isFollowing ? uiI18n.t('app.following_90eeb100') : uiI18n.t('app.follow_66587a7a')}
                 </Button>
               </div>
             )}
@@ -348,12 +355,12 @@ export function ProfileWidgetCard({
             {/* Complete profile snapshot */}
             <div className="grid grid-cols-2 gap-2 border-y border-white/10 px-4 py-4">
               {[
-                { label: 'Followers', value: <CountUp value={followStats?.followers ?? 0} /> },
-                { label: 'Following', value: <CountUp value={followStats?.following ?? 0} /> },
-                { label: 'Episodes watched', value: <CountUp value={stats?.episodes ?? 0} /> },
-                { label: 'Watch time', value: formatWatchTime(stats?.watchTimeSeconds ?? 0) },
-                { label: 'Comics read', value: <CountUp value={stats?.mangaCount ?? 0} /> },
-                { label: 'Reputation', value: `${reputationRate}%` },
+                { get label() { return uiI18n.t('app.followers_78eaabf4'); }, value: <CountUp value={followStats?.followers ?? 0} /> },
+                { get label() { return uiI18n.t('app.following_90eeb100'); }, value: <CountUp value={followStats?.following ?? 0} /> },
+                { get label() { return uiI18n.t('app.episodes_watched_a91d9ad8'); }, value: <CountUp value={stats?.episodes ?? 0} /> },
+                { get label() { return uiI18n.t('app.watch_time_200564a6'); }, value: formatWatchTime(stats?.watchTimeSeconds ?? 0) },
+                { get label() { return uiI18n.t('app.comics_read_4581963d'); }, value: <CountUp value={stats?.mangaCount ?? 0} /> },
+                { get label() { return uiI18n.t('app.reputation_5f21606b'); }, value: `${reputationRate}%` },
               ].map((stat) => (
                 <div key={stat.label} className="rounded-xl border border-white/[0.07] bg-white/[0.03] px-2 py-3 text-center">
                   <div className="text-lg font-black tabular-nums text-foreground">{stat.value}</div>
@@ -371,7 +378,7 @@ export function ProfileWidgetCard({
                 disabled={!handle}
                 className="h-9 w-full text-xs font-semibold"
               >
-                View profile
+                {uiI18n.t('app.view_profile_b98795a2')}
               </Button>
             </div>
           </div>
@@ -397,7 +404,7 @@ export function ProfileWidgetCard({
               className,
             )}
           >
-            <DialogTitle className="sr-only">Profile preview — {name}</DialogTitle>
+            <DialogTitle className="sr-only">{uiI18n.t('app.profile_preview_9a067c9b')} {name}</DialogTitle>
             {cardBody}
           </DialogContent>
         </Dialog>

@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { isMangaExtension } from '@/core/extensions/store-category';
 import { ECOSYSTEMS } from "@/core/extensions/ecosystems";
 import { RemoteExtensionsPanel } from "@/components/extensions/RemoteExtensionsPanel";
@@ -94,11 +96,11 @@ export interface ExtensionManifest {
 type TypeFilter = StoreExtensionType | 'all' | 'manga';
 
 const TYPE_FILTERS: ReadonlyArray<PillOption<TypeFilter>> = [
-  { id: 'all', label: 'All' },
-  { id: 'onlinestream', label: 'Streaming' },
-  { id: 'manga', label: 'Manga' },
-  { id: 'torrent', label: 'Torrent' },
-  { id: 'custom', label: 'Utilities' },
+  { id: 'all', get label() { return uiI18n.t('app.all_6a720856'); } },
+  { id: 'onlinestream', get label() { return uiI18n.t('app.streaming_1e832552'); } },
+  { id: 'manga', get label() { return uiI18n.t('app.manga_87db0f99'); } },
+  { id: 'torrent', get label() { return uiI18n.t('app.torrent_4d15a5de'); } },
+  { id: 'custom', get label() { return uiI18n.t('app.utilities_18fdc5ee'); } },
 ];
 
 /** Rows per column in a shelf page — four is what fills the Store's panels. */
@@ -131,6 +133,7 @@ function RowShelf({
   installer: ReturnType<typeof useExtensionInstaller>;
   onInstall: (extension: StoreExtension) => void;
 }) {
+  useUiTranslation();
   if (items.length === 0) return null;
   const pages = chunk(items, SHELF_PAGE_SIZE);
 
@@ -160,12 +163,14 @@ function RowShelf({
 }
 
 function TileSkeleton() {
+  useUiTranslation();
   return (
     <div className="h-[11.5rem] animate-pulse rounded-[1.25rem] border border-border bg-white/[0.03]" />
   );
 }
 
 export default function ExtensionHubPage() {
+  useUiTranslation();
   const isNative = useIsNativeApp();
   const isDesktopApp = useIsDesktopApp();
   const isIos = isIOS();
@@ -221,25 +226,25 @@ export default function ExtensionHubPage() {
       >
         <Link
           to="/"
-          aria-label="Back to home"
+          aria-label={uiI18n.t('app.back_to_home_34ac37f5')}
           className="mb-4 inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-sm font-semibold active:scale-95 hover:bg-white/10"
         >
-          <ArrowLeft className="h-4 w-4" /> Home
+          <ArrowLeft className="h-4 w-4" /> {uiI18n.t('app.home_70f8bb9a')}
         </Link>
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-primary">
-              Tatakai store
+              {uiI18n.t('app.tatakai_store_8985bb10')}
             </p>
             <h1 className="font-display mt-1.5 text-3xl font-black tracking-tight text-foreground sm:text-4xl">
-              Extensions
+              {uiI18n.t('app.extensions_656bcfe2')}
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
               {isIos
-                ? 'Streaming sources and utilities that plug into the player.'
-                : 'Streaming sources, torrent providers and utilities that plug into the player.'}
+                ? uiI18n.t('app.streaming_sources_and_utilities_that_plug_into_t_9c54ee02')
+                : uiI18n.t('app.streaming_sources_torrent_providers_and_utilitie_f25474a9')}
               {visibleItems.length > 0
-                ? ` ${visibleItems.length} available.`
+                ? uiI18n.t('app.i18n_value_0_available_2f7caac8', { value0: visibleItems.length })
                 : ''}
             </p>
           </div>
@@ -250,15 +255,15 @@ export default function ExtensionHubPage() {
               <Input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                aria-label="Search extensions"
-                placeholder="Search extensions"
+                aria-label={uiI18n.t('app.search_extensions_11c1d47d')}
+                placeholder={uiI18n.t('app.search_extensions_11c1d47d')}
                 className="h-10 w-full rounded-full border-border bg-muted/30 pl-9 pr-9 text-sm sm:w-72"
               />
               {isSearching ? (
                 <button
                   type="button"
                   onClick={() => setSearch('')}
-                  aria-label="Clear search"
+                  aria-label={uiI18n.t('app.clear_search_67300d0f')}
                   className="absolute right-1 top-1/2 flex h-9 w-9 items-center justify-center rounded-full -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
                   <X className="h-4 w-4" />
@@ -272,7 +277,7 @@ export default function ExtensionHubPage() {
                 className="h-10 gap-2 rounded-full border-border bg-muted/30"
               >
                 <FolderUp className="h-4 w-4" />
-                Add extension
+                {uiI18n.t('app.add_extension_11500bcc')}
               </Button>
             ) : null}
             {/*
@@ -288,18 +293,18 @@ export default function ExtensionHubPage() {
                 href={EXTENSION_PORTAL_URL}
                 target="_blank"
                 rel="noreferrer noopener"
-                title="Publish an extension on extension.tatakai.me"
+                title={uiI18n.t('app.publish_an_extension_on_extension_tatakai_me_8c4ac9c4')}
               >
                 <Upload className="h-4 w-4" />
-                Publish
+                {uiI18n.t('app.publish_56564005')}
                 <ExternalLink className="h-3.5 w-3.5 opacity-70" />
               </a>
             </Button>
           </div>
         </header>
       <div className="mt-5 space-y-4"><div className="flex flex-wrap gap-3">
-        <label className="text-sm">Ecosystem <select className="rounded border border-border bg-background p-2" value={ecosystem} onChange={e => setEcosystem(e.target.value)}><option value="all">All ecosystems</option>{ECOSYSTEMS.map(e => <option key={e} value={e}>{e}</option>)}</select></label>
-        <label className="text-sm">Compatibility <select className="rounded border border-border bg-background p-2" value={compatibility} onChange={e => setCompatibility(e.target.value)}><option value="all">All compatibility</option>{['supported','limited','external','unavailable'].map(e => <option key={e} value={e}>{e}</option>)}</select></label>
+        <label className="text-sm">{uiI18n.t('app.ecosystem_9f12cdfc')} <select className="rounded border border-border bg-background p-2" value={ecosystem} onChange={e => setEcosystem(e.target.value)}><option value="all">{uiI18n.t('app.all_ecosystems_73e7f63d')}</option>{ECOSYSTEMS.map(e => <option key={e} value={e}>{e}</option>)}</select></label>
+        <label className="text-sm">{uiI18n.t('app.compatibility_5d60c7dd')} <select className="rounded border border-border bg-background p-2" value={compatibility} onChange={e => setCompatibility(e.target.value)}><option value="all">{uiI18n.t('app.all_compatibility_376b79c8')}</option>{['supported','limited','external','unavailable'].map(e => <option key={e} value={e}>{uiI18n.t(({"supported":"app.supported_2a5e9b1b","limited":"app.limited_1eb7d5c2","external":"app.external_59d8f3ec","unavailable":"app.unavailable_1d5ee313"})[e])}</option>)}</select></label>
       </div></div>
 
         {catalogue.serviceError || !catalogue.isServiceConfigured ? (
@@ -308,13 +313,13 @@ export default function ExtensionHubPage() {
             <div className="text-sm">
               <p className="font-bold text-amber">
                 {catalogue.isServiceConfigured
-                  ? 'Extension service unreachable'
-                  : 'Extension service not configured'}
+                  ? uiI18n.t('app.extension_service_unreachable_6d092582')
+                  : uiI18n.t('app.extension_service_not_configured_02e2a292')}
               </p>
               <p className="mt-0.5 text-muted-foreground">
                 {catalogue.isServiceConfigured
-                  ? 'Showing installed extensions only. The catalogue will fill in once the service responds.'
-                  : 'Set VITE_EXTENSION_API_URL to browse the published catalogue. Installed extensions remain available.'}
+                  ? uiI18n.t('app.showing_installed_extensions_only_the_catalogue__508fbcdd')
+                  : uiI18n.t('app.set_vite_extension_api_url_to_browse_the_publish_2da70b68')}
               </p>
             </div>
           </div>
@@ -324,10 +329,9 @@ export default function ExtensionHubPage() {
           <div className="mt-6 flex items-start gap-3 rounded-2xl border border-border bg-muted/30 p-4">
             <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
             <div className="text-sm">
-              <p className="font-bold text-foreground">Browsing on the web</p>
+              <p className="font-bold text-foreground">{uiI18n.t('app.browsing_on_the_web_05ee3a58')}</p>
               <p className="mt-0.5 text-muted-foreground">
-                Extensions run inside the desktop app's sandbox. You can browse and install here,
-                but nothing loads until you open Tatakai on desktop.
+                {uiI18n.t('app.extensions_run_inside_the_desktop_app_s_sandbox__5ddfcf31')}
               </p>
             </div>
           </div>
@@ -338,7 +342,7 @@ export default function ExtensionHubPage() {
             options={typeFilters}
             value={type}
             onChange={(next) => setType(next)}
-            label="Extension type"
+            label={uiI18n.t('app.extension_type_3071e179')}
           />
         </div>
 
@@ -352,18 +356,18 @@ export default function ExtensionHubPage() {
           <div className="mt-8 rounded-3xl border border-border bg-muted/30 py-24 text-center">
             <Puzzle className="mx-auto h-10 w-10 text-muted-foreground" />
             <p className="mt-4 font-bold text-foreground">
-              {isSearching ? `Nothing matches “${search.trim()}”` : 'No extensions yet'}
+              {isSearching ? uiI18n.t('app.nothing_matches_i18n_value_0_7e8c1289', { value0: search.trim() }) : uiI18n.t('app.no_extensions_yet_5d69b08e')}
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
               {isSearching
-                ? 'Try a shorter search, or clear it to browse everything.'
-                : 'Published extensions will appear here.'}
+                ? uiI18n.t('app.try_a_shorter_search_or_clear_it_to_browse_every_65be823f')
+                : uiI18n.t('app.published_extensions_will_appear_here_933fdf96')}
             </p>
           </div>
         ) : isSearching ? (
           <section className="mt-8 space-y-4">
             <SectionHeading
-              title="Search results"
+              title={uiI18n.t('app.search_results_0144dae8')}
               meta={`${visibleItems.length} ${visibleItems.length === 1 ? 'match' : 'matches'}`}
             />
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -403,7 +407,7 @@ export default function ExtensionHubPage() {
 
             {installed.length > 0 ? (
               <RowShelf
-                title="Your library"
+                title={uiI18n.t('app.your_library_41bb0474')}
                 eyebrow="Installed"
                 items={installed}
                 installer={installer}
@@ -412,7 +416,7 @@ export default function ExtensionHubPage() {
             ) : null}
 
             <RowShelf
-              title="Trending streaming sources"
+              title={uiI18n.t('app.trending_streaming_sources_7fabd4cd')}
               eyebrow="Most installed"
               items={streaming}
               ranked
@@ -420,11 +424,11 @@ export default function ExtensionHubPage() {
               onInstall={handleInstall}
             />
 
-            <RowShelf title="Manga sources" eyebrow="Reading" items={manga} installer={installer} onInstall={handleInstall} />
+            <RowShelf title={uiI18n.t('app.manga_sources_5ca5b368')} eyebrow="Reading" items={manga} installer={installer} onInstall={handleInstall} />
 
             {!isIos ? (
               <RowShelf
-                title="Torrent providers"
+                title={uiI18n.t('app.torrent_providers_7ebdd4fe')}
                 eyebrow="Discovery"
                 items={torrent}
                 ranked
@@ -434,7 +438,7 @@ export default function ExtensionHubPage() {
             ) : null}
 
             <RowShelf
-              title="Utilities"
+              title={uiI18n.t('app.utilities_18fdc5ee')}
               eyebrow="Everything else"
               items={utilities}
               installer={installer}
@@ -444,7 +448,7 @@ export default function ExtensionHubPage() {
             <section className="space-y-4">
               <SectionHeading
                 eyebrow="Catalogue"
-                title="All extensions"
+                title={uiI18n.t('app.all_extensions_9a2ff26b')}
                 meta={`${visibleItems.length} total · ${formatCompact(
                   visibleItems.reduce((sum, item) => sum + item.installs + item.downloads, 0),
                 )} installs`}

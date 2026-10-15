@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Sidebar } from '@/components/layout/Sidebar';
@@ -11,7 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useStatusIncidents } from '@/hooks/admin/useAdminFeatures';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from '@/lib/localeFormat';
 import { StatusPageBackground } from '@/components/layout/StatusPageBackground';
 import { TATAKAI_API_URL } from '@/lib/api/api-client';
 import { resolveBackendOrigin } from '@/lib/api/backendOrigin';
@@ -143,9 +145,9 @@ function probeImageLoad(src: string, timeoutMs = 8000): Promise<number> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const start = performance.now();
-    const timer = setTimeout(() => { img.onload = null; img.onerror = null; reject(new Error('timeout')); }, timeoutMs);
+    const timer = setTimeout(() => { img.onload = null; img.onerror = null; reject(new Error(uiI18n.t('app.timeout_56d3c949'))); }, timeoutMs);
     img.onload = () => { clearTimeout(timer); resolve(Math.round(performance.now() - start)); };
-    img.onerror = () => { clearTimeout(timer); reject(new Error('load-failed')); };
+    img.onerror = () => { clearTimeout(timer); reject(new Error(uiI18n.t('app.load_failed_a78f1164'))); };
     img.src = `${src}${src.includes('?') ? '&' : '?'}_cb=${Date.now()}`;
   });
 }
@@ -164,6 +166,7 @@ function dotClass(status: Health | ProxyDisplayNode['status']): string {
 }
 
 function StatusGlyph({ status, className = 'w-5 h-5' }: { status: Health; className?: string }) {
+  useUiTranslation();
   if (status === 'operational') return <CheckCircle className={`${className} text-emerald-400`} />;
   if (status === 'degraded') return <AlertTriangle className={`${className} text-amber-400`} />;
   if (status === 'down') return <XCircle className={`${className} text-red-500`} />;
@@ -172,6 +175,7 @@ function StatusGlyph({ status, className = 'w-5 h-5' }: { status: Health; classN
 
 /** Rolling per-service history rendered as a betterstack-style tick strip. */
 function UptimeBars({ history }: { history: Health[] }) {
+  useUiTranslation();
   const recent = history.slice(-HISTORY_CAP);
   const padded: (Health | null)[] = [
     ...Array.from({ length: Math.max(0, HISTORY_CAP - recent.length) }, () => null),
@@ -193,6 +197,7 @@ function UptimeBars({ history }: { history: Health[] }) {
 
 /** Animated circular gauge for the aggregate health index. */
 function HealthRing({ value, color }: { value: number; color: string }) {
+  useUiTranslation();
   const r = 42;
   const circumference = 2 * Math.PI * r;
   return (
@@ -209,12 +214,13 @@ function HealthRing({ value, color }: { value: number; color: string }) {
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span className="text-2xl font-black font-mono">{value.toFixed(0)}%</span>
-        <span className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground">health</span>
+        <span className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground">{uiI18n.t('app.health_834b34f1')}</span>
       </div>
     </div>
   );
 }
 export default function StatusPage() {
+  useUiTranslation();
   const navigate = useNavigate();
   const isDesktopApp = useIsDesktopApp();
   const { data: incidents = [], isLoading: loadingIncidents } = useStatusIncidents(false);
@@ -223,12 +229,12 @@ export default function StatusPage() {
   const [scrapers, setScrapers] = useState<ScraperHealthNode[]>([]);
   const [scraperSummary, setScraperSummary] = useState<ScraperHealthSummary>({ total: 0, operational: 0, degraded: 0, down: 0 });
   const [services, setServices] = useState<ServiceStatus[]>([
-    { name: 'Tatakai Website', status: 'checking', icon: <Globe className="w-5 h-5" />, description: 'Main web frontend', url: 'https://tatakai.me' },
-    { name: 'Tatakai Backend', status: 'checking', icon: <Zap className="w-5 h-5" />, description: 'Unified Hono API', url: 'https://api.tatakai.me/health' },
-    { name: 'Supabase', status: 'checking', icon: <Database className="w-5 h-5" />, description: 'Database & auth infrastructure' },
-    { name: 'Jikan API', status: 'checking', icon: <Server className="w-5 h-5" />, description: 'MyAnimeList metadata provider', url: 'https://api.jikan.moe/v4' },
-    { name: 'AniList API', status: 'checking', icon: <Server className="w-5 h-5" />, description: 'AniList metadata provider', url: 'https://graphql.anilist.co' },
-    { name: 'Image Delivery', status: 'checking', icon: <ImageIcon className="w-5 h-5" />, description: 'Posters, banners & thumbnails', url: 'https://cdn.myanimelist.net' },
+    { name: 'Tatakai Website', status: 'checking', icon: <Globe className="w-5 h-5" />, get description() { return uiI18n.t('app.main_web_frontend_ccbd80f6'); }, url: 'https://tatakai.me' },
+    { name: 'Tatakai Backend', status: 'checking', icon: <Zap className="w-5 h-5" />, get description() { return uiI18n.t('app.unified_hono_api_b800ec23'); }, url: 'https://api.tatakai.me/health' },
+    { name: 'Supabase', status: 'checking', icon: <Database className="w-5 h-5" />, get description() { return uiI18n.t('app.database_auth_infrastructure_794b6e51'); } },
+    { name: 'Jikan API', status: 'checking', icon: <Server className="w-5 h-5" />, get description() { return uiI18n.t('app.myanimelist_metadata_provider_6043e89b'); }, url: 'https://api.jikan.moe/v4' },
+    { name: 'AniList API', status: 'checking', icon: <Server className="w-5 h-5" />, get description() { return uiI18n.t('app.anilist_metadata_provider_1aff8ab4'); }, url: 'https://graphql.anilist.co' },
+    { name: 'Image Delivery', status: 'checking', icon: <ImageIcon className="w-5 h-5" />, get description() { return uiI18n.t('app.posters_banners_thumbnails_054c6616'); }, url: 'https://cdn.myanimelist.net' },
     ]);
   const [uptimeHistory, setUptimeHistory] = useState<Record<string, Health[]>>({});
   const [lastChecked, setLastChecked] = useState<Date>(new Date());
@@ -243,7 +249,7 @@ export default function StatusPage() {
       headers: { Accept: 'application/json' },
       signal: AbortSignal.timeout(9000),
     });
-    if (!response.ok) throw new Error(`Scraper health failed: ${response.status}`);
+    if (!response.ok) throw new Error(uiI18n.t('app.scraper_health_failed_i18n_value_0_95b86e14', { value0: response.status }));
     const json = await response.json();
     const nodes: ScraperHealthNode[] = Array.isArray(json?.scrapers)
       ? json.scrapers.map((node: any, index: number) => ({
@@ -473,10 +479,10 @@ export default function StatusPage() {
     : 'rgb(52 211 153)';
 
   const kpis = [
-    { label: 'Health Index', value: `${healthIndex.toFixed(1)}%`, detail: `${services.filter((s) => s.status === 'operational').length}/${services.length} services up`, icon: <Gauge className="w-4 h-4" /> },
-    { label: 'Observed Uptime', value: uptimePct !== null ? `${uptimePct}%` : '--', detail: `${uptimeSamples.length} samples`, icon: <Activity className="w-4 h-4" /> },
-    { label: 'Proxy Pool', value: `${proxies.filter((p) => p.status === 'online').length}/${proxies.length}`, detail: `${proxies.filter((p) => p.status === 'degraded').length} degraded`, icon: <Server className="w-4 h-4" /> },
-    { label: 'Incidents', value: `${activeIncidents}`, detail: mttrMinutes !== null ? `MTTR ${mttrMinutes}m` : 'no history', icon: <AlertTriangle className="w-4 h-4" /> },
+    { get label() { return uiI18n.t('app.health_index_576bc73c'); }, value: `${healthIndex.toFixed(1)}%`, get detail() { return uiI18n.t('app.i18n_value_0_i18n_value_1_services_up_06e178fa', { value0: services.filter((s) => s.status === 'operational').length, value1: services.length }); }, icon: <Gauge className="w-4 h-4" /> },
+    { get label() { return uiI18n.t('app.observed_uptime_b7bcc5a8'); }, value: uptimePct !== null ? `${uptimePct}%` : '--', get detail() { return uiI18n.t('app.i18n_value_0_samples_e420e8b0', { value0: uptimeSamples.length }); }, icon: <Activity className="w-4 h-4" /> },
+    { get label() { return uiI18n.t('app.proxy_pool_66df8d9e'); }, value: `${proxies.filter((p) => p.status === 'online').length}/${proxies.length}`, get detail() { return uiI18n.t('app.i18n_value_0_degraded_353cccde', { value0: proxies.filter((p) => p.status === 'degraded').length }); }, icon: <Server className="w-4 h-4" /> },
+    { get label() { return uiI18n.t('app.incidents_5e326b17'); }, value: `${activeIncidents}`, detail: mttrMinutes !== null ? `MTTR ${mttrMinutes}m` : 'no history', icon: <AlertTriangle className="w-4 h-4" /> },
   ];
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden relative">
@@ -505,12 +511,12 @@ export default function StatusPage() {
             className="group flex items-center gap-2 p-2 rounded-full hover:bg-white/5 transition-all"
           >
             <ArrowLeft className="w-5 h-5 text-muted-foreground group-hover:text-foreground group-hover:-translate-x-1 transition-all" />
-            <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground">Return</span>
+            <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground">{uiI18n.t('app.return_24f096b2')}</span>
           </button>
           <div className="flex items-center gap-3">
             <div className="hidden sm:flex items-center gap-2 text-[11px] text-muted-foreground font-mono bg-white/5 px-3 py-1.5 rounded-full border border-white/10">
               <RefreshCw className={`w-3 h-3 ${isRefreshing ? 'animate-spin text-primary' : ''}`} />
-              {isRefreshing ? 'Checking…' : `Next check in ${nextCheckIn}s`}
+              {isRefreshing ? uiI18n.t('app.checking_820d6004') : uiI18n.t('app.next_check_in_i18n_value_0s_5ecb13de', { value0: nextCheckIn })}
             </div>
             <Button
               onClick={runChecks}
@@ -519,7 +525,7 @@ export default function StatusPage() {
               className="gap-2 bg-white/5 border-white/10 hover:bg-white/10 h-10 px-4 rounded-xl transition-all"
             >
               <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-              {isRefreshing ? 'Running' : 'Refresh'}
+              {isRefreshing ? uiI18n.t('app.running_73989d9c') : uiI18n.t('app.refresh_56e3badc')}
             </Button>
           </div>
         </div>
@@ -539,13 +545,13 @@ export default function StatusPage() {
                 </div>
                 <p className="text-muted-foreground flex items-center justify-center md:justify-start gap-2 text-sm">
                   <Activity className="w-4 h-4 text-primary" />
-                  Tatakai network infrastructure • updated {formatDistanceToNow(lastChecked, { addSuffix: true })}
+                  {uiI18n.t('app.tatakai_network_infrastructure_updated_c5762cba')} {formatDistanceToNow(lastChecked, { addSuffix: true })}
                 </p>
                 <div className="mt-4 flex flex-wrap items-center justify-center md:justify-start gap-2">
                   {(['operational', 'degraded', 'down'] as const).map((k) => (
                     <span key={k} className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-black/20 border border-white/10 capitalize">
                       <span className={`w-2 h-2 rounded-full ${dotClass(k)}`} />
-                      {services.filter((s) => s.status === k).length} {k}
+                      {services.filter((s) => s.status === k).length} {uiI18n.t(({"operational":"app.operational_7a65affc","degraded":"app.degraded_6dc24469","down":"app.down_77346d04"})[k])}
                     </span>
                   ))}
                 </div>
@@ -570,10 +576,10 @@ export default function StatusPage() {
           <div className="flex items-center justify-between mb-6">
             <h2 className="font-display text-2xl font-bold flex items-center gap-3">
               <span className="p-2 rounded-lg bg-primary/10 text-primary"><Server className="w-6 h-6" /></span>
-              Core Services
+              {uiI18n.t('app.core_services_562880c0')}
             </h2>
             <span className="text-xs text-muted-foreground font-mono bg-white/5 px-3 py-1.5 rounded-full border border-white/10">
-              {services.filter((s) => s.status === 'operational').length}/{services.length} operational
+              {services.filter((s) => s.status === 'operational').length}/{services.length} {uiI18n.t('app.operational_7a65affc')}
             </span>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -602,7 +608,7 @@ export default function StatusPage() {
                       <span className="capitalize font-medium">{service.status}</span>
                     </span>
                     <span className={`font-mono ${service.latency && service.latency > 500 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                      {service.latency !== undefined && service.latency > 0 ? `${service.latency}ms` : '--'}
+                      {service.latency !== undefined && service.latency > 0 ? uiI18n.t('app.i18n_value_0ms_0f3f2d06', { value0: service.latency }) : '--'}
                     </span>
                   </div>
                 </GlassPanel>
@@ -614,10 +620,10 @@ export default function StatusPage() {
           <div className="flex items-center justify-between mb-6">
             <h2 className="font-display text-2xl font-bold flex items-center gap-3">
               <span className="p-2 rounded-lg bg-primary/10 text-primary"><Globe className="w-6 h-6" /></span>
-              Edge Routing
+              {uiI18n.t('app.edge_routing_d1d75b9e')}
             </h2>
             <span className="text-xs text-muted-foreground font-mono bg-white/5 px-3 py-1.5 rounded-full border border-white/10">
-              {proxies.length} node{proxies.length === 1 ? '' : 's'}
+              {proxies.length} {uiI18n.t('app.node_f8e966d1')}{proxies.length === 1 ? '' : 's'}
             </span>
           </div>
           <GlassPanel className="p-0 overflow-hidden border border-white/10 rounded-3xl">
@@ -625,11 +631,11 @@ export default function StatusPage() {
               <table className="w-full text-sm text-left border-collapse">
                 <thead>
                   <tr className="bg-white/5 border-b border-white/10 text-[10px] uppercase tracking-wider text-muted-foreground">
-                    <th className="px-6 py-4 font-bold">Node</th>
-                    <th className="px-6 py-4 font-bold">Type</th>
-                    <th className="px-6 py-4 font-bold">Status</th>
-                    <th className="px-6 py-4 font-bold">Latency</th>
-                    <th className="px-6 py-4 font-bold">Weight</th>
+                    <th className="px-6 py-4 font-bold">{uiI18n.t('app.node_260f7a8c')}</th>
+                    <th className="px-6 py-4 font-bold">{uiI18n.t('app.type_3deb7456')}</th>
+                    <th className="px-6 py-4 font-bold">{uiI18n.t('app.status_bae7d5be')}</th>
+                    <th className="px-6 py-4 font-bold">{uiI18n.t('app.latency_3e399725')}</th>
+                    <th className="px-6 py-4 font-bold">{uiI18n.t('app.weight_69c0b815')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
@@ -644,7 +650,7 @@ export default function StatusPage() {
                             <span className={`font-bold text-xs uppercase tracking-wide ${proxy.status === 'online' ? 'text-emerald-400' : proxy.status === 'degraded' ? 'text-amber-400' : 'text-red-500'}`}>{proxy.status}</span>
                           </span>
                         </td>
-                        <td className="px-6 py-4 font-mono text-xs text-muted-foreground">{proxy.latencyMs > 0 ? `${proxy.latencyMs}ms` : '—'}</td>
+                        <td className="px-6 py-4 font-mono text-xs text-muted-foreground">{proxy.latencyMs > 0 ? uiI18n.t('app.i18n_value_0ms_0f3f2d06', { value0: proxy.latencyMs }) : '—'}</td>
                         <td className="px-6 py-4 font-mono text-xs text-muted-foreground">{proxy.score}</td>
                       </motion.tr>
                     ))}
@@ -654,7 +660,7 @@ export default function StatusPage() {
                       <td colSpan={5} className="px-6 py-12 text-center text-sm text-muted-foreground">
                         <span className="inline-flex items-center gap-2">
                           <Loader2 className="w-4 h-4 animate-spin" />
-                          Initializing node pool…
+                          {uiI18n.t('app.initializing_node_pool_f7b0ba32')}
                         </span>
                       </td>
                     </tr>
@@ -671,26 +677,26 @@ export default function StatusPage() {
             <div className="flex items-center justify-between mb-6">
               <h2 className="font-display text-2xl font-bold flex items-center gap-3">
                 <span className="p-2 rounded-lg bg-primary/10 text-primary"><AlertTriangle className="w-6 h-6" /></span>
-                Incidents &amp; Maintenance
+                {uiI18n.t('app.incidents_amp_maintenance_5b76da29')}
               </h2>
               {activeIncidents > 0 && (
                 <span className="text-xs font-mono px-3 py-1.5 rounded-full border bg-red-500/10 border-red-500/30 text-red-400">
-                  {activeIncidents} active
+                  {activeIncidents} {uiI18n.t('app.active_2bb6b986')}
                 </span>
               )}
             </div>
             {loadingIncidents ? (
               <GlassPanel className="p-12 border border-white/10 rounded-3xl flex items-center justify-center">
                 <span className="inline-flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="w-4 h-4 animate-spin" /> Loading incident feed…
+                  <Loader2 className="w-4 h-4 animate-spin" /> {uiI18n.t('app.loading_incident_feed_26f9e5a4')}
                 </span>
               </GlassPanel>
             ) : incidents.length === 0 ? (
               <GlassPanel className="p-12 border border-white/10 rounded-3xl flex flex-col items-center justify-center text-center gap-3">
                 <CheckCircle className="w-10 h-10 text-emerald-400" />
                 <div>
-                  <p className="font-semibold">No incidents reported</p>
-                  <p className="text-sm text-muted-foreground">All infrastructure has been running smoothly.</p>
+                  <p className="font-semibold">{uiI18n.t('app.no_incidents_reported_3d09db9f')}</p>
+                  <p className="text-sm text-muted-foreground">{uiI18n.t('app.all_infrastructure_has_been_running_smoothly_4f361b33')}</p>
                 </div>
               </GlassPanel>
             ) : (
@@ -700,14 +706,14 @@ export default function StatusPage() {
                     <GlassPanel className={`p-6 border rounded-3xl ${incident.is_active ? 'border-red-500/30 bg-red-500/[0.03]' : 'border-white/10'}`}>
                       <div className="flex flex-wrap items-center gap-2 mb-3">
                         <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg border ${SEVERITY_COLORS[incident.severity] || SEVERITY_COLORS.minor}`}>
-                          {incident.severity || 'minor'}
+                          {incident.severity || uiI18n.t('app.minor_fee63d97')}
                         </span>
                         <span className="text-[10px] font-medium uppercase tracking-wider px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-muted-foreground capitalize">
                           {String(incident.status || 'investigating').replace(/_/g, ' ')}
                         </span>
                         {incident.is_active && (
                           <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg bg-red-500/15 border border-red-500/40 text-red-400">
-                            <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" /> Live
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" /> {uiI18n.t('app.live_65c821a5')}
                           </span>
                         )}
                       </div>
@@ -740,7 +746,7 @@ export default function StatusPage() {
                       )}
                       <div className="mt-4 pt-4 border-t border-white/5 flex items-center gap-2 text-[11px] text-muted-foreground/60 font-mono">
                         <Clock className="w-3 h-3" />
-                        {incident.is_active ? 'Opened' : 'Resolved'}{' '}
+                        {incident.is_active ? uiI18n.t('app.opened_c4f1f5b1') : uiI18n.t('app.resolved_d999aeb0')}{' '}
                         {formatDistanceToNow(new Date(incident.resolved_at || incident.created_at), { addSuffix: true })}
                       </div>
                     </GlassPanel>
@@ -752,14 +758,14 @@ export default function StatusPage() {
           <div className="space-y-4">
             <h2 className="font-display text-2xl font-bold flex items-center gap-3 mb-2">
               <span className="p-2 rounded-lg bg-primary/10 text-primary"><Gauge className="w-6 h-6" /></span>
-              Reliability
+              {uiI18n.t('app.reliability_6780c750')}
             </h2>
             <GlassPanel className="p-5 border border-white/10 rounded-2xl">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">Observed Uptime</p>
+                <p className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">{uiI18n.t('app.observed_uptime_b7bcc5a8')}</p>
                 <Activity className="w-4 h-4 text-primary/60" />
               </div>
-              <div className="text-3xl font-black font-mono mb-3">{uptimePct !== null ? `${uptimePct}%` : '--'}</div>
+              <div className="text-3xl font-black font-mono mb-3">{uptimePct !== null ? uiI18n.t('app.i18n_value_0_cac4fa79', { value0: uptimePct }) : '--'}</div>
               <div className="h-2 rounded-full bg-white/10 overflow-hidden">
                 <motion.div
                   className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-primary"
@@ -768,25 +774,25 @@ export default function StatusPage() {
                   transition={{ duration: 1, ease: 'easeOut' }}
                 />
               </div>
-              <p className="mt-2 text-[11px] text-muted-foreground">{uptimeSamples.length} samples this session</p>
+              <p className="mt-2 text-[11px] text-muted-foreground">{uptimeSamples.length} {uiI18n.t('app.samples_this_session_7e8a0649')}</p>
             </GlassPanel>
             <div className="grid grid-cols-2 gap-4">
               <GlassPanel className="p-5 border border-white/10 rounded-2xl">
-                <p className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground mb-2">MTTR</p>
-                <div className="text-2xl font-black font-mono">{mttrMinutes !== null ? `${mttrMinutes}m` : '--'}</div>
-                <p className="mt-1 text-[11px] text-muted-foreground">mean recovery</p>
+                <p className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground mb-2">{uiI18n.t('app.mttr_b97d3367')}</p>
+                <div className="text-2xl font-black font-mono">{mttrMinutes !== null ? uiI18n.t('app.i18n_value_0m_a5643c66', { value0: mttrMinutes }) : '--'}</div>
+                <p className="mt-1 text-[11px] text-muted-foreground">{uiI18n.t('app.mean_recovery_d59ff579')}</p>
               </GlassPanel>
               <GlassPanel className="p-5 border border-white/10 rounded-2xl">
-                <p className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground mb-2">Check Freq</p>
+                <p className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground mb-2">{uiI18n.t('app.check_freq_1071171a')}</p>
                 <div className="text-2xl font-black font-mono">{SERVICE_CHECK_FREQ_SECONDS}s</div>
-                <p className="mt-1 text-[11px] text-muted-foreground">proxy {PROXY_POLL_FREQ_SECONDS}s</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">{uiI18n.t('app.proxy_d799bae6')} {PROXY_POLL_FREQ_SECONDS}s</p>
               </GlassPanel>
             </div>
             <GlassPanel className="p-5 border border-white/10 rounded-2xl">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground mb-1">Last Pulse</p>
-                  <div className="text-lg font-bold font-mono">{lastChecked.toLocaleTimeString()}</div>
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground mb-1">{uiI18n.t('app.last_pulse_6b3c273e')}</p>
+                  <div className="text-lg font-bold font-mono">{lastChecked.toLocaleTimeString(uiI18n.language)}</div>
                 </div>
                 <Clock className={`w-8 h-8 ${isRefreshing ? 'text-primary animate-pulse' : 'text-primary/40'}`} />
               </div>

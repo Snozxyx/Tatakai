@@ -1,7 +1,9 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from '@/lib/localeFormat';
 import { toast } from 'sonner';
 import { MessageCircle, Repeat2, Heart, Bookmark, Share, MoreHorizontal, Quote as QuoteIcon, Pencil, Trash2, Pin, PinOff, Loader2, BadgeCheck } from 'lucide-react';
 import { GlassPanel } from '@/components/ui/GlassPanel';
@@ -31,9 +33,9 @@ import { ModerationMenuItems } from '@/components/moderation/ModerationMenu';
 import { useContentFlags } from '@/hooks/moderation/useModeration';
 import { useAuth } from '@/contexts/AuthContext';
 import type { FeedPost } from '@/hooks/community/useFeed';
-import { RichContent } from './richText';
 import { RichEditor, type RichEditorHandle } from './RichEditor';
 import { Comments } from '@/components/comments/Comments';
+import { TranslatedPostContent } from './TranslatedPostContent';
 import {
   PostPollCard,
   PostImageGrid,
@@ -45,13 +47,14 @@ import {
 } from './PostEmbeds';
 
 function FlairPills({ post, showPinned }: { post: FeedPost; showPinned: boolean }) {
+  useUiTranslation();
   if (!showPinned && !post.flair && !post.is_spoiler) return null;
   
   return (
     <div className="flex flex-wrap items-center gap-2 mb-2">
       {showPinned && (
         <span className="flex items-center gap-1 rounded-md bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-emerald-400">
-          <Pin className="h-3 w-3" /> Pinned
+          <Pin className="h-3 w-3" /> {uiI18n.t('app.pinned_f9312169')}
         </span>
       )}
       {post.flair && (
@@ -61,7 +64,7 @@ function FlairPills({ post, showPinned }: { post: FeedPost; showPinned: boolean 
       )}
       {post.is_spoiler && (
         <span className="rounded-md bg-orange-500/10 border border-orange-500/20 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-orange-400">
-          Spoiler
+          {uiI18n.t('app.spoiler_875786ee')}
         </span>
       )}
     </div>
@@ -71,6 +74,7 @@ function FlairPills({ post, showPinned }: { post: FeedPost; showPinned: boolean 
 function ActionButton({ icon: Icon, count, active, activeClass, hoverClass, label, onClick, className }: {
   icon: any; count?: number; active?: boolean; activeClass?: string; hoverClass: string; label: string; onClick: (e: React.MouseEvent) => void; className?: string;
 }) {
+  useUiTranslation();
   return (
     <button
       type="button"
@@ -94,6 +98,7 @@ function ActionButton({ icon: Icon, count, active, activeClass, hoverClass, labe
 }
 
 export function PostCard({ post, defaultShowComments = false, contextCommunityId = null }: { post: FeedPost; defaultShowComments?: boolean; contextCommunityId?: string | null }) {
+  useUiTranslation();
   const navigate = useNavigate();
   const { user, isAdmin, isModerator } = useAuth();
   // Seeded from the feed's batched tallies — first paint costs no per-post
@@ -159,8 +164,8 @@ export function PostCard({ post, defaultShowComments = false, contextCommunityId
     e.stopPropagation();
     const url = `${window.location.origin}/community/forum/${post.id}`;
     navigator.clipboard?.writeText(url).then(
-      () => toast.success('Link copied to clipboard'),
-      () => toast.error('Could not copy link'),
+      () => toast.success(uiI18n.t('app.link_copied_to_clipboard_cf544a80')),
+      () => toast.error(uiI18n.t('app.could_not_copy_link_534e08ac')),
     );
   };
 
@@ -173,11 +178,11 @@ export function PostCard({ post, defaultShowComments = false, contextCommunityId
         content_type: 'text',
         metadata: { quoted_post_id: post.id },
       } as any);
-      toast.success('Quoted');
+      toast.success(uiI18n.t('app.quoted_8e06ee91'));
       setQuoteOpen(false);
       setQuoteText('');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to quote');
+      toast.error(err instanceof Error ? err.message : uiI18n.t('app.failed_to_quote_4189244b'));
     }
   };
 
@@ -186,29 +191,29 @@ export function PostCard({ post, defaultShowComments = false, contextCommunityId
     if (editorRef.current?.isEmpty()) return;
     try {
       await updatePost.mutateAsync({ id: post.id, content: html });
-      toast.success('Post updated');
+      toast.success(uiI18n.t('app.post_updated_ea3aeea3'));
       setEditOpen(false);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to update');
+      toast.error(err instanceof Error ? err.message : uiI18n.t('app.failed_to_update_197acf74'));
     }
   };
 
   const confirmDelete = async () => {
     try {
       await deletePost.mutateAsync(post.id);
-      toast.success('Post deleted');
+      toast.success(uiI18n.t('app.post_deleted_fb8dc289'));
       setDeleteOpen(false);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to delete');
+      toast.error(err instanceof Error ? err.message : uiI18n.t('app.failed_to_delete_07931ff7'));
     }
   };
 
   const handlePin = async () => {
     try {
       await setPinned.mutateAsync({ postId: post.id, pinned: !post.is_pinned });
-      toast.success(post.is_pinned ? 'Unpinned' : 'Pinned');
+      toast.success(post.is_pinned ? uiI18n.t('app.unpinned_63ca087d') : uiI18n.t('app.pinned_f9312169'));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to pin');
+      toast.error(err instanceof Error ? err.message : uiI18n.t('app.failed_to_pin_b244e578'));
     }
   };
 
@@ -269,7 +274,7 @@ export function PostCard({ post, defaultShowComments = false, contextCommunityId
                 </button>
               </ProfileWidgetCard>
               {post.author_is_official && (
-                <BadgeCheck className="h-4 w-4 shrink-0 text-sky-400" aria-label="Official account" />
+                <BadgeCheck className="h-4 w-4 shrink-0 text-sky-400" aria-label={uiI18n.t('app.official_account_b15952ac')} />
               )}
               <UserBadges badges={post.badges} size={16} max={3} />
             </div>
@@ -305,7 +310,7 @@ export function PostCard({ post, defaultShowComments = false, contextCommunityId
               {(post as any).edited_at && (
                 <>
                   <span className="text-white/20">•</span>
-                  <span className="italic">edited</span>
+                  <span className="italic">{uiI18n.t('app.edited_a22fca6c')}</span>
                 </>
               )}
               
@@ -313,7 +318,7 @@ export function PostCard({ post, defaultShowComments = false, contextCommunityId
                 <>
                   <span className="text-white/20">•</span>
                   <span className="truncate text-sky-400 max-w-[160px]">
-                    via {post.news_source}
+                    {uiI18n.t('app.via_a19e070e')} {post.news_source}
                   </span>
                 </>
               )}
@@ -323,31 +328,31 @@ export function PostCard({ post, defaultShowComments = false, contextCommunityId
           {/* Options Menu */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button type="button" aria-label="More" onClick={(e) => e.stopPropagation()} className="shrink-0 rounded-full p-2 text-muted-foreground hover:bg-white/10 hover:text-foreground transition-colors mt-[-4px] mr-[-4px]">
+                <button type="button" aria-label={uiI18n.t('app.more_4bab2d8f')} onClick={(e) => e.stopPropagation()} className="shrink-0 rounded-full p-2 text-muted-foreground hover:bg-white/10 hover:text-foreground transition-colors mt-[-4px] mr-[-4px]">
                   <MoreHorizontal className="h-5 w-5" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
                 {isAuthor && (
                   <DropdownMenuItem onClick={() => setEditOpen(true)}>
-                    <Pencil className="mr-2 h-4 w-4" /> Edit Post
+                    <Pencil className="mr-2 h-4 w-4" /> {uiI18n.t('app.edit_post_e5157b9d')}
                   </DropdownMenuItem>
                 )}
                 {canPin && (
                   <DropdownMenuItem onClick={handlePin} disabled={setPinned.isPending}>
                     {post.is_pinned ? <PinOff className="mr-2 h-4 w-4" /> : <Pin className="mr-2 h-4 w-4" />}
-                    {post.is_pinned ? 'Unpin Post' : 'Pin to Top'}
+                    {post.is_pinned ? uiI18n.t('app.unpin_post_cc453152') : uiI18n.t('app.pin_to_top_dacc47cd')}
                   </DropdownMenuItem>
                 )}
                 {(isAuthor || canPin) && canDelete && <DropdownMenuSeparator />}
                 {!isAuthor && (
                    <DropdownMenuItem onClick={handleShare}>
-                     <Share className="mr-2 h-4 w-4" /> Share Link
+                     <Share className="mr-2 h-4 w-4" /> {uiI18n.t('app.share_link_ef050958')}
                    </DropdownMenuItem>
                 )}
                 {canDelete && (
                   <DropdownMenuItem className="text-rose-400 focus:text-rose-400 focus:bg-rose-400/10" onClick={() => setDeleteOpen(true)}>
-                    <Trash2 className="mr-2 h-4 w-4" /> Delete Post
+                    <Trash2 className="mr-2 h-4 w-4" /> {uiI18n.t('app.delete_post_8bcf9240')}
                   </DropdownMenuItem>
                 )}
                 <ModerationMenuItems
@@ -366,13 +371,9 @@ export function PostCard({ post, defaultShowComments = false, contextCommunityId
         <div className="cursor-pointer flex flex-col gap-2" onClick={openPost}>
           <FlairPills post={post} showPinned={showPinned} />
           
-          {post.title && post.title !== post.content && (
-            <h3 className="font-semibold text-[17px] leading-snug text-foreground tracking-tight">{post.title}</h3>
-          )}
-          
-          {post.content && (
-            <RichContent html={post.content} className="text-[15px] text-foreground/90 leading-relaxed" />
-          )}
+          <TranslatedPostContent title={post.title} content={post.content}
+            titleClassName="font-semibold text-[17px] leading-snug text-foreground tracking-tight"
+            contentClassName="text-[15px] text-foreground/90 leading-relaxed" />
         </div>
 
         {/* Media Embeds */}
@@ -402,14 +403,14 @@ export function PostCard({ post, defaultShowComments = false, contextCommunityId
               active={liked} 
               activeClass="text-rose-500" 
               hoverClass="hover:text-rose-500 hover:bg-rose-500/10"
-              label="Like" 
+              label={uiI18n.t('app.like_c7e02c95')}
               onClick={handleLike} 
             />
             <ActionButton 
               icon={MessageCircle} 
               count={post.comments_count || 0} 
               hoverClass="hover:text-blue-400 hover:bg-blue-400/10"
-              label="Comment" 
+              label={uiI18n.t('app.comment_153d7a58')}
               onClick={(e) => { e.stopPropagation(); setShowComments((v) => !v); }} 
             />
             
@@ -417,7 +418,7 @@ export function PostCard({ post, defaultShowComments = false, contextCommunityId
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  aria-label="Repost"
+                  aria-label={uiI18n.t('app.repost_98dd4750')}
                   onClick={(e) => { e.stopPropagation(); if (!user) { e.preventDefault(); navigate('/auth'); } }}
                   className={cn(
                     'group flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-medium text-muted-foreground transition-all duration-200 ease-out hover:text-emerald-500 hover:bg-emerald-500/10',
@@ -434,11 +435,11 @@ export function PostCard({ post, defaultShowComments = false, contextCommunityId
                   onClick={() => toggleRepost.mutate({ postId: post.id, reposted: !!post.reposted })}
                 >
                   <Repeat2 className="mr-2 h-4 w-4" />
-                  {post.reposted ? 'Undo Repost' : allowRepost ? 'Repost' : 'Reposting disabled'}
+                  {post.reposted ? uiI18n.t('app.undo_repost_e97ec486') : allowRepost ? uiI18n.t('app.repost_98dd4750') : uiI18n.t('app.reposting_disabled_aba14e2f')}
                 </DropdownMenuItem>
                 <DropdownMenuItem disabled={!allowRequote} onClick={() => setQuoteOpen(true)}>
                   <QuoteIcon className="mr-2 h-4 w-4" />
-                  {allowRequote ? 'Quote Post' : 'Quoting disabled'}
+                  {allowRequote ? uiI18n.t('app.quote_post_662231f9') : uiI18n.t('app.quoting_disabled_90c6c405')}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -450,13 +451,13 @@ export function PostCard({ post, defaultShowComments = false, contextCommunityId
               active={post.bookmarked}
               activeClass="text-primary"
               hoverClass="hover:text-primary hover:bg-primary/10"
-              label="Bookmark"
+              label={uiI18n.t('app.bookmark_441da1bf')}
               onClick={(e) => { e.stopPropagation(); if (!requireAuth()) return; toggleBookmark.mutate({ postId: post.id, bookmarked: !!post.bookmarked }); }}
             />
             <ActionButton 
               icon={Share} 
               hoverClass="hover:text-sky-400 hover:bg-sky-400/10"
-              label="Share" 
+              label={uiI18n.t('app.share_09ca55ca')}
               onClick={handleShare} 
             />
           </div>
@@ -484,12 +485,12 @@ export function PostCard({ post, defaultShowComments = false, contextCommunityId
       <Dialog open={quoteOpen} onOpenChange={setQuoteOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Quote Post</DialogTitle>
+            <DialogTitle>{uiI18n.t('app.quote_post_662231f9')}</DialogTitle>
           </DialogHeader>
           <textarea
             value={quoteText}
             onChange={(e) => setQuoteText(e.target.value)}
-            placeholder="Add your thoughts..."
+            placeholder={uiI18n.t('app.add_your_thoughts_6f8c3326')}
             rows={3}
             className="w-full resize-none rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm outline-none transition-colors focus:border-primary/50 focus:bg-white/[0.05]"
           />
@@ -498,7 +499,7 @@ export function PostCard({ post, defaultShowComments = false, contextCommunityId
           </div>
           <div className="flex justify-end pt-2">
             <Button className="rounded-full px-6 font-semibold" disabled={!quoteText.trim() || createPost.isPending} onClick={submitQuote}>
-              Post Quote
+              {uiI18n.t('app.post_quote_0cc58a78')}
             </Button>
           </div>
         </DialogContent>
@@ -507,16 +508,16 @@ export function PostCard({ post, defaultShowComments = false, contextCommunityId
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Edit Post</DialogTitle>
+            <DialogTitle>{uiI18n.t('app.edit_post_e5157b9d')}</DialogTitle>
           </DialogHeader>
           <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
-            <RichEditor ref={editorRef} content={post.content || ''} placeholder="Edit your post…" minHeight="150px" />
+            <RichEditor ref={editorRef} content={post.content || ''} placeholder={uiI18n.t('app.edit_your_post_a09e168d')} minHeight="150px" />
           </div>
           <DialogFooter>
-            <Button variant="ghost" className="rounded-full" onClick={() => setEditOpen(false)}>Cancel</Button>
+            <Button variant="ghost" className="rounded-full" onClick={() => setEditOpen(false)}>{uiI18n.t('app.cancel_77dfd213')}</Button>
             <Button className="rounded-full px-6 font-semibold" disabled={updatePost.isPending} onClick={submitEdit}>
               {updatePost.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Save Changes
+              {uiI18n.t('app.save_changes_fa2984b3')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -525,14 +526,14 @@ export function PostCard({ post, defaultShowComments = false, contextCommunityId
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Post?</DialogTitle>
+            <DialogTitle>{uiI18n.t('app.delete_post_c318415f')}</DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-muted-foreground">This action cannot be undone. The post will be permanently removed from the feed.</p>
+          <p className="text-sm text-muted-foreground">{uiI18n.t('app.this_action_cannot_be_undone_the_post_will_be_pe_d03e258e')}</p>
           <DialogFooter>
-            <Button variant="ghost" className="rounded-full" onClick={() => setDeleteOpen(false)}>Cancel</Button>
+            <Button variant="ghost" className="rounded-full" onClick={() => setDeleteOpen(false)}>{uiI18n.t('app.cancel_77dfd213')}</Button>
             <Button variant="destructive" className="rounded-full px-6 font-semibold" disabled={deletePost.isPending} onClick={confirmDelete}>
               {deletePost.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Delete
+              {uiI18n.t('app.delete_f6fdbe48')}
             </Button>
           </DialogFooter>
         </DialogContent>

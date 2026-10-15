@@ -1,4 +1,7 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useEffect, memo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowRight, Clock, Play, X } from 'lucide-react';
@@ -8,18 +11,19 @@ import { getProxiedImageUrl } from '@/lib/api';
 import { fetchAniZipMapping } from '@/lib/mapping/anizip';
 import { Peekable } from '@/components/media/MediaQuickPeek';
 import { peekFromAnime } from '@/components/media/quickPeekStore';
+import i18n from '@/lib/i18n';
 
 function formatTimeLeft(remainingSeconds: number) {
-  if (remainingSeconds <= 0) return 'Almost finished';
+  if (remainingSeconds <= 0) return i18n.t('discover.almostFinished');
 
   const minutes = Math.ceil(remainingSeconds / 60);
 
-  if (minutes < 60) return `${minutes}m left`;
+  if (minutes < 60) return i18n.t('discover.minutesLeft', { count: minutes });
 
   const hours = Math.floor(minutes / 60);
   const remainingMinutes = minutes % 60;
 
-  return `${hours}h${remainingMinutes ? ` ${remainingMinutes}m` : ''} left`;
+  return i18n.t('discover.hoursLeft', { hours, minutes: remainingMinutes });
 }
 
 function resolveAnilistId(animeId: string): number | null {
@@ -39,7 +43,9 @@ const LocalContinueCard = memo(function LocalContinueCard({
   onRemove: (e: React.MouseEvent, episodeId: string) => void;
   onOpen: (item: LocalContinueWatchingItem) => void;
 }) {
+  useUiTranslation();
   const progressSeconds = Math.max(0, Number(item.progressSeconds) || 0);
+  const { t } = useTranslation();
   const durationSeconds = Math.max(0, Number(item.durationSeconds) || 0);
   const percent =
     durationSeconds > 0
@@ -94,7 +100,7 @@ const LocalContinueCard = memo(function LocalContinueCard({
         <button
           onClick={(e) => onRemove(e, item.episodeId)}
           className="absolute right-2 top-2 z-20 flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-black/70 text-white/70 opacity-90 backdrop-blur-sm transition-all duration-200 hover:border-destructive/50 hover:bg-destructive hover:text-destructive-foreground sm:opacity-0 sm:group-hover:opacity-100"
-          aria-label={`Remove ${item.animeName} from continue watching`}
+          aria-label={t('discover.removeFromContinueWatching', { name: item.animeName })}
         >
           <X className="h-3.5 w-3.5" />
         </button>
@@ -103,7 +109,7 @@ const LocalContinueCard = memo(function LocalContinueCard({
         <div className="relative aspect-video w-full overflow-hidden bg-white/[0.04]">
           <img
             src={thumb}
-            alt={epTitle ? `Episode ${item.episodeNumber}: ${epTitle}` : `${item.animeName} episode ${item.episodeNumber}`}
+            alt={epTitle ? t('migration.episodeTitle', { number: item.episodeNumber, title: epTitle }) : t('migration.animeEpisode', { name: item.animeName, number: item.episodeNumber })}
             loading="lazy"
             decoding="async"
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
@@ -111,7 +117,7 @@ const LocalContinueCard = memo(function LocalContinueCard({
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
 
           <span className="absolute left-2 top-2 rounded-md bg-black/70 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-white backdrop-blur-sm">
-            EP {item.episodeNumber}
+            {t('migration.episodeShort')} {item.episodeNumber}
           </span>
           {timeLeft && (
             <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-black/70 px-2 py-1 text-[10px] font-bold text-white/85 backdrop-blur-sm">
@@ -150,13 +156,13 @@ const LocalContinueCard = memo(function LocalContinueCard({
             </h3>
             <div className="mt-0.5 flex items-center justify-between gap-2 text-[11px] text-white/50">
               <span className="truncate">
-                Episode {item.episodeNumber}
-                {epTitle ? ` • ${epTitle}` : ''}
+                {t('anime.episode')} {item.episodeNumber}
+                {epTitle ? uiI18n.t('app.i18n_value_0_723b674d', { value0: epTitle }) : ''}
               </span>
               {percent !== null && <span className="shrink-0 tabular-nums font-bold text-white/60">{percent}%</span>}
             </div>
             <span className="mt-1.5 inline-flex items-center gap-1 text-xs font-semibold text-primary">
-              Resume
+              {t('discover.resume')}
               <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
             </span>
           </div>
@@ -167,6 +173,8 @@ const LocalContinueCard = memo(function LocalContinueCard({
 });
 
 export function LocalContinueWatching() {
+  useUiTranslation();
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [items, setItems] = useState<LocalContinueWatchingItem[]>([]);
   const navigate = useNavigate();
@@ -202,19 +210,19 @@ export function LocalContinueWatching() {
 
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-              Local queue
+              {t('discover.localQueue')}
             </p>
             <h2
               id="local-continue-watching-heading"
               className="font-display text-xl font-bold tracking-tight md:text-2xl"
             >
-              Continue Watching
+              {t('discover.continueWatching')}
             </h2>
           </div>
         </div>
 
         <p className="text-xs text-muted-foreground">
-          Pick up where you left off
+          {t('discover.pickUpWhereLeftOff')}
         </p>
       </div>
 

@@ -1,4 +1,7 @@
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
+import uiI18n from '@/lib/uiI18n';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Share2, Copy, Check, Twitter, Facebook, Link2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -17,21 +20,23 @@ interface ShareButtonProps {
 }
 
 export function ShareButton({ animeId, animeName, animePoster, description }: ShareButtonProps) {
+  useUiTranslation();
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   
   const shareUrl = `${window.location.origin}/anime/${animeId}`;
   const shareText = description 
-    ? `Check out "${animeName}" - ${description.slice(0, 100)}...`
-    : `Check out "${animeName}" on our anime platform!`;
+    ? uiI18n.t('app.check_out_i18n_value_0_i18n_value_1_224f927e', { value0: animeName, value1: description.slice(0, 100) })
+    : uiI18n.t('app.check_out_i18n_value_0_on_our_anime_platform_7900bb80', { value0: animeName });
   
   const handleCopyLink = async () => {
     try {
       await navigator.clipboard.writeText(shareUrl);
       setCopied(true);
-      toast.success('Link copied to clipboard!');
+      toast.success(t('discover.linkCopied'));
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      toast.error('Failed to copy link');
+      toast.error(t('discover.copyLinkFailed'));
     }
   };
   
@@ -75,20 +80,20 @@ export function ShareButton({ animeId, animeName, animePoster, description }: Sh
           ) : (
             <Copy className="w-4 h-4 mr-2" />
           )}
-          Copy Link
+          {t('discover.copyLink')}
         </DropdownMenuItem>
         <DropdownMenuItem onClick={handleShareTwitter} className="cursor-pointer">
           <Twitter className="w-4 h-4 mr-2" />
-          Share on X
+          {t('discover.shareOnX')}
         </DropdownMenuItem>
         <DropdownMenuItem onClick={handleShareFacebook} className="cursor-pointer">
           <Facebook className="w-4 h-4 mr-2" />
-          Share on Facebook
+          {t('discover.shareOnFacebook')}
         </DropdownMenuItem>
         {navigator.share && (
           <DropdownMenuItem onClick={handleNativeShare} className="cursor-pointer">
             <Link2 className="w-4 h-4 mr-2" />
-            More Options
+            {t('discover.moreOptions')}
           </DropdownMenuItem>
         )}
       </DropdownMenuContent>

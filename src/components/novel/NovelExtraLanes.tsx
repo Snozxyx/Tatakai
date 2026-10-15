@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { memo } from "react";
 import { useQueries } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
@@ -22,32 +24,32 @@ type LaneDef = {
 const LANES: LaneDef[] = [
   {
     id: "recent-popular",
-    title: "Most Recent Popular",
-    subtitle: "Trending across novels right now",
+    get title() { return uiI18n.t('app.most_recent_popular_570e36f0'); },
+    get subtitle() { return uiI18n.t('app.trending_across_novels_right_now_7856c20e'); },
     icon: <Flame className="h-5 w-5 text-orange" />,
     sort: "TRENDING_DESC",
     exploreTo: "/novel/discover?sort=trending",
   },
   {
     id: "most-follows",
-    title: "Most Follows",
-    subtitle: "The most followed novels",
+    get title() { return uiI18n.t('app.most_follows_4a2a2f86'); },
+    get subtitle() { return uiI18n.t('app.the_most_followed_novels_a312bd51'); },
     icon: <Heart className="h-5 w-5 text-destructive fill-destructive" />,
     sort: "FAVOURITES_DESC",
     exploreTo: "/novel/discover?sort=popularity",
   },
   {
     id: "new-novels",
-    title: "New Novels",
-    subtitle: "Fresh series that just started",
+    get title() { return uiI18n.t('app.new_novels_7cdf14e6'); },
+    get subtitle() { return uiI18n.t('app.fresh_series_that_just_started_1c388cee'); },
     icon: <Sparkles className="h-5 w-5 text-amber" />,
     sort: "START_DATE_DESC",
     exploreTo: "/novel/discover?sort=latestUpdate",
   },
   {
     id: "top-rated",
-    title: "Top Rated",
-    subtitle: "The highest-scored novels",
+    get title() { return uiI18n.t('app.top_rated_004d7e71'); },
+    get subtitle() { return uiI18n.t('app.the_highest_scored_novels_d667000b'); },
     icon: <Clock className="h-5 w-5 text-primary" />,
     sort: "SCORE_DESC",
     exploreTo: "/novel/discover?sort=rating",
@@ -79,6 +81,7 @@ function toCard(item: NovelSearchItem): UnifiedMediaCardProps["item"] | null {
 }
 
 export const NovelExtraLanes = memo(function NovelExtraLanes() {
+  useUiTranslation();
   const { settings } = useContentSafetySettings();
   const canShowAdult = settings.showAdultEverywhere;
 
@@ -141,7 +144,7 @@ export const NovelExtraLanes = memo(function NovelExtraLanes() {
                 ))}
                 <Link
                   to={lane.exploreTo}
-                  aria-label={`Show more ${lane.title}`}
+                  aria-label={uiI18n.t('app.show_more_i18n_value_0_959378b5', { value0: lane.title })}
                   className="media-card-rail-item"
                 >
                   <span className="flex aspect-[2/3] w-full flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-white/15 bg-white/[0.02] transition-colors hover:border-primary/50 hover:bg-primary/[0.06]">
@@ -149,7 +152,7 @@ export const NovelExtraLanes = memo(function NovelExtraLanes() {
                       <Plus className="h-6 w-6" />
                     </span>
                     <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                      Show more
+                      {uiI18n.t('app.show_more_25911d48')}
                     </span>
                   </span>
                   <span className="mt-2.5 block px-0.5 text-sm font-bold leading-snug text-white/45">

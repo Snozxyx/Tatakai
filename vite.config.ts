@@ -2,8 +2,14 @@ import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import { visualizer } from "rollup-plugin-visualizer";
 import path from "path";
+import { createRequire } from 'node:module';
 import packageJson from "./package.json";
 import { seoPreviewPlugin } from "./scripts/seo/vite-seo-preview.mjs";
+
+// Resolve the translation library's own ONNX runtime; KittenTTS uses another version.
+const configRequire = createRequire(import.meta.url);
+const translationRequire = createRequire(configRequire.resolve('@huggingface/transformers'));
+const translationOrtAssets = path.dirname(translationRequire.resolve('onnxruntime-web/ort-wasm-simd-threaded.wasm'));
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
@@ -31,6 +37,7 @@ export default defineConfig(({ mode }) => {
     base: isElectronBuild ? './' : '/',
     resolve: {
       alias: {
+        '@translation-ort-assets': translationOrtAssets,
         "@tatakai/release-parser": path.resolve(__dirname, "./desktop/runtime/torrent/naming/release-parser.cjs"),
         "@tatakai/candidate-scorer": path.resolve(__dirname, "./src/core/download/candidate-scorer.cjs"),
         "@tatakai/candidate-evaluator": path.resolve(__dirname, "./src/core/download/candidate-evaluator.cjs"),
@@ -54,7 +61,13 @@ export default defineConfig(({ mode }) => {
     // lazily-loaded route (e.g. BecauseYouWatched) can't trigger a mid-session
     // re-optimization that spawns a second React instance under a new `?v=` hash.
     optimizeDeps: {
+      exclude: [
+        '@translation-ort-assets/ort-wasm-simd-threaded.mjs?url',
+        '@translation-ort-assets/ort-wasm-simd-threaded.wasm?url',
+      ],
       include: [
+        '@huggingface/transformers',
+        'franc-min',
         '@tatakai/release-parser',
         '@tatakai/candidate-scorer',
         '@tatakai/candidate-evaluator',
@@ -116,6 +129,8 @@ export default defineConfig(({ mode }) => {
       },
     },
     server: {
+      // Model/browser test caches contain large files and OS-locked journals on Windows.
+      watch: { ignored: ['**/.tmp*/**', '**/.cache/**'] },
       host: "::",
       port: isWebMode ? 8081 : 8090, // Standard port for Electron dev
       // Allow Discord Activity iframe to embed the app

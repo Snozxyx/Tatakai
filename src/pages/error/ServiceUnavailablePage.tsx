@@ -1,8 +1,11 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { motion } from "framer-motion";
 import { ServerCrash, RefreshCw, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const ServiceUnavailablePage = () => {
+  useUiTranslation();
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4 overflow-hidden relative">
       {/* Animated circuit lines background */}
@@ -77,10 +80,10 @@ const ServiceUnavailablePage = () => {
           className="space-y-4 mb-8"
         >
           <h2 className="text-2xl md:text-3xl font-bold text-foreground">
-            Service Unavailable
+            {uiI18n.t('app.service_unavailable_ffbd0b77')}
           </h2>
           <p className="text-muted-foreground text-lg">
-            Our servers are currently overloaded or undergoing maintenance. Please try again in a few moments.
+            {uiI18n.t('app.our_servers_are_currently_overloaded_or_undergoi_d60e0294')}
           </p>
         </motion.div>
 
@@ -92,15 +95,13 @@ const ServiceUnavailablePage = () => {
           className="grid grid-cols-3 gap-4 mb-8"
         >
           {[
-            { label: 'API', status: 'down' },
-            { label: 'CDN', status: 'degraded' },
-            { label: 'Database', status: 'down' },
+            { get label() { return uiI18n.t('app.api_d93d10ff'); }, status: 'down' },
+            { get label() { return uiI18n.t('app.cdn_67b6c4b8'); }, status: 'degraded' },
+            { get label() { return uiI18n.t('app.database_61074f1c'); }, status: 'down' },
           ].map((item, i) => (
             <div key={item.label} className="bg-card/50 backdrop-blur rounded-lg p-3 border border-border/50">
               <motion.div
-                className={`w-3 h-3 rounded-full mx-auto mb-2 ${
-                  item.status === 'down' ? 'bg-red-500' : 'bg-yellow-500'
-                }`}
+                className={`w-3 h-3 rounded-full mx-auto mb-2 ${item.status === 'down' ? 'bg-red-500' : 'bg-yellow-500'}`}
                 animate={{ opacity: [1, 0.5, 1] }}
                 transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
               />
@@ -122,7 +123,7 @@ const ServiceUnavailablePage = () => {
             className="gap-2"
           >
             <RefreshCw className="w-5 h-5" />
-            Retry Connection
+            {uiI18n.t('app.retry_connection_27717695')}
           </Button>
           <Button
             variant="outline"
@@ -131,7 +132,7 @@ const ServiceUnavailablePage = () => {
             onClick={() => window.open('mailto:support@example.com')}
           >
             <Mail className="w-5 h-5" />
-            Contact Support
+            {uiI18n.t('app.contact_support_fe1a2922')}
           </Button>
         </motion.div>
       </motion.div>

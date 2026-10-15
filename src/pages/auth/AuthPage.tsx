@@ -1,4 +1,7 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useMemo, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -30,28 +33,30 @@ const VIDEO_SOURCES = [
 // Random text variations
 const TEXT_VARIATIONS = [
   {
-    title: "Your Gateway to Otaku Culture",
+    get title() { return uiI18n.t('app.your_gateway_to_otaku_culture_838c3f85'); },
     desc: "Track the anime and manga you love, build tier lists and playlists, and join a community of passionate fans."
   },
   {
-    title: "Discover Anime Paradise",
+    get title() { return uiI18n.t('app.discover_anime_paradise_0fb075cb'); },
     desc: "Explore endless anime worlds, keep up with your favorites, and connect with fellow enthusiasts."
   },
   {
-    title: "Unleash Your Anime Journey",
+    get title() { return uiI18n.t('app.unleash_your_anime_journey_5cabdfe3'); },
     desc: "Dive into a vast library of anime, monitor your watching habits, and engage with a vibrant fanbase."
   },
   {
-    title: "Anime Adventures Await",
+    get title() { return uiI18n.t('app.anime_adventures_await_878e3aec'); },
     desc: "Access countless anime series, follow your watchlist, and share experiences with like-minded viewers."
   },
   {
-    title: "Enter the Anime Realm",
+    get title() { return uiI18n.t('app.enter_the_anime_realm_40aaa106'); },
     desc: "Browse an extensive collection of anime, track episodes, and become part of an active community."
   }
 ];
 
 export default function AuthPage() {
+  useUiTranslation();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const {
     signIn,
@@ -127,12 +132,12 @@ export default function AuthPage() {
 
     const emailResult = emailSchema.safeParse(email);
     if (!emailResult.success) {
-      newErrors.email = emailResult.error.errors[0].message;
+      newErrors.email = t('auth.invalidEmail');
     }
 
     const passwordResult = passwordSchema.safeParse(password);
     if (!passwordResult.success) {
-      newErrors.password = passwordResult.error.errors[0].message;
+      newErrors.password = t('auth.passwordMin');
     }
 
     setErrors(newErrors);
@@ -155,7 +160,7 @@ export default function AuthPage() {
     e.preventDefault();
     if (!validateForm()) return;
     if (turnstileEnabled && !captchaToken) {
-      toast.error('Please complete the verification challenge');
+      toast.error(t('auth.completeChallenge'));
       return;
     }
     setIsLoading(true);
@@ -163,23 +168,23 @@ export default function AuthPage() {
       if (isLogin) {
         const { error } = await signIn(email, password, captchaToken ?? undefined);
         if (error) {
-          toast.error(error.message.includes('Invalid login credentials') ? 'Invalid email or password' : error.message);
+          toast.error(error.message.includes('Invalid login credentials') ? t('auth.invalidCredentials') : error.message);
           resetCaptcha();
         } else {
-          toast.success('Welcome back!');
+          toast.success(t('auth.welcomeBackToast'));
           navigate('/');
         }
       } else {
         const { error, mode } = await signUp(email, password, displayName, captchaToken ?? undefined);
         if (error) {
-          toast.error(error.message.includes('already registered') ? 'This email is already registered' : error.message);
+          toast.error(error.message.includes('already registered') ? t('auth.emailRegistered') : error.message);
           resetCaptcha();
         } else if (mode === 'restricted') {
-          toast.info('Account created. Sign in to browse; verify your email later to post or upload.');
+          toast.info(uiI18n.t('app.account_created_sign_in_to_browse_verify_your_em_2a041254'));
           setIsLogin(true);
           resetCaptcha();
         } else {
-          toast.success(`Almost there — we sent a 6-digit code to ${email}`);
+          toast.success(t('auth.codeSent', { email }));
           goToVerify();
         }
       }
@@ -191,17 +196,17 @@ export default function AuthPage() {
   const handleVerify = async (codeOverride?: string) => {
     const code = (codeOverride ?? otp).trim();
     if (code.length !== 6) {
-      toast.error('Enter the 6-digit code');
+      toast.error(t('auth.enter6Digit'));
       return;
     }
     setIsLoading(true);
     try {
       const { error } = await verifySignupCode(email, code);
       if (error) {
-        toast.error(error.message.toLowerCase().includes('expired') ? 'That code expired — request a new one.' : 'Invalid code. Please try again.');
+        toast.error(error.message.toLowerCase().includes('expired') ? t('auth.codeExpired') : t('auth.invalidCodeRetry'));
         setOtp('');
       } else {
-        toast.success('Email verified — welcome to Tatakai!');
+        toast.success(t('auth.emailVerified'));
         // New accounts go straight into onboarding (theme, profile, rules).
         navigate('/onboarding');
       }
@@ -212,7 +217,7 @@ export default function AuthPage() {
 
   const handleResend = async () => {
     if (turnstileEnabled) {
-      toast.info('Head back and complete the challenge to get a fresh code.');
+      toast.info(t('auth.resendChallengeHint'));
       backToForm();
       return;
     }
@@ -220,7 +225,7 @@ export default function AuthPage() {
     try {
       const { error } = await resendSignupCode(email);
       if (error) toast.error(error.message);
-      else toast.success(`New code sent to ${email}`);
+      else toast.success(t('auth.newCodeSent', { email }));
     } finally {
       setIsLoading(false);
     }
@@ -251,7 +256,7 @@ export default function AuthPage() {
           )}
         >
           <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-          <span className="text-sm font-medium">{step === 'verify' ? 'Back' : 'Back to Home'}</span>
+          <span className="text-sm font-medium">{step === 'verify' ? t('common.back') : t('auth.backToHome')}</span>
         </button>
 
         <div className="w-full max-w-md">
@@ -259,17 +264,17 @@ export default function AuthPage() {
           <div className="mb-10">
             <div className="flex items-center gap-3 mb-6">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-lg overflow-hidden">
-                <img src={`${import.meta.env.BASE_URL}assets/logo/tatakai-logo-square.png`} alt="Tatakai logo" className="w-full h-full object-cover" />
+                <img src={`${import.meta.env.BASE_URL}assets/logo/tatakai-logo-square.png`} alt={uiI18n.t('app.tatakai_logo_290743b0')} className="w-full h-full object-cover" />
               </div>
-              <h1 className="font-display text-3xl font-bold gradient-text">Tatakai</h1>
+              <h1 className="font-display text-3xl font-bold gradient-text">{uiI18n.t('app.tatakai_28bda6bd')}</h1>
             </div>
             <h2 className="text-2xl lg:text-3xl font-bold text-foreground mb-2">
-              {step === 'verify' ? 'Enter your code' : isLogin ? 'Welcome back!' : 'Create your account'}
+              {step === 'verify' ? t('auth.enterYourCode') : isLogin ? t('auth.welcomeBackTitle') : t('auth.createAccountTitle')}
             </h2>
             <p className="text-muted-foreground">
               {step === 'verify' ? (
-                <>We sent a 6-digit code to <span className="text-foreground font-medium">{email}</span>. Enter it below.</>
-              ) : isLogin ? 'Enter your credentials to access your account.' : 'Join thousands of anime lovers today.'}
+                <>{t('auth.codeSentHint')} <span className="text-foreground font-medium">{email}</span>. {t('auth.enterItBelow')}</>
+              ) : isLogin ? t('auth.loginHint') : t('auth.signupHint')}
             </p>
           </div>
 
@@ -291,15 +296,15 @@ export default function AuthPage() {
                 {isLoading ? (
                   <div className="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
                 ) : (
-                  <span className="flex items-center gap-2"><ShieldCheck className="w-5 h-5" /> Verify</span>
+                  <span className="flex items-center gap-2"><ShieldCheck className="w-5 h-5" /> {t('auth.verify')}</span>
                 )}
               </Button>
               <div className="flex items-center justify-between text-sm">
                 <button type="button" onClick={backToForm} className="text-muted-foreground hover:text-foreground transition-colors">
-                  Use a different email
+                  {t('auth.useDifferentEmail')}
                 </button>
                 <button type="button" onClick={handleResend} disabled={isLoading} className="text-primary hover:underline font-medium disabled:opacity-50">
-                  Resend code
+                  {t('auth.resendCode')}
                 </button>
               </div>
             </div>
@@ -307,7 +312,7 @@ export default function AuthPage() {
             <form onSubmit={handleFormSubmit} className="space-y-5">
               {!isLogin && (
                 <div className="space-y-2">
-                  <Label htmlFor="displayName" className="text-foreground font-medium">Display Name</Label>
+                  <Label htmlFor="displayName" className="text-foreground font-medium">{t('auth.displayName')}</Label>
                   <div className="relative">
                     <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                     <Input
@@ -316,14 +321,14 @@ export default function AuthPage() {
                       type="text"
                       value={displayName}
                       onChange={(e) => setDisplayName(e.target.value)}
-                      placeholder="Your display name"
+                      placeholder={t('auth.displayNamePlaceholder')}
                       className="h-12 pl-12 bg-muted/30 border-border hover:border-primary/50 focus:border-primary transition-colors"
                     />
                   </div>
                 </div>
               )}
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-foreground font-medium">Email</Label>
+                <Label htmlFor="email" className="text-foreground font-medium">{t('auth.email')}</Label>
                 <div className="relative">
                   <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                   <Input
@@ -342,7 +347,7 @@ export default function AuthPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-foreground font-medium">Password</Label>
+                <Label htmlFor="password" className="text-foreground font-medium">{t('auth.password')}</Label>
                 <div className="relative">
                   <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                   <Input
@@ -359,7 +364,7 @@ export default function AuthPage() {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    aria-label={showPassword ? uiI18n.t('app.hide_password_e40123b4') : uiI18n.t('app.show_password_044b852f')}
                     aria-pressed={showPassword}
                     className="absolute right-1 top-1/2 flex h-11 w-11 items-center justify-center rounded-lg -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                   >
@@ -370,7 +375,7 @@ export default function AuthPage() {
                 {isLogin && (
                   <div className="flex justify-end">
                     <button type="button" onClick={() => navigate('/reset-password')} className="text-sm text-primary hover:underline">
-                      Forgot password?
+                      {t('auth.forgotPassword')}
                     </button>
                   </div>
                 )}
@@ -389,17 +394,16 @@ export default function AuthPage() {
                   />
                   {challengeError && !captchaToken && (
                     <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-center">
-                      <p className="text-sm text-foreground font-medium">Verification didn't load correctly.</p>
+                      <p className="text-sm text-foreground font-medium">{uiI18n.t('app.verification_didn_t_load_correctly_4902f292')}</p>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        On iPhone this is usually iCloud Private Relay, a VPN, or a Safari content
-                        blocker interfering with the check. Disable them for this site, or try Safari.
+                        {uiI18n.t('app.on_iphone_this_is_usually_icloud_private_relay_a_b6f8de3d')}
                       </p>
                       <button
                         type="button"
                         onClick={retryChallenge}
                         className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline"
                       >
-                        <RefreshCw className="w-4 h-4" /> Retry verification
+                        <RefreshCw className="w-4 h-4" /> {uiI18n.t('app.retry_verification_a113d86c')}
                       </button>
                     </div>
                   )}
@@ -414,9 +418,9 @@ export default function AuthPage() {
                 {isLoading ? (
                   <div className="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
                 ) : isLogin ? (
-                  'Sign In'
+                  t('auth.signIn')
                 ) : (
-                  'Create Account'
+                  t('auth.createAccountBtn')
                 )}
               </Button>
             </form>
@@ -424,9 +428,9 @@ export default function AuthPage() {
           {step !== 'verify' && (
             <div className="mt-8 text-center">
               <p className="text-muted-foreground">
-                {isLogin ? "Don't have an account?" : 'Already have an account?'}
+                {isLogin ? t('auth.noAccount') : t('auth.haveAccount')}
                 <button onClick={switchAuthMode} className="ml-2 text-primary hover:underline font-semibold">
-                  {isLogin ? 'Sign Up' : 'Sign In'}
+                  {isLogin ? t('auth.register') : t('auth.signIn')}
                 </button>
               </p>
             </div>
@@ -435,14 +439,14 @@ export default function AuthPage() {
           {/* Decorative / terms element */}
           <div className="mt-12 pt-8 border-t border-border/50">
             <p className="text-xs text-muted-foreground text-center">
-              By continuing, you agree to our{' '}
-              <button onClick={() => navigate('/terms')} className="text-primary hover:underline">Terms of Service</button>
+              {t('auth.agreePrefix')}{' '}
+              <button onClick={() => navigate('/terms')} className="text-primary hover:underline">{t('auth.termsOfService')}</button>
               ,{' '}
-              <button onClick={() => navigate('/privacy')} className="text-primary hover:underline">Privacy Policy</button>
+              <button onClick={() => navigate('/privacy')} className="text-primary hover:underline">{t('auth.privacyPolicy')}</button>
               ,{' '}
-              <button onClick={() => navigate('/dmca')} className="text-primary hover:underline">DMCA Policy</button>
-              , and{' '}
-              <button onClick={() => navigate('/community-guidelines')} className="text-primary hover:underline">Community Guidelines</button>
+              <button onClick={() => navigate('/dmca')} className="text-primary hover:underline">{t('auth.dmcaPolicy')}</button>
+              , {t('auth.and')}{' '}
+              <button onClick={() => navigate('/community-guidelines')} className="text-primary hover:underline">{t('auth.communityGuidelines')}</button>
               .
             </p>
           </div>
@@ -464,9 +468,9 @@ export default function AuthPage() {
         {/* Content over video */}
         <div className="absolute inset-0 flex flex-col justify-end p-12">
           <div className="max-w-md">
-            <h3 className="text-3xl font-bold text-white mb-4 drop-shadow-lg">Your Gateway to Anime</h3>
+            <h3 className="text-3xl font-bold text-white mb-4 drop-shadow-lg">{t('auth.heroFallbackTitle')}</h3>
             <p className="text-white/80 text-lg drop-shadow-md">
-              Stream thousands of anime titles, track your progress, and join a community of passionate fans.
+              {t('auth.heroFallbackDesc')}
             </p>
           </div>
         </div>

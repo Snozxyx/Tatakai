@@ -1,6 +1,8 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from '@/lib/localeFormat';
 import { MessageSquare, Clapperboard, AlertCircle, Library, ListMusic, Trophy, FileText, MessageCircle } from 'lucide-react';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Badge } from '@/components/ui/badge';
@@ -63,6 +65,7 @@ function SectionHeader({
   subtitle?: string;
   count: number;
 }) {
+  useUiTranslation();
   return (
     <div className="flex items-center justify-between gap-3 mb-5">
       <div className="flex items-center gap-2.5 min-w-0">
@@ -80,6 +83,7 @@ function SectionHeader({
 }
 
 function StatChip({ icon, label, count }: { icon: React.ReactNode; label: string; count: number }) {
+  useUiTranslation();
   return (
     <div className="flex items-center gap-2 rounded-2xl border border-white/[0.05] bg-white/[0.02] px-3.5 py-2">
       <span className="text-primary/80">{icon}</span>
@@ -89,6 +93,7 @@ function StatChip({ icon, label, count }: { icon: React.ReactNode; label: string
   );
 }
 export function VaultTab({ userId, isViewingOther, onNavigate }: VaultTabProps) {
+  useUiTranslation();
   const { data: posts = [], isLoading: loadingPosts } = useUserForumPosts(userId);
   const { comments, isLoading: loadingComments } = useUserCommentsDetailed(userId);
   const { data: playlists = [], isLoading: loadingPlaylists } = useUserPlaylists(userId);
@@ -108,34 +113,34 @@ export function VaultTab({ userId, isViewingOther, onNavigate }: VaultTabProps) 
           <div className="flex items-center gap-2">
             <Library className="w-4 h-4 text-primary/80" />
             <h3 className="font-display font-bold text-base sm:text-lg text-foreground tracking-tight">
-              {isViewingOther ? "User's Vault" : 'My Vault'}
+              {isViewingOther ? uiI18n.t('app.user_s_vault_b49ea307') : uiI18n.t('app.my_vault_d32f613b')}
             </h3>
           </div>
           {!loading && !isEmpty && (
             <div className="flex flex-wrap gap-2">
-              {posts.length > 0 && <StatChip icon={<FileText className="w-4 h-4" />} label="Posts" count={posts.length} />}
+              {posts.length > 0 && <StatChip icon={<FileText className="w-4 h-4" />} label={uiI18n.t('app.posts_a0ca0c31')} count={posts.length} />}
               {comments.length > 0 && (
-                <StatChip icon={<MessageCircle className="w-4 h-4" />} label="Comments" count={comments.length} />
+                <StatChip icon={<MessageCircle className="w-4 h-4" />} label={uiI18n.t('app.comments_fce06e20')} count={comments.length} />
               )}
               {playlists.length > 0 && (
-                <StatChip icon={<ListMusic className="w-4 h-4" />} label="Playlists" count={playlists.length} />
+                <StatChip icon={<ListMusic className="w-4 h-4" />} label={uiI18n.t('app.playlists_77b69f32')} count={playlists.length} />
               )}
               {publicTierLists.length > 0 && (
-                <StatChip icon={<Trophy className="w-4 h-4" />} label="Tiers" count={publicTierLists.length} />
+                <StatChip icon={<Trophy className="w-4 h-4" />} label={uiI18n.t('app.tiers_435080ba')} count={publicTierLists.length} />
               )}
             </div>
           )}
         </div>
         {loading ? (
-          <div className="text-center py-16 text-muted-foreground font-medium">Loading vault…</div>
+          <div className="text-center py-16 text-muted-foreground font-medium">{uiI18n.t('app.loading_vault_f5bd63f5')}</div>
         ) : isEmpty ? (
           <div className="text-center py-20 border border-dashed border-white/10 bg-white/[0.01] rounded-[2rem]">
             <Library className="w-16 h-16 mx-auto text-muted-foreground/30 mb-6" />
-            <h3 className="text-xl font-bold mb-2">Nothing in the vault yet</h3>
+            <h3 className="text-xl font-bold mb-2">{uiI18n.t('app.nothing_in_the_vault_yet_328a823c')}</h3>
             <p className="text-muted-foreground">
               {isViewingOther
-                ? "This user hasn't shared posts, comments, playlists or tier lists yet."
-                : 'Your posts, comments, playlists and tier lists will collect here.'}
+                ? uiI18n.t('app.this_user_hasn_t_shared_posts_comments_playlists_9668eea9')
+                : uiI18n.t('app.your_posts_comments_playlists_and_tier_lists_wil_e80f3cdc')}
             </p>
           </div>
         ) : (
@@ -145,8 +150,8 @@ export function VaultTab({ userId, isViewingOther, onNavigate }: VaultTabProps) 
               <section>
                 <SectionHeader
                   icon={<FileText className="w-4 h-4" />}
-                  label="Posts"
-                  subtitle={isViewingOther ? 'Shared threads' : "Threads you've shared"}
+                  label={uiI18n.t('app.posts_a0ca0c31')}
+                  subtitle={isViewingOther ? uiI18n.t('app.shared_threads_82b33fc2') : uiI18n.t('app.threads_you_ve_shared_bac50e1d')}
                   count={posts.length}
                 />
                 <div className="columns-1 lg:columns-2 gap-4 [column-fill:_balance]">
@@ -160,7 +165,7 @@ export function VaultTab({ userId, isViewingOther, onNavigate }: VaultTabProps) 
                             className="mb-2 gap-1.5 text-[10px] font-black tracking-wider uppercase bg-amber-500/10 text-amber-500 border-amber-500/20 rounded-full"
                           >
                             <AlertCircle className="w-3 h-3" />
-                            Pending review
+                            {uiI18n.t('app.pending_review_6a80f44e')}
                           </Badge>
                         )}
                         <PostCard post={toFeedPost(post)} />
@@ -175,8 +180,8 @@ export function VaultTab({ userId, isViewingOther, onNavigate }: VaultTabProps) 
               <section>
                 <SectionHeader
                   icon={<MessageSquare className="w-4 h-4" />}
-                  label="Comments"
-                  subtitle="Where you've joined the conversation"
+                  label={uiI18n.t('app.comments_fce06e20')}
+                  subtitle={uiI18n.t('app.where_you_ve_joined_the_conversation_1a2a9130')}
                   count={comments.length}
                 />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -203,7 +208,7 @@ export function VaultTab({ userId, isViewingOther, onNavigate }: VaultTabProps) 
                       >
                         <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                           <span className="text-[11px] font-bold uppercase tracking-wider text-primary/80 line-clamp-1">
-                            on {c.title}
+                            {uiI18n.t('app.on_db3d405b')} {c.title}
                           </span>
                           {c.hasEpisode && (
                             <Badge
@@ -211,7 +216,7 @@ export function VaultTab({ userId, isViewingOther, onNavigate }: VaultTabProps) 
                               className="gap-1 text-[9px] font-black tracking-wider uppercase bg-sky-500/10 text-sky-300 border-sky-500/20 rounded-full py-0"
                             >
                               <Clapperboard className="w-2.5 h-2.5" />
-                              Episode
+                              {uiI18n.t('app.episode_8669aa56')}
                             </Badge>
                           )}
                           {c.is_spoiler && (
@@ -219,7 +224,7 @@ export function VaultTab({ userId, isViewingOther, onNavigate }: VaultTabProps) 
                               variant="secondary"
                               className="text-[9px] font-black tracking-wider uppercase bg-rose-500/10 text-rose-300 border-rose-500/20 rounded-full py-0"
                             >
-                              Spoiler
+                              {uiI18n.t('app.spoiler_875786ee')}
                             </Badge>
                           )}
                           <span className="ml-auto uppercase tracking-widest text-[10px] font-semibold text-muted-foreground/60 whitespace-nowrap">
@@ -243,8 +248,8 @@ export function VaultTab({ userId, isViewingOther, onNavigate }: VaultTabProps) 
               <section>
                 <SectionHeader
                   icon={<ListMusic className="w-4 h-4" />}
-                  label="Playlists"
-                  subtitle="Public playlists"
+                  label={uiI18n.t('app.playlists_77b69f32')}
+                  subtitle={uiI18n.t('app.public_playlists_31787cf9')}
                   count={playlists.length}
                 />
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -260,8 +265,8 @@ export function VaultTab({ userId, isViewingOther, onNavigate }: VaultTabProps) 
               <section>
                 <SectionHeader
                   icon={<Trophy className="w-4 h-4" />}
-                  label="Tier Lists"
-                  subtitle="Public tier lists"
+                  label={uiI18n.t('app.tier_lists_86752701')}
+                  subtitle={uiI18n.t('app.public_tier_lists_6d49082e')}
                   count={publicTierLists.length}
                 />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">

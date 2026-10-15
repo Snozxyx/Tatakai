@@ -1,33 +1,57 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { Link } from 'react-router-dom';
 import { Heart, Github, Twitter, MessageCircle, ExternalLink } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 
 const SOCIAL_LINKS = [
-  { icon: MessageCircle, label: 'Discord', url: 'https://discord.gg/Mt2jG5QuGP', color: 'hover:text-[#5865F2]' },
-  { icon: Github, label: 'GitHub', url: 'https://github.com/snozxyx/tatakai', color: 'hover:text-[#fff]' },
+  { icon: MessageCircle, get label() { return uiI18n.t('app.discord_bccc14ee'); }, url: 'https://discord.gg/Mt2jG5QuGP', color: 'hover:text-[#5865F2]' },
+  { icon: Github, get label() { return uiI18n.t('app.github_5442e2b6'); }, url: 'https://github.com/snozxyx/tatakai', color: 'hover:text-[#fff]' },
 ];
 
 const FOOTER_LINKS = {
   Product: [
-    { label: 'Home', path: '/' },
-    { label: 'Collections', path: '/collections' },
-    { label: 'Trending', path: '/trending' },
-    { label: 'Suggestions', path: '/suggestions' },
+    { get label() { return uiI18n.t('app.home_70f8bb9a'); }, path: '/' },
+    { get label() { return uiI18n.t('app.collections_4bbb632f'); }, path: '/collections' },
+    { get label() { return uiI18n.t('app.trending_8a12d562'); }, path: '/trending' },
+    { get label() { return uiI18n.t('app.suggestions_861edba0'); }, path: '/suggestions' },
   ],
   Support: [
-    { label: 'Community', path: '/community' },
-    { label: 'Community Guidelines', path: '/community-guidelines' },
-    { label: 'Terms of Service', path: '/terms' },
-    { label: 'Privacy Policy', path: '/privacy' },
-    { label: 'DMCA', path: '/dmca' },
+    { get label() { return uiI18n.t('app.community_bfd58ee3'); }, path: '/community' },
+    { get label() { return uiI18n.t('app.community_guidelines_75343669'); }, path: '/community-guidelines' },
+    { get label() { return uiI18n.t('app.terms_of_service_0c8a9a95'); }, path: '/terms' },
+    { get label() { return uiI18n.t('app.privacy_policy_9db108ba'); }, path: '/privacy' },
+    { get label() { return uiI18n.t('app.dmca_844327d3'); }, path: '/dmca' },
   ],
   Socials: [
-    { label: 'Discord', path: 'https://discord.gg/Mt2jG5QuGP', isExternal: true },
-    { label: 'Github', path: 'https://github.com/snozxyx/tatakai', isExternal: true },
+    { get label() { return uiI18n.t('app.discord_bccc14ee'); }, path: 'https://discord.gg/Mt2jG5QuGP', isExternal: true },
+    { get label() { return uiI18n.t('app.github_c53ced31'); }, path: 'https://github.com/snozxyx/tatakai', isExternal: true },
   ]
 };
 
 export function Footer() {
+  useUiTranslation();
+  const { t } = useTranslation();
+  const FOOTER_LINKS = {
+    [t('layout.footerProduct')]: [
+      { label: t('nav.home'), path: '/' },
+      { label: t('layout.footerCollections'), path: '/collections' },
+      { label: t('nav.trending'), path: '/trending' },
+      { label: t('layout.footerSuggestions'), path: '/suggestions' },
+    ],
+    [t('layout.footerSupport')]: [
+      { label: t('nav.community'), path: '/community' },
+      { label: t('layout.footerCommunityGuidelines'), path: '/community-guidelines' },
+      { label: t('layout.footerTerms'), path: '/terms' },
+      { label: t('layout.footerPrivacy'), path: '/privacy' },
+      { label: t('layout.footerDmca'), path: '/dmca' },
+    ],
+    [t('layout.footerSocials')]: [
+      { get label() { return uiI18n.t('app.discord_bccc14ee'); }, path: 'https://discord.gg/Mt2jG5QuGP', isExternal: true },
+      { get label() { return uiI18n.t('app.github_c53ced31'); }, path: 'https://github.com/snozxyx/tatakai', isExternal: true },
+    ]
+  };
   return (
     <footer className="relative  pt-20 pb-10 overflow-hidden border-t border-white/5 bg-black/40 backdrop-blur-xl">
       {/* Background Gradients */}
@@ -43,12 +67,11 @@ export function Footer() {
           <div className="lg:col-span-5 space-y-6">
             <Link to="/" className="block w-fit group">
               <h2 className="text-4xl font-black tracking-tighter text-white font-display group-hover:opacity-80 transition-opacity">
-                TATAKAI
+                {uiI18n.t('app.tatakai_72f9bae9')}
               </h2>
             </Link>
             <p className="text-muted-foreground leading-relaxed max-w-md text-lg font-medium">
-              The extension-based otaku community.
-              Track anime and manga, build tier lists and playlists, and connect with fellow fans.
+              {t('layout.footerTagline')}
             </p>
             <div className="flex items-center gap-4">
               {SOCIAL_LINKS.map((social) => (
@@ -105,10 +128,10 @@ export function Footer() {
 
         {/* Bottom Section */}
         <div className="pt-8 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
-          <p>© {new Date().getFullYear()} Tatakai. All rights reserved.</p>
+          <p>{t('layout.footerRights', { year: new Date().getFullYear() })}</p>
           <div className="flex items-center gap-6">
             <span className="flex items-center gap-1.5 hover:text-red-500 transition-colors cursor-default select-none group">
-              Made with <Heart className="w-4 h-4 fill-current group-hover:animate-pulse" /> by Tatakai Team
+              {t('layout.footerMadeWith')} <Heart className="w-4 h-4 fill-current group-hover:animate-pulse" /> {t('layout.footerByTeam')}
             </span>
           </div>
         </div>
@@ -116,7 +139,7 @@ export function Footer() {
         {/* Simplified Educational Disclaimer for clean look */}
          <div className="mt-8 text-center opacity-40 hover:opacity-100 transition-opacity">
           <p className="text-[10px] text-muted-foreground">
-            This platform is for educational purposes only. We do not host any content.
+            {t('layout.footerDisclaimer')}
           </p>
         </div>
       </div>

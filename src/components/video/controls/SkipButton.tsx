@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { FastForward } from "lucide-react";
 import type { ActiveSkip } from "../VideoPlayer.types";
 
@@ -14,6 +16,7 @@ export function SkipButton({
   onSkip,
   getSkipLabel,
 }: SkipButtonProps) {
+  useUiTranslation();
   if (!activeSkip) return null;
 
   return (

@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useSearchParams, useNavigate, useParams } from "react-router-dom";
 import { Background } from "@/components/layout/Background";
 import { Sidebar } from "@/components/layout/Sidebar";
@@ -48,6 +50,7 @@ import { controlItemClass, controlMenuClass, controlTriggerClass } from '@/compo
 import { celebrate, type CelebrateVariant } from '@/components/effects/Celebrate';
 
 function useExtensionSearch(query: string, enabled: boolean) {
+  useUiTranslation();
   return useQuery({
     queryKey: ['extension-search', query],
     queryFn: async () => {
@@ -72,6 +75,7 @@ function useExtensionSearch(query: string, enabled: boolean) {
 
 
 export default function SearchPage() {
+  useUiTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const { producerName } = useParams<{ producerName?: string }>();
   const navigate = useNavigate();
@@ -1107,7 +1111,7 @@ export default function SearchPage() {
         body: formData,
       });
 
-      if (!response.ok) throw new Error("Search failed");
+      if (!response.ok) throw new Error(uiI18n.t('app.search_failed_e2e904ac'));
       const data = await response.json();
       const rawResults = data.result || [];
 
@@ -1351,14 +1355,14 @@ export default function SearchPage() {
               <Input
                 id="tatakai-search-page-input"
                 type="text"
-                placeholder="Search anime, manga, novels, manhwa or alternate titles..."
+                placeholder={uiI18n.t('app.search_anime_manga_novels_manhwa_or_alternate_ti_bace1b9f')}
                 value={searchInput}
                 onChange={(e) => {
                   setSearchInput(e.target.value);
                   setShowSuggestions(true);
                 }}
                 onFocus={() => setShowSuggestions(true)}
-                aria-label="Search anime, manga, novels, manhwa and characters by title or alternate title"
+                aria-label={uiI18n.t('app.search_anime_manga_novels_manhwa_and_characters__0caf6d34')}
                 autoComplete="off"
                 className="pl-14 pr-32 h-14 bg-card/85 hover:bg-card focus:bg-card border border-border hover:border-primary/40 focus:border-primary rounded-full text-base backdrop-blur-md transition-[color,background-color,border-color,opacity,transform]"
               />
@@ -1368,7 +1372,7 @@ export default function SearchPage() {
                     type="button"
                     onClick={handleClearSearch}
                     className="p-1.5 rounded-full hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors"
-                    title="Clear"
+                    title={uiI18n.t('app.clear_719ea396')}
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -1377,7 +1381,7 @@ export default function SearchPage() {
                   type="submit"
                   className="px-5 h-9 rounded-full bg-primary text-primary-foreground font-semibold text-sm hover:brightness-110 active:scale-95 transition-[color,background-color,border-color,opacity,transform] shadow-md"
                 >
-                  Search
+                  {uiI18n.t('app.search_bce06414')}
                 </button>
               </div>
             </div>
@@ -1399,24 +1403,24 @@ export default function SearchPage() {
             <div>
               <h1 className="font-display text-2xl md:text-3xl font-bold flex items-center gap-3">
                 <Search className="w-6 h-6 md:w-7 md:h-7 text-primary" />
-                {hasSearchContext ? 'Search Results' : 'Discover'}
+                {hasSearchContext ? uiI18n.t('app.search_results_5e054413') : uiI18n.t('app.discover_4827ea22')}
               </h1>
               {hasSearchContext && (
                 <p className="text-muted-foreground text-xs md:text-sm mt-1">
                   {query ? (
                     <>
-                      Showing results for "<span className="text-foreground font-medium">{query}</span>"
+                      {uiI18n.t('app.showing_results_for_c17b3a2b')}<span className="text-foreground font-medium">{query}</span>"
                     </>
                   ) : (
-                    <>Showing manga discovery results</>
+                    <>{uiI18n.t('app.showing_manga_discovery_results_8bcf1a96')}</>
                   )}
-                  {` • ${filteredAnimeResults.length} anime`}
-                  {` • ${filteredMangaResults.length} manga`}
-                  {` • ${filteredNovelResults.length} novels`}
-                  {showCharacterResults && ` • ${characterResults.length} characters`}
-                  {activeFilterCount > 0 && ` • ${activeFilterCount} active filters`}
+                  {uiI18n.t('app.i18n_value_0_anime_06076e08', { value0: filteredAnimeResults.length })}
+                  {uiI18n.t('app.i18n_value_0_manga_1600b087', { value0: filteredMangaResults.length })}
+                  {uiI18n.t('app.i18n_value_0_novels_395fba93', { value0: filteredNovelResults.length })}
+                  {showCharacterResults && uiI18n.t('app.i18n_value_0_characters_fd5e3ab3', { value0: characterResults.length })}
+                  {activeFilterCount > 0 && uiI18n.t('app.i18n_value_0_active_filters_5a80fffc', { value0: activeFilterCount })}
                   {!contentSafetySettings.showAdultEverywhere &&
-                    ` • mature results ${(explicitMangaQuery || mangaAdultFilter || query.trim().length > 0) ? 'blurred' : 'hidden'}`}
+                    uiI18n.t('app.mature_results_i18n_value_0_df9a2ed2', { value0: (explicitMangaQuery || mangaAdultFilter || query.trim().length > 0) ? 'blurred' : 'hidden' })}
                 </p>
               )}
             </div>
@@ -1431,17 +1435,17 @@ export default function SearchPage() {
               options={DISCOVER_SORTS}
               value={discoverSort}
               onChange={handleDiscoverSortChange}
-              label="Sort"
+              label={uiI18n.t('app.sort_adc4e96a')}
             />
 
             {/* Type Switcher Pills */}
             <div className="flex bg-muted/40 p-1 rounded-full border border-white/5">
               {[
-                { id: 'all', label: 'All' },
-                { id: 'anime', label: 'Anime', icon: <Film className="w-3 h-3" /> },
-                { id: 'manga', label: 'Manga', icon: <BookOpen className="w-3 h-3" /> },
-                { id: 'novel', label: 'Novels', icon: <BookOpen className="w-3 h-3" /> },
-                { id: 'character', label: 'Characters' }
+                { id: 'all', get label() { return uiI18n.t('app.all_6a720856'); } },
+                { id: 'anime', get label() { return uiI18n.t('app.anime_f1b32a19'); }, icon: <Film className="w-3 h-3" /> },
+                { id: 'manga', get label() { return uiI18n.t('app.manga_87db0f99'); }, icon: <BookOpen className="w-3 h-3" /> },
+                { id: 'novel', get label() { return uiI18n.t('app.novels_4ae488fd'); }, icon: <BookOpen className="w-3 h-3" /> },
+                { id: 'character', get label() { return uiI18n.t('app.characters_b6f59f08'); } }
               ].map(type => (
                 <button
                   key={type.id}
@@ -1463,7 +1467,7 @@ export default function SearchPage() {
             {/* Year Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger className={controlTriggerClass}>
-                {minReleaseYear > 0 ? minReleaseYear : 'Any year'}
+                {minReleaseYear > 0 ? minReleaseYear : uiI18n.t('app.any_year_57344265')}
                 <ChevronDown className="h-3.5 w-3.5 opacity-60" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className={controlMenuClass}>
@@ -1474,7 +1478,7 @@ export default function SearchPage() {
                     setLocalMinReleaseYear(0);
                   }}
                 >
-                  Any year
+                  {uiI18n.t('app.any_year_57344265')}
                   {minReleaseYear === 0 && <Check className="h-3.5 w-3.5 text-primary" />}
                 </DropdownMenuItem>
                 {discoverYears().map((value) => (
@@ -1496,7 +1500,7 @@ export default function SearchPage() {
             {/* Trace.moe image search */}
             <div className="flex items-center gap-2">
               <label className={controlTriggerClass}>
-                <span className="max-w-[120px] truncate">{selectedFile ? selectedFile.name : 'Image search'}</span>
+                <span className="max-w-[120px] truncate">{selectedFile ? selectedFile.name : uiI18n.t('app.image_search_993350ec')}</span>
                 <input
                   type="file"
                   className="hidden"
@@ -1510,7 +1514,7 @@ export default function SearchPage() {
                   disabled={isSearchingImage}
                   className="px-3.5 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-bold hover:brightness-110 active:scale-95 transition-[color,background-color,border-color,opacity,transform] flex items-center gap-1.5"
                 >
-                  {isSearchingImage ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Identify'}
+                  {isSearchingImage ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : uiI18n.t('app.identify_38af51b7')}
                 </button>
               )}
             </div>
@@ -1519,7 +1523,7 @@ export default function SearchPage() {
             <DropdownMenu>
               <DropdownMenuTrigger className={controlTriggerClass}>
                 <Tag className="h-3.5 w-3.5 opacity-60" />
-                {resolvedAnimeGenre || (animeGenreFilter !== 'all' ? animeGenreFilter : 'Genre')}
+                {resolvedAnimeGenre || (animeGenreFilter !== 'all' ? animeGenreFilter : uiI18n.t('app.genre_2aa31fca'))}
                 <ChevronDown className="h-3.5 w-3.5 opacity-60" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className={controlMenuClass}>
@@ -1532,7 +1536,7 @@ export default function SearchPage() {
                     setLocalMangaGenre('all');
                   }}
                 >
-                  All genres
+                  {uiI18n.t('app.all_genres_09ac5f61')}
                   {animeGenreFilter === 'all' && <Check className="h-3.5 w-3.5 text-primary" />}
                 </DropdownMenuItem>
                 {animeGenreOptions.map((option) => (
@@ -1569,7 +1573,7 @@ export default function SearchPage() {
               )}
             >
               <SlidersHorizontal className="w-3.5 h-3.5" />
-              <span>Filters</span>
+              <span>{uiI18n.t('app.filters_96e57821')}</span>
               {activeFilterCount > 0 && (
                 <span className="flex items-center justify-center w-4 h-4 rounded-full bg-primary text-primary-foreground text-[9px] font-bold">
                   {activeFilterCount}
@@ -1588,10 +1592,10 @@ export default function SearchPage() {
                   <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/15 text-primary">
                     <SlidersHorizontal className="w-4 h-4" />
                   </span>
-                  <span className="text-xs font-bold uppercase tracking-wider">Power Filters</span>
+                  <span className="text-xs font-bold uppercase tracking-wider">{uiI18n.t('app.power_filters_c5424719')}</span>
                   {activeFilterCount > 0 && (
                     <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-black text-primary-foreground">
-                      {activeFilterCount} active
+                      {activeFilterCount} {uiI18n.t('app.active_2bb6b986')}
                     </span>
                   )}
                 </div>
@@ -1602,7 +1606,7 @@ export default function SearchPage() {
                     onClick={resetFilters}
                     className="h-9 px-3.5 rounded-xl text-xs font-bold uppercase tracking-wide bg-background/70 border border-white/10 text-muted-foreground hover:text-foreground hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-[color,background-color,border-color,opacity,transform]"
                   >
-                    Reset all
+                    {uiI18n.t('app.reset_all_a21b0fec')}
                   </button>
 
                   <button
@@ -1611,7 +1615,7 @@ export default function SearchPage() {
                     className="ui-button h-10 px-6 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 motion-safe:active:scale-[.97] transition-[color,background-color,border-color,opacity,transform] shadow-lg shadow-primary/20 flex items-center gap-2 text-xs"
                   >
                     <Search className="w-3.5 h-3.5" />
-                    Apply Filters
+                    {uiI18n.t('app.apply_filters_6b2a78a8')}
                   </button>
                 </div>
               </div>
@@ -1621,52 +1625,52 @@ export default function SearchPage() {
                 <div className="space-y-4 rounded-2xl border border-white/[0.06] bg-white/[0.015] p-4 md:p-5">
                   <div className="flex items-center gap-2 pb-2 border-b border-white/5">
                     <Film className="w-4 h-4 text-primary" />
-                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-foreground">Anime Filters</h3>
+                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-foreground">{uiI18n.t('app.anime_filters_93a99363')}</h3>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <label htmlFor="filter-localAnimeType" className="text-xs text-muted-foreground font-semibold">Type</label>
+                      <label htmlFor="filter-localAnimeType" className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.type_3deb7456')}</label>
                       <select
                         id="filter-localAnimeType"
                         value={localAnimeType}
                         onChange={(e) => setLocalAnimeType(e.target.value)}
                         className="w-full h-11 rounded-xl bg-background/80 border border-white/10 px-3 text-sm outline-none transition-[color,background-color,border-color,opacity,transform] cursor-pointer hover:border-white/25 hover:bg-background focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
                       >
-                        <option value="all">All types</option>
-                        <option value="tv">TV</option>
-                        <option value="movie">Movie</option>
-                        <option value="ova">OVA</option>
-                        <option value="ona">ONA</option>
-                        <option value="special">Special</option>
+                        <option value="all">{uiI18n.t('app.all_types_30c8a0fc')}</option>
+                        <option value="tv">{uiI18n.t('app.tv_56ab49a5')}</option>
+                        <option value="movie">{uiI18n.t('app.movie_0e65bd96')}</option>
+                        <option value="ova">{uiI18n.t('app.ova_256d1ad0')}</option>
+                        <option value="ona">{uiI18n.t('app.ona_2e6b1c12')}</option>
+                        <option value="special">{uiI18n.t('app.special_942078ca')}</option>
                       </select>
                     </div>
 
                     <div className="space-y-1.5">
-                      <label htmlFor="filter-localAnimeStatus" className="text-xs text-muted-foreground font-semibold">Status</label>
+                      <label htmlFor="filter-localAnimeStatus" className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.status_bae7d5be')}</label>
                       <select
                         id="filter-localAnimeStatus"
                         value={localAnimeStatus}
                         onChange={(e) => setLocalAnimeStatus(e.target.value)}
                         className="w-full h-11 rounded-xl bg-background/80 border border-white/10 px-3 text-sm outline-none transition-[color,background-color,border-color,opacity,transform] cursor-pointer hover:border-white/25 hover:bg-background focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
                       >
-                        <option value="all">Any status</option>
-                        <option value="currently-airing">Currently Airing</option>
-                        <option value="finished-airing">Finished Airing</option>
-                        <option value="not-yet-aired">Not Yet Aired</option>
+                        <option value="all">{uiI18n.t('app.any_status_55201ac9')}</option>
+                        <option value="currently-airing">{uiI18n.t('app.currently_airing_024e7049')}</option>
+                        <option value="finished-airing">{uiI18n.t('app.finished_airing_44bcad79')}</option>
+                        <option value="not-yet-aired">{uiI18n.t('app.not_yet_aired_ca93adcf')}</option>
                       </select>
                     </div>
                   </div>
 
                   <div className="space-y-1.5">
-                    <label htmlFor="filter-localAnimeGenre" className="text-xs text-muted-foreground font-semibold">Genre</label>
+                    <label htmlFor="filter-localAnimeGenre" className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.genre_2aa31fca')}</label>
                     <select
                       id="filter-localAnimeGenre"
                       value={localAnimeGenre}
                       onChange={(e) => setLocalAnimeGenre(e.target.value)}
                       className="w-full h-11 rounded-xl bg-background/80 border border-white/10 px-3 text-sm outline-none transition-[color,background-color,border-color,opacity,transform] cursor-pointer hover:border-white/25 hover:bg-background focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
                     >
-                      <option value="all">Any genre</option>
+                      <option value="all">{uiI18n.t('app.any_genre_a2ae9cce')}</option>
                       {animeGenreOptions.map((genre) => (
                         <option key={genre.value} value={genre.value}>
                           {genre.label}
@@ -1678,13 +1682,13 @@ export default function SearchPage() {
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <Tags className="w-3.5 h-3.5 text-primary" />
-                      <p className="text-xs text-muted-foreground font-semibold">AniList Tags</p>
+                      <p className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.anilist_tags_dae15328')}</p>
                     </div>
                     <Input
-                      aria-label="Search AniList tags"
+                      aria-label={uiI18n.t('app.search_anilist_tags_8238a70a')}
                       value={tagSearch}
                       onChange={(event) => setTagSearch(event.target.value)}
-                      placeholder="Search tags..."
+                      placeholder={uiI18n.t('app.search_tags_aa0f0bbb')}
                       className="h-9 rounded-xl bg-background/80 border-white/10 text-xs"
                     />
                     <button
@@ -1697,7 +1701,7 @@ export default function SearchPage() {
                           : "border-white/10 bg-background/60 text-muted-foreground hover:border-amber-400/30 hover:text-amber-300"
                       )}
                     >
-                      {showSpoilerTags ? 'Hiding nothing — spoiler tags shown' : 'Show spoiler tags'}
+                      {showSpoilerTags ? uiI18n.t('app.hiding_nothing_spoiler_tags_shown_ee779cb0') : uiI18n.t('app.show_spoiler_tags_de6453df')}
                     </button>
                     {selectedAnimeTags.length > 0 && (
                       <div className="flex flex-wrap gap-1.5">
@@ -1705,7 +1709,7 @@ export default function SearchPage() {
                           <button
                             key={tag}
                             type="button"
-                            title="Remove tag"
+                            title={uiI18n.t('app.remove_tag_bc7b89e4')}
                             onClick={() => setSelectedAnimeTags((current) => current.filter((value) => value !== tag))}
                             className="rounded-md bg-primary/15 px-2 py-1 text-[10px] font-bold text-primary hover:bg-primary/25"
                           >
@@ -1719,24 +1723,24 @@ export default function SearchPage() {
                       selected={selectedAnimeTags}
                       onToggle={(name) => setSelectedAnimeTags((current) => current.includes(name) ? current.filter((value) => value !== name) : [...current, name])}
                       maxHeightClass="max-h-40"
-                      emptyText="No tags match that search."
+                      emptyText={uiI18n.t('app.no_tags_match_that_search_b5b4f8be')}
                     />
                   </div>
 
                   <div className="space-y-1.5">
-                    <label htmlFor="filter-localAnimeSort" className="text-xs text-muted-foreground font-semibold">Sort Method</label>
+                    <label htmlFor="filter-localAnimeSort" className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.sort_method_7ae019e9')}</label>
                     <select
                       id="filter-localAnimeSort"
                       value={localAnimeSort}
                       onChange={(e) => setLocalAnimeSort(e.target.value)}
                       className="w-full h-11 rounded-xl bg-background/80 border border-white/10 px-3 text-sm outline-none transition-[color,background-color,border-color,opacity,transform] cursor-pointer hover:border-white/25 hover:bg-background focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
                     >
-                      <option value="default">Best match</option>
-                      <option value="recently-added">Recently Added</option>
-                      <option value="recently-updated">Recently Updated</option>
-                      <option value="score">Score</option>
-                      <option value="name-a-z">Name A-Z</option>
-                      <option value="released-date">Released Date</option>
+                      <option value="default">{uiI18n.t('app.best_match_86f686f8')}</option>
+                      <option value="recently-added">{uiI18n.t('app.recently_added_66560f11')}</option>
+                      <option value="recently-updated">{uiI18n.t('app.recently_updated_04bf5346')}</option>
+                      <option value="score">{uiI18n.t('app.score_489f4877')}</option>
+                      <option value="name-a-z">{uiI18n.t('app.name_a_z_257c1c4b')}</option>
+                      <option value="released-date">{uiI18n.t('app.released_date_6ccfd4a6')}</option>
                     </select>
                   </div>
                 </div>
@@ -1745,26 +1749,26 @@ export default function SearchPage() {
                 <div className="space-y-4 rounded-2xl border border-white/[0.06] bg-white/[0.015] p-4 md:p-5">
                   <div className="flex items-center gap-2 pb-2 border-b border-white/5">
                     <BookOpen className="w-4 h-4 text-primary" />
-                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-foreground">Manga Filters</h3>
+                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-foreground">{uiI18n.t('app.manga_filters_f16ae5e7')}</h3>
                   </div>
 
                   <div className="space-y-1.5">
-                    <label htmlFor="filter-localMangaOrigin" className="text-xs text-muted-foreground font-semibold">Origin</label>
+                    <label htmlFor="filter-localMangaOrigin" className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.origin_44ab85a2')}</label>
                     <select
                       id="filter-localMangaOrigin"
                       value={localMangaOrigin}
                       onChange={(e) => setLocalMangaOrigin(e.target.value)}
                       className="w-full h-11 rounded-xl bg-background/80 border border-white/10 px-3 text-sm outline-none transition-[color,background-color,border-color,opacity,transform] cursor-pointer hover:border-white/25 hover:bg-background focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
                     >
-                      <option value="all">All origins</option>
-                      <option value="JP">Japan (Manga)</option>
-                      <option value="KR">South Korea (Manhwa/Webtoon)</option>
-                      <option value="CN">China (Manhua)</option>
+                      <option value="all">{uiI18n.t('app.all_origins_8b645e03')}</option>
+                      <option value="JP">{uiI18n.t('app.japan_manga_e84da95f')}</option>
+                      <option value="KR">{uiI18n.t('app.south_korea_manhwa_webtoon_e69ff1fb')}</option>
+                      <option value="CN">{uiI18n.t('app.china_manhua_3ff6ad6f')}</option>
                     </select>
                   </div>
 
                   <div className="space-y-2 rounded-xl border border-white/10 bg-background/50 p-3">
-                    <p className="text-xs text-muted-foreground font-semibold">Popular Manhwa / Webtoon Tags</p>
+                    <p className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.popular_manhwa_webtoon_tags_dcc334b1')}</p>
                     <div className="flex flex-wrap gap-1.5">
                       {['Cultivation', 'Dungeon', 'Necromancy', 'Age Regression', 'Video Games', 'Revenge', 'Survival', 'Martial Arts', 'Post-Apocalyptic'].map((tag) => (
                         <button
@@ -1776,11 +1780,11 @@ export default function SearchPage() {
                             selectedMangaTags.includes(tag) ? "border-primary/50 bg-primary/15 text-primary" : "border-white/10 text-muted-foreground hover:border-primary/30 hover:text-foreground"
                           )}
                         >
-                          {tag}
+                          {uiI18n.t(({"Cultivation":"app.cultivation_72a09e3e","Dungeon":"app.dungeon_ef947e3a","Necromancy":"app.necromancy_b02bd83f","Age Regression":"app.age_regression_240a896b","Video Games":"app.video_games_ed143e8b","Revenge":"app.revenge_fa84139d","Survival":"app.survival_fe88ea8d","Martial Arts":"app.martial_arts_d0f0b5b7","Post-Apocalyptic":"app.post_apocalyptic_5e7e47ca"})[tag])}
                         </button>
                       ))}
                     </div>
-                    <p className="text-xs text-muted-foreground font-semibold">Popular Manga Tags</p>
+                    <p className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.popular_manga_tags_e53151a9')}</p>
                     <div className="flex flex-wrap gap-1.5">
                       {['School', 'Shounen', 'Seinen', 'Shoujo', 'Josei', 'Isekai', 'Cyberpunk', 'Samurai', 'Ninja', 'Family Life'].map((tag) => (
                         <button
@@ -1792,7 +1796,7 @@ export default function SearchPage() {
                             selectedMangaTags.includes(tag) ? "border-primary/50 bg-primary/15 text-primary" : "border-white/10 text-muted-foreground hover:border-primary/30 hover:text-foreground"
                           )}
                         >
-                          {tag}
+                          {uiI18n.t(({"School":"app.school_f2f3d66a","Shounen":"app.shounen_611c0d1c","Seinen":"app.seinen_34012d1c","Shoujo":"app.shoujo_61e8a8ab","Josei":"app.josei_44d383ca","Isekai":"app.isekai_8f383a56","Cyberpunk":"app.cyberpunk_e2878e18","Samurai":"app.samurai_807e72f0","Ninja":"app.ninja_7eb0443b","Family Life":"app.family_life_60750c75"})[tag])}
                         </button>
                       ))}
                     </div>
@@ -1800,48 +1804,48 @@ export default function SearchPage() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <label htmlFor="filter-localMangaType" className="text-xs text-muted-foreground font-semibold">Format</label>
+                      <label htmlFor="filter-localMangaType" className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.format_041a5dec')}</label>
                       <select
                         id="filter-localMangaType"
                         value={localMangaType}
                         onChange={(e) => setLocalMangaType(e.target.value)}
                         className="w-full h-11 rounded-xl bg-background/80 border border-white/10 px-3 text-sm outline-none transition-[color,background-color,border-color,opacity,transform] cursor-pointer hover:border-white/25 hover:bg-background focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
                       >
-                        <option value="all">All formats</option>
-                        <option value="manga">Manga</option>
-                        <option value="manhwa">Manhwa</option>
-                        <option value="manhua">Manhua</option>
-                        <option value="comics">Comics</option>
+                        <option value="all">{uiI18n.t('app.all_formats_63944b6a')}</option>
+                        <option value="manga">{uiI18n.t('app.manga_87db0f99')}</option>
+                        <option value="manhwa">{uiI18n.t('app.manhwa_8251bcf8')}</option>
+                        <option value="manhua">{uiI18n.t('app.manhua_b6ddb037')}</option>
+                        <option value="comics">{uiI18n.t('app.comics_0fd813b3')}</option>
                       </select>
                     </div>
 
                     <div className="space-y-1.5">
-                      <label htmlFor="filter-localMangaStatus" className="text-xs text-muted-foreground font-semibold">Status</label>
+                      <label htmlFor="filter-localMangaStatus" className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.status_bae7d5be')}</label>
                       <select
                         id="filter-localMangaStatus"
                         value={localMangaStatus}
                         onChange={(e) => setLocalMangaStatus(e.target.value)}
                         className="w-full h-11 rounded-xl bg-background/80 border border-white/10 px-3 text-sm outline-none transition-[color,background-color,border-color,opacity,transform] cursor-pointer hover:border-white/25 hover:bg-background focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
                       >
-                        <option value="all">Any status</option>
-                        <option value="ongoing">Ongoing</option>
-                        <option value="completed">Completed</option>
-                        <option value="hiatus">Hiatus</option>
-                        <option value="cancelled">Cancelled</option>
-                        <option value="unreleased">Unreleased</option>
+                        <option value="all">{uiI18n.t('app.any_status_55201ac9')}</option>
+                        <option value="ongoing">{uiI18n.t('app.ongoing_2e0254c2')}</option>
+                        <option value="completed">{uiI18n.t('app.completed_1798b3ba')}</option>
+                        <option value="hiatus">{uiI18n.t('app.hiatus_f6eb2b71')}</option>
+                        <option value="cancelled">{uiI18n.t('app.cancelled_a1bf92ef')}</option>
+                        <option value="unreleased">{uiI18n.t('app.unreleased_81dd1756')}</option>
                       </select>
                     </div>
                   </div>
 
                   <div className="space-y-1.5">
-                    <label htmlFor="filter-localMangaGenre" className="text-xs text-muted-foreground font-semibold">Genre</label>
+                    <label htmlFor="filter-localMangaGenre" className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.genre_2aa31fca')}</label>
                     <select
                       id="filter-localMangaGenre"
                       value={localMangaGenre}
                       onChange={(e) => setLocalMangaGenre(e.target.value)}
                       className="w-full h-11 rounded-xl bg-background/80 border border-white/10 px-3 text-sm outline-none transition-[color,background-color,border-color,opacity,transform] cursor-pointer hover:border-white/25 hover:bg-background focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
                     >
-                      <option value="all">Any genre</option>
+                      <option value="all">{uiI18n.t('app.any_genre_a2ae9cce')}</option>
                       {/* If a tag from MangaPage was passed via URL and isn't in the list, show it as the first option */}
                       {localMangaGenre !== 'all' && !atsuGenreOptions.some((g) => g.value === localMangaGenre) && (
                         <option value={localMangaGenre}>
@@ -1859,17 +1863,17 @@ export default function SearchPage() {
                   <div className="space-y-2 rounded-xl border border-primary/10 bg-primary/5 p-3">
                     <div className="flex items-center gap-2">
                       <Tags className="w-3.5 h-3.5 text-primary" />
-                      <select aria-label="Manga tag catalog" value={mangaTagSource || 'anilist'}
+                      <select aria-label={uiI18n.t('app.manga_tag_catalog_3c6109dc')} value={mangaTagSource || 'anilist'}
                         onChange={(event) => { setMangaTagSource(event.target.value as 'anilist' | 'mangabaka'); setSelectedMangaTags([]); }}
                         className="min-h-11 rounded-lg border border-border bg-background px-3 text-sm">
-                        <option value="anilist">AniList tags</option>
-                        <option value="mangabaka">MangaBaka tags</option>
+                        <option value="anilist">{uiI18n.t('app.anilist_tags_57a023ee')}</option>
+                        <option value="mangabaka">{uiI18n.t('app.mangabaka_tags_982685a1')}</option>
                       </select>
                     </div>
                     <Input
                       value={mangaTagSearch}
                       onChange={(event) => setMangaTagSearch(event.target.value)}
-                      placeholder="Search manga tags..."
+                      placeholder={uiI18n.t('app.search_manga_tags_ba10d508')}
                       className="h-9 rounded-xl bg-background/80 border-white/10 text-xs"
                     />
                     <button
@@ -1882,7 +1886,7 @@ export default function SearchPage() {
                           : "border-white/10 bg-background/60 text-muted-foreground hover:border-amber-400/30 hover:text-amber-300"
                       )}
                     >
-                      {showSpoilerTags ? 'Spoiler tags shown' : 'Show spoiler tags'}
+                      {showSpoilerTags ? uiI18n.t('app.spoiler_tags_shown_9b29c01d') : uiI18n.t('app.show_spoiler_tags_de6453df')}
                     </button>
                     <div className="flex flex-wrap gap-1.5">
                       {selectedMangaTags.length > 0 ? selectedMangaTags.map((tag) => (
@@ -1895,7 +1899,7 @@ export default function SearchPage() {
                           {tag} x
                         </button>
                       )) : (
-                        <span className="text-[10px] text-muted-foreground">No manga tags selected</span>
+                        <span className="text-[10px] text-muted-foreground">{uiI18n.t('app.no_manga_tags_selected_05d6ce1a')}</span>
                       )}
                     </div>
                     <TagGroupCloud
@@ -1903,7 +1907,7 @@ export default function SearchPage() {
                       selected={selectedMangaTags}
                       onToggle={(name) => setSelectedMangaTags((current) => current.includes(name) ? current.filter((value) => value !== name) : [...current, name])}
                       maxHeightClass="max-h-40"
-                      emptyText="No tags match that search."
+                      emptyText={uiI18n.t('app.no_tags_match_that_search_b5b4f8be')}
                     />
                   </div>
 
@@ -1916,9 +1920,9 @@ export default function SearchPage() {
                       id="adult-filter"
                     />
                     <label htmlFor="adult-filter" className="text-xs font-bold uppercase tracking-wide text-muted-foreground group-hover:text-foreground cursor-pointer flex-1">
-                      18+ Adult Content
+                      {uiI18n.t('app.18_adult_content_9017958f')}
                     </label>
-                    {localMangaAdult && <span className="text-[10px] text-primary animate-pulse font-black">ENABLED</span>}
+                    {localMangaAdult && <span className="text-[10px] text-primary animate-pulse font-black">{uiI18n.t('app.enabled_e22fb092')}</span>}
                   </div>
                 </div>
 
@@ -1928,27 +1932,27 @@ export default function SearchPage() {
                 <div className="space-y-4 rounded-2xl border border-white/[0.06] bg-white/[0.015] p-4 md:p-5">
                   <div className="flex items-center gap-2 pb-2 border-b border-white/5">
                     <SlidersHorizontal className="w-4 h-4 text-primary" />
-                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-foreground">General Tuning</h3>
+                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-foreground">{uiI18n.t('app.general_tuning_6eb6147d')}</h3>
                   </div>
 
                   <div className="space-y-1.5">
-                    <label htmlFor="filter-localSortMode" className="text-xs text-muted-foreground font-semibold">Global Sort Method</label>
+                    <label htmlFor="filter-localSortMode" className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.global_sort_method_e38cf87c')}</label>
                     <select
                       id="filter-localSortMode"
                       value={localSortMode}
                       onChange={(e) => setLocalSortMode(e.target.value as any)}
                       className="w-full h-11 rounded-xl bg-background/80 border border-white/10 px-3 text-sm outline-none transition-[color,background-color,border-color,opacity,transform] cursor-pointer hover:border-white/25 hover:bg-background focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
                     >
-                      <option value="relevance">Relevance</option>
-                      <option value="rating">Highest Rating</option>
-                      <option value="popularity">Popularity</option>
-                      <option value="title">Title A-Z</option>
+                      <option value="relevance">{uiI18n.t('app.relevance_dcb70f52')}</option>
+                      <option value="rating">{uiI18n.t('app.highest_rating_2b1db9e1')}</option>
+                      <option value="popularity">{uiI18n.t('app.popularity_be6c200f')}</option>
+                      <option value="title">{uiI18n.t('app.title_a_z_ed803fe1')}</option>
                     </select>
                   </div>
 
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <p className="text-xs text-muted-foreground font-semibold">Min Rating</p>
+                      <p className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.min_rating_a8ae7609')}</p>
                       <span className="text-xs font-bold text-primary">{localMinRating.toFixed(1)}</span>
                     </div>
                     <input
@@ -1956,23 +1960,23 @@ export default function SearchPage() {
                       min={0}
                       max={10}
                       step={0.5}
-                      aria-label="Minimum rating" value={localMinRating}
+                      aria-label={uiI18n.t('app.minimum_rating_bdb888a3')} value={localMinRating}
                       onChange={(e) => setLocalMinRating(Number(e.target.value))}
                       className="w-full h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
                     />
                   </div>
 
                   <div className="space-y-1.5">
-                    <p className="text-xs text-muted-foreground font-semibold">Min Release Year</p>
+                    <p className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.min_release_year_e7f7c51e')}</p>
                     <div className="relative">
                       <Input
                         type="number"
                         min={1900}
                         max={new Date().getFullYear() + 1}
-                        aria-label="Minimum release year" value={localMinReleaseYear || ''}
+                        aria-label={uiI18n.t('app.minimum_release_year_5f7499af')} value={localMinReleaseYear || ''}
                         onChange={(e) => setLocalMinReleaseYear(Math.max(0, Number(e.target.value) || 0))}
                         className="h-10 rounded-xl bg-background/80 border-white/10 focus:border-primary/50"
-                        placeholder="Any year..."
+                        placeholder={uiI18n.t('app.any_year_7a823621')}
                       />
                       {localMinReleaseYear > 0 && (
                         <button
@@ -1987,31 +1991,31 @@ export default function SearchPage() {
 
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <p className="text-xs text-muted-foreground font-semibold">Max Rating</p>
-                      <span className="text-xs font-bold text-primary">{localMaxRating > 0 ? localMaxRating.toFixed(1) : 'Any'}</span>
+                      <p className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.max_rating_d60f5b91')}</p>
+                      <span className="text-xs font-bold text-primary">{localMaxRating > 0 ? localMaxRating.toFixed(1) : uiI18n.t('app.any_322444d3')}</span>
                     </div>
                     <input
                       type="range"
                       min={0}
                       max={10}
                       step={0.5}
-                      aria-label="Maximum rating" value={localMaxRating}
+                      aria-label={uiI18n.t('app.maximum_rating_ccbb633d')} value={localMaxRating}
                       onChange={(e) => setLocalMaxRating(Number(e.target.value))}
                       className="w-full h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
                     />
                   </div>
 
                   <div className="space-y-1.5">
-                    <p className="text-xs text-muted-foreground font-semibold">Max Release Year</p>
+                    <p className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.max_release_year_3431e8c7')}</p>
                     <div className="relative">
                       <Input
                         type="number"
                         min={1900}
                         max={new Date().getFullYear() + 1}
-                        aria-label="Maximum release year" value={localMaxReleaseYear || ''}
+                        aria-label={uiI18n.t('app.maximum_release_year_805454f8')} value={localMaxReleaseYear || ''}
                         onChange={(e) => setLocalMaxReleaseYear(Math.max(0, Number(e.target.value) || 0))}
                         className="h-10 rounded-xl bg-background/80 border-white/10 focus:border-primary/50"
-                        placeholder="Any year..."
+                        placeholder={uiI18n.t('app.any_year_7a823621')}
                       />
                       {localMaxReleaseYear > 0 && (
                         <button
@@ -2025,45 +2029,45 @@ export default function SearchPage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <p className="text-xs text-muted-foreground font-semibold">Season <span className="text-muted-foreground/60 normal-case">(anime)</span></p>
-                    <select aria-label="Season"
+                    <p className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.season_62255f56')} <span className="text-muted-foreground/60 normal-case">{uiI18n.t('app.anime_1483ec5d')}</span></p>
+                    <select aria-label={uiI18n.t('app.season_62255f56')}
                         value={localSeason}
                       onChange={(e) => setLocalSeason(e.target.value)}
                       className="w-full h-11 rounded-xl bg-background/80 border border-white/10 px-3 text-sm outline-none transition-[color,background-color,border-color,opacity,transform] cursor-pointer hover:border-white/25 hover:bg-background focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
                     >
-                      <option value="all">Any season</option>
-                      <option value="WINTER">Winter</option>
-                      <option value="SPRING">Spring</option>
-                      <option value="SUMMER">Summer</option>
-                      <option value="FALL">Fall</option>
+                      <option value="all">{uiI18n.t('app.any_season_3959b2c5')}</option>
+                      <option value="WINTER">{uiI18n.t('app.winter_24615d93')}</option>
+                      <option value="SPRING">{uiI18n.t('app.spring_89677615')}</option>
+                      <option value="SUMMER">{uiI18n.t('app.summer_7c92fc5c')}</option>
+                      <option value="FALL">{uiI18n.t('app.fall_5c1ae82c')}</option>
                     </select>
                   </div>
 
                   <div className="space-y-1.5">
-                    <p className="text-xs text-muted-foreground font-semibold">Episodes <span className="text-muted-foreground/60 normal-case">(anime)</span></p>
+                    <p className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.episodes_49d641ba')} <span className="text-muted-foreground/60 normal-case">{uiI18n.t('app.anime_1483ec5d')}</span></p>
                     <div className="grid grid-cols-2 gap-2">
                       <Input
                         type="number"
                         min={0}
-                        aria-label="Minimum episodes" value={localMinEpisodes || ''}
+                        aria-label={uiI18n.t('app.minimum_episodes_602509da')} value={localMinEpisodes || ''}
                         onChange={(e) => setLocalMinEpisodes(Math.max(0, Number(e.target.value) || 0))}
                         className="h-10 rounded-xl bg-background/80 border-white/10 focus:border-primary/50"
-                        placeholder="Min"
+                        placeholder={uiI18n.t('app.min_7eb0cee8')}
                       />
                       <Input
                         type="number"
                         min={0}
-                        aria-label="Maximum episodes" value={localMaxEpisodes || ''}
+                        aria-label={uiI18n.t('app.maximum_episodes_99e6d079')} value={localMaxEpisodes || ''}
                         onChange={(e) => setLocalMaxEpisodes(Math.max(0, Number(e.target.value) || 0))}
                         className="h-10 rounded-xl bg-background/80 border-white/10 focus:border-primary/50"
-                        placeholder="Max"
+                        placeholder={uiI18n.t('app.max_a95e85ae')}
                       />
                     </div>
                   </div>
 
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <p className="text-xs text-muted-foreground font-semibold">Image Confidence</p>
+                      <p className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.image_confidence_3ed346c3')}</p>
                       <span className="text-xs font-bold text-primary">{Math.round(imageConfidenceThreshold * 100)}%</span>
                     </div>
                     <input
@@ -2071,7 +2075,7 @@ export default function SearchPage() {
                       min={0.5}
                       max={1}
                       step={0.01}
-                      aria-label="Image confidence" value={imageConfidenceThreshold}
+                      aria-label={uiI18n.t('app.image_confidence_6efb4be8')} value={imageConfidenceThreshold}
                       onChange={(e) => setImageConfidenceThreshold(Number(e.target.value))}
                       className="w-full h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
                     />
@@ -2094,19 +2098,19 @@ export default function SearchPage() {
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold flex items-center gap-2">
                 <Film className="w-5 h-5 text-primary" />
-                Scene <span className="text-primary italic">Identification</span>
-                <span className="text-sm font-normal text-muted-foreground ml-1">({filteredImageResults.length} match{filteredImageResults.length !== 1 ? 'es' : ''})</span>
+                {uiI18n.t('app.scene_33446003')} <span className="text-primary italic">{uiI18n.t('app.identification_9d2c7063')}</span>
+                <span className="text-sm font-normal text-muted-foreground ml-1">({filteredImageResults.length} {uiI18n.t('app.match_ef5c844e')}{filteredImageResults.length !== 1 ? uiI18n.t('app.es_09cd68a2') : ''})</span>
               </h2>
               <button
                 onClick={() => { setImageResults(null); setSelectedFile(null); }}
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
-                Clear
+                {uiI18n.t('app.clear_719ea396')}
               </button>
             </div>
             {filteredImageResults.length === 0 ? (
               <GlassPanel className="p-6 text-sm text-muted-foreground">
-                No frame matches above {Math.round(imageConfidenceThreshold * 100)}% confidence. Lower the confidence filter to see more candidates.
+                {uiI18n.t('app.no_frame_matches_above_a2661490')} {Math.round(imageConfidenceThreshold * 100)}{uiI18n.t('app.confidence_lower_the_confidence_filter_to_see_mo_a747aab3')}
               </GlassPanel>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -2138,7 +2142,7 @@ export default function SearchPage() {
                       <div className="relative aspect-video bg-black flex-shrink-0 overflow-hidden">
                         <img
                           src={result.image}
-                          alt={`Frame from ${animeTitle}`}
+                          alt={uiI18n.t('app.frame_from_i18n_value_0_9347f326', { value0: animeTitle })}
                           className="w-full h-full object-cover"
                           onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                         />
@@ -2149,7 +2153,7 @@ export default function SearchPage() {
                         {/* Episode badge */}
                         {result.episode != null && (
                           <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-black/70 backdrop-blur-sm text-xs font-bold text-white">
-                            EP {result.episode}
+                            {uiI18n.t('app.ep_00c1bff9')} {result.episode}
                           </div>
                         )}
                         {/* Timestamp */}
@@ -2166,7 +2170,7 @@ export default function SearchPage() {
                             rel="noopener noreferrer"
                             className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/30"
                             onClick={(e) => e.stopPropagation()}
-                            title="Preview scene"
+                            title={uiI18n.t('app.preview_scene_08210673')}
                           >
                             <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30 hover:bg-white/30 transition-colors">
                               <Play className="w-5 h-5 text-white fill-white ml-0.5" />
@@ -2189,25 +2193,25 @@ export default function SearchPage() {
                           <p className="font-bold text-sm leading-tight line-clamp-2 mb-1">{animeTitle}</p>
                           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
                             {result.episode != null && (
-                              <span className="font-semibold text-foreground/70">Episode {result.episode}</span>
+                              <span className="font-semibold text-foreground/70">{uiI18n.t('app.episode_8669aa56')} {result.episode}</span>
                             )}
                             {timestampSecs !== null && (
-                              <span>at {formatTimestamp(timestampSecs)}</span>
+                              <span>{uiI18n.t('app.at_27e90dfa')} {formatTimestamp(timestampSecs)}</span>
                             )}
-                            <span className={`font-black ${similarityColor}`}>{similarityPct}% match</span>
+                            <span className={`font-black ${similarityColor}`}>{similarityPct}{uiI18n.t('app.match_a12e74de')}</span>
                           </div>
                           <div className="mt-3 flex gap-2">
                             <button
                               onClick={() => navigate(`/anime/${result.anilist}`)}
                               className="flex-1 py-1.5 rounded-lg bg-primary/15 hover:bg-primary/30 text-[10px] font-bold text-primary transition-[color,background-color,border-color,opacity,transform] border border-primary/20 hover:border-primary/40"
                             >
-                              View Anime
+                              {uiI18n.t('app.view_anime_fcdc083e')}
                             </button>
                             <button
                               onClick={() => navigate(`/search?q=${encodeURIComponent(animeTitle)}`)}
                               className="flex-1 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-[10px] font-bold text-muted-foreground hover:text-foreground transition-[color,background-color,border-color,opacity,transform] border border-white/5"
                             >
-                              Search
+                              {uiI18n.t('app.search_bce06414')}
                             </button>
                           </div>
                         </div>
@@ -2224,7 +2228,7 @@ export default function SearchPage() {
           <div className="mb-12 animate-in fade-in slide-in-from-top-4 duration-500">
             <h2 className="text-xl font-bold mb-6 flex items-center gap-3">
               <Puzzle className="w-5 h-5 text-primary" />
-              Community Modules ({extensionResults.length})
+              {uiI18n.t('app.community_modules_aa40ab23')}{extensionResults.length})
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {extensionResults.map((result, idx) => (
@@ -2240,7 +2244,7 @@ export default function SearchPage() {
                     <h3 className="font-bold text-sm truncate">{result.title}</h3>
                     <div className="flex items-center gap-2 mt-1">
                       <span className="text-[10px] font-black uppercase tracking-widest text-primary/70">{result.providerName}</span>
-                      <span className="text-[10px] text-muted-foreground">• {result.type || 'Result'}</span>
+                      <span className="text-[10px] text-muted-foreground">• {result.type || uiI18n.t('app.result_5faa59d4')}</span>
                     </div>
                   </div>
                   <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
@@ -2261,7 +2265,7 @@ export default function SearchPage() {
                   <div className="p-2 rounded-xl bg-primary/10 text-primary">
                     <User className="w-5 h-5" />
                   </div>
-                  <h2 className="text-2xl font-black tracking-tight">Character <span className="text-primary italic">Matches</span></h2>
+                  <h2 className="text-2xl font-black tracking-tight">{uiI18n.t('app.character_ee9946c8')} <span className="text-primary italic">{uiI18n.t('app.matches_ee2dbd5d')}</span></h2>
                 </div>
                 <div className={POSTER_GRID_CLASS}>
                   {characterResults.map((character: any) => (
@@ -2288,8 +2292,8 @@ export default function SearchPage() {
                     <Film className="w-5 h-5" />
                   </div>
                   <h2 className="text-2xl font-black tracking-tight">
-                    Episode <span className="text-primary italic">Matches</span>
-                    <span className="ml-2 text-sm font-normal text-muted-foreground">(by episode title)</span>
+                    {uiI18n.t('app.episode_8669aa56')} <span className="text-primary italic">{uiI18n.t('app.matches_ee2dbd5d')}</span>
+                    <span className="ml-2 text-sm font-normal text-muted-foreground">{uiI18n.t('app.by_episode_title_03d8c78e')}</span>
                   </h2>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -2312,10 +2316,10 @@ export default function SearchPage() {
                       <div className="min-w-0 flex-1">
                         <p className="font-bold text-sm truncate group-hover:text-primary transition-colors">{hit.animeName}</p>
                         <p className="text-xs text-muted-foreground truncate mt-0.5">
-                          <span className="font-semibold text-primary/70">Episode: </span>{hit.episodeTitle}
+                          <span className="font-semibold text-primary/70">{uiI18n.t('app.episode_8bffcf5b')} </span>{hit.episodeTitle}
                         </p>
                         <div className="flex items-center gap-2 mt-1">
-                          <span className="text-[10px] font-black uppercase tracking-widest text-primary/50 bg-primary/10 px-1.5 py-0.5 rounded-md">Episode Match</span>
+                          <span className="text-[10px] font-black uppercase tracking-widest text-primary/50 bg-primary/10 px-1.5 py-0.5 rounded-md">{uiI18n.t('app.episode_match_4f089f26')}</span>
                           <ChevronRight className="w-3 h-3 text-muted-foreground/40 group-hover:translate-x-1 transition-transform" />
                         </div>
                       </div>
@@ -2328,17 +2332,17 @@ export default function SearchPage() {
             {showNovelResults && novelSearchError && (
               <div role="alert" className="my-6 rounded-2xl border border-destructive/30 p-5">
                 <p>{novelSearchError.message}</p>
-                <Button className="mt-3" onClick={() => void retryNovelSearch()}>Retry novel search</Button>
+                <Button className="mt-3" onClick={() => void retryNovelSearch()}>{uiI18n.t('app.retry_novel_search_bb8570e7')}</Button>
               </div>
             )}
             {showMangaResults && mangaSearchError && (
               <div role="alert" className="my-6 rounded-2xl border border-destructive/30 p-5">
                 <p>{mangaSearchError.message}</p>
-                <Button className="mt-3" onClick={() => void retryMangaSearch()}>Retry manga search</Button>
+                <Button className="mt-3" onClick={() => void retryMangaSearch()}>{uiI18n.t('app.retry_manga_search_94f4e4f5')}</Button>
               </div>
             )}
             {showMangaResults && infiniteMangaData?.pages[0]?.source === 'mangabaka' && (
-              <p className="my-4 text-sm text-muted-foreground">Catalog: <a className="underline" href="https://mangabaka.org/data/api" target="_blank" rel="noreferrer">MangaBaka and its metadata providers</a>. Titles without a Tatakai mapping open on MangaBaka.</p>
+              <p className="my-4 text-sm text-muted-foreground">{uiI18n.t('app.catalog_4dabf82c')} <a className="underline" href="https://mangabaka.org/data/api" target="_blank" rel="noreferrer">{uiI18n.t('app.mangabaka_and_its_metadata_providers_7f97fa76')}</a>{uiI18n.t('app.titles_without_a_tatakai_mapping_open_on_mangaba_20de82ca')}</p>
             )}
             {(showAnimeResults || showMangaResults || showNovelResults) && (hasMixedResults || hasMoreResults) && (
               <>
@@ -2353,18 +2357,18 @@ export default function SearchPage() {
                   {isFetchingMoreResults ? (
                     <div className="flex items-center gap-3 text-primary animate-pulse bg-primary/5 px-6 py-3 rounded-2xl border border-primary/10">
                       <Loader2 className="w-5 h-5 animate-spin" />
-                      <span className="text-sm font-bold uppercase tracking-wider">Loading more...</span>
+                      <span className="text-sm font-bold uppercase tracking-wider">{uiI18n.t('app.loading_more_35e3dc3d')}</span>
                     </div>
                   ) : hasMoreResults ? (
                     <Button variant="outline" onClick={() => {
                       if (hasNextAnimePage) void (isProducerRoute ? fetchNextProducerPage() : fetchNextSearchPage());
                       if (hasNextMangaPage) void fetchNextMangaPage();
                       if (hasNextNovelPage) void fetchNextNovelPage();
-                    }}>Load more results</Button>
+                    }}>{uiI18n.t('app.load_more_results_1faf82e4')}</Button>
                   ) : (
                     <div className="flex flex-col items-center gap-2 opacity-40">
                       <div className="h-px w-24 bg-border" />
-                      <span className="text-[10px] font-black uppercase tracking-[0.2em]">End of results</span>
+                      <span className="text-[10px] font-black uppercase tracking-[0.2em]">{uiI18n.t('app.end_of_results_a68743b8')}</span>
                     </div>
                   )}
                 </div>
@@ -2374,8 +2378,8 @@ export default function SearchPage() {
             {!hasAnyResult && !hasMoreResults && !mangaSearchError && !novelSearchError && (
               <div className="text-center py-20">
                 <Search className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-                <h2 className="text-xl font-semibold mb-2">No results found</h2>
-                <p className="text-muted-foreground">Try broadening filters or using a different query</p>
+                <h2 className="text-xl font-semibold mb-2">{uiI18n.t('app.no_results_found_658e79f9')}</h2>
+                <p className="text-muted-foreground">{uiI18n.t('app.try_broadening_filters_or_using_a_different_quer_3e21e6f7')}</p>
               </div>
             )}
           </>
@@ -2384,7 +2388,7 @@ export default function SearchPage() {
           <div className="mt-8 flex w-full flex-col items-center text-center">
             {recentSearches.length > 0 && (
               <div className="mb-8 w-full max-w-3xl">
-                <p className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">Recent searches</p>
+                <p className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">{uiI18n.t('app.recent_searches_a73d2913')}</p>
                 <div className="flex flex-wrap justify-center gap-2.5">
                   {recentSearches.map((term, idx) => (
                     <div key={idx} className="group inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-xs transition-[color,background-color,border-color,opacity,transform]">
@@ -2397,7 +2401,7 @@ export default function SearchPage() {
                       <button
                         onClick={(e) => { e.stopPropagation(); deleteSearchItem(term); }}
                         className="opacity-0 group-hover:opacity-100 transition-opacity ml-1 text-muted-foreground hover:text-destructive"
-                        title="Remove"
+                        title={uiI18n.t('app.remove_e963907d')}
                       >
                         <X className="w-3 h-3" />
                       </button>

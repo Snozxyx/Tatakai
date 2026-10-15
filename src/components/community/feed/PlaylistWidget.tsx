@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useNavigate } from 'react-router-dom';
 import { Music2, Play } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -17,9 +19,10 @@ export function PlaylistWidget({
     'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx16498-buvcRTBx4NSm.jpg',
     'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx21-ELSYx3yMPcKM.jpg',
   ],
-  title = 'Anime OSTs & Mixes',
+  title = uiI18n.t('app.anime_osts_mixes_0fda0153'),
   itemCount = 24,
 }: PlaylistWidgetProps) {
+  useUiTranslation();
   const navigate = useNavigate();
   const displayImages = coverImages.slice(0, 4);
 
@@ -42,7 +45,7 @@ export function PlaylistWidget({
             <Music2 className="h-3.5 w-3.5 text-emerald-400" />
           </div>
           <span className="text-[11px] font-bold uppercase tracking-widest text-emerald-400">
-            Playlists
+            {uiI18n.t('app.playlists_77b69f32')}
           </span>
         </div>
       </div>
@@ -59,7 +62,7 @@ export function PlaylistWidget({
             )}>
               {displayImages.map((img, idx) => (
                 <div key={idx} className="relative h-full w-full overflow-hidden bg-zinc-800">
-                  <img src={img} alt={`Playlist cover ${idx + 1}`} className="h-full w-full object-cover" />
+                  <img src={img} alt={uiI18n.t('app.playlist_cover_i18n_value_0_9e1d5b80', { value0: idx + 1 })} className="h-full w-full object-cover" />
                 </div>
               ))}
             </div>
@@ -81,7 +84,7 @@ export function PlaylistWidget({
                 {title}
               </h3>
               <p className="mt-0.5 text-[11px] font-medium text-muted-foreground">
-                {itemCount} {itemCount === 1 ? 'track' : 'tracks'}
+                {itemCount} {itemCount === 1 ? uiI18n.t('app.track_42aef171') : uiI18n.t('app.tracks_fc2b7585')}
               </p>
             </div>
 

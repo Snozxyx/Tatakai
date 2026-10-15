@@ -1,10 +1,12 @@
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { motion } from "framer-motion";
 import { Home, Search, ArrowLeft, Ghost, Compass } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusVideoBackground } from "@/components/layout/StatusVideoBackground";
 
 const NotFound = () => {
+  const { t } = useTranslation();
   return (
     <div className="min-h-screen flex items-center justify-center p-4 overflow-hidden relative">
       <StatusVideoBackground overlayColor="from-primary/10 via-background/90 to-background/95" />
@@ -61,11 +63,11 @@ const NotFound = () => {
           className="bg-card/50 backdrop-blur-xl border border-border/50 rounded-2xl p-8 shadow-2xl"
         >
           <h2 className="font-display text-2xl md:text-3xl font-bold text-foreground mb-4">
-            Lost in the Void
+            {t('errors.lostInVoid')}
           </h2>
           
           <p className="text-muted-foreground text-lg mb-8">
-            The page you're looking for has vanished into another dimension. Let's get you back on track!
+            {t('errors.notFoundDesc')}
           </p>
 
           {/* Action Buttons */}
@@ -78,13 +80,13 @@ const NotFound = () => {
             <Button asChild size="lg" className="gap-2">
               <Link to="/">
                 <Home className="w-5 h-5" />
-                Back to Home
+                {t('errors.backToHome')}
               </Link>
             </Button>
             <Button asChild variant="outline" size="lg" className="gap-2">
               <Link to="/search">
                 <Search className="w-5 h-5" />
-                Search Anime
+                {t('errors.searchAnime')}
               </Link>
             </Button>
           </motion.div>
@@ -102,7 +104,7 @@ const NotFound = () => {
             className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors group"
           >
             <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-            Go back to previous page
+            {t('errors.goBackPrevious')}
           </button>
         </motion.div>
 

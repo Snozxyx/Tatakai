@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Background } from "@/components/layout/Background";
@@ -17,15 +19,16 @@ import { MangaTrendingSection } from '@/components/manga/MangaTrendingSection';
 type TabType = 'trending' | 'popular' | 'favorites' | 'airing' | 'completed' | 'season-now' | 'upcoming';
 
 const TABS: { id: TabType; icon: any; label: string; isJikan?: boolean }[] = [
-  { id: "popular", icon: Flame, label: "Popular" },
-  { id: "favorites", icon: Heart, label: "Favorite" },
-  { id: "airing", icon: Star, label: "Airing" },
-  { id: "completed", icon: Clock, label: "Completing" },
-  { id: "season-now", icon: Calendar, label: "The Season", isJikan: true },
-  { id: "upcoming", icon: Sparkles, label: "Upcoming", isJikan: true },
+  { id: "popular", icon: Flame, get label() { return uiI18n.t('app.popular_9bc2c5b3'); } },
+  { id: "favorites", icon: Heart, get label() { return uiI18n.t('app.favorite_6b90b6a1'); } },
+  { id: "airing", icon: Star, get label() { return uiI18n.t('app.airing_6b3a6f4c'); } },
+  { id: "completed", icon: Clock, get label() { return uiI18n.t('app.completing_e25146cc'); } },
+  { id: "season-now", icon: Calendar, get label() { return uiI18n.t('app.the_season_caac9aec'); }, isJikan: true },
+  { id: "upcoming", icon: Sparkles, get label() { return uiI18n.t('app.upcoming_523baab9'); }, isJikan: true },
 ];
 
 function CollectionsHero({ anime, title }: { anime: AnimeCard; title: string }) {
+  useUiTranslation();
   const navigate = useNavigate();
 
   // Handle MAL anime IDs (they start with "mal-")
@@ -61,7 +64,7 @@ function CollectionsHero({ anime, title }: { anime: AnimeCard; title: string }) 
         <div className="flex items-center gap-3 mb-4">
           <div className="px-2 md:px-3 py-1 rounded-full bg-orange-500/20 backdrop-blur-md border border-orange-500/30 text-orange-400 text-[10px] md:text-xs font-bold uppercase tracking-widest flex items-center gap-1 md:gap-2">
             <Star className="w-3 h-3 fill-current" />
-            Top Featured in {title}
+            {uiI18n.t('app.top_featured_in_780af4f4')} {title}
           </div>
         </div>
 
@@ -75,13 +78,13 @@ function CollectionsHero({ anime, title }: { anime: AnimeCard; title: string }) 
             className="flex items-center gap-2 px-4 md:px-8 py-2 md:py-3 bg-white text-black rounded-xl md:rounded-2xl text-sm md:text-base font-bold hover:scale-105 transition-all shadow-xl"
           >
             <PlayCircle className="w-5 h-5" />
-            Watch Now
+            {uiI18n.t('app.watch_now_fe70cb6e')}
           </button>
           <button
             onClick={handleClick}
             className="hidden sm:block px-4 md:px-8 py-2 md:py-3 bg-white/10 backdrop-blur-md text-white rounded-xl md:rounded-2xl text-sm md:text-base font-bold hover:bg-white/20 transition-all border border-white/10"
           >
-            Details
+            {uiI18n.t('app.details_dc3decbb')}
           </button>
         </div>
       </div>
@@ -90,6 +93,7 @@ function CollectionsHero({ anime, title }: { anime: AnimeCard; title: string }) 
 }
 
 export default function CollectionsPage() {
+  useUiTranslation();
   const navigate = useNavigate();
   const isDesktopApp = useIsDesktopApp();
   const [activeTab, setActiveTab] = useState<TabType>("popular");
@@ -176,9 +180,9 @@ export default function CollectionsPage() {
                 <Library className="w-6 h-6 md:w-8 md:h-8 text-white" />
               </div>
               <div>
-                <h1 className="text-2xl md:text-3xl lg:text-5xl font-black tracking-tighter">Collections</h1>
+                <h1 className="text-2xl md:text-3xl lg:text-5xl font-black tracking-tighter">{uiI18n.t('app.collections_4bbb632f')}</h1>
                 <p className="text-muted-foreground text-sm md:text-base font-medium">
-                  Explore curated masterpiece libraries
+                  {uiI18n.t('app.explore_curated_masterpiece_libraries_cfa777a0')}
                 </p>
               </div>
             </div>
@@ -188,7 +192,7 @@ export default function CollectionsPage() {
               className="flex items-center gap-2 px-4 md:px-5 py-2 md:py-2.5 rounded-xl bg-card/40 backdrop-blur-xl border border-white/5 text-muted-foreground hover:text-white transition-all w-fit"
             >
               <ArrowLeft className="w-4 h-4" />
-              <span className="text-sm font-bold">Go Back</span>
+              <span className="text-sm font-bold">{uiI18n.t('app.go_back_f03e2d07')}</span>
             </button>
           </div>
         </div>
@@ -204,7 +208,7 @@ export default function CollectionsPage() {
                 <tab.icon className="w-3 h-3 md:w-4 md:h-4" />
                 <span className="font-bold">{tab.label}</span>
                 {tab.isJikan && (
-                  <span className="hidden md:inline text-[10px] opacity-60 ml-1">MAL</span>
+                  <span className="hidden md:inline text-[10px] opacity-60 ml-1">{uiI18n.t('app.mal_308b46c0')}</span>
                 )}
               </TabsTrigger>
             ))}
@@ -254,9 +258,9 @@ export default function CollectionsPage() {
                     {currentCollection.length === 0 && (
                       <div className="flex flex-col items-center justify-center py-24 text-center">
                         <Library className="w-16 h-16 text-muted-foreground/20 mb-4" />
-                        <h3 className="text-xl font-bold mb-2">No Anime Found</h3>
+                        <h3 className="text-xl font-bold mb-2">{uiI18n.t('app.no_anime_found_7cb7d047')}</h3>
                         <p className="text-muted-foreground">
-                          Try selecting a different collection tab
+                          {uiI18n.t('app.try_selecting_a_different_collection_tab_1ebbd9c9')}
                         </p>
                       </div>
                     )}
@@ -270,7 +274,7 @@ export default function CollectionsPage() {
         {/* ── Manga Discovery ───────────────────────────────────────── */}
         <div className="mt-12">
           <MangaTrendingSection
-            title="Discover Manga"
+            title={uiI18n.t('app.discover_manga_693e598c')}
             defaultTab="manhwa"
             showTabs
             limit={18}

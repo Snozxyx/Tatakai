@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useIsMobile } from '@/hooks/ui/use-mobile';
@@ -16,6 +18,7 @@ interface LayerProps { reduce: boolean; compact: boolean; }
 
 /** Above ambient artwork, below content. The host owns its isolated stacking context. */
 export function ProfileBackgroundEffects({ effect, variant = 'page' }: ProfileBackgroundEffectsProps) {
+  useUiTranslation();
   const reduce = useMotionPreference();
   const isMobile = useIsMobile();
   const compact = variant === 'widget';
@@ -67,6 +70,7 @@ const PARTICLE_SCENES = {
 } satisfies Record<ParticleKind, { count: number; smallCount: number; duration: number; animation: string; background: string }>;
 
 function ParticleLayer({ kind, reduce, compact, widget }: LayerProps & { kind: ParticleKind; widget: boolean }) {
+  useUiTranslation();
   const scene = PARTICLE_SCENES[kind];
   const count = widget ? Math.ceil(scene.smallCount * 0.65) : compact ? scene.smallCount : scene.count;
   // Stable distribution keeps particles from jumping when settings or viewport change.
@@ -101,6 +105,7 @@ function ParticleLayer({ kind, reduce, compact, widget }: LayerProps & { kind: P
 }
 
 function BlackholeLayer({ reduce, compact }: LayerProps) {
+  useUiTranslation();
   return (
     <>
       <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at 50% 43%, #030108 5%, #0c0719 30%, hsl(var(--profile-accent) / 0.12) 65%, #070910)' }} />
@@ -115,6 +120,7 @@ function BlackholeLayer({ reduce, compact }: LayerProps) {
 }
 
 function SkyLayer({ reduce, compact }: LayerProps) {
+  useUiTranslation();
   return (
     <>
       <div className="absolute inset-0" style={{ background: 'linear-gradient(155deg, #101d36, #252044 40%, #15344a 75%, #0c1427)' }} />
@@ -129,6 +135,7 @@ function SkyLayer({ reduce, compact }: LayerProps) {
 }
 
 function AuroraLayer({ reduce, compact }: LayerProps) {
+  useUiTranslation();
   return (
     <>
       <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, #06141e, #081b23 55%, #0a101d)' }} />
@@ -145,6 +152,7 @@ function AuroraLayer({ reduce, compact }: LayerProps) {
 }
 
 function MoonlitLayer({ reduce, compact }: LayerProps) {
+  useUiTranslation();
   return (
     <>
       <ParticleLayer kind="stars" reduce={reduce} compact={compact} widget={compact} />
@@ -159,6 +167,7 @@ function MoonlitLayer({ reduce, compact }: LayerProps) {
 }
 
 function PrismLayer({ reduce, compact }: LayerProps) {
+  useUiTranslation();
   return (
     <>
       <div className="absolute inset-0" style={{ background: 'linear-gradient(150deg, #101322, #191527 50%, #0b1620)' }} />
@@ -171,6 +180,7 @@ function PrismLayer({ reduce, compact }: LayerProps) {
 }
 
 function OceanLayer({ reduce, compact }: LayerProps) {
+  useUiTranslation();
   return (
     <>
       <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, #12303d, #09222f 45%, #040f1d)' }} />

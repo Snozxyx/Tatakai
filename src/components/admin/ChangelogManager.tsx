@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,10 +15,11 @@ import { toast } from 'sonner';
 import { 
   History, Plus, X, Trash2, Loader2, Edit2, Eye, EyeOff, Star
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format } from '@/lib/localeFormat';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 
 export function ChangelogManager() {
+  useUiTranslation();
   const confirm = useConfirm();
   const [showForm, setShowForm] = useState(false);
   const [editingChangelog, setEditingChangelog] = useState<Changelog | null>(null);
@@ -61,12 +64,12 @@ export function ChangelogManager() {
 
   const handleSave = async () => {
     if (!formData.version.trim()) {
-      toast.error('Please enter a version');
+      toast.error(uiI18n.t('app.please_enter_a_version_e44dab11'));
       return;
     }
 
     if (formData.changes.filter(c => c.trim()).length === 0) {
-      toast.error('Please add at least one change');
+      toast.error(uiI18n.t('app.please_add_at_least_one_change_a0b7fa12'));
       return;
     }
 
@@ -82,26 +85,26 @@ export function ChangelogManager() {
 
       if (editingChangelog) {
         await updateChangelog.mutateAsync({ id: editingChangelog.id, updates: data });
-        toast.success('Changelog updated');
+        toast.success(uiI18n.t('app.changelog_updated_a72bff92'));
       } else {
         await createChangelog.mutateAsync(data);
-        toast.success('Changelog created');
+        toast.success(uiI18n.t('app.changelog_created_3c2af52b'));
       }
       setShowForm(false);
       resetForm();
     } catch (error) {
-      toast.error('Failed to save changelog');
+      toast.error(uiI18n.t('app.failed_to_save_changelog_70582466'));
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!(await confirm({ title: 'Are you sure you want to delete this changelog entry?', destructive: true }))) return;
+    if (!(await confirm({ get title() { return uiI18n.t('app.are_you_sure_you_want_to_delete_this_changelog_e_463c9611'); }, destructive: true }))) return;
     
     try {
       await deleteChangelog.mutateAsync(id);
-      toast.success('Changelog deleted');
+      toast.success(uiI18n.t('app.changelog_deleted_3518eaa1'));
     } catch (error) {
-      toast.error('Failed to delete changelog');
+      toast.error(uiI18n.t('app.failed_to_delete_changelog_d8b7e482'));
     }
   };
 
@@ -111,9 +114,9 @@ export function ChangelogManager() {
         id: changelog.id, 
         updates: { is_published: !changelog.is_published } 
       });
-      toast.success(changelog.is_published ? 'Changelog unpublished' : 'Changelog published');
+      toast.success(changelog.is_published ? uiI18n.t('app.changelog_unpublished_77fe1d75') : uiI18n.t('app.changelog_published_1f87cb8a'));
     } catch (error) {
-      toast.error('Failed to update changelog');
+      toast.error(uiI18n.t('app.failed_to_update_changelog_e008f3e1'));
     }
   };
 
@@ -141,11 +144,11 @@ export function ChangelogManager() {
       <div className="flex items-center justify-between">
         <h2 className="font-display text-xl font-semibold flex items-center gap-2">
           <History className="w-5 h-5 text-primary" />
-          Changelog Manager
+          {uiI18n.t('app.changelog_manager_da7d0f06')}
         </h2>
         <Button onClick={() => { resetForm(); setShowForm(true); }} className="gap-2">
           <Plus className="w-4 h-4" />
-          New Release
+          {uiI18n.t('app.new_release_e75aa11b')}
         </Button>
       </div>
 
@@ -153,7 +156,7 @@ export function ChangelogManager() {
       {showForm && (
         <div className="p-6 rounded-xl bg-muted/30 border border-muted space-y-6">
           <div className="flex items-center justify-between">
-            <h3 className="font-medium">{editingChangelog ? 'Edit Release' : 'Create New Release'}</h3>
+            <h3 className="font-medium">{editingChangelog ? uiI18n.t('app.edit_release_c0acc67e') : uiI18n.t('app.create_new_release_348eef19')}</h3>
             <button onClick={() => { setShowForm(false); resetForm(); }} className="text-muted-foreground hover:text-foreground">
               <X className="w-5 h-5" />
             </button>
@@ -161,7 +164,7 @@ export function ChangelogManager() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="text-sm font-medium mb-2 block">Version *</label>
+              <label className="text-sm font-medium mb-2 block">{uiI18n.t('app.version_6f96d8db')}</label>
               <Input
                 value={formData.version}
                 onChange={(e) => setFormData(prev => ({ ...prev, version: e.target.value }))}
@@ -170,7 +173,7 @@ export function ChangelogManager() {
               />
             </div>
             <div>
-              <label className="text-sm font-medium mb-2 block">Release Date</label>
+              <label className="text-sm font-medium mb-2 block">{uiI18n.t('app.release_date_645195f3')}</label>
               <Input
                 type="date"
                 value={formData.release_date}
@@ -179,11 +182,11 @@ export function ChangelogManager() {
               />
             </div>
             <div>
-              <label className="text-sm font-medium mb-2 block">Title (Optional)</label>
+              <label className="text-sm font-medium mb-2 block">{uiI18n.t('app.title_optional_03834ae5')}</label>
               <Input
                 value={formData.title}
                 onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                placeholder="e.g., Big Summer Update"
+                placeholder={uiI18n.t('app.e_g_big_summer_update_1f7a0461')}
                 className="bg-muted/50"
               />
             </div>
@@ -191,10 +194,10 @@ export function ChangelogManager() {
 
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-medium">Changes *</label>
+              <label className="text-sm font-medium">{uiI18n.t('app.changes_b915c46f')}</label>
               <Button variant="ghost" size="sm" onClick={addChange} className="gap-1">
                 <Plus className="w-3 h-3" />
-                Add Change
+                {uiI18n.t('app.add_change_bee9e959')}
               </Button>
             </div>
             <div className="space-y-2">
@@ -203,7 +206,7 @@ export function ChangelogManager() {
                   <Input
                     value={change}
                     onChange={(e) => updateChange(index, e.target.value)}
-                    placeholder="Describe a change..."
+                    placeholder={uiI18n.t('app.describe_a_change_86886d66')}
                     className="bg-muted/50"
                   />
                   {formData.changes.length > 1 && (
@@ -227,7 +230,7 @@ export function ChangelogManager() {
                 checked={formData.is_published}
                 onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_published: checked }))}
               />
-              <span className="text-sm">Published</span>
+              <span className="text-sm">{uiI18n.t('app.published_483bf207')}</span>
             </div>
             <div className="flex items-center gap-2">
               <Switch
@@ -235,7 +238,7 @@ export function ChangelogManager() {
                 onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_latest: checked }))}
               />
               <Star className="w-4 h-4 text-yellow-500" />
-              <span className="text-sm">Latest Release</span>
+              <span className="text-sm">{uiI18n.t('app.latest_release_8c0770b8')}</span>
             </div>
           </div>
 
@@ -246,10 +249,10 @@ export function ChangelogManager() {
               className="gap-2"
             >
               {(createChangelog.isPending || updateChangelog.isPending) && <Loader2 className="w-4 h-4 animate-spin" />}
-              {editingChangelog ? 'Update' : 'Create'} Release
+              {editingChangelog ? uiI18n.t('app.update_fb91e24f') : uiI18n.t('app.create_6e157c5d')} {uiI18n.t('app.release_d41f56ce')}
             </Button>
             <Button variant="outline" onClick={() => { setShowForm(false); resetForm(); }}>
-              Cancel
+              {uiI18n.t('app.cancel_77dfd213')}
             </Button>
           </div>
         </div>
@@ -261,42 +264,38 @@ export function ChangelogManager() {
       ) : changelogs.length === 0 ? (
         <div className="text-center py-12">
           <History className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-          <p className="text-muted-foreground">No changelog entries yet</p>
+          <p className="text-muted-foreground">{uiI18n.t('app.no_changelog_entries_yet_4e321952')}</p>
         </div>
       ) : (
         <div className="space-y-4">
           {changelogs.map((changelog) => (
             <div
               key={changelog.id}
-              className={`p-4 rounded-xl border transition-all ${
-                changelog.is_latest 
+              className={`p-4 rounded-xl border transition-all ${changelog.is_latest
                   ? 'border-primary bg-primary/5' 
                   : changelog.is_published 
                     ? 'border-muted' 
-                    : 'border-muted opacity-60'
-              }`}
+                    : 'border-muted opacity-60'}`}
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-2">
-                    <span className={`px-2 py-0.5 rounded-md text-xs font-bold ${
-                      changelog.is_latest ? 'bg-primary text-primary-foreground' : 'bg-muted'
-                    }`}>
+                    <span className={`px-2 py-0.5 rounded-md text-xs font-bold ${changelog.is_latest ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
                       v{changelog.version}
                     </span>
                     {changelog.is_latest && (
                       <span className="px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-500 text-xs font-bold flex items-center gap-1">
                         <Star className="w-3 h-3" />
-                        LATEST
+                        {uiI18n.t('app.latest_e5951ac8')}
                       </span>
                     )}
                     {changelog.is_published ? (
                       <span className="px-2 py-0.5 rounded-full bg-green-500/20 text-green-500 text-xs">
-                        Published
+                        {uiI18n.t('app.published_483bf207')}
                       </span>
                     ) : (
                       <span className="px-2 py-0.5 rounded-full bg-muted text-muted-foreground text-xs">
-                        Draft
+                        {uiI18n.t('app.draft_23d33e22')}
                       </span>
                     )}
                     <span className="text-xs text-muted-foreground">
@@ -323,7 +322,7 @@ export function ChangelogManager() {
                     variant="ghost"
                     size="sm"
                     onClick={() => handleTogglePublished(changelog)}
-                    title={changelog.is_published ? 'Unpublish' : 'Publish'}
+                    title={changelog.is_published ? uiI18n.t('app.unpublish_1ac0a74d') : uiI18n.t('app.publish_56564005')}
                   >
                     {changelog.is_published ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </Button>

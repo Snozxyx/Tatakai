@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { debridOrchestrator, extractMagnetHash } from '@/core/providers/debrid-orchestrator';
 import type { AvailabilityState } from '@/core/providers/cloud-debrid-client';
 /**
@@ -30,6 +32,7 @@ import {
   X,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { useTranslation } from "react-i18next";
 import {
   TORRENT_SORT_OPTIONS,
   formatBytesShort,
@@ -80,6 +83,7 @@ export function TorrentSourcePanel({
   canPlayTorrent,
   onSelect,
 }: TorrentSourcePanelProps) {
+  useUiTranslation();
   const [accountRevision, setAccountRevision] = useState(0);
   useEffect(() => {
     const update = () => setAccountRevision(value => value + 1);
@@ -100,6 +104,7 @@ export function TorrentSourcePanel({
   const [hideDead, setHideDead] = useState(false);
   const [hideBatches, setHideBatches] = useState(false);
   const [minQuality, setMinQuality] = useState<number>(0);
+  const { t } = useTranslation();
 
   // Which quality tiers this episode actually has — offering "1080p+" when
   // nothing above 720p was found is a filter that can only return nothing.
@@ -164,12 +169,12 @@ export function TorrentSourcePanel({
         <div className="flex items-center gap-2">
           <Magnet className="h-3.5 w-3.5 text-emerald-400" />
           <span className="text-xs font-bold uppercase tracking-widest text-emerald-400">
-            Torrent releases
+            {t('torrent.panel.title')}
           </span>
           <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-muted-foreground">
             {sorted.length === sources.length
-              ? `${sources.length}`
-              : `${sorted.length} of ${sources.length}`}
+              ? t('torrent.panel.countTotal', { total: sources.length })
+              : t('torrent.panel.countFiltered', { shown: sorted.length, total: sources.length })}
           </span>
         </div>
 
@@ -178,7 +183,7 @@ export function TorrentSourcePanel({
           <Input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Filter releases, groups, codecs..."
+            placeholder={t('torrent.panel.filterPlaceholder')}
             className="h-8 rounded-lg border-white/10 bg-black/20 pl-7 pr-7 text-xs"
           />
           {query && (
@@ -186,7 +191,7 @@ export function TorrentSourcePanel({
               type="button"
               onClick={() => setQuery("")}
               className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              aria-label="Clear release filter"
+              aria-label={t('torrent.panel.clearFilter')}
             >
               <X className="h-3 w-3" />
             </button>
@@ -197,7 +202,7 @@ export function TorrentSourcePanel({
       {/* ── Sort + filter controls ─────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center gap-1.5">
         <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-          Sort
+          {t('torrent.panel.sort')}
         </span>
         {TORRENT_SORT_OPTIONS.map((option) => {
           const active = option.key === sortKey;
@@ -206,12 +211,10 @@ export function TorrentSourcePanel({
               key={option.key}
               type="button"
               onClick={() => applySort(option.key)}
-              className={`flex h-7 items-center gap-1 rounded-lg px-2.5 text-[11px] font-medium transition-all ${
-                active
+              className={`flex h-7 items-center gap-1 rounded-lg px-2.5 text-[11px] font-medium transition-all ${active
                   ? "bg-foreground text-background"
-                  : "bg-white/5 text-muted-foreground hover:bg-white/10 hover:text-foreground"
-              }`}
-              title={active ? "Click again to reverse" : `Sort by ${option.label.toLowerCase()}`}
+                  : "bg-white/5 text-muted-foreground hover:bg-white/10 hover:text-foreground"}`}
+              title={active ? t('torrent.panel.reverseSort') : t('torrent.panel.sortBy', { label: option.label.toLowerCase() })}
             >
               {option.label}
               {active &&
@@ -229,26 +232,22 @@ export function TorrentSourcePanel({
         <button
           type="button"
           onClick={() => setHideDead((value) => !value)}
-          className={`h-7 rounded-lg px-2.5 text-[11px] font-medium transition-all ${
-            hideDead
+          className={`h-7 rounded-lg px-2.5 text-[11px] font-medium transition-all ${hideDead
               ? "bg-red-500/20 text-red-300"
-              : "bg-white/5 text-muted-foreground hover:bg-white/10 hover:text-foreground"
-          }`}
-          title="Hide releases the indexer reports as having no seeders"
+              : "bg-white/5 text-muted-foreground hover:bg-white/10 hover:text-foreground"}`}
+          title={t('torrent.panel.hideDeadHint')}
         >
-          Hide 0 seeders
+          {t('torrent.panel.hideDead')}
         </button>
         <button
           type="button"
           onClick={() => setHideBatches((value) => !value)}
-          className={`h-7 rounded-lg px-2.5 text-[11px] font-medium transition-all ${
-            hideBatches
+          className={`h-7 rounded-lg px-2.5 text-[11px] font-medium transition-all ${hideBatches
               ? "bg-amber-500/20 text-amber-300"
-              : "bg-white/5 text-muted-foreground hover:bg-white/10 hover:text-foreground"
-          }`}
-          title="Hide season packs — they download in full even for one episode"
+              : "bg-white/5 text-muted-foreground hover:bg-white/10 hover:text-foreground"}`}
+          title={t('torrent.panel.hideBatchesHint')}
         >
-          Hide batches
+          {t('torrent.panel.hideBatches')}
         </button>
 
         {qualityTiers.length > 1 && (
@@ -256,12 +255,12 @@ export function TorrentSourcePanel({
             value={minQuality}
             onChange={(event) => setMinQuality(Number(event.target.value))}
             className="h-7 rounded-lg border border-white/10 bg-black/20 px-2 text-[11px] text-foreground outline-none"
-            title="Minimum resolution"
+            title={t('torrent.panel.minResolution')}
           >
-            <option value={0}>Any quality</option>
+            <option value={0}>{t('torrent.panel.anyQuality')}</option>
             {qualityTiers.map((tier) => (
               <option key={tier} value={tier}>
-                {tier >= 2160 ? "4K" : `${tier}p`}+
+                {tier >= 2160 ? "4K" : uiI18n.t('app.i18n_value_0p_f996f669', { value0: tier })}+
               </option>
             ))}
           </select>
@@ -278,7 +277,7 @@ export function TorrentSourcePanel({
             }}
             className="h-7 rounded-lg px-2 text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
           >
-            Reset
+            {t('torrent.panel.reset')}
           </button>
         )}
       </div>
@@ -286,7 +285,7 @@ export function TorrentSourcePanel({
       {/* ── Rows ───────────────────────────────────────────────────────────── */}
       {sorted.length === 0 ? (
         <div className="rounded-xl border border-dashed border-white/10 p-4 text-center text-[11px] text-muted-foreground">
-          No releases match these filters.
+          {t('torrent.panel.noMatches')}
         </div>
       ) : (
         <div className="flex max-h-[22rem] flex-col gap-1.5 overflow-y-auto pr-1">
@@ -305,12 +304,10 @@ export function TorrentSourcePanel({
                 type="button"
                 onClick={() => onSelect(source)}
                 disabled={!canPlayTorrent}
-                className={`group flex w-full flex-col gap-1 rounded-xl border px-3 py-2 text-left transition-all disabled:cursor-not-allowed disabled:opacity-50 ${
-                  isActive
+                className={`group flex w-full flex-col gap-1 rounded-xl border px-3 py-2 text-left transition-all disabled:cursor-not-allowed disabled:opacity-50 ${isActive
                     ? "border-emerald-400/60 bg-emerald-500/15"
-                    : "border-white/5 bg-white/[0.02] hover:border-emerald-500/30 hover:bg-emerald-500/10"
-                }`}
-                title={canPlayTorrent ? title : "Torrent playback needs the Tatakai desktop or mobile app"}
+                    : "border-white/5 bg-white/[0.02] hover:border-emerald-500/30 hover:bg-emerald-500/10"}`}
+                title={canPlayTorrent ? title : t('migration.torrentNeedsApp')}
               >
                 <div className="flex items-start gap-2">
                   <span className={`mt-[6px] h-1.5 w-1.5 shrink-0 rounded-full ${HEALTH_DOT[health]}`} />
@@ -321,12 +318,12 @@ export function TorrentSourcePanel({
                     const hash = extractMagnetHash(source.magnet || source.magnetLink || source.url || '');
                     const state = hash ? availability[hash] || 'unknown' : 'unknown';
                     return <span className={`shrink-0 text-[10px] ${state === 'cached' ? 'text-emerald-400' : 'text-muted-foreground'}`}>
-                      {state === 'cached' ? 'Cached' : state === 'uncached' ? 'Uncached' : state === 'error' ? 'Check failed' : 'Unknown'}
+                      {state === 'cached' ? uiI18n.t('app.cached_b169be96') : state === 'uncached' ? uiI18n.t('app.uncached_4a7d05d7') : state === 'error' ? t('migration.checkFailed') : t('watch.unknown')}
                     </span>;
                   })()}
                   {isActive && (
                     <span className="shrink-0 rounded-full bg-emerald-400/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-300">
-                      Playing
+                      {t('torrent.panel.playing')}
                     </span>
                   )}
                 </div>
@@ -334,8 +331,8 @@ export function TorrentSourcePanel({
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pl-3.5 text-[10px] text-muted-foreground">
                   <span className={`flex items-center gap-1 font-medium ${HEALTH_TEXT[health]}`}>
                     <Users className="h-2.5 w-2.5" />
-                    {seeders == null ? "n/a" : seeders} seed
-                    {typeof source?.leechers === "number" ? ` · ${source.leechers} leech` : ""}
+                    {t('torrent.panel.seedCount', { count: seeders == null ? t('torrent.status.notAvailable') : seeders })}
+                    {typeof source?.leechers === "number" ? uiI18n.t('app.i18n_value_0_92e4cd32', { value0: t('torrent.panel.leechCount', { count: source.leechers }) }) : ""}
                   </span>
                   {sizeLabel && (
                     <span className="flex items-center gap-1">
@@ -349,7 +346,7 @@ export function TorrentSourcePanel({
                   {batch && (
                     <span className="flex items-center gap-1 rounded-full bg-amber-500/10 px-1.5 py-0.5 text-amber-400">
                       <Layers className="h-2.5 w-2.5" />
-                      {String(source?.episodeRange ?? "").trim() || "Batch"}
+                      {String(source?.episodeRange ?? "").trim() || t('torrent.panel.batch')}
                     </span>
                   )}
                 </div>
@@ -361,7 +358,7 @@ export function TorrentSourcePanel({
 
       {!canPlayTorrent && (
         <p className="text-[10px] text-amber-400">
-          Torrent playback needs the Tatakai desktop or mobile app — these releases can't be started in a web browser.
+          {t('migration.torrentBrowserNote')}
         </p>
       )}
     </div>

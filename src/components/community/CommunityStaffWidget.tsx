@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useNavigate } from 'react-router-dom';
 import { Crown, Shield, ShieldCheck } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -6,8 +8,8 @@ import { OnlineDot } from './feed/OnlineDot';
 import type { CommunityMember } from '@/hooks/community/useCommunities';
 
 const ROLE_META: Record<string, { label: string; icon: typeof Crown; className: string }> = {
-  owner: { label: 'Owner', icon: Crown, className: 'text-amber-400 border-amber-400/25 bg-amber-400/10' },
-  mod: { label: 'Moderator', icon: Shield, className: 'text-sky-400 border-sky-400/25 bg-sky-400/10' },
+  owner: { get label() { return uiI18n.t('app.owner_89ff3122'); }, icon: Crown, className: 'text-amber-400 border-amber-400/25 bg-amber-400/10' },
+  mod: { get label() { return uiI18n.t('app.moderator_ad3b15c3'); }, icon: Shield, className: 'text-sky-400 border-sky-400/25 bg-sky-400/10' },
 };
 
 /**
@@ -26,6 +28,7 @@ export function CommunityStaffWidget({
   onlineUserIds: Set<string>;
   className?: string;
 }) {
+  useUiTranslation();
   const navigate = useNavigate();
 
   // Owner first, then mods; members are excluded from the staff list.
@@ -49,7 +52,7 @@ export function CommunityStaffWidget({
         <div className="flex h-7 w-7 items-center justify-center rounded-full border border-amber-400/20 bg-amber-400/10">
           <ShieldCheck className="h-3.5 w-3.5 text-amber-400" />
         </div>
-        <span className="text-[11px] font-bold uppercase tracking-widest text-amber-400">Community Team</span>
+        <span className="text-[11px] font-bold uppercase tracking-widest text-amber-400">{uiI18n.t('app.community_team_ab7bc8e8')}</span>
       </div>
 
       {/* Staff rows */}

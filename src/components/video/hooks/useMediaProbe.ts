@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
+import i18n from "@/lib/i18n";
 import type {
   UseMediaProbeParams,
   AudioTrack,
@@ -156,7 +157,7 @@ export function useMediaProbe({
                 `[VideoPlayer] Successfully detected ${audio.length} audio tracks and ${dedupedSubs.length} internal subtitles.`,
               );
               toast.success(
-                `Detected ${audio.length} audio tracks & ${dedupedSubs.length} subtitles`,
+                i18n.t('player.tracksDetected', { audio: audio.length, subtitles: dedupedSubs.length }),
                 { id: "probe-success", duration: 2000 },
               );
             }

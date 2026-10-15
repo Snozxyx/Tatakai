@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -32,6 +34,7 @@ export interface CommunityEventInput {
  * Guarded so the tab renders empty pre-migration instead of throwing.
  */
 export function useCommunityEvents() {
+  useUiTranslation();
   return useQuery({
     queryKey: ['community-events'],
     staleTime: 60 * 1000,
@@ -56,11 +59,12 @@ export function useCommunityEvents() {
 
 /** Create an event (admin/moderator only — RLS enforces the staff gate). */
 export function useCreateCommunityEvent() {
+  useUiTranslation();
   const { user } = useAuth();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: CommunityEventInput): Promise<CommunityEvent> => {
-      if (!user) throw new Error('Not authenticated');
+      if (!user) throw new Error(uiI18n.t('app.not_authenticated_0c91acba'));
       const db = supabase as any;
       const { data, error } = await db
         .from('community_events')
@@ -76,6 +80,7 @@ export function useCreateCommunityEvent() {
 
 /** Delete an event (admin/moderator only — RLS enforces the staff gate). */
 export function useDeleteCommunityEvent() {
+  useUiTranslation();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string): Promise<void> => {

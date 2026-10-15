@@ -1,6 +1,8 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from '@/lib/localeFormat';
 import {
   Activity,
   CheckCircle2,
@@ -132,6 +134,7 @@ const statusPillClass = (status: string) => {
 };
 
 export function ApiAdminPanel() {
+  useUiTranslation();
   const queryClient = useQueryClient();
   const [recentLimit, setRecentLimit] = useState('10');
   const [validationLimit, setValidationLimit] = useState('8');
@@ -178,11 +181,11 @@ export function ApiAdminPanel() {
       setLastValidationRun(payload);
       queryClient.invalidateQueries({ queryKey: ['admin-api', 'canonical-summary'] });
       toast.success(
-        `Source validation done: ${payload.healthy} healthy / ${payload.unhealthy} unhealthy`
+        uiI18n.t('app.source_validation_done_i18n_value_0_healthy_i18n_335a0e8e', { value0: payload.healthy, value1: payload.unhealthy })
       );
     },
     onError: (error: any) => {
-      toast.error(error?.message || 'Failed to run source validation sample');
+      toast.error(error?.message || uiI18n.t('app.failed_to_run_source_validation_sample_a88e7257'));
     },
   });
 
@@ -190,7 +193,7 @@ export function ApiAdminPanel() {
     mutationFn: async () => {
       const content = webhookMessage.trim();
       if (!content) {
-        throw new Error('Webhook message cannot be empty');
+        throw new Error(uiI18n.t('app.webhook_message_cannot_be_empty_1b040e91'));
       }
 
       return fetchJson<{ ok?: boolean }>('/webhooks/discord', {
@@ -206,10 +209,10 @@ export function ApiAdminPanel() {
       });
     },
     onSuccess: () => {
-      toast.success('Discord webhook test sent');
+      toast.success(uiI18n.t('app.discord_webhook_test_sent_a3629958'));
     },
     onError: (error: any) => {
-      toast.error(error?.message || 'Failed to send Discord webhook test');
+      toast.error(error?.message || uiI18n.t('app.failed_to_send_discord_webhook_test_a7bf23cb'));
     },
   });
 
@@ -227,7 +230,7 @@ export function ApiAdminPanel() {
               <Server className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Operational Scrapers</p>
+              <p className="text-xs text-muted-foreground">{uiI18n.t('app.operational_scrapers_8314ca3b')}</p>
               <p className="text-xl font-bold">
                 {scraperSummary ? `${scraperSummary.operational}/${scraperSummary.total}` : '--'}
               </p>
@@ -241,7 +244,7 @@ export function ApiAdminPanel() {
               <Database className="w-5 h-5 text-secondary" />
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Canonical Snapshots</p>
+              <p className="text-xs text-muted-foreground">{uiI18n.t('app.canonical_snapshots_bc0aa8e2')}</p>
               <p className="text-xl font-bold">
                 {canonicalSummary ? canonicalSummary.snapshotTotal : '--'}
               </p>
@@ -255,7 +258,7 @@ export function ApiAdminPanel() {
               <Activity className="w-5 h-5 text-amber-500" />
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Source Queue Due</p>
+              <p className="text-xs text-muted-foreground">{uiI18n.t('app.source_queue_due_cdd5b57b')}</p>
               <p className="text-xl font-bold">
                 {canonicalSummary ? canonicalSummary.sourceQueue.due : '--'}
               </p>
@@ -269,10 +272,10 @@ export function ApiAdminPanel() {
               <Zap className="w-5 h-5 text-emerald-500" />
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Last Validation Check</p>
+              <p className="text-xs text-muted-foreground">{uiI18n.t('app.last_validation_check_8da21dba')}</p>
               <p className="text-xl font-bold">
                 {lastValidationRun
-                  ? `${lastValidationRun.checked} (${lastValidationRun.healthy}/${lastValidationRun.unhealthy})`
+                  ? uiI18n.t('app.i18n_value_0_i18n_value_1_i18n_value_2_9734bded', { value0: lastValidationRun.checked, value1: lastValidationRun.healthy, value2: lastValidationRun.unhealthy })
                   : '--'}
               </p>
             </div>
@@ -285,10 +288,10 @@ export function ApiAdminPanel() {
           <div>
             <h2 className="font-display text-xl font-semibold flex items-center gap-2">
               <Server className="w-5 h-5 text-primary" />
-              API Health and Scrapers
+              {uiI18n.t('app.api_health_and_scrapers_48c811df')}
             </h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Live health from {TATAKAI_API_URL}/health/scrapers
+              {uiI18n.t('app.live_health_from_3ed241b9')} {TATAKAI_API_URL}/health/scrapers
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -300,7 +303,7 @@ export function ApiAdminPanel() {
             >
               <Button variant="outline" size="sm" className="gap-2">
                 <ExternalLink className="w-4 h-4" />
-                Open
+                {uiI18n.t('app.open_cf9b7706')}
               </Button>
             </a>
             <Button
@@ -315,32 +318,32 @@ export function ApiAdminPanel() {
               ) : (
                 <RefreshCw className="w-4 h-4" />
               )}
-              Refresh
+              {uiI18n.t('app.refresh_56e3badc')}
             </Button>
           </div>
         </div>
 
         {scraperHealthQuery.isLoading ? (
-          <p className="text-sm text-muted-foreground">Loading scraper health...</p>
+          <p className="text-sm text-muted-foreground">{uiI18n.t('app.loading_scraper_health_fd807a83')}</p>
         ) : scraperHealthQuery.isError ? (
-          <p className="text-sm text-destructive">Failed to load scraper health.</p>
+          <p className="text-sm text-destructive">{uiI18n.t('app.failed_to_load_scraper_health_8e17ee1f')}</p>
         ) : (
           <div className="space-y-3">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
               <div className="rounded-lg border border-border/40 p-3">
-                <p className="text-xs text-muted-foreground">Total</p>
+                <p className="text-xs text-muted-foreground">{uiI18n.t('app.total_b25928c6')}</p>
                 <p className="text-lg font-bold">{scraperSummary?.total ?? 0}</p>
               </div>
               <div className="rounded-lg border border-border/40 p-3">
-                <p className="text-xs text-muted-foreground">Operational</p>
+                <p className="text-xs text-muted-foreground">{uiI18n.t('app.operational_8459f935')}</p>
                 <p className="text-lg font-bold text-emerald-500">{scraperSummary?.operational ?? 0}</p>
               </div>
               <div className="rounded-lg border border-border/40 p-3">
-                <p className="text-xs text-muted-foreground">Degraded</p>
+                <p className="text-xs text-muted-foreground">{uiI18n.t('app.degraded_13c27ff8')}</p>
                 <p className="text-lg font-bold text-amber-500">{scraperSummary?.degraded ?? 0}</p>
               </div>
               <div className="rounded-lg border border-border/40 p-3">
-                <p className="text-xs text-muted-foreground">Down</p>
+                <p className="text-xs text-muted-foreground">{uiI18n.t('app.down_bf93e5ce')}</p>
                 <p className="text-lg font-bold text-destructive">{scraperSummary?.down ?? 0}</p>
               </div>
             </div>
@@ -363,7 +366,7 @@ export function ApiAdminPanel() {
                     >
                       {node.status}
                     </span>
-                    <span className="text-xs text-muted-foreground">{node.latencyMs}ms</span>
+                    <span className="text-xs text-muted-foreground">{node.latencyMs}{uiI18n.t('app.ms_26cc3217')}</span>
                   </div>
                 </div>
               ))}
@@ -371,7 +374,7 @@ export function ApiAdminPanel() {
 
             {scraperHealthQuery.data?.checkedAt && (
               <p className="text-xs text-muted-foreground">
-                Last checked {formatDistanceToNow(new Date(scraperHealthQuery.data.checkedAt), { addSuffix: true })}
+                {uiI18n.t('app.last_checked_ada1b725')} {formatDistanceToNow(new Date(scraperHealthQuery.data.checkedAt), { addSuffix: true })}
               </p>
             )}
           </div>
@@ -383,10 +386,10 @@ export function ApiAdminPanel() {
           <div>
             <h2 className="font-display text-xl font-semibold flex items-center gap-2">
               <Database className="w-5 h-5 text-primary" />
-              Canonical Store Summary
+              {uiI18n.t('app.canonical_store_summary_14344d05')}
             </h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Snapshot totals, queue state, and recent canonical jobs.
+              {uiI18n.t('app.snapshot_totals_queue_state_and_recent_canonical_39857366')}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -394,10 +397,10 @@ export function ApiAdminPanel() {
               value={recentLimit}
               onChange={(event) => setRecentLimit(event.target.value)}
               className="w-20 h-9"
-              aria-label="Recent rows"
+              aria-label={uiI18n.t('app.recent_rows_015ee31e')}
             />
             <Button variant="outline" size="sm" onClick={() => canonicalSummaryQuery.refetch()}>
-              Refresh
+              {uiI18n.t('app.refresh_56e3badc')}
             </Button>
           </div>
         </div>
@@ -405,40 +408,40 @@ export function ApiAdminPanel() {
         {!canonicalData?.enabled ? (
           <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-500 flex items-center gap-2">
             <TriangleAlert className="w-4 h-4" />
-            Canonical database is disabled.
+            {uiI18n.t('app.canonical_database_is_disabled_1be90977')}
           </div>
         ) : canonicalSummaryQuery.isLoading ? (
-          <p className="text-sm text-muted-foreground">Loading canonical summary...</p>
+          <p className="text-sm text-muted-foreground">{uiI18n.t('app.loading_canonical_summary_f67dd7b6')}</p>
         ) : canonicalSummaryQuery.isError ? (
-          <p className="text-sm text-destructive">Failed to load canonical summary.</p>
+          <p className="text-sm text-destructive">{uiI18n.t('app.failed_to_load_canonical_summary_21cef622')}</p>
         ) : canonicalSummary ? (
           <div className="space-y-4">
             <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
               <div className="rounded-lg border border-border/40 p-3">
-                <p className="text-xs text-muted-foreground">Snapshots</p>
+                <p className="text-xs text-muted-foreground">{uiI18n.t('app.snapshots_55420c59')}</p>
                 <p className="text-lg font-bold">{canonicalSummary.snapshotTotal}</p>
               </div>
               <div className="rounded-lg border border-border/40 p-3">
-                <p className="text-xs text-muted-foreground">Queue Total</p>
+                <p className="text-xs text-muted-foreground">{uiI18n.t('app.queue_total_6bbb3226')}</p>
                 <p className="text-lg font-bold">{canonicalSummary.sourceQueue.total}</p>
               </div>
               <div className="rounded-lg border border-border/40 p-3">
-                <p className="text-xs text-muted-foreground">Pending</p>
+                <p className="text-xs text-muted-foreground">{uiI18n.t('app.pending_96f608c1')}</p>
                 <p className="text-lg font-bold">{canonicalSummary.sourceQueue.pending}</p>
               </div>
               <div className="rounded-lg border border-border/40 p-3">
-                <p className="text-xs text-muted-foreground">Healthy</p>
+                <p className="text-xs text-muted-foreground">{uiI18n.t('app.healthy_80ea156e')}</p>
                 <p className="text-lg font-bold text-emerald-500">{canonicalSummary.sourceQueue.healthy}</p>
               </div>
               <div className="rounded-lg border border-border/40 p-3">
-                <p className="text-xs text-muted-foreground">Unhealthy</p>
+                <p className="text-xs text-muted-foreground">{uiI18n.t('app.unhealthy_718edf75')}</p>
                 <p className="text-lg font-bold text-destructive">{canonicalSummary.sourceQueue.unhealthy}</p>
               </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div className="rounded-lg border border-border/40 p-3">
-                <p className="font-medium mb-2">Snapshot by scope</p>
+                <p className="font-medium mb-2">{uiI18n.t('app.snapshot_by_scope_54730f02')}</p>
                 <div className="space-y-2">
                   {canonicalSummary.snapshotByScope.map((row) => (
                     <div key={row.scope} className="flex items-center justify-between text-sm">
@@ -450,7 +453,7 @@ export function ApiAdminPanel() {
               </div>
 
               <div className="rounded-lg border border-border/40 p-3">
-                <p className="font-medium mb-2">Recent jobs</p>
+                <p className="font-medium mb-2">{uiI18n.t('app.recent_jobs_0c1c622f')}</p>
                 <div className="space-y-2 max-h-44 overflow-auto pr-1">
                   {canonicalSummary.recentJobs.map((job, index) => (
                     <div key={`${job.jobName}-${index}`} className="text-sm border-b border-border/30 pb-2">
@@ -463,7 +466,7 @@ export function ApiAdminPanel() {
                         </span>
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">
-                        {new Date(job.startedAt).toLocaleString()}
+                        {new Date(job.startedAt).toLocaleString(uiI18n.language)}
                       </p>
                     </div>
                   ))}
@@ -472,7 +475,7 @@ export function ApiAdminPanel() {
             </div>
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">No canonical summary available.</p>
+          <p className="text-sm text-muted-foreground">{uiI18n.t('app.no_canonical_summary_available_33c1c57c')}</p>
         )}
       </GlassPanel>
 
@@ -481,10 +484,10 @@ export function ApiAdminPanel() {
           <div>
             <h2 className="font-display text-xl font-semibold flex items-center gap-2">
               <Zap className="w-5 h-5 text-primary" />
-              Source Validation Job
+              {uiI18n.t('app.source_validation_job_f7b48f30')}
             </h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Run the random source-validation sampler from the admin dashboard.
+              {uiI18n.t('app.run_the_random_source_validation_sampler_from_th_6246e7bc')}
             </p>
           </div>
         </div>
@@ -493,12 +496,12 @@ export function ApiAdminPanel() {
           <Input
             value={validationLimit}
             onChange={(event) => setValidationLimit(event.target.value)}
-            placeholder="Limit (1-50)"
+            placeholder={uiI18n.t('app.limit_1_50_932ad6e8')}
           />
           <Input
             value={validationTimeoutMs}
             onChange={(event) => setValidationTimeoutMs(event.target.value)}
-            placeholder="Timeout ms (1500-20000)"
+            placeholder={uiI18n.t('app.timeout_ms_1500_20000_fe7280c6')}
           />
           <Button
             onClick={() => sourceValidationMutation.mutate()}
@@ -510,14 +513,14 @@ export function ApiAdminPanel() {
             ) : (
               <Activity className="w-4 h-4" />
             )}
-            Run Validation
+            {uiI18n.t('app.run_validation_814ad2fd')}
           </Button>
         </div>
 
         {lastValidationRun && (
           <div className="space-y-2">
             <div className="text-sm text-muted-foreground">
-              Checked {lastValidationRun.checked}, healthy {lastValidationRun.healthy}, unhealthy{' '}
+              {uiI18n.t('app.checked_b2bc0c00')} {lastValidationRun.checked}{uiI18n.t('app.healthy_f0644c6f')} {lastValidationRun.healthy}{uiI18n.t('app.unhealthy_9cc0d966')}{' '}
               {lastValidationRun.unhealthy}
             </div>
             <div className="space-y-2 max-h-48 overflow-auto pr-1">
@@ -532,10 +535,10 @@ export function ApiAdminPanel() {
                     ) : (
                       <XCircle className="w-4 h-4 text-destructive" />
                     )}
-                    <span>Queue #{result.id}</span>
+                    <span>{uiI18n.t('app.queue_d97a3a5d')}{result.id}</span>
                   </div>
                   <span className="text-xs text-muted-foreground">
-                    {result.status || 'no-status'} {result.error ? `(${result.error})` : ''}
+                    {result.status || uiI18n.t('app.no_status_e0de8e29')} {result.error ? uiI18n.t('app.i18n_value_0_f65d319b', { value0: result.error }) : ''}
                   </span>
                 </div>
               ))}
@@ -548,10 +551,10 @@ export function ApiAdminPanel() {
         <div className="mb-4">
           <h2 className="font-display text-xl font-semibold flex items-center gap-2">
             <ExternalLink className="w-5 h-5 text-primary" />
-            API Webhook Smoke Test
+            {uiI18n.t('app.api_webhook_smoke_test_138fc533')}
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Sends a test payload to /webhooks/discord using the status channel.
+            {uiI18n.t('app.sends_a_test_payload_to_webhooks_discord_using_t_ac7be1c9')}
           </p>
         </div>
 
@@ -559,7 +562,7 @@ export function ApiAdminPanel() {
           <Input
             value={webhookMessage}
             onChange={(event) => setWebhookMessage(event.target.value)}
-            placeholder="Webhook message"
+            placeholder={uiI18n.t('app.webhook_message_07ba0f38')}
           />
           <Button
             onClick={() => webhookMutation.mutate()}
@@ -571,7 +574,7 @@ export function ApiAdminPanel() {
             ) : (
               <ExternalLink className="w-4 h-4" />
             )}
-            Send Test
+            {uiI18n.t('app.send_test_c59675d5')}
           </Button>
         </div>
       </GlassPanel>

@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { List, Search } from 'lucide-react';
@@ -21,6 +23,7 @@ const SHELF_GRID = 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-5';
 const DIALOG_GRID = 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-5';
 
 export function WatchlistTab({ watchlist, loading, isViewingOther, onNavigate }: WatchlistTabProps) {
+  useUiTranslation();
   const items = useMemo(() => watchlist || [], [watchlist]);
   const { search, setSearch, term, groups, matchCount } = useShelfSearch<any>(
     items,
@@ -69,10 +72,10 @@ export function WatchlistTab({ watchlist, loading, isViewingOther, onNavigate }:
           <div className="flex items-center gap-2">
             <List className="w-4 h-4 text-primary/80" />
             <h3 className="font-display font-bold text-base sm:text-lg text-foreground tracking-tight">
-              {isViewingOther ? 'Watchlist' : 'My Watchlist'}
+              {isViewingOther ? uiI18n.t('app.watchlist_48a616d9') : uiI18n.t('app.my_watchlist_73953be6')}
             </h3>
             <span className="px-3 py-1 rounded-full bg-white/[0.03] text-xs font-semibold text-muted-foreground border border-white/[0.05]">
-              {items.length} items
+              {items.length} {uiI18n.t('app.items_7316c8b2')}
             </span>
           </div>
           {items.length > 0 && (
@@ -81,7 +84,7 @@ export function WatchlistTab({ watchlist, loading, isViewingOther, onNavigate }:
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search watchlist…"
+                placeholder={uiI18n.t('app.search_watchlist_d550ae5d')}
                 className="pl-9 rounded-full bg-white/[0.03] border-white/[0.08] h-10"
               />
             </div>
@@ -97,16 +100,16 @@ export function WatchlistTab({ watchlist, loading, isViewingOther, onNavigate }:
         ) : items.length === 0 ? (
           <div className="text-center py-20 border border-dashed border-white/10 bg-white/[0.01] rounded-[2rem]">
             <List className="w-16 h-16 mx-auto text-muted-foreground/30 mb-6" />
-            <h3 className="text-xl font-bold mb-2">{isViewingOther ? 'Watchlist is empty' : 'Your watchlist is empty'}</h3>
-            <p className="text-muted-foreground mb-8">{isViewingOther ? "This user hasn't added any anime yet." : 'Start adding anime to track your progress!'}</p>
+            <h3 className="text-xl font-bold mb-2">{isViewingOther ? uiI18n.t('app.watchlist_is_empty_4fd3c75a') : uiI18n.t('app.your_watchlist_is_empty_97f5dadd')}</h3>
+            <p className="text-muted-foreground mb-8">{isViewingOther ? uiI18n.t('app.this_user_hasn_t_added_any_anime_yet_17c1ce14') : uiI18n.t('app.start_adding_anime_to_track_your_progress_10d3ef55')}</p>
             {!isViewingOther && (
               <Button onClick={() => onNavigate('/')} className="rounded-full h-12 px-8 font-bold">
-                Browse Anime
+                {uiI18n.t('app.browse_anime_c2cad772')}
               </Button>
             )}
           </div>
         ) : term && matchCount === 0 ? (
-          <div className="text-center py-16 text-muted-foreground text-sm">No anime match “{search}”.</div>
+          <div className="text-center py-16 text-muted-foreground text-sm">{uiI18n.t('app.no_anime_match_19b2b03a')}{search}”.</div>
         ) : (
           <div className="space-y-10">
             {groups.map((g) => (

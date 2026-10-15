@@ -1,11 +1,13 @@
 import { GlassPanel } from "@/components/ui/GlassPanel";
 import { Sparkles, ArrowRight, ListOrdered } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { TierListCard } from "@/components/tierlist/TierListCard";
 
 export function TierlistSection() {
+    const { t } = useTranslation();
     const { data: tierlists, isLoading } = useQuery({
         queryKey: ['popular_tierlists'],
         queryFn: async () => {
@@ -26,13 +28,13 @@ export function TierlistSection() {
             <div className="flex items-center justify-between mb-6 px-2">
                 <h2 className="font-display text-2xl font-semibold tracking-tight flex items-center gap-2">
                     <ListOrdered className="w-5 h-5 text-primary" />
-                    Community Tier Lists
+                    {t('home.communityTierLists')}
                 </h2>
                 <Link
                     to="/tierlists"
                     className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
                 >
-                    View All <ArrowRight className="w-4 h-4" />
+                    {t('home.viewAll')} <ArrowRight className="w-4 h-4" />
                 </Link>
             </div>
 

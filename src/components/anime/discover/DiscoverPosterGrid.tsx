@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
  * The poster grid from docs/image-8.png — seven columns at the design's widest
  * breakpoint, stepping down to two on phones. Cards come from the shared
@@ -24,6 +26,7 @@ interface DiscoverPosterGridProps {
 }
 
 export function PosterGridSkeleton({ count = 14, className }: { count?: number; className?: string }) {
+  useUiTranslation();
   return (
     <div data-mobile-poster-grid className={cn(POSTER_GRID_CLASS, className)}>
       {Array.from({ length: count }).map((_, i) => (
@@ -40,6 +43,7 @@ export function DiscoverPosterGrid({
   preview,
   className,
 }: DiscoverPosterGridProps) {
+  useUiTranslation();
   if (isLoading && media.length === 0) {
     return <PosterGridSkeleton count={skeletonCount} className={className} />;
   }

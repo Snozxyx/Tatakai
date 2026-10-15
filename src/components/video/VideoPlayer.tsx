@@ -1,8 +1,11 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { usePlaybackCoordinator } from '@/core/player/usePlaybackCoordinator';
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import Hls from "hls.js";
 import { toast } from "sonner";
 import { Lock, Maximize, SlidersHorizontal } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { useVideoSettings } from "@/hooks/media/useVideoSettings";
 import { useKeybinds } from "@/hooks/media/useKeybinds";
@@ -174,7 +177,7 @@ export function VideoPlayer({
   onPause,
   isLive,
   isTimelineLocked = false,
-  timelineLockReason = "Seeking unlocks after the torrent has fully downloaded and verified.",
+  timelineLockReason = "",
   hideTimelineUi = false,
   episodeTitle,
   isOffline,
@@ -186,6 +189,8 @@ export function VideoPlayer({
   nextEpisodeThumbnail,
   nextEpisodeNumber,
 }: VideoPlayerProps & VideoPlayerExtendedProps) {
+  useUiTranslation();
+  const { t } = useTranslation();
   // ---------------------------------------------------------------------------
   // Refs
   // ---------------------------------------------------------------------------
@@ -326,17 +331,17 @@ export function VideoPlayer({
   const timelineSeekingLocked = Boolean(isTimelineLocked && !isLive);
   const timelineUiHidden = Boolean(hideTimelineUi && !isLive);
   const timelineSeekingLockedRef = useRef(timelineSeekingLocked);
-  const timelineLockReasonRef = useRef(timelineLockReason);
+  const timelineLockReasonRef = useRef(timelineLockReason || t('player.seekingUnlocksAfterVerify'));
   useEffect(() => {
     timelineSeekingLockedRef.current = timelineSeekingLocked;
-    timelineLockReasonRef.current = timelineLockReason;
-  }, [timelineSeekingLocked, timelineLockReason]);
+    timelineLockReasonRef.current = timelineLockReason || t('player.seekingUnlocksAfterVerify');
+  }, [timelineSeekingLocked, timelineLockReason, t]);
 
   const showTimelineLockHint = useCallback(() => {
-    toast.info(timelineLockReasonRef.current || "Seeking is temporarily locked.", {
+    toast.info(timelineLockReasonRef.current || t('player.seekingUnlocksAfterVerify'), {
       id: "torrent-timeline-locked",
     });
-  }, []);
+  }, [t]);
 
   // ---------------------------------------------------------------------------
   // Hooks
@@ -496,7 +501,7 @@ export function VideoPlayer({
 
       const runtime = (window as any).tatakaiRuntime;
       if (!runtime?.extractSubtitle) {
-        toast.error("Internal subtitle extraction not available");
+        toast.error(t('player.internalSubUnavailable'));
         return;
       }
 
@@ -521,14 +526,14 @@ export function VideoPlayer({
         // fall back to stream URL
       }
 
-      toast.loading(`Loading ${sub.label || sub.lang} subtitle...`, { id: "internal-sub-load" });
+      toast.loading(t('player.internalSubLoading', { label: sub.label || sub.lang }), { id: "internal-sub-load" });
 
       try {
         const result = await runtime.extractSubtitle(probeUrl, trackId);
         toast.dismiss("internal-sub-load");
 
         if (!result?.success || !result?.url) {
-          toast.error(result?.error || "Failed to extract subtitle");
+          toast.error(result?.error || t('player.internalSubExtractFailed'));
           return;
         }
 
@@ -551,7 +556,7 @@ export function VideoPlayer({
           text = decodeURIComponent(subtitleUrl.slice(commaIndex + 1));
         } else {
           const res = await fetch(subtitleUrl);
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          if (!res.ok) throw new Error(uiI18n.t('app.http_i18n_value_0_63a176f2', { value0: res.status }));
           text = await res.text();
         }
         const blob = new Blob([text], { type: "text/vtt" });
@@ -589,13 +594,13 @@ export function VideoPlayer({
         }
 
         setCurrentSubtitle(`internal:${trackId}`);
-        toast.success(`Loaded ${sub.label || sub.lang} subtitle`);
+        toast.success(t('player.internalSubLoaded', { label: sub.label || sub.lang }));
       } catch (err: any) {
         toast.dismiss("internal-sub-load");
-        toast.error(err?.message || "Failed to load internal subtitle");
+        toast.error(err?.message || t('player.internalSubLoadFailed'));
       }
     },
-    [videoRef, internalSubtitles, currentSource?.url, currentSource?.sourceType, currentSource?.isM3U8, setCurrentSubtitle],
+    [videoRef, internalSubtitles, currentSource?.url, currentSource?.sourceType, currentSource?.isM3U8, setCurrentSubtitle, t],
   );
 
   const { handleAudioTrackChange, externalAudioRef } = useAudioTrackManager({
@@ -720,9 +725,9 @@ export function VideoPlayer({
     if (settings.sleepTimer === sleepAnnouncedRef.current) return;
     sleepAnnouncedRef.current = settings.sleepTimer;
     if (settings.sleepTimer !== "off" && settings.sleepTimer !== "end-of-episode") {
-      toast.info(`Sleep timer set for ${settings.sleepTimer} minutes.`, { id: "sleep-timer-set" });
+      toast.info(t('player.sleepTimerSet', { minutes: settings.sleepTimer }), { id: "sleep-timer-set" });
     }
-  }, [settings.sleepTimer]);
+  }, [settings.sleepTimer, t]);
 
   // ---------------------------------------------------------------------------
   // Anime4K GPU upscaling (desktop only, opt-in)
@@ -1053,7 +1058,7 @@ export function VideoPlayer({
       if (onProgressUpdate) reportProgress(dur ?? finalPos, dur, true);
       // "End of episode" sleep timer stops the chain here, overriding auto-next.
       if (settings.sleepTimer === "end-of-episode") {
-        toast.info("Sleep timer: stopped at end of episode.", { id: "sleep-timer-end" });
+        toast.info(t('player.sleepTimerEnded'), { id: "sleep-timer-end" });
         return;
       }
       // Auto-next: don't jump instantly — show the Up-Next overlay and count
@@ -1074,7 +1079,7 @@ export function VideoPlayer({
       // (and triggering a server failover) while the real source mounts.
       if (!currentSource?.url) return;
       const code = Number(err?.code || 0);
-      const rawMessage = String(err?.message || "Unknown error");
+      const rawMessage = String(err?.message || t('errors.unknownError'));
       // Our own programmatic unload fires code 4 ("Empty src attribute") and the
       // event can land after the next source has mounted, when nothing looks
       // empty anymore — the timestamp is the only reliable identifier.
@@ -1085,7 +1090,7 @@ export function VideoPlayer({
       let friendlyMessage: string | null = null;
       const eventMessage = String(e?.message || e?.target?.error?.message || "").trim().toLowerCase();
       const normalizedMessage = rawMessage.toLowerCase();
-      const compositeMessage = `${normalizedMessage} ${eventMessage}`;
+      const compositeMessage = uiI18n.t('app.i18n_value_0_i18n_value_1_84b81eb1', { value0: normalizedMessage, value1: eventMessage });
 
       const isTorrent =
         currentSource?.url?.startsWith("magnet:") || currentSource?.sourceType === "torrent";
@@ -1384,7 +1389,7 @@ export function VideoPlayer({
               setCurrentTime(newTime);
             } catch (err) {
               console.error("Torrent seek failed:", err);
-              toast.error("Could not seek torrent stream");
+              toast.error(t('player.torrentSeekFailed'));
             }
           })();
           return;
@@ -1462,7 +1467,7 @@ export function VideoPlayer({
         <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 pointer-events-none">
           <div className="flex items-center gap-2 rounded-full bg-black/70 px-3 py-1.5 text-xs font-medium text-white border border-white/10 shadow-lg backdrop-blur-md whitespace-nowrap">
             <Maximize className="w-3.5 h-3.5 shrink-0" />
-            <span>Double-click for fullscreen</span>
+            <span>{t('migration.doubleFullscreen')}</span>
           </div>
         </div>
       )}
@@ -1652,22 +1657,18 @@ export function VideoPlayer({
       {/* Controls Overlay */}
       <div
         ref={controlsOverlayRef}
-        className={`absolute inset-x-0 bottom-0 video-controls-gradient px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-6 sm:p-4 md:p-5 transition-all duration-300 ${
-          getShowControls()
+        className={`absolute inset-x-0 bottom-0 video-controls-gradient px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-6 sm:p-4 md:p-5 transition-all duration-300 ${getShowControls()
             ? "opacity-100 translate-y-0"
-            : "opacity-0 translate-y-4 pointer-events-none"
-        }`}
+            : "opacity-0 translate-y-4 pointer-events-none"}`}
       >
         {/* Progress Bar */}
         {!timelineUiHidden && (
           <div
-            className={`relative h-1 md:h-1.5 bg-white/20 rounded-full group/progress mb-4 md:mb-5 video-progress-track ${
-              isLive
+            className={`relative h-1 md:h-1.5 bg-white/20 rounded-full group/progress mb-4 md:mb-5 video-progress-track ${isLive
                 ? "cursor-default pointer-events-none"
                 : timelineSeekingLocked
                   ? "cursor-not-allowed opacity-85"
-                  : "cursor-pointer"
-            }`}
+                  : "cursor-pointer"}`}
             onClick={!isLive ? (timelineSeekingLocked ? showTimelineLockHint : handleSeek) : undefined}
             onTouchMove={!isLive && !timelineSeekingLocked ? handleSeek : undefined}
             onMouseMove={!isLive && !timelineSeekingLocked ? handleProgressBarHover : undefined}
@@ -1721,7 +1722,7 @@ export function VideoPlayer({
             {timelineSeekingLocked && (
               <div className="absolute right-0 bottom-full mb-2 hidden items-center gap-1.5 rounded-full border border-white/10 bg-black/80 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white/75 shadow-xl backdrop-blur-md sm:flex">
                 <Lock className="h-3 w-3 text-primary" />
-                <span>Seeking locked</span>
+                <span>{t('player.seekingLocked')}</span>
               </div>
             )}
           </div>
@@ -1805,7 +1806,7 @@ export function VideoPlayer({
             <button
               onClick={() => setShowSettingsPanel(true)}
               className="p-2 rounded-lg hover:bg-white/10 transition-colors"
-              title="Player Preferences"
+              title={t('player.playerPreferences')}
             >
               <SlidersHorizontal className="w-4 h-4 md:w-5 md:h-5" />
             </button>

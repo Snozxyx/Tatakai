@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
  * src/components/integrations/SyncPreviewModal.tsx
  *
@@ -34,17 +36,18 @@ interface SyncPreviewModalProps {
 }
 
 const INTEGRATION_META: Record<Integration, { label: string; color: string; short: string; logo?: string }> = {
-  mal: { label: 'MyAnimeList', color: '#2E51A2', short: 'MAL' },
-  anilist: { label: 'AniList', color: '#02A9FF', short: 'AL' },
-  mangabaka: { label: 'MangaBaka', color: MANGABAKA_ACCENT, short: 'MB', logo: MANGABAKA_LOGO_URL },
+  mal: { get label() { return uiI18n.t('app.myanimelist_be786904'); }, color: '#2E51A2', short: 'MAL' },
+  anilist: { get label() { return uiI18n.t('app.anilist_c03a6787'); }, color: '#02A9FF', short: 'AL' },
+  mangabaka: { get label() { return uiI18n.t('app.mangabaka_c4dfa49b'); }, color: MANGABAKA_ACCENT, short: 'MB', logo: MANGABAKA_LOGO_URL },
 };
 
 function DirectionBadge({ direction }: { direction: SyncProposalItem['direction'] }) {
+  useUiTranslation();
   if (direction === 'import') {
     return (
       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/15 text-blue-400 border border-blue-500/20">
         <ArrowDown className="w-3 h-3" />
-        Import
+        {uiI18n.t('app.import_d6fbc9d2')}
       </span>
     );
   }
@@ -52,19 +55,20 @@ function DirectionBadge({ direction }: { direction: SyncProposalItem['direction'
     return (
       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
         <ArrowUp className="w-3 h-3" />
-        Export
+        {uiI18n.t('app.export_f3e4fadb')}
       </span>
     );
   }
   return (
     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/20">
       <ArrowLeftRight className="w-3 h-3" />
-      Conflict
+      {uiI18n.t('app.conflict_39f7b080')}
     </span>
   );
 }
 
 function StatusPill({ label, value }: { label: string; value?: string | null }) {
+  useUiTranslation();
   if (!value) return null;
   return (
     <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/[0.04] border border-white/10 text-muted-foreground capitalize">
@@ -83,6 +87,7 @@ export function SyncPreviewModal({
   isLoading = false,
   isApplying = false,
 }: SyncPreviewModalProps) {
+  useUiTranslation();
   const meta = INTEGRATION_META[integration];
   const reduceMotion = useReducedMotion();
 
@@ -162,10 +167,10 @@ export function SyncPreviewModal({
                 meta.short
               )}
             </div>
-            Sync with {meta.label}
+            {uiI18n.t('app.sync_with_7801c2bd')} {meta.label}
           </SheetTitle>
           <p className="text-xs font-medium text-muted-foreground/80 mt-1">
-            Review {mediaType ?? 'anime & manga'} changes before applying. Select what to sync.
+            {uiI18n.t('app.review_e29a79fe')} {mediaType ?? uiI18n.t('app.anime_manga_405d3673')} {uiI18n.t('app.changes_before_applying_select_what_to_sync_3bc94939')}
           </p>
 
           {/* Stats row */}
@@ -174,26 +179,26 @@ export function SyncPreviewModal({
               {importCount > 0 && (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20">
                   <ArrowDown className="w-3 h-3" />
-                  {importCount} import
+                  {importCount} {uiI18n.t('app.import_62fdfbd5')}
                 </span>
               )}
               {exportCount > 0 && (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                   <ArrowUp className="w-3 h-3" />
-                  {exportCount} export
+                  {exportCount} {uiI18n.t('app.export_51713409')}
                 </span>
               )}
               {conflictCount > 0 && (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
                   <ArrowLeftRight className="w-3 h-3" />
-                  {conflictCount} conflict
+                  {conflictCount} {uiI18n.t('app.conflict_ae214513')}
                 </span>
               )}
               <button
                 onClick={toggleAll}
                 className="ml-auto text-xs font-bold text-muted-foreground hover:text-white underline underline-offset-2 transition-colors"
               >
-                {items.every(item => selectedIds.has(item.id)) ? 'Deselect all' : 'Select all'}
+                {items.every(item => selectedIds.has(item.id)) ? uiI18n.t('app.deselect_all_85cce1e1') : uiI18n.t('app.select_all_913afff1')}
               </button>
             </div>
           )}
@@ -204,16 +209,16 @@ export function SyncPreviewModal({
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-24 gap-4 text-muted-foreground">
               <Loader2 className="w-9 h-9 animate-spin" style={{ color: meta.color }} />
-              <p className="text-sm font-medium">Fetching changes from {meta.label}…</p>
+              <p className="text-sm font-medium">{uiI18n.t('app.fetching_changes_from_a6e14493')} {meta.label}…</p>
             </div>
           ) : items.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24 gap-4 px-8 text-center">
               <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-500/10 border border-green-500/20">
                 <CheckCircle2 className="w-9 h-9 text-green-500" />
               </div>
-              <p className="text-base font-bold text-foreground">All caught up!</p>
+              <p className="text-base font-bold text-foreground">{uiI18n.t('app.all_caught_up_eeaebc0f')}</p>
               <p className="text-xs font-medium text-muted-foreground/80 max-w-xs">
-                Your Tatakai {mediaType ?? 'anime & manga'} list is in sync with {meta.label}. Nothing to apply.
+                {uiI18n.t('app.your_tatakai_a9166ec4')} {mediaType ?? uiI18n.t('app.anime_manga_405d3673')} {uiI18n.t('app.list_is_in_sync_with_823b95ba')} {meta.label}{uiI18n.t('app.nothing_to_apply_bbf65461')}
               </p>
             </div>
           ) : (
@@ -269,22 +274,22 @@ export function SyncPreviewModal({
 
                         {(item.localStatus || item.remoteStatus) && (
                           <div className="flex items-center gap-1.5 flex-wrap mt-2">
-                            {item.localStatus && <StatusPill label="Local" value={item.localStatus} />}
+                            {item.localStatus && <StatusPill label={uiI18n.t('app.local_dc99d54d')} value={item.localStatus} />}
                             {item.localProgress != null && (
-                              <StatusPill label={item.type === 'anime' ? 'Ep' : 'Ch'} value={String(item.localProgress)} />
+                              <StatusPill label={item.type === 'anime' ? uiI18n.t('app.ep_91954275') : uiI18n.t('app.ch_f71fb785')} value={String(item.localProgress)} />
                             )}
                             {item.type === 'manga' && item.localVolumes != null && item.localVolumes > 0 && (
-                              <StatusPill label="Vol" value={String(item.localVolumes)} />
+                              <StatusPill label={uiI18n.t('app.vol_1837d13d')} value={String(item.localVolumes)} />
                             )}
                             {(item.localStatus || item.localProgress != null) && (item.remoteStatus || item.remoteProgress != null) && (
                               <ArrowLeftRight className="w-2.5 h-2.5 text-muted-foreground" />
                             )}
                             {item.remoteStatus && <StatusPill label={meta.short} value={item.remoteStatus} />}
                             {item.remoteProgress != null && (
-                              <StatusPill label={item.type === 'anime' ? 'Ep' : 'Ch'} value={String(item.remoteProgress)} />
+                              <StatusPill label={item.type === 'anime' ? uiI18n.t('app.ep_91954275') : uiI18n.t('app.ch_f71fb785')} value={String(item.remoteProgress)} />
                             )}
                             {item.type === 'manga' && item.remoteVolumes != null && item.remoteVolumes > 0 && (
-                              <StatusPill label="Vol" value={String(item.remoteVolumes)} />
+                              <StatusPill label={uiI18n.t('app.vol_1837d13d')} value={String(item.remoteVolumes)} />
                             )}
                           </div>
                         )}
@@ -313,11 +318,11 @@ export function SyncPreviewModal({
           {items.length > 0 && !isLoading && (
             <p className="text-xs font-medium text-muted-foreground flex items-center gap-1 mr-auto">
               <Info className="w-3 h-3" />
-              {selectedItems.length} of {items.length} selected
+              {selectedItems.length} {uiI18n.t('app.of_de04fa0e')} {items.length} {uiI18n.t('app.selected_835f3b50')}
             </p>
           )}
           <Button variant="ghost" onClick={onClose} disabled={isApplying} className="h-11 rounded-full px-6 font-bold hover:bg-white/10">
-            Cancel
+            {uiI18n.t('app.cancel_77dfd213')}
           </Button>
           {items.length > 0 && !isLoading && (
             <Button
@@ -327,9 +332,9 @@ export function SyncPreviewModal({
               style={selectedItems.length > 0 ? { backgroundColor: meta.color, boxShadow: `0 0 20px ${meta.color}40` } : undefined}
             >
               {isApplying ? (
-                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Applying…</>
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {uiI18n.t('app.applying_e578c274')}</>
               ) : (
-                <><RefreshCw className="mr-2 h-4 w-4" /> Apply {selectedItems.length}</>
+                <><RefreshCw className="mr-2 h-4 w-4" /> {uiI18n.t('app.apply_cfea419c')} {selectedItems.length}</>
               )}
             </Button>
           )}

@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -11,6 +13,7 @@ import { useWatchRoomContext } from './WatchRoomContext';
 
 /** Host controls as a left slide-in Sheet: anime · episodes · providers · manual · local files. */
 export function WatchRoomSettingsSheet() {
+  useUiTranslation();
     const {
         isHost, showSettings, setShowSettings, setAnimeSearchMode, setShowAnimeSearch,
         episodesData, room, updateRoom, roomId, loadingSources, serversData, isDesktopApp,
@@ -25,12 +28,12 @@ export function WatchRoomSettingsSheet() {
         <Sheet open={showSettings} onOpenChange={setShowSettings}>
             <SheetContent side="right" className="w-full sm:max-w-2xl bg-background/80 backdrop-blur-2xl border-white/10 p-0">
                 <SheetHeader className="px-6 pt-6 pb-2">
-                    <SheetTitle className="flex items-center gap-2 font-semibold"><Settings className="w-4 h-4 text-[hsl(var(--isshoni-accent))]" /> Room settings</SheetTitle>
+                    <SheetTitle className="flex items-center gap-2 font-semibold"><Settings className="w-4 h-4 text-[hsl(var(--isshoni-accent))]" /> {uiI18n.t('app.room_settings_2e77763e')}</SheetTitle>
                 </SheetHeader>
                 <ScrollArea className="h-[calc(100vh_-_5rem)] px-6 pb-6">
                     <div className="space-y-6">
                         <div className="space-y-3">
-                            <h3 className="text-sm font-semibold text-foreground flex items-center gap-2"><Search className="w-4 h-4 text-muted-foreground" /> Anime</h3>
+                            <h3 className="text-sm font-semibold text-foreground flex items-center gap-2"><Search className="w-4 h-4 text-muted-foreground" /> {uiI18n.t('app.anime_f1b32a19')}</h3>
                             <Button
                                 variant="outline"
                                 className="w-full justify-start text-sm bg-white/5 border-white/10 hover:bg-white/10 rounded-xl h-11"
@@ -40,37 +43,37 @@ export function WatchRoomSettingsSheet() {
                                 }}
                             >
                                 <Search className="w-4 h-4 mr-2 text-muted-foreground" />
-                                Search & Select…
+                                {uiI18n.t('app.search_select_639bf70a')}
                             </Button>
                         </div>
                         <div className="space-y-3">
-                            <h3 className="text-sm font-semibold text-foreground flex items-center gap-2"><PlayCircle className="w-4 h-4 text-muted-foreground" /> Episodes</h3>
+                            <h3 className="text-sm font-semibold text-foreground flex items-center gap-2"><PlayCircle className="w-4 h-4 text-muted-foreground" /> {uiI18n.t('app.episodes_49d641ba')}</h3>
                             <ScrollArea className="h-[200px] bg-white/5 border border-white/5 rounded-2xl p-2"><div className="grid grid-cols-4 gap-1.5">{episodesData?.episodes.map(e => <Button key={e.episodeId} size="sm" variant={room.episode_id === e.episodeId ? "secondary" : "ghost"} className={`h-9 text-xs rounded-lg ${room.episode_id === e.episodeId ? 'bg-white/15' : 'hover:bg-white/10'}`} onClick={() => updateRoom.mutate({ roomId: roomId!, updates: { episode_id: e.episodeId, episode_number: e.number, episode_title: e.title } as any })}>{e.number}</Button>)}</div></ScrollArea>
                         </div>
                         <div className="space-y-4">
-                            <h3 className="text-sm font-semibold text-foreground flex items-center gap-2"><Settings className="w-4 h-4 text-muted-foreground" /> Provider Selection</h3>
+                            <h3 className="text-sm font-semibold text-foreground flex items-center gap-2"><Settings className="w-4 h-4 text-muted-foreground" /> {uiI18n.t('app.provider_selection_a5bca288')}</h3>
 
                             {loadingSources && (
                                 <div className="flex items-center gap-2 rounded-xl bg-white/5 border border-white/5 px-3 py-4 text-xs text-muted-foreground">
                                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                    Resolving servers…
+                                    {uiI18n.t('app.resolving_servers_a7ede214')}
                                 </div>
                             )}
 
                             {!loadingSources && serversData.all.length === 0 && serversData.torrents.length === 0 && (
                                 <div className="rounded-2xl border border-white/5 bg-white/5 px-4 py-4 text-xs text-muted-foreground space-y-2">
-                                    <p className="font-semibold text-foreground/80">No servers found</p>
+                                    <p className="font-semibold text-foreground/80">{uiI18n.t('app.no_servers_found_94e48102')}</p>
                                     <p className="opacity-70 leading-relaxed">
                                         {!isDesktopApp
-                                            ? 'Automatic resolution needs the desktop app. Paste a custom stream URL below to host from here.'
+                                            ? uiI18n.t('app.automatic_resolution_needs_the_desktop_app_paste_83a4602c')
                                             : !sourceDiagnostics?.streamEnabled
-                                                ? "Couldn't read this title's AniList id or episode number yet. Re-open the room, or change the anime again."
+                                                ? uiI18n.t('app.couldn_t_read_this_title_s_anilist_id_or_episode_289e7850')
                                                 : sourceDiagnostics?.streamUnavailable
-                                                    ? 'The toko streaming extension isn’t running or is out of date. Restart the app (and rebuild/reinstall the toko extension), then Retry.'
-                                                    : 'No provider had this episode. Try another episode or server, or paste a custom stream URL below.'}
+                                                    ? uiI18n.t('app.the_toko_streaming_extension_isn_t_running_or_is_ec74603b')
+                                                    : uiI18n.t('app.no_provider_had_this_episode_try_another_episode_1cf2a202')}
                                     </p>
                                     <Button size="sm" variant="outline" className="h-8 rounded-full text-xs bg-white/5 border-white/10 hover:bg-white/10" onClick={() => refetchSources()}>
-                                        Retry
+                                        {uiI18n.t('app.retry_9f5cd8a2')}
                                     </Button>
                                 </div>
                             )}
@@ -106,7 +109,7 @@ export function WatchRoomSettingsSheet() {
                             {serversData.torrents.length > 0 && (
                                 <div className="space-y-2">
                                     <p className="text-xs font-medium text-amber-400/80 px-1 flex items-center gap-1.5">
-                                        <Magnet className="w-3.5 h-3.5" /> Torrent Releases
+                                        <Magnet className="w-3.5 h-3.5" /> {uiI18n.t('app.torrent_releases_99fecbfb')}
                                         <span className="opacity-50">({serversData.torrents.length})</span>
                                     </p>
                                     <div className="space-y-1.5">
@@ -141,50 +144,50 @@ export function WatchRoomSettingsSheet() {
                                         ))}
                                     </div>
                                     <p className="text-[11px] italic text-muted-foreground/60 px-1">
-                                        Torrent releases can't be broadcast to a watch party yet — pick a server above to host.
+                                        {uiI18n.t('app.torrent_releases_can_t_be_broadcast_to_a_watch_p_2623a053')}
                                     </p>
                                 </div>
                             )}
                         </div>
                         <div className="space-y-4">
                             <div className="space-y-2">
-                                <h3 className="text-sm font-semibold text-foreground flex items-center gap-2"><Film className="w-4 h-4 text-muted-foreground" /> Custom Stream URL</h3>
+                                <h3 className="text-sm font-semibold text-foreground flex items-center gap-2"><Film className="w-4 h-4 text-muted-foreground" /> {uiI18n.t('app.custom_stream_url_68d0d46c')}</h3>
                                 <Input
-                                    placeholder="Paste M3U8 or MP4 URL…"
+                                    placeholder={uiI18n.t('app.paste_m3u8_or_mp4_url_7d8acc7d')}
                                     value={room.manual_stream_url || ''}
                                     onChange={(e) => updateRoom.mutate({ roomId: roomId!, updates: { manual_stream_url: e.target.value } as any })}
                                     className="bg-white/5 border-white/10 rounded-xl text-sm h-11"
                                 />
-                                <p className="text-[11px] text-muted-foreground">Overrides server selection. Supports direct links.</p>
+                                <p className="text-[11px] text-muted-foreground">{uiI18n.t('app.overrides_server_selection_supports_direct_links_68ec480f')}</p>
                             </div>
 
                             <div className="space-y-2">
-                                <h3 className="text-sm font-semibold text-foreground flex items-center gap-2"><Subtitles className="w-4 h-4 text-muted-foreground" /> Manual Subtitle</h3>
+                                <h3 className="text-sm font-semibold text-foreground flex items-center gap-2"><Subtitles className="w-4 h-4 text-muted-foreground" /> {uiI18n.t('app.manual_subtitle_6a23cd52')}</h3>
                                 <Input
-                                    placeholder="Paste VTT or SRT URL…"
+                                    placeholder={uiI18n.t('app.paste_vtt_or_srt_url_1900df4b')}
                                     value={room.manual_subtitle_url || ''}
                                     onChange={(e) => updateRoom.mutate({ roomId: roomId!, updates: { manual_subtitle_url: e.target.value } as any })}
                                     className="bg-white/5 border-white/10 rounded-xl text-sm h-11"
                                 />
-                                <p className="text-[11px] text-muted-foreground">Useful for custom servers without built-in subs.</p>
+                                <p className="text-[11px] text-muted-foreground">{uiI18n.t('app.useful_for_custom_servers_without_built_in_subs_4b9ef4c6')}</p>
                             </div>
                         </div>
 
                         <div className="space-y-3">
-                            <h3 className="text-sm font-semibold text-foreground flex items-center gap-2"><HardDrive className="w-4 h-4 text-muted-foreground" /> Your Files</h3>
+                            <h3 className="text-sm font-semibold text-foreground flex items-center gap-2"><HardDrive className="w-4 h-4 text-muted-foreground" /> {uiI18n.t('app.your_files_1f5832f2')}</h3>
                             {!isDesktopApp ? (
                                 <p className="text-[11px] text-muted-foreground leading-relaxed">
-                                    Streaming a file from your device or offline library needs the desktop app — it serves the file over your host tunnel.
+                                    {uiI18n.t('app.streaming_a_file_from_your_device_or_offline_lib_24bee16e')}
                                 </p>
                             ) : localShare ? (
                                 <div className="space-y-2 rounded-2xl border border-[hsl(var(--isshoni-accent))]/30 bg-[hsl(var(--isshoni-accent))]/[0.08] px-3 py-3">
                                     <p className="text-xs font-semibold text-foreground/90 flex items-center gap-1.5 min-w-0">
                                         <Radio className="w-3.5 h-3.5 text-[hsl(var(--isshoni-accent))] shrink-0" />
-                                        <span className="truncate">{localShare.fileName || 'Local file'}</span>
+                                        <span className="truncate">{localShare.fileName || uiI18n.t('app.local_file_576d5ace')}</span>
                                     </p>
-                                    <p className="text-[11px] text-muted-foreground">Broadcasting from your device to the party.</p>
+                                    <p className="text-[11px] text-muted-foreground">{uiI18n.t('app.broadcasting_from_your_device_to_the_party_1a731dc7')}</p>
                                     <Button size="sm" variant="outline" className="h-8 text-xs rounded-full bg-white/5 border-white/10 hover:bg-white/10" onClick={clearLocalShare}>
-                                        Stop & back to anime
+                                        {uiI18n.t('app.stop_back_to_anime_15cd87e3')}
                                     </Button>
                                 </div>
                             ) : (
@@ -196,7 +199,7 @@ export function WatchRoomSettingsSheet() {
                                         disabled={publishingLocal}
                                     >
                                         {publishingLocal ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FolderOpen className="w-4 h-4 mr-2 text-muted-foreground" />}
-                                        Play a video file…
+                                        {uiI18n.t('app.play_a_video_file_0d301e58')}
                                     </Button>
                                     <Button
                                         variant="outline"
@@ -205,9 +208,9 @@ export function WatchRoomSettingsSheet() {
                                         disabled={publishingLocal}
                                     >
                                         <HardDrive className="w-4 h-4 mr-2 text-muted-foreground" />
-                                        From your library…
+                                        {uiI18n.t('app.from_your_library_29037b9a')}
                                     </Button>
-                                    <p className="text-[11px] text-muted-foreground">Streams a downloaded episode or any local video to everyone in the room.</p>
+                                    <p className="text-[11px] text-muted-foreground">{uiI18n.t('app.streams_a_downloaded_episode_or_any_local_video__8482c31a')}</p>
                                 </div>
                             )}
                         </div>

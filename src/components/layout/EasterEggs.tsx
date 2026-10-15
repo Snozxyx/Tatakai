@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
  * Global easter eggs, mounted once beside GlobalListeners in MainLayout.
  *
@@ -38,28 +40,28 @@ interface SecretWordConfig {
 const SECRET_WORDS: Record<string, SecretWordConfig> = {
   tatakai: {
     toast: '🌸 Tatakai! Fight on.',
-    description: 'Dedicate your heart to the battle.',
+    get description() { return uiI18n.t('app.dedicate_your_heart_to_the_battle_848c0ccc'); },
     variant: 'petal',
     count: 24,
     sound: 'sparkle',
   },
   sugoi: {
     toast: '✨ Sugoi! You spotted it.',
-    description: 'Your awareness stat is maxed out.',
+    get description() { return uiI18n.t('app.your_awareness_stat_is_maxed_out_9bd15f34'); },
     variant: 'spark',
     count: 28,
     sound: 'pop',
   },
   senpai: {
     toast: '👀 Senpai noticed you!',
-    description: 'Keep doing what you are doing.',
+    get description() { return uiI18n.t('app.keep_doing_what_you_are_doing_7e2cef47'); },
     variant: 'confetti',
     count: 32,
     sound: 'pop',
   },
   nani: {
     toast: '💥 NANI?!',
-    description: 'Omae wa mou shindeiru.',
+    get description() { return uiI18n.t('app.omae_wa_mou_shindeiru_94a408e7'); },
     variant: 'spark',
     count: 35,
     sound: 'sparkle',
@@ -214,6 +216,7 @@ function ensureGlobalStyles() {
 // ==========================================
 
 export function EasterEggs() {
+  useUiTranslation();
   const [showPetals, setShowPetals] = useState(false);
   const konamiIndex = useRef(0);
   const letterBuffer = useRef('');
@@ -339,7 +342,7 @@ export function EasterEggs() {
           konamiIndex.current = 0;
           SoundFX.playChime();
           toast('⚡ Power level: OVER 9000!', {
-            description: 'You unlocked the secret sakura blossom festival.',
+            get description() { return uiI18n.t('app.you_unlocked_the_secret_sakura_blossom_festival_ebb88767'); },
             duration: 4500,
           });
 
@@ -359,7 +362,7 @@ export function EasterEggs() {
   // 5. Console Greeting
   useEffect(() => {
     const banner = 'font-size:26px;font-weight:900;color:#f43f5e;text-shadow:0 2px 10px rgba(244,63,94,0.4);';
-    const subtitle = 'font-size:12px;color:#a855f7;font-weight:600;';
+    const subtitle = uiI18n.t('app.font_size_12px_color_a855f7_font_weight_600_6bd48939');
     const tip = 'font-size:11px;color:#94a3b8;font-style:italic;';
     console.log('%c🌸 TATAKAI', banner);
     console.log('%cWelcome, challenger. The console holds deep secrets.', subtitle);
@@ -390,6 +393,7 @@ interface PetalItem {
 }
 
 function PetalShower({ onComplete }: { onComplete: () => void }) {
+  useUiTranslation();
   const reduce = useReducedMotion();
 
   const petals: PetalItem[] = useMemo(() => {

@@ -1,4 +1,7 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { useTranslation } from 'react-i18next';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Smile } from 'lucide-react';
 
@@ -7,25 +10,25 @@ import { Smile } from 'lucide-react';
  * category. Selecting one inserts the raw unicode character into the composer.
  * Not exhaustive by design — the goal is quick reactions, not a full keyboard.
  */
-const EMOJI_GROUPS: { label: string; emojis: string[] }[] = [
+const EMOJI_GROUPS: { labelKey: string; emojis: string[] }[] = [
   {
-    label: 'Smileys',
+    labelKey: 'comments.emojiSmileys',
     emojis: ['😀', '😂', '🤣', '😊', '😍', '😎', '🤩', '😭', '😢', '😅', '😉', '🙃', '😴', '🤔', '😤', '😱', '🥹', '🥳', '😇', '🤯', '😳', '🫠', '😏', '🙄'],
   },
   {
-    label: 'Gestures',
+    labelKey: 'comments.emojiGestures',
     emojis: ['👍', '👎', '👏', '🙌', '🙏', '🤝', '💪', '🫶', '👀', '🫡', '✌️', '🤞', '👌', '🤙', '👋', '🤟'],
   },
   {
-    label: 'Hearts',
+    labelKey: 'comments.emojiHearts',
     emojis: ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '💔', '💕', '💖', '💗', '💘', '💝', '💯', '✨'],
   },
   {
-    label: 'Anime',
+    labelKey: 'comments.emojiAnime',
     emojis: ['🔥', '⚔️', '🗡️', '🌸', '🍥', '⭐', '🌟', '💫', '🎌', '👺', '🐉', '🥷', '🎭', '📺', '🍜', '🎮'],
   },
   {
-    label: 'Reactions',
+    labelKey: 'comments.emojiReactions',
     emojis: ['😂', '💀', '👽', '🤡', '🎉', '🎊', '🤌', '🧠', '🫥', '😈', '🤖', '🥶', '🥵', '🤪', '😬', '🫢'],
   },
 ];
@@ -36,6 +39,8 @@ interface EmojiPickerProps {
 }
 
 export function EmojiPicker({ onSelect, trigger }: EmojiPickerProps) {
+  useUiTranslation();
+  const { t } = useTranslation();
   return (
     <Popover>
       <PopoverTrigger asChild>{trigger}</PopoverTrigger>
@@ -43,9 +48,9 @@ export function EmojiPicker({ onSelect, trigger }: EmojiPickerProps) {
         <ScrollArea className="h-64">
           <div className="p-3 space-y-3">
             {EMOJI_GROUPS.map((group) => (
-              <div key={group.label}>
+              <div key={group.labelKey}>
                 <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                  {group.label}
+                  {t(group.labelKey)}
                 </p>
                 <div className="grid grid-cols-8 gap-0.5">
                   {group.emojis.map((emoji, i) => (

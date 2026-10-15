@@ -1,3 +1,5 @@
+import uiI18n from '@/lib/uiI18n';
+import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { CalendarDays, MapPin, ExternalLink, Plus, X, Trash2, Clock, Calendar, Image as ImageIcon, Link as LinkIcon, Type } from 'lucide-react';
@@ -30,10 +32,10 @@ function fmtDate(iso: string) {
   try {
     const d = new Date(iso);
     return {
-      month: d.toLocaleDateString(undefined, { month: 'short' }).toUpperCase(),
+      month: d.toLocaleDateString(uiI18n.language, { month: 'short' }).toUpperCase(),
       day: d.getDate(),
-      time: d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }),
-      weekday: d.toLocaleDateString(undefined, { weekday: 'short' }),
+      time: d.toLocaleTimeString(uiI18n.language, { hour: 'numeric', minute: '2-digit' }),
+      weekday: d.toLocaleDateString(uiI18n.language, { weekday: 'short' }),
     };
   } catch {
     return { month: '---', day: 0, time: '--:--', weekday: '---' };
@@ -41,6 +43,7 @@ function fmtDate(iso: string) {
 }
 
 export function CommunityEventsSection() {
+  useUiTranslation();
   const { isAdmin, isModerator } = useAuth();
   const isStaff = isAdmin || isModerator;
   
@@ -56,7 +59,7 @@ export function CommunityEventsSection() {
 
   const submit = async () => {
     if (!form.title?.trim() || !form.starts_at) {
-      toast.error('Title and start time are required.');
+      toast.error(uiI18n.t('app.title_and_start_time_are_required_95ed835a'));
       return;
     }
     
@@ -71,24 +74,24 @@ export function CommunityEventsSection() {
         image_url: form.image_url?.trim() || null,
       });
       
-      toast.success('Event successfully posted.');
+      toast.success(uiI18n.t('app.event_successfully_posted_020f9b20'));
       setForm(EMPTY_FORM);
       setShowForm(false);
       
       // Force a manual refetch just in case react-query invalidation is missed
       refetch?.(); 
     } catch (e: any) {
-      toast.error(e?.message || 'Failed to post event.');
+      toast.error(e?.message || uiI18n.t('app.failed_to_post_event_f98806f9'));
     }
   };
 
   const remove = async (id: string) => {
     try {
       await deleteEvent.mutateAsync(id);
-      toast.success('Event removed.');
+      toast.success(uiI18n.t('app.event_removed_1a4ee92d'));
       refetch?.(); // Manual fallback refetch
     } catch (e: any) {
-      toast.error(e?.message || 'Failed to remove event.');
+      toast.error(e?.message || uiI18n.t('app.failed_to_remove_event_051f5c5f'));
     }
   };
 
@@ -108,8 +111,8 @@ export function CommunityEventsSection() {
               <Calendar className="h-5 w-5" />
             </div>
             <div className="flex flex-col">
-              <h2 className="text-base font-bold tracking-tight text-foreground">Event Schedule</h2>
-              <p className="text-[13px] text-muted-foreground/80">Streams, watch-alongs, & releases</p>
+              <h2 className="text-base font-bold tracking-tight text-foreground">{uiI18n.t('app.event_schedule_b8c2708c')}</h2>
+              <p className="text-[13px] text-muted-foreground/80">{uiI18n.t('app.streams_watch_alongs_releases_6b650d42')}</p>
             </div>
           </div>
           {isStaff && (
@@ -123,7 +126,7 @@ export function CommunityEventsSection() {
               )}
             >
               {showForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-              {showForm ? 'Cancel' : 'Add Event'}
+              {showForm ? uiI18n.t('app.cancel_77dfd213') : uiI18n.t('app.add_event_f5be6c97')}
             </Button>
           )}
         </div>
@@ -144,15 +147,15 @@ export function CommunityEventsSection() {
                 <div className="space-y-3">
                   <div className="relative group">
                     <Type className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground/60 transition-colors group-focus-within:text-primary" />
-                    <input className={cn(inputCls, "pl-10")} placeholder="Event Title *" value={form.title} maxLength={140} onChange={(e) => set('title', e.target.value)} />
+                    <input className={cn(inputCls, "pl-10")} placeholder={uiI18n.t('app.event_title_c1a7adc6')} value={form.title} maxLength={140} onChange={(e) => set('title', e.target.value)} />
                   </div>
-                  <textarea className={cn(inputCls, 'min-h-[90px] resize-y')} placeholder="Event Description (optional)" value={form.description ?? ''} onChange={(e) => set('description', e.target.value)} />
+                  <textarea className={cn(inputCls, 'min-h-[90px] resize-y')} placeholder={uiI18n.t('app.event_description_optional_ccad4bb5')} value={form.description ?? ''} onChange={(e) => set('description', e.target.value)} />
                 </div>
                 
                 {/* Date & Time Pickers */}
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 p-4 rounded-xl bg-black/20 border border-white/5">
                   <label className="flex flex-col gap-1.5">
-                    <span className="text-[11px] font-bold uppercase tracking-widest text-primary/80 ml-1">Start Time *</span>
+                    <span className="text-[11px] font-bold uppercase tracking-widest text-primary/80 ml-1">{uiI18n.t('app.start_time_0ba2ac13')}</span>
                     <div className="relative group">
                       <Clock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60 transition-colors group-focus-within:text-primary z-10 pointer-events-none" />
                       <input 
@@ -166,7 +169,7 @@ export function CommunityEventsSection() {
                   </label>
                   
                   <label className="flex flex-col gap-1.5">
-                    <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground ml-1">End Time</span>
+                    <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground ml-1">{uiI18n.t('app.end_time_4c640e92')}</span>
                     <div className="relative group">
                       <Clock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60 transition-colors group-focus-within:text-primary z-10 pointer-events-none" />
                       <input 
@@ -183,17 +186,17 @@ export function CommunityEventsSection() {
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div className="relative group">
                     <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60 transition-colors group-focus-within:text-primary" />
-                    <input className={cn(inputCls, "pl-10")} placeholder="Location (e.g. Discord)" value={form.location ?? ''} onChange={(e) => set('location', e.target.value)} />
+                    <input className={cn(inputCls, "pl-10")} placeholder={uiI18n.t('app.location_e_g_discord_41997956')} value={form.location ?? ''} onChange={(e) => set('location', e.target.value)} />
                   </div>
                   <div className="relative group">
                     <LinkIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60 transition-colors group-focus-within:text-primary" />
-                    <input className={cn(inputCls, "pl-10")} placeholder="Link URL" value={form.link ?? ''} onChange={(e) => set('link', e.target.value)} />
+                    <input className={cn(inputCls, "pl-10")} placeholder={uiI18n.t('app.link_url_08738f6e')} value={form.link ?? ''} onChange={(e) => set('link', e.target.value)} />
                   </div>
                 </div>
                 
                 <div className="relative group">
                   <ImageIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60 transition-colors group-focus-within:text-primary" />
-                  <input className={cn(inputCls, "pl-10")} placeholder="Cover Image URL" value={form.image_url ?? ''} onChange={(e) => set('image_url', e.target.value)} />
+                  <input className={cn(inputCls, "pl-10")} placeholder={uiI18n.t('app.cover_image_url_c2690579')} value={form.image_url ?? ''} onChange={(e) => set('image_url', e.target.value)} />
                 </div>
                 
                 {/* Submit Action */}
@@ -203,7 +206,7 @@ export function CommunityEventsSection() {
                     disabled={createEvent.isPending || !form.title || !form.starts_at} 
                     className="h-10 gap-2 rounded-full px-6 text-sm font-bold shadow-lg active:scale-95 transition-transform"
                   >
-                    {createEvent.isPending ? 'Posting…' : 'Post Event'}
+                    {createEvent.isPending ? uiI18n.t('app.posting_20c00d70') : uiI18n.t('app.post_event_cb4ea388')}
                   </Button>
                 </div>
               </div>
@@ -223,9 +226,9 @@ export function CommunityEventsSection() {
             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white/[0.03] mb-4 ring-1 ring-white/10">
               <CalendarDays className="h-8 w-8 text-muted-foreground/40" />
             </div>
-            <h3 className="font-display text-[17px] font-semibold text-foreground">No upcoming events</h3>
+            <h3 className="font-display text-[17px] font-semibold text-foreground">{uiI18n.t('app.no_upcoming_events_b488b5ca')}</h3>
             <p className="mt-2 max-w-sm text-sm text-muted-foreground">
-              {isStaff ? 'Schedule your first event using the button above.' : 'Check back soon — the community team posts events here.'}
+              {isStaff ? uiI18n.t('app.schedule_your_first_event_using_the_button_above_472d14ba') : uiI18n.t('app.check_back_soon_the_community_team_posts_events__2d05a4a1')}
             </p>
           </div>
         ) : (
@@ -257,7 +260,7 @@ export function CommunityEventsSection() {
                         <button 
                           onClick={() => remove(ev.id)} 
                           className="shrink-0 rounded-full p-2 text-muted-foreground/50 opacity-0 transition-all hover:bg-rose-500/15 hover:text-rose-400 group-hover/ev:opacity-100 mt-[-4px] mr-[-4px]" 
-                          title="Delete Event"
+                          title={uiI18n.t('app.delete_event_d45effe5')}
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -292,7 +295,7 @@ export function CommunityEventsSection() {
                           className="inline-flex items-center gap-1.5 rounded-md border border-primary/20 bg-primary/10 px-2.5 py-1 text-xs font-bold text-primary transition-colors hover:bg-primary/20 hover:text-primary-foreground"
                         >
                           <ExternalLink className="h-3.5 w-3.5" />
-                          View Details
+                          {uiI18n.t('app.view_details_907b3bee')}
                         </a>
                       )}
                     </div>

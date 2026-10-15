@@ -1,3 +1,4 @@
+import uiI18n from '@/lib/uiI18n';
 import React from 'react';
 import { extensionRegistry } from './ExtensionRegistry';
 import { GlassPanel } from '@/components/ui/GlassPanel';
@@ -18,14 +19,14 @@ export function initDemoExtension() {
     label: 'Demo Page',
     component: () => (
       <div className="min-h-screen bg-background p-12">
-        <h1 className="text-4xl font-bold mb-4">Extension Custom Page</h1>
-        <p className="text-muted-foreground mb-8">This entire page was injected by an extension!</p>
+        <h1 className="text-4xl font-bold mb-4">{uiI18n.t('app.extension_custom_page_993017bc')}</h1>
+        <p className="text-muted-foreground mb-8">{uiI18n.t('app.this_entire_page_was_injected_by_an_extension_9a84ce08')}</p>
         <GlassPanel className="p-8 max-w-2xl">
           <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
             <Sparkles className="text-primary" />
-            Dynamic Content
+            {uiI18n.t('app.dynamic_content_c2663d78')}
           </h2>
-          <p className="text-sm">Extensions can render any React component here.</p>
+          <p className="text-sm">{uiI18n.t('app.extensions_can_render_any_react_component_here_96093e11')}</p>
         </GlassPanel>
       </div>
     )
@@ -43,7 +44,7 @@ export function initDemoExtension() {
       >
         <Activity className="w-4 h-4 text-primary" />
         <span className="text-[10px] font-bold uppercase tracking-widest text-primary">
-          Extension Insight: {anime?.info?.stats?.type || 'Unknown'} detected
+          {uiI18n.t('app.extension_insight_ac2b7363')} {anime?.info?.stats?.type || 'Unknown'} {uiI18n.t('app.detected_bcbfffd8')}
         </span>
       </motion.div>
     )
