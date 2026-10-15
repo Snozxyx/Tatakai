@@ -82,7 +82,11 @@ contextBridge.exposeInMainWorld('electron', {
         ipcRenderer.removeAllListeners('download-completed');
         ipcRenderer.removeAllListeners('download-error');
     },
-    onToggleLogViewer: (callback) => ipcRenderer.on('toggle-log-viewer', () => callback()),
+    onToggleLogViewer: (callback) => {
+        const listener = () => callback();
+        ipcRenderer.on('toggle-log-viewer', listener);
+        return () => ipcRenderer.removeListener('toggle-log-viewer', listener);
+    },
 
     // ── Manga chapter downloads + offline library ─────────────────────────────
     // Dedicated event channels (manga-download-*) with PER-CHANNEL listener

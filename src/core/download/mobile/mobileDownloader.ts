@@ -149,11 +149,14 @@ interface MuxPlugin {
   ): Promise<{ remove: () => Promise<void> }>;
 }
 
-async function getMuxPlugin(): Promise<MuxPlugin | null> {
+async function getMuxPlugin(): Promise<{ plugin: MuxPlugin } | null> {
   if (!hasMuxService()) return null;
   try {
     const { registerPlugin } = await import('@capacitor/core');
-    return registerPlugin<MuxPlugin>('TatakaiMux');
+    // Capacitor returns a proxy whose unknown properties become native method
+    // calls. Returning it directly from an async function makes Promise
+    // resolution probe `.then`, which Capacitor forwards as a plugin method.
+    return { plugin: registerPlugin<MuxPlugin>('TatakaiMux') };
   } catch {
     return null;
   }
@@ -529,8 +532,9 @@ async function downloadHlsAsMp4(
   isCancelled: () => boolean,
   svcLabel?: string,
 ): Promise<{ uri: string; size?: number }> {
-  const plugin = await getMuxPlugin();
-  if (!plugin) throw new Error('Remux service not available on this device.');
+  const mux = await getMuxPlugin();
+  if (!mux) throw new Error('Remux service not available on this device.');
+  const { plugin } = mux;
   const { Capacitor } = await import('@capacitor/core');
   const { Filesystem, Directory } = await import('@capacitor/filesystem');
 
@@ -849,8 +853,8 @@ function stallAfter(episodeId: string): { promise: Promise<never>; cancel: () =>
       } catch { /* best-effort */ }
       void (async () => {
         try {
-          const plugin = await getMuxPlugin();
-          await plugin?.cancelMux({ jobId: episodeId });
+          const mux = await getMuxPlugin();
+          await mux?.plugin.cancelMux({ jobId: episodeId });
         } catch { /* plugin missing — nothing to stop */ }
       })();
       reject(new Error('Download stalled with no completion for a long time — try again on a faster connection.'));
@@ -916,8 +920,8 @@ export function cancelMobileDownload(episodeId: string): void {
   // Await nothing: stop a native remux in flight too (best-effort).
   void (async () => {
     try {
-      const plugin = await getMuxPlugin();
-      await plugin?.cancelMux({ jobId: episodeId });
+      const mux = await getMuxPlugin();
+      await mux?.plugin.cancelMux({ jobId: episodeId });
     } catch { /* plugin missing — nothing to stop */ }
   })();
 }

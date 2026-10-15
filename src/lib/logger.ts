@@ -1,10 +1,10 @@
 import { recordDiagnosticError } from '@/core/diagnostics/recent-errors';
 import { logClientError } from './errorLogger';
-
-const noop = () => {};
+import { isDeveloperModeEnabled } from './developerMode';
 
 // Preserve original console methods to avoid recursion when we overwrite console.* later
 const origConsole = {
+  log: console.log.bind(console),
   error: console.error.bind(console),
   warn: console.warn.bind(console),
   info: console.info.bind(console),
@@ -13,18 +13,18 @@ const origConsole = {
 
 export const logger = {
   debug: (...args: any[]) => {
-    if (!import.meta.env.PROD) {
-      origConsole.debug(...args);
+    if (!import.meta.env.PROD || isDeveloperModeEnabled()) {
+      console.debug(...args);
     }
   },
   info: (...args: any[]) => {
-    if (!import.meta.env.PROD) {
-      origConsole.info(...args);
+    if (!import.meta.env.PROD || isDeveloperModeEnabled()) {
+      console.info(...args);
     }
   },
   warn: (...args: any[]) => {
     recordDiagnosticError('warning', args[0]);
-    if (!import.meta.env.PROD) {
+    if (!import.meta.env.PROD || isDeveloperModeEnabled()) {
       origConsole.warn(...args);
     }
     // NOTE: warnings are intentionally NOT forwarded to Discord. They are still
@@ -83,11 +83,11 @@ function previewArgs(args: unknown[]): unknown[] {
 export function initConsoleProtection() {
   if (import.meta.env.PROD) {
     // eslint-disable-next-line no-console
-    console.log = noop;
+    console.log = (...args: any[]) => { if (isDeveloperModeEnabled()) origConsole.log(...args); };
     // eslint-disable-next-line no-console
-    console.info = noop;
+    console.info = (...args: any[]) => { if (isDeveloperModeEnabled()) origConsole.info(...args); };
     // eslint-disable-next-line no-console
-    console.debug = noop;
+    console.debug = (...args: any[]) => { if (isDeveloperModeEnabled()) origConsole.debug(...args); };
     // We keep console.warn/error but forward warn->logger.warn and error->logger.error
     // eslint-disable-next-line no-console
     console.warn = (...args: any[]) => void logger.warn(...args);

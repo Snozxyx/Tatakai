@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { analytics } from '@/core/analytics/AnalyticsService';
+import { getVisitorId, getVisitSessionId } from '@/lib/analyticsIdentity';
 
 // Check if we're online
 function isOnline(): boolean {
@@ -9,14 +10,7 @@ function isOnline(): boolean {
 }
 
 // Generate or get session ID from localStorage
-function getSessionId(): string {
-  let sessionId = localStorage.getItem('tatakai_session_id');
-  if (!sessionId) {
-    sessionId = crypto.randomUUID();
-    localStorage.setItem('tatakai_session_id', sessionId);
-  }
-  return sessionId;
-}
+const getSessionId = getVisitSessionId;
 
 const VISITOR_INFO_CACHE_KEY = 'tatakai_visitor_info_cache_v1';
 const VISITOR_INFO_TTL_MS = 30 * 60 * 1000;
@@ -163,6 +157,7 @@ export async function trackPageVisit(pagePath: string, userId?: string): Promise
     await supabase.from('page_visits').insert({
       user_id: userId || null,
       session_id: sessionId,
+      visitor_id: getVisitorId(),
       ip_address: visitorInfo.ip,
       country: visitorInfo.country,
       city: visitorInfo.city,

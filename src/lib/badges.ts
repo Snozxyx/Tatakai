@@ -93,8 +93,8 @@ const COLLECTIBLE_BADGES: BadgeDef[] = [
     rarity: 'mythic',
     image: chikra('og'),
     award: 'auto',
-    description: 'One of the first 100 members.',
-    rule: 'Auto: among the first 100 signups',
+    description: 'Here for the 1,000-member milestone.',
+    rule: 'Granted to all existing members at the 1,000-member celebration',
   },
   {
     key: 'centurion',

@@ -1,11 +1,22 @@
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useEffect, useState, useRef } from 'react';
-import { useIsNativeApp } from '@/hooks/ui/useIsNativeApp';
-import { X, Terminal, Trash2, Copy, Download, Search, Filter, ChevronDown, Check } from 'lucide-react';
+import {
+  X,
+  Terminal,
+  Trash2,
+  Copy,
+  Download,
+  Search,
+  Filter,
+  ChevronDown,
+  Check,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useDeveloperMode } from '@/hooks/ui/useDeveloperMode';
+import { consoleValue } from '@/lib/consoleValue';
 
 interface LogEntry {
   level: 'info' | 'warn' | 'error' | 'debug';
@@ -18,7 +29,7 @@ type LogFilter = 'all' | 'info' | 'warn' | 'error' | 'debug';
 
 export function LogViewer() {
   useUiTranslation();
-  const isNative = useIsNativeApp();
+  const { enabled } = useDeveloperMode();
   const [isOpen, setIsOpen] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [filter, setFilter] = useState<LogFilter>('all');
@@ -27,37 +38,56 @@ export function LogViewer() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (!enabled) {
+      setIsOpen(false);
+      return;
+    }
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        (e.ctrlKey || e.metaKey) &&
+        e.shiftKey &&
+        e.key.toLowerCase() === 'i'
+      ) {
+        e.preventDefault();
+        setIsOpen((open) => !open);
+      }
       // Only handle Escape to close
-      if (e.key === 'Escape' && isOpen) {
+      if (e.key === 'Escape') {
         setIsOpen(false);
       }
     };
 
     // Listen for Electron's toggle event
-    if ((window as any).electron?.onToggleLogViewer) {
-      (window as any).electron.onToggleLogViewer(() => {
-        setIsOpen(prev => !prev);
-      });
-    }
+    const unsubscribe = (window as any).electron?.onToggleLogViewer?.(() =>
+      setIsOpen((prev) => !prev)
+    );
+    const toggle = () => setIsOpen((previous) => !previous);
+    window.addEventListener('tatakai:toggle-log-viewer', toggle);
 
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen]);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('tatakai:toggle-log-viewer', toggle);
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
+  }, [enabled]);
 
   useEffect(() => {
-    if (!isNative) return;
+    if (!enabled) return;
 
     const originalConsole = {
       log: console.log,
       warn: console.warn,
       error: console.error,
       debug: console.debug,
+      info: console.info,
     };
 
     const addLog = (level: LogEntry['level'], message: any, ...args: any[]) => {
-      const timestamp = new Date().toLocaleTimeString(uiI18n.language, { hour12: false });
-      let formattedMessage = String(message);
+      const timestamp = new Date().toLocaleTimeString(uiI18n.language, {
+        hour12: false,
+      });
+      let formattedMessage = consoleValue(message);
       let data: any = args.length > 0 ? args : undefined;
 
       if (message instanceof Error) {
@@ -65,13 +95,19 @@ export function LogViewer() {
         data = message.stack ? [message.stack] : undefined;
       }
 
-      setLogs(prev => [...prev.slice(-500), { level, message: formattedMessage, data, timestamp }]);
-      
+      setLogs((prev) => [
+        ...prev.slice(-500),
+        { level, message: formattedMessage, data, timestamp },
+      ]);
+
       if (scrollRef.current) {
         const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
         if (scrollHeight - scrollTop - clientHeight < 100) {
           setTimeout(() => {
-            scrollRef.current?.scrollTo({ top: scrollHeight, behavior: 'smooth' });
+            scrollRef.current?.scrollTo({
+              top: scrollHeight,
+              behavior: 'smooth',
+            });
           }, 0);
         }
       }
@@ -93,30 +129,57 @@ export function LogViewer() {
       if (args.length > 0) addLog('debug', args[0], ...args.slice(1));
       originalConsole.debug(...args);
     };
+    console.info = (...args: any[]) => {
+      if (args.length) addLog('info', args[0], ...args.slice(1));
+      originalConsole.info(...args);
+    };
+    const onError = (event: ErrorEvent) =>
+      addLog('error', event.error || event.message);
+    const onRejection = (event: PromiseRejectionEvent) =>
+      addLog('error', event.reason);
+    window.addEventListener('error', onError);
+    window.addEventListener('unhandledrejection', onRejection);
+    addLog('info', uiI18n.t('developerConsole.enabled'), {
+      version: __APP_VERSION__,
+      route: window.location.pathname,
+    });
 
     return () => {
       console.log = originalConsole.log;
       console.warn = originalConsole.warn;
       console.error = originalConsole.error;
       console.debug = originalConsole.debug;
+      console.info = originalConsole.info;
+      window.removeEventListener('error', onError);
+      window.removeEventListener('unhandledrejection', onRejection);
     };
-  }, [isNative]);
+  }, [enabled]);
 
-  if (!isOpen) return null;
+  if (!enabled || !isOpen) return null;
 
-  const filteredLogs = logs.filter(log => {
+  const filteredLogs = logs.filter((log) => {
     if (filter !== 'all' && log.level !== filter) return false;
-    if (search && !log.message.toLowerCase().includes(search.toLowerCase())) return false;
+    if (search && !log.message.toLowerCase().includes(search.toLowerCase()))
+      return false;
     return true;
   });
 
   const copyLogs = () => {
-    const text = filteredLogs.map(l => `[${l.timestamp}] [${l.level.toUpperCase()}] ${l.message}`).join('\n');
+    const text = filteredLogs
+      .map((l) => `[${l.timestamp}] [${l.level.toUpperCase()}] ${l.message}`)
+      .join('\n');
     navigator.clipboard.writeText(text);
   };
 
   const exportLogs = () => {
-    const text = filteredLogs.map(l => `[${l.timestamp}] [${l.level.toUpperCase()}] ${l.message}${l.data ? '\n' + JSON.stringify(l.data, null, 2) : ''}`).join('\n\n');
+    const text = filteredLogs
+      .map(
+        (l) =>
+          `[${l.timestamp}] [${l.level.toUpperCase()}] ${l.message}${
+            l.data ? '\n' + consoleValue(l.data) : ''
+          }`
+      )
+      .join('\n\n');
     const blob = new Blob([text], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -128,21 +191,21 @@ export function LogViewer() {
 
   const logCounts = {
     all: logs.length,
-    info: logs.filter(l => l.level === 'info').length,
-    warn: logs.filter(l => l.level === 'warn').length,
-    error: logs.filter(l => l.level === 'error').length,
-    debug: logs.filter(l => l.level === 'debug').length,
+    info: logs.filter((l) => l.level === 'info').length,
+    warn: logs.filter((l) => l.level === 'warn').length,
+    error: logs.filter((l) => l.level === 'error').length,
+    debug: logs.filter((l) => l.level === 'debug').length,
   };
 
   return (
     <AnimatePresence>
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 md:p-8"
       >
-        <motion.div 
+        <motion.div
           initial={{ scale: 0.95, y: 20 }}
           animate={{ scale: 1, y: 0 }}
           exit={{ scale: 0.95, y: 20 }}
@@ -153,29 +216,61 @@ export function LogViewer() {
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-lg border border-white/10">
                 <Terminal className="w-4 h-4 text-purple-400" />
-                <span className="font-mono text-sm font-semibold text-white/90">{uiI18n.t('app.console_9f3341d3')}</span>
+                <span className="font-mono text-sm font-semibold text-white/90">
+                  {uiI18n.t('app.console_9f3341d3')}
+                </span>
               </div>
-              
+
               {/* Stats */}
               <div className="hidden md:flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 text-[10px] font-bold">{logCounts.info} {uiI18n.t('app.info_9c9cf999')}</span>
-                <span className="px-2 py-0.5 rounded bg-yellow-500/10 text-yellow-400 text-[10px] font-bold">{logCounts.warn} {uiI18n.t('app.warn_c2fd77bf')}</span>
-                <span className="px-2 py-0.5 rounded bg-red-500/10 text-red-400 text-[10px] font-bold">{logCounts.error} {uiI18n.t('app.err_b9c7a527')}</span>
+                <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 text-[10px] font-bold">
+                  {logCounts.info} {uiI18n.t('app.info_9c9cf999')}
+                </span>
+                <span className="px-2 py-0.5 rounded bg-yellow-500/10 text-yellow-400 text-[10px] font-bold">
+                  {logCounts.warn} {uiI18n.t('app.warn_c2fd77bf')}
+                </span>
+                <span className="px-2 py-0.5 rounded bg-red-500/10 text-red-400 text-[10px] font-bold">
+                  {logCounts.error} {uiI18n.t('app.err_b9c7a527')}
+                </span>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon" onClick={() => setLogs([])} title={uiI18n.t('app.clear_719ea396')} className="h-8 w-8 hover:bg-white/5">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setLogs([])}
+                title={uiI18n.t('app.clear_719ea396')}
+                className="h-8 w-8 hover:bg-white/5"
+              >
                 <Trash2 className="w-4 h-4 text-zinc-400" />
               </Button>
-              <Button variant="ghost" size="icon" onClick={copyLogs} title={uiI18n.t('app.copy_af74f7c5')} className="h-8 w-8 hover:bg-white/5">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={copyLogs}
+                title={uiI18n.t('app.copy_af74f7c5')}
+                className="h-8 w-8 hover:bg-white/5"
+              >
                 <Copy className="w-4 h-4 text-zinc-400" />
               </Button>
-              <Button variant="ghost" size="icon" onClick={exportLogs} title={uiI18n.t('app.export_f3e4fadb')} className="h-8 w-8 hover:bg-white/5">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={exportLogs}
+                title={uiI18n.t('app.export_f3e4fadb')}
+                className="h-8 w-8 hover:bg-white/5"
+              >
                 <Download className="w-4 h-4 text-zinc-400" />
               </Button>
               <div className="w-px h-5 bg-white/10 mx-1" />
-              <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)} title={uiI18n.t('app.close_esc_6ae84e4a')} className="h-8 w-8 hover:bg-red-500/20 hover:text-red-400">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsOpen(false)}
+                title={uiI18n.t('app.close_esc_6ae84e4a')}
+                className="h-8 w-8 hover:bg-red-500/20 hover:text-red-400"
+              >
                 <X className="w-4 h-4" />
               </Button>
             </div>
@@ -197,7 +292,7 @@ export function LogViewer() {
 
             {/* Filter Dropdown */}
             <div className="relative">
-              <button 
+              <button
                 onClick={() => setShowFilterMenu(!showFilterMenu)}
                 className="flex items-center gap-2 h-8 px-3 bg-white/5 border border-white/10 rounded-lg text-xs font-medium text-white/70 hover:bg-white/10 transition-colors"
               >
@@ -205,19 +300,34 @@ export function LogViewer() {
                 <span className="capitalize">{filter}</span>
                 <ChevronDown className="w-3 h-3" />
               </button>
-              
+
               {showFilterMenu && (
                 <div className="absolute top-full left-0 mt-1 w-32 bg-zinc-900 border border-white/10 rounded-lg shadow-xl overflow-hidden z-10">
-                  {(['all', 'info', 'warn', 'error', 'debug'] as LogFilter[]).map(f => (
+                  {(
+                    ['all', 'info', 'warn', 'error', 'debug'] as LogFilter[]
+                  ).map((f) => (
                     <button
                       key={f}
-                      onClick={() => { setFilter(f); setShowFilterMenu(false); }}
+                      onClick={() => {
+                        setFilter(f);
+                        setShowFilterMenu(false);
+                      }}
                       className={cn(
-                        "w-full flex items-center justify-between px-3 py-2 text-xs hover:bg-white/5 transition-colors",
-                        filter === f ? "text-purple-400" : "text-white/60"
+                        'w-full flex items-center justify-between px-3 py-2 text-xs hover:bg-white/5 transition-colors',
+                        filter === f ? 'text-purple-400' : 'text-white/60'
                       )}
                     >
-                      <span className="capitalize">{uiI18n.t(({"all":"app.all_d87c4480","info":"app.info_59bd0a3f","warn":"app.warn_4c8ea476","error":"app.error_11f9578d","debug":"app.debug_32faaeca"})[f])}</span>
+                      <span className="capitalize">
+                        {uiI18n.t(
+                          {
+                            all: 'app.all_d87c4480',
+                            info: 'app.info_59bd0a3f',
+                            warn: 'app.warn_4c8ea476',
+                            error: 'app.error_11f9578d',
+                            debug: 'app.debug_32faaeca',
+                          }[f]
+                        )}
+                      </span>
                       {filter === f && <Check className="w-3 h-3" />}
                     </button>
                   ))}
@@ -227,39 +337,52 @@ export function LogViewer() {
           </div>
 
           {/* Log Content */}
-          <div ref={scrollRef} className="flex-1 overflow-y-auto p-2 font-mono text-xs">
+          <div
+            ref={scrollRef}
+            className="flex-1 overflow-y-auto p-2 font-mono text-xs"
+          >
             {filteredLogs.map((log, i) => (
-              <div 
-                key={i} 
+              <div
+                key={i}
                 className={cn(
-                  "flex gap-2 py-1.5 px-2 rounded hover:bg-white/[0.02] group border-l-2",
-                  log.level === 'info' && "border-blue-500/50",
-                  log.level === 'debug' && "border-purple-500/50",
-                  log.level === 'warn' && "border-yellow-500/50",
-                  log.level === 'error' && "border-red-500/50",
+                  'flex gap-2 py-1.5 px-2 rounded hover:bg-white/[0.02] group border-l-2',
+                  log.level === 'info' && 'border-blue-500/50',
+                  log.level === 'debug' && 'border-purple-500/50',
+                  log.level === 'warn' && 'border-yellow-500/50',
+                  log.level === 'error' && 'border-red-500/50'
                 )}
               >
-                <span className="text-zinc-600 shrink-0 select-none w-16">{log.timestamp}</span>
-                <span className={cn(
-                  "uppercase font-bold w-10 shrink-0 select-none text-[10px] py-0.5 text-center rounded",
-                  log.level === 'info' && "bg-blue-500/10 text-blue-400",
-                  log.level === 'debug' && "bg-purple-500/10 text-purple-400",
-                  log.level === 'warn' && "bg-yellow-500/10 text-yellow-400",
-                  log.level === 'error' && "bg-red-500/10 text-red-400",
-                )}>{log.level}</span>
-                <div className={cn(
-                  "break-all whitespace-pre-wrap flex-1",
-                  log.level === 'info' && "text-zinc-300",
-                  log.level === 'debug' && "text-zinc-400",
-                  log.level === 'warn' && "text-yellow-200",
-                  log.level === 'error' && "text-red-300",
-                )}>
+                <span className="text-zinc-600 shrink-0 select-none w-16">
+                  {log.timestamp}
+                </span>
+                <span
+                  className={cn(
+                    'uppercase font-bold w-10 shrink-0 select-none text-[10px] py-0.5 text-center rounded',
+                    log.level === 'info' && 'bg-blue-500/10 text-blue-400',
+                    log.level === 'debug' && 'bg-purple-500/10 text-purple-400',
+                    log.level === 'warn' && 'bg-yellow-500/10 text-yellow-400',
+                    log.level === 'error' && 'bg-red-500/10 text-red-400'
+                  )}
+                >
+                  {log.level}
+                </span>
+                <div
+                  className={cn(
+                    'break-all whitespace-pre-wrap flex-1',
+                    log.level === 'info' && 'text-zinc-300',
+                    log.level === 'debug' && 'text-zinc-400',
+                    log.level === 'warn' && 'text-yellow-200',
+                    log.level === 'error' && 'text-red-300'
+                  )}
+                >
                   {log.message}
                   {log.data && (
                     <div className="mt-1 pl-3 border-l border-white/10 text-zinc-500 text-[10px] overflow-x-auto">
-                       {Array.isArray(log.data) ? log.data.map((d, di) => (
-                         <div key={di}>{typeof d === 'object' ? JSON.stringify(d, null, 2) : String(d)}</div>
-                       )) : typeof log.data === 'string' ? log.data : JSON.stringify(log.data, null, 2)}
+                      {Array.isArray(log.data)
+                        ? log.data.map((d, di) => (
+                            <div key={di}>{consoleValue(d)}</div>
+                          ))
+                        : consoleValue(log.data)}
                     </div>
                   )}
                 </div>
@@ -270,20 +393,35 @@ export function LogViewer() {
                 <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center">
                   <Terminal className="w-8 h-8 opacity-30" />
                 </div>
-                <p className="text-sm">{uiI18n.t('app.no_logs_captured_yet_0eb713f4')}</p>
-                <p className="text-xs text-zinc-600">{uiI18n.t('app.console_output_will_appear_here_f8a7ae79')}</p>
+                <p className="text-sm">
+                  {uiI18n.t('app.no_logs_captured_yet_0eb713f4')}
+                </p>
+                <p className="text-xs text-zinc-600">
+                  {uiI18n.t('app.console_output_will_appear_here_f8a7ae79')}
+                </p>
               </div>
             )}
           </div>
 
           {/* Footer */}
           <div className="flex items-center justify-between px-4 py-2 border-t border-white/5 bg-zinc-900/30 text-[10px] text-zinc-600">
-            <span>{uiI18n.t('app.press_ea683ad6')} <kbd className="px-1.5 py-0.5 bg-white/5 rounded text-zinc-400">F12</kbd> {uiI18n.t('app.or_1758356d')} <kbd className="px-1.5 py-0.5 bg-white/5 rounded text-zinc-400">{uiI18n.t('app.ctrl_shift_i_f54c4d27')}</kbd> {uiI18n.t('app.to_toggle_6d192f60')}</span>
-            <span>{filteredLogs.length} {uiI18n.t('app.entries_c2e311d6')}</span>
+            <span>
+              {uiI18n.t('app.press_ea683ad6')}{' '}
+              <kbd className="px-1.5 py-0.5 bg-white/5 rounded text-zinc-400">
+                F12
+              </kbd>{' '}
+              {uiI18n.t('app.or_1758356d')}{' '}
+              <kbd className="px-1.5 py-0.5 bg-white/5 rounded text-zinc-400">
+                {uiI18n.t('app.ctrl_shift_i_f54c4d27')}
+              </kbd>{' '}
+              {uiI18n.t('app.to_toggle_6d192f60')}
+            </span>
+            <span>
+              {filteredLogs.length} {uiI18n.t('app.entries_c2e311d6')}
+            </span>
           </div>
         </motion.div>
       </motion.div>
     </AnimatePresence>
   );
 }
-

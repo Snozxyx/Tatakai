@@ -1,218 +1,24 @@
+import { Terminal } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
-import { useState, useEffect, useRef } from 'react';
-import { X, Trash2, Copy, Terminal } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { Capacitor } from '@capacitor/core';
+import { useDeveloperMode } from '@/hooks/ui/useDeveloperMode';
 
-interface LogEntry {
-  timestamp: Date;
-  level: 'log' | 'warn' | 'error' | 'info';
-  message: string;
-  data?: unknown;
-}
-
+/** Mobile launcher for the shared production-capable console; capture is owned once. */
 export function DevConsole() {
   useUiTranslation();
-  const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [isOpen, setIsOpen] = useState(false);
-  const [filter, setFilter] = useState<'all' | 'log' | 'warn' | 'error' | 'info'>('all');
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const recentNetworkLogs = useRef(new Map<string, number>());
-
-  useEffect(() => {
-    // Only work on mobile platforms
-    if (!Capacitor.isNativePlatform()) {
-      return;
-    }
-    
-    // Intercept console methods
-    // Intercept console methods
-    const originalLog = console.log;
-    const originalWarn = console.warn;
-    const originalError = console.error;
-    const originalInfo = console.info;
-
-    const appendLog = (level: LogEntry['level'], args: unknown[]) => {
-      const entry: LogEntry = {
-        timestamp: new Date(),
-        level,
-        message: args.map(arg => typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)).join(' '),
-        data: args.length === 1 ? args[0] : args,
-      };
-      setLogs(prev => [...prev, entry].slice(-500));
-    };
-
-    const expectedProviderFailure = (args: unknown[]) => {
-      let text = '';
-      try {
-        text = args.map((arg) => typeof arg === 'string' ? arg : JSON.stringify(arg)).join(' ').toLowerCase();
-      } catch {
-        text = String(args).toLowerCase();
-      }
-      const expected = [
-        'unknownhostexception', 'sockettimeoutexception', 'unable to resolve host',
-        'no address associated with hostname', 'failed to connect', 'read timed out',
-        'networkunavailableerror',
-      ].some((part) => text.includes(part));
-      return expected ? text.replace(/\s+/g, ' ').slice(0, 240) : null;
-    };
-
-    console.log = (...args: unknown[]) => {
-      originalLog(...args);
-      appendLog('log', args);
-    };
-
-    console.warn = (...args: unknown[]) => {
-      originalWarn(...args);
-      appendLog('warn', args);
-    };
-
-    console.error = (...args: unknown[]) => {
-      originalError(...args);
-      const networkKey = expectedProviderFailure(args);
-      if (networkKey) {
-        const lastSeen = recentNetworkLogs.current.get(networkKey) || 0;
-        if (Date.now() - lastSeen < 15_000) return;
-        recentNetworkLogs.current.set(networkKey, Date.now());
-        appendLog('warn', ['Provider skipped because its server is unavailable.', ...args]);
-        return;
-      }
-      appendLog('error', args);
-    };
-
-    console.info = (...args: unknown[]) => {
-      originalInfo(...args);
-      appendLog('info', args);
-    };
-
-    return () => {
-      console.log = originalLog;
-      console.warn = originalWarn;
-      console.error = originalError;
-      console.info = originalInfo;
-    };
-  }, []);
-
-  // Auto-scroll to bottom
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [logs]);
-  
-  // Only render on mobile platforms
-  if (!Capacitor.isNativePlatform()) {
-    return null;
-  }
-
-  const filteredLogs = filter === 'all' 
-    ? logs 
-    : logs.filter(log => log.level === filter);
-
-  const clearLogs = () => setLogs([]);
-
-  const copyLogs = () => {
-    const text = filteredLogs.map(log => 
-      `[${log.timestamp.toLocaleTimeString(uiI18n.language)}] [${log.level.toUpperCase()}] ${log.message}`
-    ).join('\n');
-    navigator.clipboard.writeText(text);
-  };
-
-  const getLevelColor = (level: string) => {
-    switch (level) {
-      case 'error': return 'text-red-400';
-      case 'warn': return 'text-yellow-400';
-      case 'info': return 'text-blue-400';
-      default: return 'text-gray-300';
-    }
-  };
-
+  const { enabled } = useDeveloperMode();
+  if (!enabled || !Capacitor.isNativePlatform()) return null;
   return (
-    <>
-      {/* Floating Toggle Button */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-20 right-4 z-[9999] w-14 h-14 rounded-full bg-purple-600 shadow-lg flex items-center justify-center"
-      >
-        <Terminal className="w-6 h-6 text-white" />
-      </button>
-
-      {/* Console Panel */}
-      {isOpen && (
-        <div className="fixed inset-0 z-[10000] bg-black/95 flex flex-col">
-          {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-white/10">
-            <div className="flex items-center gap-2">
-              <Terminal className="w-5 h-5 text-purple-400" />
-              <h3 className="text-white font-semibold">{uiI18n.t('app.dev_console_1425373e')}</h3>
-              <span className="text-xs text-white/50">({filteredLogs.length} {uiI18n.t('app.logs_7d3a6765')}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={copyLogs}
-                className="p-2 rounded-lg bg-white/5 hover:bg-white/10"
-              >
-                <Copy className="w-4 h-4 text-white" />
-              </button>
-              <button
-                onClick={clearLogs}
-                className="p-2 rounded-lg bg-white/5 hover:bg-white/10"
-              >
-                <Trash2 className="w-4 h-4 text-white" />
-              </button>
-              <button
-                onClick={() => setIsOpen(false)}
-                className="p-2 rounded-lg bg-white/5 hover:bg-white/10"
-              >
-                <X className="w-4 h-4 text-white" />
-              </button>
-            </div>
-          </div>
-
-          {/* Filters */}
-          <div className="flex gap-2 p-2 border-b border-white/10 overflow-x-auto">
-            {(['all', 'log', 'info', 'warn', 'error'] as const).map((level) => (
-              <button
-                key={level}
-                onClick={() => setFilter(level)}
-                className={cn(
-                  "px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap",
-                  filter === level 
-                    ? "bg-purple-600 text-white" 
-                    : "bg-white/5 text-white/70"
-                )}
-              >
-                {level.toUpperCase()}
-              </button>
-            ))}
-          </div>
-
-          {/* Logs */}
-          <div 
-            ref={scrollRef}
-            className="flex-1 overflow-y-auto p-4 space-y-2 font-mono text-sm"
-          >
-            {filteredLogs.length === 0 ? (
-              <p className="text-white/50 text-center py-8">{uiI18n.t('app.no_logs_yet_c7462a9d')}</p>
-            ) : (
-              filteredLogs.map((log, index) => (
-                <div key={index} className="flex gap-2 items-start">
-                  <span className="text-white/40 text-xs shrink-0">
-                    {log.timestamp.toLocaleTimeString(uiI18n.language)}
-                  </span>
-                  <span className={cn("text-xs shrink-0", getLevelColor(log.level))}>
-                    [{log.level.toUpperCase()}]
-                  </span>
-                  <pre className="text-white/90 whitespace-pre-wrap break-all flex-1">
-                    {log.message}
-                  </pre>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
-    </>
+    <button
+      type="button"
+      aria-label={uiI18n.t('app.dev_console_1425373e')}
+      onClick={() =>
+        window.dispatchEvent(new Event('tatakai:toggle-log-viewer'))
+      }
+      className="fixed bottom-20 right-4 z-[9999] flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg"
+    >
+      <Terminal className="h-6 w-6" />
+    </button>
   );
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { getVisitorId } from '@/lib/analyticsIdentity';
 
 /**
  * Live presence over Supabase Realtime.
@@ -44,7 +45,7 @@ export function useClientPresence(enabled: boolean = true) {
     let channel: ReturnType<typeof supabase.channel> | null = null;
     let timer: ReturnType<typeof setInterval> | null = null;
     let disposed = false;
-    const sessionId = getSessionId();
+    const sessionId = getVisitorId();
 
     const payload = (): PresenceEntry => ({
       session_id: sessionId,
@@ -56,6 +57,10 @@ export function useClientPresence(enabled: boolean = true) {
     const track = async () => {
       if (disposed || !channel) return;
       try {
+        if (document.visibilityState === 'hidden') {
+          await channel.untrack();
+          return;
+        }
         await channel.track(payload());
       } catch {
         // Presence is best-effort; page-visit rows remain the durable record.
@@ -78,6 +83,7 @@ export function useClientPresence(enabled: boolean = true) {
 
     window.addEventListener('tatakai:location-change', onNav);
     window.addEventListener('popstate', onNav);
+    document.addEventListener('visibilitychange', onNav);
     timer = setInterval(() => {
       if (document.visibilityState === 'visible') void track();
     }, HEARTBEAT_MS);
@@ -86,10 +92,11 @@ export function useClientPresence(enabled: boolean = true) {
       disposed = true;
       window.removeEventListener('tatakai:location-change', onNav);
       window.removeEventListener('popstate', onNav);
+      document.removeEventListener('visibilitychange', onNav);
       if (timer) clearInterval(timer);
       try {
         void channel?.untrack();
-        void channel?.unsubscribe();
+        if (channel) void supabase.removeChannel(channel);
       } catch {
         // ignore
       }
@@ -115,6 +122,11 @@ export function useOnlinePresence(enabled: boolean = true): PresenceEntry[] {
         for (const arr of Object.values(state)) {
           for (const p of arr as PresenceEntry[]) {
             if (!p || typeof p.session_id !== 'string') continue;
+            if (
+              !Number.isFinite(Date.parse(p.online_at)) ||
+              Date.now() - Date.parse(p.online_at) > 90_000
+            )
+              continue;
             if (p.session_id.startsWith('admin-')) continue;
             const prev = bySession.get(p.session_id);
             if (!prev || String(p.online_at) > String(prev.online_at)) {
@@ -142,10 +154,12 @@ export function useOnlinePresence(enabled: boolean = true): PresenceEntry[] {
       channel = null;
     }
 
+    const expiryTimer = setInterval(pull, HEARTBEAT_MS);
     return () => {
       disposed = true;
+      clearInterval(expiryTimer);
       try {
-        void channel?.unsubscribe();
+        if (channel) void supabase.removeChannel(channel);
       } catch {
         // ignore
       }

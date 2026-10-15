@@ -6,6 +6,11 @@ export type DeviceTranslationState = {
   enabled: boolean;
   status: TranslationStatus;
   progress: number | null;
+  mode?: 'auto' | 'browser';
+  engine?: 'native' | 'offline' | null;
+  cached?: boolean;
+  downloadedBytes?: number;
+  nativeAvailable?: boolean;
 };
 export type DeviceTranslationResult = {
   texts: string[];
@@ -53,6 +58,17 @@ let state: DeviceTranslationState = {
   enabled: readEnabled(),
   status: 'idle',
   progress: null,
+  mode: (() => {
+    try {
+      return localStorage.getItem('tatakai:translation-mode') === 'browser'
+        ? 'browser'
+        : 'auto';
+    } catch {
+      return 'auto';
+    }
+  })(),
+  engine: null,
+  cached: false,
 };
 const serverState: DeviceTranslationState = {
   enabled: false,
@@ -63,11 +79,92 @@ const listeners = new Set<() => void>();
 const nativeTranslators = new Map<string, Promise<NativeTranslator>>();
 let worker: Worker | null = null;
 let nextId = 0;
+let translationEpoch = 0;
 const pending = new Map<
   number,
   { resolve: (texts: string[]) => void; reject: (error: Error) => void }
 >();
 const downloads = new Map<string, { loaded: number; total: number }>();
+
+export function setDeviceTranslationMode(mode: 'auto' | 'browser') {
+  const enabled = state.enabled;
+  setDeviceTranslationEnabled(false);
+  try {
+    localStorage.setItem('tatakai:translation-mode', mode);
+  } catch {
+    /* session only */
+  }
+  update({ mode, engine: null });
+  setDeviceTranslationEnabled(enabled);
+}
+
+/** Inspect persistent model files without reading their large bodies into memory. */
+export async function inspectDeviceTranslation() {
+  let cached = false;
+  try {
+    const files: string[] = [];
+    for (const name of await caches.keys()) {
+      const cache = await caches.open(name);
+      for (const request of await cache.keys()) {
+        if (request.url.includes('Xenova/m2m100_418M/'))
+          files.push(request.url);
+      }
+    }
+    cached = [
+      'encoder_model_quantized.onnx',
+      'decoder_model_merged_quantized.onnx',
+    ].every((file) => files.some((url) => url.endsWith(file)));
+  } catch {
+    /* Cache API may be disabled. */
+  }
+  update({
+    cached,
+    nativeAvailable: typeof (globalThis as any).Translator !== 'undefined',
+  });
+}
+
+export async function prepareDeviceTranslation(target: string) {
+  if (!state.enabled) setDeviceTranslationEnabled(true);
+  const epoch = translationEpoch;
+  if (
+    state.mode === 'browser' ||
+    typeof (globalThis as any).Translator !== 'undefined'
+  ) {
+    const factory = (globalThis as any).Translator as NativeFactory | undefined;
+    if (!factory) {
+      update({ status: 'error', engine: 'native' });
+      throw new Error('browser-unavailable');
+    }
+    update({ status: 'loading', engine: 'native', progress: null });
+    try {
+      const source = target === 'en' ? 'es' : 'en';
+      const parameters = { sourceLanguage: source, targetLanguage: target };
+      if ((await factory.availability(parameters)) === 'unavailable')
+        throw new Error('browser-unavailable');
+      const translator = await factory.create(parameters);
+      if (!state.enabled || epoch !== translationEpoch) {
+        translator.destroy?.();
+        throw new DOMException('Cancelled', 'AbortError');
+      }
+      nativeTranslators.set(`${source}:${target}`, Promise.resolve(translator));
+      update({ status: 'ready', engine: 'native', progress: 100 });
+      return;
+    } catch (error) {
+      if ((error as Error)?.name === 'AbortError') throw error;
+      if (state.mode === 'browser') {
+        update({ status: 'error' });
+        throw error;
+      }
+    }
+  }
+  if ((navigator as Navigator & { deviceMemory?: number }).deviceMemory! < 4) {
+    update({ status: 'error' });
+    throw new Error('device-memory');
+  }
+  update({ status: 'loading', engine: 'offline', progress: 0 });
+  await translateOffline([], 'en', target);
+  void inspectDeviceTranslation();
+}
 
 function update(patch: Partial<DeviceTranslationState>) {
   state = { ...state, ...patch };
@@ -97,6 +194,7 @@ export function setDeviceTranslationEnabled(enabled: boolean) {
     ...(!enabled ? { status: 'idle' as const, progress: null } : {}),
   });
   if (!enabled) {
+    translationEpoch++;
     worker?.terminate();
     worker = null;
     downloads.clear();
@@ -137,12 +235,15 @@ function getWorker() {
       );
       update({
         status: 'loading',
+        engine: 'offline',
+        downloadedBytes: files.reduce((n, f) => n + f.loaded, 0),
         progress: Math.max(state.progress ?? 0, progress),
       });
       return;
     }
     if (data.type === 'ready') {
-      update({ status: 'ready', progress: 100 });
+      update({ status: 'ready', progress: 100, engine: 'offline' });
+      void inspectDeviceTranslation();
       return;
     }
     const request = pending.get(data.id);
@@ -260,6 +361,7 @@ export async function translateOnDevice(
           promise.catch(() => nativeTranslators.delete(key));
         }
         const translator = await promise;
+        update({ status: 'ready', engine: 'native', progress: 100 });
         const translated = [];
         for (const text of texts) {
           if (options.signal?.aborted)
@@ -283,6 +385,7 @@ export async function translateOnDevice(
       // The explicitly enabled local worker remains usable in that runtime.
     }
   }
+  if (state.mode === 'browser') throw new Error('browser-unavailable');
   const memory = (typeof navigator !== 'undefined' ? navigator : undefined) as
     | (Navigator & { deviceMemory?: number })
     | undefined;

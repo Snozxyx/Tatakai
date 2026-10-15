@@ -53,7 +53,7 @@ export function useNovelChapters(novelId: string | undefined, title?: string, fu
   const detail = client.getQueryData<Awaited<ReturnType<typeof getNovelDetail>>>(['novel-detail', novelId])?.detail;
   const titles = [...new Set([title, detail?.title?.english, detail?.title?.romaji, ...(detail?.title?.synonyms || []), detail?.canonicalTitle].filter((value): value is string => Boolean(value && value !== 'Untitled')))];
   return useQuery({
-    queryKey: ['novel-chapters', novelId, titles[0], fullScan ? 'full' : 'fast'],
+    queryKey: ['novel-chapters', novelId, titles, fullScan ? 'full' : 'fast'],
     queryFn: () => getNovelChapters(String(novelId), titles[0], titles, {fullScan}),
     placeholderData: (previous, previousQuery) => previousQuery?.queryKey[1] === novelId ? previous : undefined,
     enabled: Boolean(novelId) && titles.length > 0,

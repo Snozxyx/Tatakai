@@ -1,7 +1,7 @@
 {
   "name": "tatakai",
   "private": true,
-  "version": "6.1.1",
+  "version": "6.1.2",
   "description": "Tatakai â€” an extension-based otaku community for tracking anime & manga",
   "author": {
     "name": "Snozxyx",
@@ -164,6 +164,7 @@
   },
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",
+    "@electric-sql/pglite": "^0.5.10",
     "@eslint/js": "^9.32.0",
     "@tailwindcss/typography": "^0.5.16",
     "@types/animejs": "^3.1.13",

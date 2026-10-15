@@ -4,6 +4,29 @@ All notable changes to Tatakai are documented here.
 
 ---
 
+## [6.1.2] - 2026-10-15
+
+### Added
+- English, Spanish and Japanese interface catalogs and account-language request headers.
+- On-device community translation controls, improved developer logs and an update changelog sheet.
+- Private badge reward notifications and the existing-member OG milestone migration.
+- Admin-controlled community image approval enforced by database triggers.
+- Server-side visitor, retention and foreground-activity analytics with bounded request deadlines.
+
+### Fixed
+- Restore novel catalog fallback date-filter compatibility. Top Rated puts rated novels first; Newest uses full publication dates, with unknown values last and stable pagination.
+- Keep novel catalog results separate from manga.
+- Play Watch Party tunnel streams directly without waiting for unrelated episode metadata.
+- Prevent Linux AppImage crashes when launcher output pipes close.
+- Use consistent, privacy-aware watch-time totals in profile previews and full profiles.
+- Cache eligible public avatars and banners through Redis, with original-source fallback.
+- Correct analytics migration SQL aliases and validate named dollar-quoted PostgreSQL function bodies.
+- Improve extension prompts, native downloads and novel chapter loading.
+
+### Database and extension
+- The reviewed admin dashboard aggregate migration was installed on Server B separately. Release workflows do not automatically apply migrations.
+- Update Toko to 4.5.5 for its dedicated Atsu prose-novel provider and novel API capabilities.
+
 ## [6.1.1] - 2026-10-14
 
 **Patch release.** Safe mobile pull-to-refresh, novel catalogue correctness, and faster search rendering.

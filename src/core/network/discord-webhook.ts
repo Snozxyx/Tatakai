@@ -33,6 +33,7 @@ const TATAKAI_WEBHOOK_BASE = resolveWebhookBase(TATAKAI_API_URL);
 export type WebhookChannel = 'user_created' | 'error_logs' | 'comment' | 'review_popup';
 
 export interface DiscordEmbed {
+  url?: string;
   title?: string;
   description?: string;
   color?: number; // decimal colour
@@ -457,6 +458,18 @@ export function notifyError(error: ErrorReport): boolean {
 /**
  * Notify when a new comment is posted.
  */
+export function notifyForumPost(post: { id: string; title: string; content: string; userId: string; userName?: string; imageUrl?: string | null; approved: boolean; isSpoiler?: boolean }) {
+  const preview = post.content.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 900);
+  void sendToDiscord({ channel: 'comment', username: 'Tatakai Community', embeds: [{
+    title: field(post.title || 'New community post', 200), url: `https://tatakai.me/forum/${encodeURIComponent(post.id)}`,
+    description: post.isSpoiler ? `||${preview}||` : preview, color: COLORS.info,
+    fields: [{ name: 'Author', value: field(post.userName || post.userId, 160) },
+      { name: 'Status', value: post.approved ? 'Published' : 'Pending approval' },
+      ...(post.imageUrl ? [{ name: 'Attachment', value: field(post.imageUrl, 900) }] : [])],
+    timestamp: new Date().toISOString(), footer: { text: 'Tatakai Forum' },
+  }] });
+}
+
 export function notifyComment(comment: {
   userName?: string;
   userId?: string;

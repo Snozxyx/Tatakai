@@ -3,6 +3,7 @@ import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { TorrentPreloadController } from '@/core/player/TorrentPreloadController';
 import { useDeveloperMode } from '@/hooks/ui/useDeveloperMode';
 import { SourceDebug } from '@/components/extensions/SourceDebug';
+import { ExtensionRequired } from '@/components/extensions/ExtensionRequired';
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
 import {
@@ -3339,6 +3340,7 @@ export default function WatchPage() {
             </div>
 
             {/* Server & Category Selection - Hide in offline mode, generic torrent, or unreleased episode */}
+            {!isOfflineMode && !isGenericTorrent && !isCurrentUnaired && <ExtensionRequired kind="anime" hasContent={visibleSources.length > 0} />}
             {!isOfflineMode && !isGenericTorrent && !isCurrentUnaired && (
               <GlassPanel className="p-4 md:p-5">
                 <div className="flex flex-col gap-4 md:gap-6">

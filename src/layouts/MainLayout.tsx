@@ -25,6 +25,9 @@ import { MobileNav } from '@/components/layout/MobileNav';
 import { OfflineBanner } from '@/components/layout/OfflineBanner';
 import { OfflineGate } from '@/components/layout/OfflineGate';
 import { V6AnnouncementPopup } from '@/components/layout/V6AnnouncementPopup';
+import { UpdateChangelogSheet } from '@/components/layout/UpdateChangelogSheet';
+import { BadgeReward } from '@/components/effects/BadgeReward';
+import { useEngagementTracking } from '@/hooks/api/useEngagementTracking';
 import { PopupDisplay } from "@/components/layout/PopupDisplay";
 import { LogViewer } from "@/components/debug/LogViewer";
 import { DevConsole } from "@/components/debug/DevConsole";
@@ -54,6 +57,7 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
   const [deferredStartupReady, setDeferredStartupReady] = useState(false);
   usePageTracking(deferredStartupReady);
   useClientPresence(deferredStartupReady);
+  useEngagementTracking(deferredStartupReady);
   useActiveSession(deferredStartupReady);
   const restoredTorrentSessionsRef = useRef(false);
   const navigate = useNavigate();
@@ -255,6 +259,8 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
             {showSidebar && <Background />}
             {showSidebar && <Sidebar />}
             <V6AnnouncementPopup />
+            <UpdateChangelogSheet />
+            <BadgeReward />
             <GlobalListeners />
             <EasterEggs />
             <CelebrationHost />

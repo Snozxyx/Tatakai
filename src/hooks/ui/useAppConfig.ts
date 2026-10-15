@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-export type AppConfigKey = 'min_supported_version' | 'latest_version' | 'force_update_message' | 'android_download_url';
+export type AppConfigKey = 'min_supported_version' | 'latest_version' | 'force_update_message' | 'android_download_url' | 'community_image_approval_required';
 
 export interface AppConfigItem {
     key: string;

@@ -12,6 +12,7 @@ import { usePreferredTitleLanguage } from '@/hooks/ui/useTitleLanguage';
 import { setPreferredTitleLanguage, setAccountTitleLanguage, type TitleLanguage } from '@/lib/titleLanguage';
 import { useDeviceTranslation } from '@/hooks/community/useDeviceTranslation';
 import { setDeviceTranslationEnabled } from '@/lib/community/onDeviceTranslation';
+import { TranslationStatus } from '@/components/settings/TranslationStatus';
 import { FeatureFlag, useFeatureFlag, toggleFlag } from '@/core/feature-flags';
 import {
   SettingRow,
@@ -195,6 +196,7 @@ export function DisplayPanel() {
       <SettingsSection icon={Languages} title={t('community.translation.settingsTitle')} description={t('community.translation.setupDescription')}>
         <SettingRow title={t('community.translation.autoTranslate')} description={t('community.translation.settingsDescription')}
           control={<Switch aria-label={t('community.translation.autoTranslate')} checked={deviceTranslation.enabled} onCheckedChange={setDeviceTranslationEnabled} />} />
+        <TranslationStatus />
       </SettingsSection>
 
       <SettingsSection

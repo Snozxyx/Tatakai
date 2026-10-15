@@ -396,11 +396,10 @@ export function ProfileWidgetCard({
         <Dialog open={open} onOpenChange={(o) => { if (!o) void triggerHaptic('tap'); setOpen(o); }}>
           <DialogTrigger asChild>{children}</DialogTrigger>
           <DialogContent
+            showCloseButton={false}
             aria-describedby={undefined}
             className={cn(
               'w-[min(22rem,calc(100vw-2rem))] max-h-[calc(100dvh-4rem)] overflow-y-auto rounded-3xl border-white/10 bg-background/95 p-0 shadow-2xl backdrop-blur-xl custom-scrollbar',
-              // hide the default top-right close — we own the single top-left one
-              '[&>button.absolute.right-4]:hidden',
               className,
             )}
           >

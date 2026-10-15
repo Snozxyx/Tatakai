@@ -161,8 +161,8 @@ async function probeHealth(baseUrl: string, timeoutMs = 1200): Promise<ResolvedB
         namespaces: [
           {
             namespace: "toko",
-            routes: ["sources", "stream", "torrent", "manga/chapters", "manga/pages"],
-            capabilities: ["manga"],
+            routes: ["sources", "stream", "torrent", "manga/chapters", "manga/pages", "novel/chapters", "novel/content"],
+            capabilities: ["manga", "novel"],
           },
         ],
       };

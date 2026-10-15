@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { moderateContent, getViolationMessage } from '@/lib/autoModeration';
 import { getRankTier } from '@/lib/rankUtils';
+import { notifyForumPost } from '@/core/network/discord-webhook';
 
 export interface ForumPost {
   id: string;
@@ -234,7 +235,10 @@ export function useCreateForumPost() {
         authorScore = count ?? 0;
       } catch { /* fail-soft: treat as rank 0 */ }
       const rankOk = getRankTier(authorScore).rank > 3;
-      const requiresApproval = !!post.image_url && !rankOk;
+      const { data: approvalSetting, error: settingError } = await supabase.from('app_config')
+        .select('value').eq('key', 'community_image_approval_required').maybeSingle();
+      if (settingError) throw settingError;
+      const requiresApproval = approvalSetting?.value === 'true' && !!post.image_url && !rankOk;
 
       const { data, error } = await supabase
         .from('forum_posts')
@@ -249,6 +253,9 @@ export function useCreateForumPost() {
         .single();
 
       if (error) throw error;
+      notifyForumPost({ id: data.id, title: data.title, content: data.content,
+        userId: user.id, userName: user.user_metadata?.username, imageUrl: data.image_url,
+        approved: data.is_approved, isSpoiler: data.is_spoiler });
       return data;
     },
     // Optimistic feed insert for text posts (which auto-approve), so a new post

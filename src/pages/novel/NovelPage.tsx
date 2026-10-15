@@ -1,6 +1,7 @@
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { SourceDebug } from '@/components/extensions/SourceDebug';
+import { ExtensionRequired } from '@/components/extensions/ExtensionRequired';
 /**
  * NovelPage.tsx
  * Novel information and chapter listing page — mirrors MangaPage's design.
@@ -1574,6 +1575,7 @@ export default function NovelPage() {
                     </p>
                     {sortedChapters.length === 0 && (
                       <div className="mt-4 text-left">
+                        <ExtensionRequired kind="novel" />
                         <NovelDiagnostics anilistId={typeof info.anilistId === "number" ? info.anilistId : null} title={novelSearchTitle} />
                       </div>
                     )}

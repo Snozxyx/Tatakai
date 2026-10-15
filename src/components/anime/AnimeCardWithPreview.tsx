@@ -28,6 +28,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useWatchlistItem, useAddToWatchlist, useRemoveFromWatchlist } from "@/hooks/user/useWatchlist";
 import { useLongPress } from "@/hooks/ui/useLongPress";
 import { openMediaQuickPeek } from "@/components/media/quickPeekStore";
+import { resolveTatakaiAnimeViewId, TatakaiAnimeViews } from '@/components/media/TatakaiAnimeViews';
 
 interface AnimeCardWithPreviewProps {
   anime: AnimeCardType;
@@ -70,6 +71,7 @@ function AnimeCardWithPreviewInner({ anime, showPreview = true, disableClick = f
     (anime as any)?.anilist_id ??
     (String(anime.malId || '') === anime.id ? null : resolveAniListId(anime.id)) ??
     null;
+  const animeViewId = resolveTatakaiAnimeViewId(anime.id, previewAniListId);
 
   const isAdult = inferAnimeAdultFlag(anime);
   
@@ -197,6 +199,7 @@ function AnimeCardWithPreviewInner({ anime, showPreview = true, disableClick = f
       {!!anime.episodes?.sub && <span>· {anime.episodes.sub} {t('anime.sub')}</span>}
       {!!anime.episodes?.dub && <span>· {anime.episodes.dub} {t('anime.dub')}</span>}
       {label && <span>· {label}</span>}
+      {animeViewId && <TatakaiAnimeViews animeId={animeViewId} />}
     </div>} />;
 }
 

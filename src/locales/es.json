@@ -6826,5 +6826,81 @@
       "settingsDescription": "Traduce al idioma de la app. Funciona sin cuenta.",
       "stopDownload": "Detener descarga"
     }
+  },
+  "translationStatus": {
+    "engine": "Motor de traducción",
+    "lite": "Lite · solo navegador",
+    "full": "Automático · navegador y modelo local",
+    "liteDescription": "Usa los paquetes del navegador. No descarga el modelo de 650 MB. Los idiomas y tamaños dependen del navegador.",
+    "fullDescription": "Usa el navegador cuando es posible. El modelo local opcional descarga unos 650 MB una vez. El texto permanece en tu dispositivo.",
+    "ready": "Listo en este dispositivo",
+    "notReady": "Sin inicializar",
+    "cached": "Descargado · listo para cargar",
+    "downloading": "Preparando la traducción",
+    "error": "Error al preparar. Revisa la conexión o prueba Lite.",
+    "progress": "Descarga del modelo de traducción",
+    "unsupported": "Este navegador no ofrece traducción local. Prueba el modo automático u otro navegador compatible.",
+    "prepare": "Preparar traducción",
+    "recheck": "Comprobar disponibilidad",
+    "nativeEngine": "Motor: paquete de idioma del navegador",
+    "offlineEngine": "Motor: modelo local en este dispositivo"
+  },
+  "communityControls": {
+    "imageApproval": "Exigir aprobación de publicaciones con imágenes",
+    "imageApprovalDescription": "Desactivado por defecto. Al activarlo, las imágenes de miembros por debajo de Jonin requieren aprobación."
+  },
+  "badgeReward": {
+    "unlocked": "Nueva insignia desbloqueada",
+    "equipped": "Insignia equipada",
+    "milestone": "1.000 miembros. Tú estuviste aquí. Gracias por formar parte del comienzo de Tatakai.",
+    "description": "Una nueva insignia para tu colección. Equípala para mostrarla en tu perfil.",
+    "equip": "Equipar insignia",
+    "later": "Guardar en la colección",
+    "continue": "Continuar",
+    "failed": "No se pudo guardar tu elección. Reinténtalo."
+  },
+  "releaseSheet": {
+    "title": "Novedades de v{{version}}",
+    "description": "Tu aplicación se ha actualizado. Estos son los cambios.",
+    "continue": "Continuar",
+    "unavailable": "Las notas aún no están disponibles. Puedes consultarlas después en Ajustes."
+  },
+  "insights": {
+    "title": "Audiencia y retención",
+    "definition": "Agregados exactos del servidor · días UTC · miembros únicos entre dispositivos. Invitados por dispositivo.",
+    "unavailable": "Analíticas no disponibles. Comprueba la migración y reinténtalo.",
+    "retry": "Reintentar",
+    "loading": "Cargando analíticas…",
+    "uniqueVisitors": "Visitantes únicos",
+    "dau": "DAU de hoy",
+    "pageViews": "Páginas vistas",
+    "retention": "Retención del día {{day}}",
+    "notMature": "Sin cohorte madura aún",
+    "visitorTrend": "Visitantes diarios y recurrentes",
+    "visitors": "Visitantes",
+    "returning": "Visitantes recurrentes",
+    "hourly": "Páginas vistas por hora · UTC",
+    "dailyTime": "Tiempo activo diario",
+    "minutes": "Minutos activos",
+    "retainedDaily": "Regresaron del día anterior",
+    "retained": "Visitantes retenidos",
+    "timeDefinition": "El tiempo activo mide pestañas visibles con interacción en los últimos 5 minutos. No se reconstruye el pasado. D1/D7 usan cohortes observadas con seguimiento completo; los recurrentes ya habían visitado antes.",
+    "measuredSince": "Medido desde {{date}}.",
+    "weekPattern": "Patrón semanal · páginas vistas UTC",
+    "repeatDays": "{{count}} visitantes activos en varios días",
+    "multiDay": "Miembros en varios días",
+    "loadingSummary": "Cargando el resumen del servidor… Los gráficos se cargan por separado.",
+    "timedOut": "La solicitud tardó demasiado. Reintenta o elige un período más corto.",
+    "registeredCount": "{{count}} miembros registrados"
+  },
+  "developerConsole": {
+    "enabled": "Consola de desarrollo activada"
+  },
+  "extensionRequired": {
+    "title": "Descarga una extensión para empezar",
+    "anime": "Instala una extensión de anime compatible para cargar las fuentes del episodio.",
+    "manga": "Instala una extensión de manga para cargar los capítulos de esta obra.",
+    "novel": "Instala una extensión de novelas para cargar los capítulos y empezar a leer.",
+    "hub": "Abrir el centro de extensiones"
   }
 }

@@ -5,6 +5,9 @@ import { detectPostLanguage } from '../src/lib/community/detectLanguage';
 import {
   setDeviceTranslationEnabled,
   translateOnDevice,
+  setDeviceTranslationMode,
+  prepareDeviceTranslation,
+  getDeviceTranslationState,
 } from '../src/lib/community/onDeviceTranslation';
 
 const originalParser = globalThis.DOMParser;
@@ -15,6 +18,7 @@ beforeEach(() => {
   globalThis.DOMParser = new JSDOM('').window.DOMParser;
 });
 afterEach(() => {
+  setDeviceTranslationMode('auto');
   setDeviceTranslationEnabled(false);
   globalThis.DOMParser = originalParser;
   (globalThis as any).Translator = originalTranslator;
@@ -23,6 +27,15 @@ afterEach(() => {
 });
 
 describe('on-device community translation', () => {
+  test('Lite mode never falls back to the large worker model',async()=>{
+    (globalThis as any).Translator=undefined;
+    (globalThis as any).LanguageDetector=undefined;
+    setDeviceTranslationMode('browser');
+    setDeviceTranslationEnabled(true);
+    await expect(translateOnDevice(['I really enjoyed watching this anime with my friends last night.'],'es')).rejects.toThrow('browser-unavailable');
+    await expect(prepareDeviceTranslation('es')).rejects.toThrow('browser-unavailable');
+    expect(getDeviceTranslationState().engine).toBe('native');
+  });
   test('preserves markup, mentions, hashtags, links, code, and spoilers', () => {
     const html =
       '<p>Hello <strong>everyone</strong> <span data-mention data-label="alice">@alice</span> <span data-hashtag data-tag="anime">#anime</span> <a href="https://tatakai.me">read more</a></p><p><code>const value = 1;</code><span data-spoiler>secret ending</span></p>';

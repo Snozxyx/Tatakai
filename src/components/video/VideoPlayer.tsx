@@ -567,7 +567,10 @@ export function VideoPlayer({
         for (let i = video.children.length - 1; i >= 0; i--) {
           const child = video.children[i];
           if ((child as HTMLTrackElement).kind === "subtitles" && (child as HTMLTrackElement).dataset?.internal === "true") {
-            video.removeChild(child);
+            // Extraction is async; React may have reconciled the <video>'s
+            // children while it was running. `remove()` is safe if this track
+            // has already been detached, unlike parent.removeChild(child).
+            child.remove();
           }
         }
 

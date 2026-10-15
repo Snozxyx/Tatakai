@@ -14,6 +14,20 @@ export interface ChangelogRelease {
 
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '6.1.2',
+    date: '2026-10-15',
+    changes: [
+      'English, Spanish and Japanese interface catalogs, with on-device community translation controls',
+      'Community milestone badge rewards and admin-controlled image approval',
+      'Server-side visitor, retention and foreground-activity analytics',
+      'Novel catalog recovery, correct Top Rated and Newest ordering, and novel-only results',
+      'Watch Party tunnel playback fixes and consistent profile watch-time totals',
+      'Public profile image caching and Linux AppImage closed-output-pipe crash protection',
+      'Improved developer logs, extension prompts, native downloads and update notifications',
+      'Toko 4.5.5 adds a separate Atsu prose-novel provider; update the extension separately',
+    ],
+  },
+  {
     version: '6.1.1',
     date: '2026-10-14',
     changes: [

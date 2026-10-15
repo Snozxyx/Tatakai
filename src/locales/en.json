@@ -6826,5 +6826,81 @@
       "settingsDescription": "Translate into your app language. Works without an account.",
       "stopDownload": "Stop download"
     }
+  },
+  "translationStatus": {
+    "engine": "Translation engine",
+    "lite": "Lite · browser only",
+    "full": "Automatic · browser + offline fallback",
+    "liteDescription": "Uses your browser’s language packs. No 650 MB model download. Available languages and pack sizes depend on the browser.",
+    "fullDescription": "Uses browser translation when possible. The optional offline fallback downloads about 650 MB once. Post text stays on your device.",
+    "ready": "Ready on this device",
+    "notReady": "Not initialized",
+    "cached": "Downloaded · ready to load",
+    "downloading": "Preparing translation",
+    "error": "Setup failed. Check your connection or try Lite mode.",
+    "progress": "Translation model download",
+    "unsupported": "This browser does not expose on-device translation. Try Automatic mode or a supported browser.",
+    "prepare": "Prepare translation",
+    "recheck": "Check readiness",
+    "nativeEngine": "Engine: browser language pack",
+    "offlineEngine": "Engine: offline model on this device"
+  },
+  "communityControls": {
+    "imageApproval": "Require approval for image posts",
+    "imageApprovalDescription": "Off by default. Enable to queue image posts from members below Jonin rank for staff approval."
+  },
+  "badgeReward": {
+    "unlocked": "New badge unlocked",
+    "equipped": "Badge equipped",
+    "milestone": "1,000 members. You were here for it. Thank you for being part of Tatakai’s beginning.",
+    "description": "A new addition to your collection. Equip it to feature it on your profile.",
+    "equip": "Equip badge",
+    "later": "Keep in collection",
+    "continue": "Continue",
+    "failed": "Could not save your choice. Try again."
+  },
+  "releaseSheet": {
+    "title": "What’s new in v{{version}}",
+    "description": "Your app has been updated. Here’s what changed.",
+    "continue": "Let’s go",
+    "unavailable": "Release notes are not available yet. You can check them later in Settings."
+  },
+  "insights": {
+    "title": "Audience & retention",
+    "definition": "Exact server aggregates · UTC days · signed-in members deduplicated across devices. Guests are counted per device.",
+    "unavailable": "Analytics unavailable. Check that the analytics migration is installed and retry.",
+    "retry": "Retry",
+    "loading": "Loading analytics…",
+    "uniqueVisitors": "Unique visitors",
+    "dau": "DAU today",
+    "pageViews": "Page views",
+    "retention": "Day {{day}} retention",
+    "notMature": "No mature cohort yet",
+    "visitorTrend": "Daily visitors & returning visitors",
+    "visitors": "Visitors",
+    "returning": "Returning visitors",
+    "hourly": "Hourly page views · UTC",
+    "dailyTime": "Daily active time",
+    "minutes": "Active minutes",
+    "retainedDaily": "Returned from the previous day",
+    "retained": "Retained visitors",
+    "timeDefinition": "Active time measures visible tabs with interaction in the last 5 minutes. Historical time cannot be reconstructed. D1/D7 use first-observed cohorts with a completed follow-up day; returning visitors were observed before that day.",
+    "measuredSince": "Measured since {{date}}.",
+    "weekPattern": "Weekly activity pattern · UTC page views",
+    "repeatDays": "{{count}} visitors active on multiple days",
+    "multiDay": "Multi-day members",
+    "loadingSummary": "Loading the server summary… Charts load independently.",
+    "timedOut": "This request took too long. Retry, or choose a shorter date range.",
+    "registeredCount": "{{count}} registered members"
+  },
+  "developerConsole": {
+    "enabled": "Developer console enabled"
+  },
+  "extensionRequired": {
+    "title": "Download an extension to get started",
+    "anime": "Install a compatible anime extension to load video sources for this episode.",
+    "manga": "Install a manga extension to load chapters for this title.",
+    "novel": "Install a novel extension to load chapters and start reading.",
+    "hub": "Open Extension Hub"
   }
 }

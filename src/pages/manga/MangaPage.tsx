@@ -2,6 +2,7 @@ import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { languageLabel } from '@/core/extensions/remote/metadata';
 import { SourceDebug } from '@/components/extensions/SourceDebug';
+import { ExtensionRequired } from '@/components/extensions/ExtensionRequired';
 /**
  * MangaPage.tsx
  * Comprehensive Manga information and chapter listing page.
@@ -1798,6 +1799,7 @@ export default function MangaPage() {
                           ? uiI18n.t('app.no_chapters_match_your_current_filters_or_search_5adc1f8d')
                           : uiI18n.t('app.no_chapters_match_the_selected_provider_language_a2fdfc68')}
                     </p>
+                    {sortedChapters.length === 0 && <ExtensionRequired kind="manga" />}
                   </GlassPanel>
                 )}
               </section>

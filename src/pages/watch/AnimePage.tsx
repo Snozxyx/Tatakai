@@ -88,6 +88,7 @@ const EPISODES_PER_GROUP = 24;
 import { ExtensionSlot } from "@/core/extensions/ExtensionSlot";
 import { useContentSafetySettings } from "@/hooks/user/useContentSafetySettings";
 import { AdultWarningGate } from "@/components/content/AdultWarningGate";
+import { TatakaiAnimeViews } from '@/components/media/TatakaiAnimeViews';
 
 // --- Helper Component: Relation Tree ---
 // Renders the "Series Tree" relations with the SAME 16:9 rail card design as the
@@ -926,6 +927,7 @@ export default function AnimePage() {
 
                   {/* Stats */}
                   <div className="flex flex-wrap gap-4 mb-6">
+                    <TatakaiAnimeViews animeId={contentAnimeId} variant="detail" />
                     {info.stats.rating && (
                       <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber/20 text-amber">
                         <Star className="w-4 h-4 fill-amber" />

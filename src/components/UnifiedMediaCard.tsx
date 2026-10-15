@@ -24,6 +24,7 @@ import { openMediaQuickPeek, type QuickPeekMedia } from "@/components/media/quic
 import { useHoverPreview } from '@/hooks/useHoverPreview';
 import { useIsMobile } from '@/hooks/ui/use-mobile';
 import { Loader2 } from 'lucide-react';
+import { resolveTatakaiAnimeViewId, TatakaiAnimeViews } from '@/components/media/TatakaiAnimeViews';
 
 export interface UnifiedMediaCardProps {
   item: {
@@ -83,6 +84,7 @@ export const UnifiedMediaCard = memo(function UnifiedMediaCard({ item, variant, 
   const mobile = useIsMobile();
   const previewEnabled = isAnime && !mobile;
   const preview = useHoverPreview({ anilistId: item.anilistId, malId: item.malId, title: item.name, enabled: previewEnabled && !shouldBlurAdult });
+  const animeViewId = isAnime ? resolveTatakaiAnimeViewId(item.id, item.anilistId) : undefined;
   // Phones: no hover states exist, so drop the GPU-heavy hover overlays,
   // backdrop-blurs and transitions entirely (big scroll win on long grids).
 
@@ -168,6 +170,7 @@ export const UnifiedMediaCard = memo(function UnifiedMediaCard({ item, variant, 
       {score && <ScoreBadge score={score} />}{label && <MetaBadge className="text-white/85">{label}</MetaBadge>}
       {isAnime && !!item.episodes?.sub && <MetaBadge className="text-white/85">{item.episodes.sub} {uiI18n.t('app.sub_5d85613a')} {item.episodes.dub ? uiI18n.t('app.i18n_value_0_dub_f85b5df5', { value0: item.episodes.dub }) : ''}</MetaBadge>}
       {(isManga || isNovel) && !!item.chapters && <MetaBadge className="text-white/85">{item.chapters} {uiI18n.t('app.ch_482bd64c')}</MetaBadge>}
+      {animeViewId && <TatakaiAnimeViews animeId={animeViewId} className="text-white/85" />}
     </div> : <div className="flex flex-wrap items-center gap-x-1.5">
       <span className="capitalize">{isAnime ? item.type || uiI18n.t('app.anime_f1b32a19') : mediaBadgeLabel}</span>
       {item.year && <span>· {item.year}</span>}
@@ -176,5 +179,6 @@ export const UnifiedMediaCard = memo(function UnifiedMediaCard({ item, variant, 
       {isAnime && !!item.episodes?.dub && <span>· {item.episodes.dub} {uiI18n.t('app.dub_1ca4b285')}</span>}
       {label && <span>· {label}</span>}
       {item.status && !isCharacter && <span>· {item.status}</span>}
+      {animeViewId && <TatakaiAnimeViews animeId={animeViewId} />}
     </div>} />;
 });

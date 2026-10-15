@@ -3165,6 +3165,7 @@ export type Database = {
           id: string;
           user_id: string | null;
           session_id: string;
+          visitor_id: string | null;
           ip_address: string | null;
           country: string | null;
           city: string | null;
@@ -3183,6 +3184,7 @@ export type Database = {
           id?: string;
           user_id?: string | null;
           session_id: string;
+          visitor_id?: string | null;
           ip_address?: string | null;
           country?: string | null;
           city?: string | null;
@@ -3201,6 +3203,7 @@ export type Database = {
           id?: string;
           user_id?: string | null;
           session_id?: string;
+          visitor_id?: string | null;
           ip_address?: string | null;
           country?: string | null;
           city?: string | null;

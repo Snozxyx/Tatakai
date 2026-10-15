@@ -33,7 +33,7 @@ const files = argv.length
 const isMigration = (f) => VERSIONED.test(f.split(/[\\/]/).pop());
 
 // Each CREATE OR REPLACE FUNCTION through the close of its dollar-quoted body.
-const FN = /CREATE OR REPLACE FUNCTION[\s\S]*?\$\$[\s\S]*?\$\$/g;
+const FN = /CREATE OR REPLACE FUNCTION[\s\S]*?(\$(?:[A-Za-z_][A-Za-z0-9_]*)?\$)[\s\S]*?\1/g;
 
 await loadModule();
 

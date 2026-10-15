@@ -18,6 +18,7 @@ import { usePinForumPost } from '@/hooks/community/useForum';
 import { cn } from '@/lib/utils';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { RichContent } from '@/components/community/feed/richText';
+import { CommunityApprovalSetting } from './CommunityApprovalSetting';
 
 export function ContentModerationManager() {
   useUiTranslation();
@@ -188,6 +189,7 @@ export function ContentModerationManager() {
 
   return (
     <div className="space-y-6">
+      <CommunityApprovalSetting />
       <div className="flex items-center justify-between">
         <h2 className="font-display text-xl font-semibold flex items-center gap-2">
           <AlertTriangle className="w-5 h-5 text-primary" />

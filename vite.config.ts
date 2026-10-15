@@ -32,8 +32,8 @@ export default defineConfig(({ mode }) => {
     // ONNX Runtime model files for the on-device KittenTTS narrator.
     assetsInclude: ['**/*.wasm'],
     worker: { format: 'es' },
-    // Production console/debugger stripping (terser `drop_console` parity).
-    esbuild: mode === 'production' || mode === 'web' ? { drop: ['console', 'debugger'] } : {},
+    // Keep console calls for the explicitly enabled production diagnostic viewer.
+    esbuild: mode === 'production' || mode === 'web' ? { drop: ['debugger'] } : {},
     base: isElectronBuild ? './' : '/',
     resolve: {
       alias: {

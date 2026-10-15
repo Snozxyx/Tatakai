@@ -8,6 +8,7 @@ import { AdultBadge } from "@/components/MediaCardBadges";
 import { inferAnimeAdultFlag } from "@/lib/contentSafety";
 import { AnimeCard, getHighQualityPoster } from "@/lib/api";
 import { AnimeCardWithPreview } from "./AnimeCardWithPreview";
+import { resolveTatakaiAnimeViewId, TatakaiAnimeViews } from '@/components/media/TatakaiAnimeViews';
 import { useIsMobile } from "@/hooks/ui/use-mobile";
 import { buildPreferredAnimeRouteId } from "@/lib/animeIdMapping";
 import { BlurhashImage } from "@/components/ui/blurhash-image";
@@ -101,6 +102,9 @@ export const AnimeGrid = memo(function AnimeGrid({
           })();
 
           const { score, label } = splitRating(anime.rating);
+          const animeViewId = String((anime as any).mediaType || 'anime').toLowerCase() === 'anime'
+            ? resolveTatakaiAnimeViewId(anime.id, anime.anilistId)
+            : undefined;
           const posterClass = 'media-card-image h-full w-full object-cover';
           return <Peekable key={cardKey} media={(anime as any).mediaType === 'manga' ? peekFromManga(anime as any, cardRouteTo) : peekFromAnime(anime, cardRouteTo)}>
             <MediaCardFrame title={anime.name} href={cardRouteTo}
@@ -113,6 +117,7 @@ export const AnimeGrid = memo(function AnimeGrid({
               </>}
               metadata={<div className="flex flex-wrap gap-x-1.5"><span>{anime.type || uiI18n.t('app.anime_f1b32a19')}</span>
                 {anime.year && <span>· {anime.year}</span>}{!!anime.episodes?.sub && <span>· {anime.episodes.sub} {uiI18n.t('app.sub_5d85613a')}</span>}{!!anime.episodes?.dub && <span>· {anime.episodes.dub} {uiI18n.t('app.dub_1ca4b285')}</span>}{label && <span>· {label}</span>}
+                {animeViewId && <TatakaiAnimeViews animeId={animeViewId} />}
               </div>} />
           </Peekable>;
         })}

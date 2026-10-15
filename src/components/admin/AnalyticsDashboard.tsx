@@ -1,6 +1,6 @@
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { motion } from 'framer-motion';
 import {
@@ -14,11 +14,11 @@ import {
 } from 'recharts';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
-import { subDays, startOfDay, endOfDay } from 'date-fns';
-import { format } from '@/lib/localeFormat';
 import { fetchAllReleases, fetchRepoStats, platformForAsset, formatCompact, GITHUB_REPO_URL } from '@/lib/github';
-import { classifyChannel } from '@/hooks/api/useAnalytics';
 import { WorldMap } from '@/components/admin/WorldMap';
+import { EngagementInsights } from './EngagementInsights';
+import { fetchAdminAnalytics, type DashboardStats } from '@/lib/adminAnalytics';
+import { requestWithDeadline } from '@/lib/requestDeadline';
 
 const GA4_ACQUISITION_URL = 'https://analytics.google.com/analytics/web/#/reports/acquisition-overview';
 const GA4_FUNNEL_URL = 'https://analytics.google.com/analytics/web/#/analysis';
@@ -28,342 +28,36 @@ export function AnalyticsDashboard() {
   const [timeRange, setTimeRange] = useState<'day' | 'week' | 'month'>('week');
   const days = timeRange === 'day' ? 1 : timeRange === 'week' ? 7 : 30;
 
-  // Total users
-  const { data: totalUsers } = useQuery({
-    queryKey: ['analytics_total_users'],
-    queryFn: async () => {
-      const { count } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true });
+  const dashboardQuery = useQuery({
+    queryKey: ['admin-dashboard-aggregate', days],
+    queryFn: ({signal}) => fetchAdminAnalytics<DashboardStats>('admin_dashboard_stats', days, signal),
+    staleTime: 60_000, retry: false, refetchOnWindowFocus: false, networkMode: 'always',
+  });
+  const totalUsersQuery = useQuery({
+    queryKey: ['analytics_total_users'], staleTime: 60_000, retry: false, networkMode: 'always',
+    queryFn: async ({signal}) => {
+      const {count,error} = await requestWithDeadline(abort => supabase.from('profiles').select('*',{count:'exact',head:true}).abortSignal(abort),signal);
+      if(error) throw error;
       return count || 0;
     },
   });
-
-  // ---- Shared range fetches ------------------------------------------------
-  // The dashboard used to run ~10 separate full-table scans of page_visits
-  // (plus a per-day × 4 query fan-out) on every range change. On a busy site
-  // that saturates the connection pool and blocks the renderer main thread
-  // parsing megabytes of JSON — on desktop the 'unresponsive' guard then
-  // reloads the whole page. Three scans now feed every metric below via
-  // useMemo, with a 60s stale window and no refetch on window focus.
-  const rangeStart = useMemo(() => subDays(new Date(), days).toISOString(), [days]);
-
-  const { data: visits } = useQuery({
-    queryKey: ['analytics_visits', timeRange],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('page_visits')
-        .select('session_id, user_id, created_at, country, referrer, channel, utm_medium, referrer_host, page_path')
-        .gte('created_at', rangeStart)
-        .limit(20000);
-      if (error) throw error;
-      return data || [];
-    },
-    staleTime: 60_000,
-    refetchOnWindowFocus: false,
-  });
-
-  const { data: watchRows } = useQuery({
-    queryKey: ['analytics_watch_rows', timeRange],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('watch_sessions')
-        .select('session_id, user_id, watch_duration_seconds, genres, created_at')
-        .gte('created_at', rangeStart);
-      if (error) throw error;
-      return data || [];
-    },
-    staleTime: 60_000,
-    refetchOnWindowFocus: false,
-  });
-
-  const { data: signupRows } = useQuery({
-    queryKey: ['analytics_signups', timeRange],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('user_id, created_at')
-        .gte('created_at', rangeStart);
-      if (error) throw error;
-      return data || [];
-    },
-    staleTime: 60_000,
-    refetchOnWindowFocus: false,
-  });
-
-  // Total visitors (unique sessions)
-  const totalVisitors = useMemo(() => {
-    const uniqueSessions = new Set((visits || []).map(v => v.session_id).filter(Boolean));
-    return uniqueSessions.size;
-  }, [visits]);
-
-  // Guest vs logged in visitors
-  const visitorBreakdown = useMemo(() => {
-    const sessions = new Map<string, boolean>();
-    (visits || []).forEach(v => {
-      if (v.session_id && !sessions.has(v.session_id)) {
-        sessions.set(v.session_id, !!v.user_id);
-      }
-    });
-
-    let guests = 0, loggedIn = 0;
-    sessions.forEach(isLoggedIn => isLoggedIn ? loggedIn++ : guests++);
-
-    return { guests, loggedIn };
-  }, [visits]);
-
-  // Total watch time
-  const totalWatchTime = useMemo(() => {
-    return (watchRows || []).reduce((acc, s) => acc + (s.watch_duration_seconds || 0), 0);
-  }, [watchRows]);
-
-  // All countries by unique session — fed to the world map (no more top-5 cut).
-  const topCountries = useMemo(() => {
-    const countryCount = new Map<string, Set<string>>();
-    (visits || []).forEach(v => {
-      const name = (v.country ?? '').trim();
-      if (name && v.session_id) {
-        if (!countryCount.has(name)) {
-          countryCount.set(name, new Set());
-        }
-        countryCount.get(name)!.add(v.session_id);
-      }
-    });
-
-    return Array.from(countryCount.entries())
-      .map(([name, sessions]) => ({ name, value: sessions.size }))
-      .sort((a, b) => b.value - a.value || a.name.localeCompare(b.name));
-  }, [visits]);
-
-  const unknownCountrySessions = useMemo(() => {
-    const s = new Set<string>();
-    (visits || []).forEach(v => {
-      if (!(v.country ?? '').trim() && v.session_id) s.add(v.session_id);
-    });
-    return s.size;
-  }, [visits]);
-
-  // Top genres watched
-  const topGenres = useMemo(() => {
-    const genreTime = new Map<string, number>();
-    (watchRows || []).forEach(s => {
-      if (s.genres && Array.isArray(s.genres)) {
-        s.genres.forEach((genre: string) => {
-          genreTime.set(genre, (genreTime.get(genre) || 0) + (s.watch_duration_seconds || 0));
-        });
-      }
-    });
-
-    const colors = ['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#ec4899'];
-    return Array.from(genreTime.entries())
-      .map(([name, value], i) => ({ name, value: Math.round(value / 60), color: colors[i % colors.length] }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 6);
-  }, [watchRows]);
-
-  // Daily visitor stats — bucketed in memory from the shared fetches (used to
-  // be up to 120 sequential day-scoped requests).
-  const dailyStats = useMemo(() => {
-    const stats = [];
-    const now = new Date();
-
-    for (let i = days - 1; i >= 0; i--) {
-      const date = subDays(now, i);
-      const dayStart = startOfDay(date).getTime();
-      const dayEnd = endOfDay(date).getTime();
-
-      const daySessions = new Set<string>();
-      // DAU identity: logged-in user id, else guest session id. The old code
-      // only counted logged-in user_ids, so a mostly logged-out day read 0.
-      const dayActives = new Set<string>();
-      (visits || []).forEach(v => {
-        const t = new Date(v.created_at).getTime();
-        if (t < dayStart || t > dayEnd || !v.session_id) return;
-        daySessions.add(v.session_id);
-        dayActives.add(v.user_id ? `u:${v.user_id}` : `s:${v.session_id}`);
-      });
-
-      let watchMinutes = 0;
-      (watchRows || []).forEach(s => {
-        const t = new Date(s.created_at).getTime();
-        if (t >= dayStart && t <= dayEnd) watchMinutes += (s.watch_duration_seconds || 0);
-      });
-      watchMinutes = watchMinutes / 60;
-
-      let newUsers = 0;
-      (signupRows || []).forEach(p => {
-        const t = new Date(p.created_at).getTime();
-        if (t >= dayStart && t <= dayEnd) newUsers++;
-      });
-
-      stats.push({
-        date: format(date, timeRange === 'day' ? 'HH:mm' : 'MMM dd'),
-        visitors: daySessions.size,
-        dau: dayActives.size,
-        watchTime: Math.round(watchMinutes),
-        newUsers,
-        retention: daySessions.size > 0 ? Math.round((dayActives.size / daySessions.size) * 100) : 0
-      });
-    }
-
-    return stats;
-  }, [visits, watchRows, signupRows, days, timeRange]);
-
-  // Hourly activity
-  const hourlyActivity = useMemo(() => {
-    const todayStart = startOfDay(new Date()).getTime();
-    const hourCounts = new Array(24).fill(0);
-    (visits || []).forEach(v => {
-      const t = new Date(v.created_at).getTime();
-      if (t < todayStart) return;
-      hourCounts[new Date(t).getHours()]++;
-    });
-
-    return hourCounts.map((count, i) => ({
-      hour: `${i.toString().padStart(2, '0')}:00`,
-      visits: count,
-    }));
-  }, [visits]);
-
-  // Referrer channels — prefers the stored `channel` column (written by
-  // trackPageVisit), falling back to the shared classifier for older rows.
-  const referrerChannels = useMemo(() => {
-    const channels = new Map<string, Set<string>>();
-    (visits || []).forEach(v => {
-      const channel = v.channel || classifyChannel(v.referrer, v.utm_medium);
-      if (!channels.has(channel)) {
-        channels.set(channel, new Set());
-      }
-      channels.get(channel)!.add(v.session_id);
-    });
-
-    const colors = ['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#ec4899'];
-    return Array.from(channels.entries())
-      .map(([name, sessions], i) => ({
-        name,
-        value: sessions.size,
-        color: colors[i % colors.length]
-      }))
-      .sort((a, b) => b.value - a.value);
-  }, [visits]);
-
-  // Top referring hosts (where the traffic actually comes from).
-  const topReferrers = useMemo(() => {
-    const hostSessions = new Map<string, Set<string>>();
-    (visits || []).forEach((v) => {
-      let host = (v.referrer_host || '').toLowerCase();
-      if (!host && v.referrer) {
-        try {
-          host = new URL(v.referrer).hostname.toLowerCase();
-        } catch {
-          host = '';
-        }
-      }
-      if (!host || !v.session_id) return;
-      if (!hostSessions.has(host)) hostSessions.set(host, new Set());
-      hostSessions.get(host)!.add(v.session_id);
-    });
-
-    return Array.from(hostSessions.entries())
-      .map(([host, sessions]) => ({ host, sessions: sessions.size }))
-      .sort((a, b) => b.sessions - a.sessions)
-      .slice(0, 8);
-  }, [visits]);
-
-  // Session quality metrics
-  const sessionQuality = useMemo(() => {
-    const sessionPageCounts = new Map<string, number>();
-    let totalPageViews = 0;
-    (visits || []).forEach((visit) => {
-      const sessionId = String(visit.session_id || '').trim();
-      if (!sessionId) return;
-      totalPageViews++;
-      sessionPageCounts.set(sessionId, (sessionPageCounts.get(sessionId) || 0) + 1);
-    });
-
-    const totalSessions = sessionPageCounts.size;
-    const returningSessions = Array.from(sessionPageCounts.values()).filter((count) => count > 1).length;
-    const returningRate = totalSessions > 0 ? Math.round((returningSessions / totalSessions) * 100) : 0;
-    const avgPagesPerSession = totalSessions > 0
-      ? Number((totalPageViews / totalSessions).toFixed(2))
-      : 0;
-
-    const totalWatchSeconds =
-      (watchRows || []).reduce((acc, session) => acc + (session.watch_duration_seconds || 0), 0);
-    const watchSessionCount = (watchRows || []).length;
-    const avgWatchMinutes = watchSessionCount > 0
-      ? Math.round((totalWatchSeconds / watchSessionCount) / 60)
-      : 0;
-
-    return {
-      totalSessions,
-      totalPageViews,
-      returningSessions,
-      returningRate,
-      avgPagesPerSession,
-      avgWatchMinutes,
-    };
-  }, [visits, watchRows]);
-
-  // Top page paths by unique sessions
-  const topPages = useMemo(() => {
-    const pathSessions = new Map<string, Set<string>>();
-    (visits || []).forEach((visit) => {
-      const sessionId = String(visit.session_id || '').trim();
-      if (!sessionId) return;
-
-      const rawPath = String(visit.page_path || '/').trim() || '/';
-      const normalizedPath = rawPath.replace(/\?.*$/, '') || '/';
-
-      if (!pathSessions.has(normalizedPath)) {
-        pathSessions.set(normalizedPath, new Set());
-      }
-      pathSessions.get(normalizedPath)!.add(sessionId);
-    });
-
-    return Array.from(pathSessions.entries())
-      .map(([path, sessions]) => ({ path, sessions: sessions.size }))
-      .sort((a, b) => b.sessions - a.sessions)
-      .slice(0, 8);
-  }, [visits]);
-
-  // Success funnel: Visit → Signup → Activation (first watch) → Retention
-  // (active on 2+ distinct days). All rates computed over the selected window.
-  const funnel = useMemo(() => {
-    const sessionCounts = new Map<string, number>();
-    const userDays = new Map<string, Set<string>>();
-    (visits || []).forEach((v) => {
-      const sid = String(v.session_id || '').trim();
-      if (sid) sessionCounts.set(sid, (sessionCounts.get(sid) || 0) + 1);
-      if (v.user_id) {
-        const day = String(v.created_at || '').slice(0, 10);
-        if (!userDays.has(v.user_id)) userDays.set(v.user_id, new Set());
-        userDays.get(v.user_id)!.add(day);
-      }
-    });
-
-    const visitors = sessionCounts.size;
-    const bounced = Array.from(sessionCounts.values()).filter((c) => c <= 1).length;
-    const newUserIds = ((signupRows || []).map((p) => p.user_id).filter(Boolean)) as string[];
-    const signups = newUserIds.length;
-    const watchers = new Set((watchRows || []).map((w) => w.user_id).filter(Boolean));
-    const activated = newUserIds.filter((id) => watchers.has(id)).length;
-    const loggedInUsers = userDays.size;
-    const retained = Array.from(userDays.values()).filter((d) => d.size >= 2).length;
-
-    const pct = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 100) : 0);
-    return {
-      visitors,
-      signups,
-      activated,
-      retained,
-      loggedInUsers,
-      signupRate: pct(signups, visitors),
-      activationRate: pct(activated, signups),
-      retentionRate: pct(retained, loggedInUsers),
-      bounceRate: pct(bounced, visitors),
-    };
-  }, [visits, watchRows, signupRows]);
+  const data = dashboardQuery.data;
+  const colors = ['#8b5cf6','#06b6d4','#10b981','#f59e0b','#ef4444','#ec4899'];
+  const totalUsers = data?.totalUsers ?? totalUsersQuery.data;
+  const totalVisitors = data?.totalVisitors;
+  const visitorBreakdown = data?.visitorBreakdown;
+  const totalWatchTime = data?.totalWatchTime;
+  const topCountries = data?.topCountries || [];
+  const unknownCountrySessions = data?.unknownCountrySessions || 0;
+  const topGenres = (data?.topGenres || []).map((row,index)=>({...row,color:colors[index%colors.length]}));
+  const dailyStats = data?.dailyStats || [];
+  const hourlyActivity = data?.hourlyActivity || [];
+  const referrerChannels = (data?.referrerChannels || []).map((row,index)=>({...row,color:colors[index%colors.length]}));
+  const topReferrers = data?.topReferrers || [];
+  const topPages = data?.topPages || [];
+  const sessionQuality = data?.sessionQuality;
+  const funnel = data?.funnel;
+  const todayBreakdown = data?.todayBreakdown || {members:0,guests:0,total:0};
 
   // GitHub releases & downloads (snozxyx/tatakai) — real download counts per release/platform
   const { data: githubData } = useQuery({
@@ -415,20 +109,6 @@ export function AnalyticsDashboard() {
     },
   });
 
-  // Today breakdown for the DAU card subtitle (members vs guests).
-  const todayBreakdown = useMemo(() => {
-    const todayStart = startOfDay(new Date()).getTime();
-    const members = new Set<string>();
-    const guests = new Set<string>();
-    (visits || []).forEach(v => {
-      const t = new Date(v.created_at).getTime();
-      if (t < todayStart || !v.session_id) return;
-      if (v.user_id) members.add(v.user_id);
-      else guests.add(v.session_id);
-    });
-    return { members: members.size, guests: guests.size, total: members.size + guests.size };
-  }, [visits]);
-
   const formatWatchTime = (seconds: number) => {    const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     if (hours > 0) return `${hours}h ${minutes}m`;
@@ -479,9 +159,9 @@ export function AnalyticsDashboard() {
       color: 'from-cyan-500 to-cyan-700',
     },
     {
-      get title() { return uiI18n.t('app.returning_sessions_5f3a36ee'); },
+      get title() { return uiI18n.t('insights.returning'); },
       value: `${sessionQuality?.returningRate || 0}%`,
-      get subtitle() { return uiI18n.t('app.i18n_value_0_repeat_sessions_2c9e80f8', { value0: sessionQuality?.returningSessions || 0 }); },
+      get subtitle() { return uiI18n.t('insights.repeatDays', { count: sessionQuality?.returningSessions || 0 }); },
       icon: <TrendingUp className="w-5 h-5" />,
       color: 'from-emerald-500 to-emerald-700',
     },
@@ -535,6 +215,11 @@ export function AnalyticsDashboard() {
         </div>
       </div>
 
+      <EngagementInsights days={days} />
+      {dashboardQuery.isPending && <p role="status" className="text-sm text-muted-foreground">{uiI18n.t('insights.loadingSummary')}</p>}
+      {dashboardQuery.isError && <div role="alert" className="rounded-xl border border-border p-4 text-sm"><p>{uiI18n.t((dashboardQuery.error as Error)?.message === 'analytics-timeout' ? 'insights.timedOut' : 'insights.unavailable')}</p><button type="button" className="mt-3 font-semibold text-primary" onClick={()=>void dashboardQuery.refetch()}>{uiI18n.t('insights.retry')}</button></div>}
+      {!data && totalUsersQuery.isSuccess && <p className="text-sm text-muted-foreground">{uiI18n.t('insights.registeredCount',{count:totalUsersQuery.data})}</p>}
+      {data && <>
       {/* Success funnel: Visit → Signup → Activation → Retention */}
       <GlassPanel className="p-6">
         <h3 className="font-medium mb-1 flex items-center gap-2">
@@ -549,7 +234,7 @@ export function AnalyticsDashboard() {
             { get label() { return uiI18n.t('app.visitors_f8f3b6f9'); }, value: funnel?.visitors ?? 0, rate: null as number | null },
             { get label() { return uiI18n.t('app.signups_09c26725'); }, value: funnel?.signups ?? 0, rate: funnel?.signupRate ?? 0 },
             { get label() { return uiI18n.t('app.activated_a0b861f6'); }, value: funnel?.activated ?? 0, rate: funnel?.activationRate ?? 0 },
-            { get label() { return uiI18n.t('app.retained_ae868d9a'); }, value: funnel?.retained ?? 0, rate: funnel?.retentionRate ?? 0 },
+            { get label() { return uiI18n.t('insights.multiDay'); }, value: funnel?.retained ?? 0, rate: funnel?.retentionRate ?? 0 },
             { get label() { return uiI18n.t('app.bounce_rate_f45a2ab6'); }, value: `${funnel?.bounceRate ?? 0}%`, rate: null },
           ].map((step) => (
             <div key={step.label} className="rounded-2xl bg-white/5 border border-white/10 p-4">
@@ -865,6 +550,7 @@ export function AnalyticsDashboard() {
         </GlassPanel>
       </div>
 
+      </>}
       {/* GitHub Releases & Downloads */}
       {githubData && (
         <div className="space-y-4">

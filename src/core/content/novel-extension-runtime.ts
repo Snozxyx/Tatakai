@@ -107,6 +107,7 @@ function mergeRows(
         if (namespace && sp) subProviderToNamespace.set(sp, namespace);
         existing.sources.push({
           provider: sp,
+          providerName: s.providerName || row.providerName,
           chapterKey: s.chapterKey || String(number),
           providerChapterId: s.providerChapterId || s.chapterKey || String(number),
           language: s.language ?? null,
@@ -119,6 +120,7 @@ function mergeRows(
     }
     existing.sources.push({
       provider,
+      providerName: row.providerName,
       chapterKey: row.chapterKey || String(number),
       providerChapterId: row.providerChapterId || row.chapterKey || String(number),
       language: row.language ?? null,
