@@ -3,6 +3,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      preserve_release:
+        description: 'Also preserve a checksum-verified build release for alternate delivery'
+        type: boolean
+        default: false
 permissions:
   contents: write
   actions: read
@@ -45,7 +50,7 @@ jobs:
           retention-days: 7
           if-no-files-found: error
       - name: Preserve verified build when Actions storage is full
-        if: steps.release_artifact.outcome == 'failure'
+        if: steps.release_artifact.outcome == 'failure' || inputs.preserve_release == true
         run: node scripts/publish-server-build.mjs
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
