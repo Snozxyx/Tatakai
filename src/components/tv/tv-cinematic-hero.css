@@ -1,0 +1,190 @@
+/* TV billboards share a composition; desktop and mobile heroes are independent. */
+.tv-cinema {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  height: 61vh;
+  min-height: 420px;
+  max-height: 760px;
+  margin-bottom: 2.4vw;
+  border-radius: 20px;
+  background: #18121c;
+  box-shadow: 0 20px 54px rgba(10, 4, 13, 0.3);
+}
+.tv-cinema-art {
+  position: absolute;
+  inset: 0 0 0 auto;
+  height: 100%;
+  width: 82%;
+  object-fit: cover;
+  object-position: center 35%;
+}
+.tv-cinema > .tv-trailer-layer {
+  inset: 0 0 0 24%;
+  z-index: 0;
+  mask-image: linear-gradient(to right, transparent, #000 28%);
+}
+.tv-cinema > .tv-trailer-layer video {
+  opacity: 1;
+}
+.tv-cinema-scrim {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, #18121c 0%, rgba(24, 18, 28, 0.96) 20%, rgba(24, 18, 28, 0.69) 39%, rgba(24, 18, 28, 0.12) 67%, transparent 85%),
+    linear-gradient(0deg, rgba(17, 10, 22, 0.7), transparent 45%);
+}
+.tv-cinema-copy {
+  position: absolute;
+  left: 3.6vw;
+  bottom: 3.2vw;
+  width: 49%;
+  max-width: 760px;
+  color: #fff7fc;
+}
+.tv-cinema h1 {
+  margin: 0 0 0.45em;
+  font-size: clamp(32px, 3.5vw, 74px);
+  line-height: 1.07;
+  font-weight: 750;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+  max-width: 22ch;
+}
+.tv-cinema .tv-title-logo {
+  display: flex;
+  align-items: flex-end;
+  height: 15vh;
+  max-height: 190px;
+  margin-bottom: 1.4vw;
+}
+.tv-cinema .tv-title-logo img {
+  width: auto;
+  height: auto;
+  max-height: 100%;
+  max-width: 34vw;
+  object-fit: contain;
+  object-position: left bottom;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
+}
+.tv-cinema .tv-title-logo img.tv-logo-square {
+  width: 30vw;
+  height: 15vh;
+  object-fit: cover;
+  object-position: center;
+}
+.tv-cinema .tv-hero-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  align-items: center;
+  margin: 0 0 1vw;
+  color: #eee0eb;
+  font-size: clamp(14px, 1.16vw, 24px);
+  line-height: 1.5;
+}
+.tv-cinema .tv-hero-facts > span {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+.tv-cinema .tv-hero-facts > span + span::before {
+  content: "·";
+  margin: 0 0.65em;
+  color: #be9fb6;
+}
+.tv-cinema .tv-hero-facts > .tv-hero-score {
+  color: #f4dbb4;
+  gap: 0.3em;
+}
+.tv-cinema-description {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  margin: 0 0 1.75vw;
+  max-width: 45ch;
+  color: #f0e5ee;
+  font-size: clamp(15px, 1.36vw, 28px);
+  line-height: 1.55;
+  text-shadow: 0 2px 8px rgba(12, 5, 15, 0.25);
+}
+.tv-cinema .tv-cinema-actions {
+  gap: 0.8vw;
+  margin: 0;
+}
+.tv-cinema-actions > :is(a, button) {
+  min-height: 3.8vw;
+  padding: 0.8em 1.55em;
+  border-radius: 999px;
+  font-size: clamp(15px, 1.25vw, 27px);
+  font-weight: 650;
+  border: 1px solid rgba(255, 246, 252, 0.23);
+  background: rgba(255, 246, 252, 0.13);
+  backdrop-filter: blur(18px);
+}
+.tv-cinema-actions > .tv-primary {
+  background: #fff7fc;
+  color: #231624;
+  border-color: transparent;
+}
+.tv-cinema-actions svg {
+  width: 1.15em;
+  height: 1.15em;
+}
+.tv-cinema-corner {
+  position: absolute;
+  right: 2vw;
+  bottom: 2vw;
+  display: flex;
+  align-items: center;
+  gap: 0.8vw;
+}
+.tv-cinema-status {
+  padding: 0.65em 1em;
+  border-radius: 999px;
+  background: rgba(28, 17, 31, 0.62);
+  color: #f4e6f0;
+  backdrop-filter: blur(18px);
+  font-size: clamp(12px, 1vw, 22px);
+}
+.tv-cinema button.tv-preview-toggle,
+.tv-cinema-navigation button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: max(42px, 3.3vw);
+  height: max(42px, 3.3vw);
+  min-width: 0;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 246, 252, 0.32);
+  background: rgba(28, 17, 31, 0.38);
+  backdrop-filter: blur(18px);
+}
+.tv-cinema-navigation {
+  position: absolute;
+  right: 2vw;
+  top: 1.6vw;
+  display: flex;
+  align-items: center;
+  gap: 0.8vw;
+  color: #fff7fc;
+  font-size: clamp(12px, 1vw, 22px);
+  font-variant-numeric: tabular-nums;
+}
+.tv-cinema :is(button, a):focus-visible {
+  outline: 3px solid #ffe6f5;
+  outline-offset: 5px;
+}
+.tv-title-full-synopsis {
+  max-width: 75ch;
+  padding-block: 1.5em;
+  color: #eee0eb;
+  line-height: 1.7;
+}
+@media (max-height: 650px) {
+  .tv-cinema { min-height: 370px; }
+  .tv-cinema-copy { bottom: 2.5vw; }
+}

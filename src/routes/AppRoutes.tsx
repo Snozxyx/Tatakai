@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
+import TVLinkPage from '@/pages/tv/TVLinkPage';
 import { Routes, Route, Navigate, useLocation, useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -460,6 +461,7 @@ const AppRoutes = () => {
         <Route path="/extensions" element={<ProtectedRoute><ExtensionHubPage /></ProtectedRoute>} />
         <Route path="/extensions/:extensionId" element={<ProtectedRoute><ExtensionDetailPage /></ProtectedRoute>} />
         <Route path="/auth" element={<AuthPage />} />
+        <Route path="/link" element={<TVLinkPage />} />
         <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
         <Route path="/setup" element={<SetupPage />} />
         <Route path="/discord" element={<DiscordPage />} />

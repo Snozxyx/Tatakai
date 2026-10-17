@@ -14,6 +14,7 @@ import { installGlobalAdminSecretFetchPatch } from '@/lib/api/adminSecret';
 import '@/lib/production'; // Suppress console in production
 import { installMobileLayout } from '@/lib/mobile/layout';
 import { initializeMediaMetadataCache } from '@/lib/queryClient';
+import { initializeTVDevice } from '@/core/tv/device';
 
 installMobileLayout();
 
@@ -98,6 +99,7 @@ if (typeof window !== 'undefined') {
 }
 
 async function renderApp() {
+  await initializeTVDevice();
   // Native source discovery must be ready before routes/nav mount. Otherwise
   // their first React Query request caches an empty extension/custom-source
   // catalogue for five minutes.

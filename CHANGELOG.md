@@ -4,6 +4,24 @@ All notable changes to Tatakai are documented here.
 
 ---
 
+## [6.2.0] - 2026-10-17
+
+### Added
+- Dedicated Android TV / Google TV app with remote navigation, TV discovery, profiles, library, downloads, community, and native playback controls.
+- Secure TV linking at `https://tatakai.me/link`: expiring QR/PIN codes, companion approval, an independent TV login, and encrypted optional provider, IPTV, and extension transfers.
+- Experimental IPTV playlists, channel favorites, and Now/Next guide support.
+- Lightweight TV video wallpapers with still-image and reduced-motion fallbacks.
+- Separate Android TV APK and flavor-aware updates that preserve the existing mobile application.
+
+### Fixed
+- Retain HLS/DASH transport hints through local proxy URLs and TV source changes.
+- Preserve remote focus during pagination, profile navigation, and player menus.
+- Require verified email for TV approval; pairing state is service-only, rate-limited, expiring, and cleared after acknowledgement.
+
+### Validation
+- Automated pairing tests cover authorization, encrypted login, concurrent approvals, expiry, replay, and acknowledgement. Database tests verify role restrictions and lookup limits.
+- Physical TV HDR, passthrough, and device-specific launcher behavior still require hardware acceptance.
+
 ## [6.1.2] - 2026-10-15
 
 ### Added

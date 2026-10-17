@@ -18,6 +18,12 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(android.os.Bundle savedInstanceState) {
         // This must happen before BridgeActivity builds its Capacitor bridge.
         registerPlugin(TatakaiTorrentPlugin.class);
+        registerPlugin(app.tatakai.me.tv.TatakaiDevicePlugin.class);
+        registerPlugin(app.tatakai.me.tv.TatakaiSecretsPlugin.class);
+        if ("tv".equals(BuildConfig.FLAVOR)) {
+            try { registerPlugin((Class) Class.forName("app.tatakai.me.tv.TvHomeChannelPlugin")); }
+            catch (ClassNotFoundException ignored) { }
+        }
         registerPlugin(NativePlayerPlugin.class);
         registerPlugin(app.tatakai.me.download.TatakaiDownloadsPlugin.class);
         // Loopback media proxy (anime HLS/MP4 + subtitles + manga images +

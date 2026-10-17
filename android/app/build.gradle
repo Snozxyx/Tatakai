@@ -8,13 +8,25 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+    buildFeatures { buildConfig = true }
+    flavorDimensions += "device"
+    productFlavors {
+        mobile { dimension "device" }
+        tv {
+            dimension "device"
+            testInstrumentationRunner "app.tatakai.me.player.TvPlayerPreviewRunner"
+            applicationId "app.tatakai.me.tv"
+            minSdk 28
+            versionNameSuffix "-tv"
+        }
+    }
     
     defaultConfig {
         applicationId = "app.tatakai.me"
         minSdk = rootProject.ext.minSdkVersion
         targetSdk = rootProject.ext.targetSdkVersion
-        versionCode = 612
-        versionName = "6.1.2"
+        versionCode = 620
+        versionName = "6.2.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -102,6 +114,10 @@ dependencies {
     def media3Version = '1.5.1'
     implementation "androidx.media3:media3-exoplayer:$media3Version"
     implementation "androidx.media3:media3-exoplayer-hls:$media3Version"
+    implementation "androidx.media3:media3-exoplayer-dash:$media3Version"
+    implementation "androidx.media3:media3-exoplayer-rtsp:$media3Version"
+    implementation "androidx.media3:media3-session:$media3Version"
+    tvImplementation "androidx.tvprovider:tvprovider:1.0.0"
     implementation "androidx.media3:media3-ui:$media3Version"
 
     // HLS → MP4 remux for offline downloads (mobile parity with desktop's

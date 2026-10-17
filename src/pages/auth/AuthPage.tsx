@@ -2,7 +2,7 @@ import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -55,6 +55,9 @@ const TEXT_VARIATIONS = [
 ];
 
 export default function AuthPage() {
+  const [tvLinkParams] = useSearchParams();
+  const requestedReturn = tvLinkParams.get('returnTo') || sessionStorage.getItem('tatakai-auth-return') || '/';
+  const safeReturn = requestedReturn.startsWith('/') && !requestedReturn.startsWith('//') && !/[\\\u0000-\u001f]/.test(requestedReturn) && !requestedReturn.startsWith('/auth') ? requestedReturn : '/';
   useUiTranslation();
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -97,9 +100,10 @@ export default function AuthPage() {
   // Redirect if already logged in
   useEffect(() => {
     if (user) {
-      navigate('/');
+      sessionStorage.removeItem('tatakai-auth-return');
+      navigate(safeReturn);
     }
-  }, [user, navigate]);
+  }, [user, navigate, safeReturn]);
 
   if (user) {
     return null;
@@ -172,7 +176,7 @@ export default function AuthPage() {
           resetCaptcha();
         } else {
           toast.success(t('auth.welcomeBackToast'));
-          navigate('/');
+          navigate(safeReturn);
         }
       } else {
         const { error, mode } = await signUp(email, password, displayName, captchaToken ?? undefined);

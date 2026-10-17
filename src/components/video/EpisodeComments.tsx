@@ -1,4 +1,7 @@
+import { supabase } from '@/integrations/supabase/client';
 import uiI18n from '@/lib/uiI18n';
+import { requestTVWriting } from '@/core/tv/writingHandoff';
+import { isTV } from '@/core/tv/device';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useMemo, useEffect } from 'react';
 import { useComments, useAddComment, useDeleteComment, useLikeComment, useEditComment, type CommentEntityType } from '@/hooks/community/useComments';
@@ -95,6 +98,9 @@ export function Comments({ entityType, entityId, episodeId, entityName, fallback
   const confirm = useConfirm();
   const navigate = useNavigate();
   const location = useLocation();
+  useEffect(() => {
+    if (!isTV() && !user && new URLSearchParams(location.search).get('compose') === 'reply') sessionStorage.setItem('tatakai-auth-return', location.pathname + location.search + location.hash);
+  }, [user, location.pathname, location.search, location.hash]);
   const ensureAgreed = useCommunityRulesGate();
   // The `#comment-<uuid>` target a notification deep-link points at, plus the
   // id we're transiently highlighting once we've scrolled to it.
@@ -118,6 +124,23 @@ export function Comments({ entityType, entityId, episodeId, entityName, fallback
   const [filter, setFilter] = useState<CommentFilter>('new');
 
   const { data: comments = [], isLoading } = useComments(entityType, entityId, epId);
+  const [handoffUnavailable, setHandoffUnavailable] = useState(false);
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (isTV() || params.get('compose') !== 'reply' || entityType !== 'forum_post' || isLoading) return;
+    const id = params.get('commentId');
+    if (id) {
+      // Replies are stored one level deep: target their root composer.
+      void (supabase as any).from('comments').select('id,parent_id,entity_id,is_deleted').eq('id', id).eq('entity_type', 'forum_post').eq('entity_id', entityId).maybeSingle().then(({ data }: { data: { id: string; parent_id: string | null; is_deleted?: boolean } | null }) => {
+        if (!data || data.is_deleted) { setHandoffUnavailable(true); return; }
+        setReplyingId(data.parent_id || data.id); setIsExpanded(true);
+      });
+    } else {
+      const timer = setTimeout(() => document.querySelector<HTMLTextAreaElement>('[data-tv-comment-composer] textarea')?.focus(), 100);
+      return () => clearTimeout(timer);
+    }
+  }, [location.search, entityId, entityType, isLoading]);
+
   const addComment = useAddComment();
   const deleteComment = useDeleteComment();
   const likeComment = useLikeComment();
@@ -305,6 +328,7 @@ export function Comments({ entityType, entityId, episodeId, entityName, fallback
 
   return (
     <div className="mt-8">
+      {handoffUnavailable && <p role="alert">This comment is unavailable or you do not have access to it.</p>}
       {/* Header */}
       <button
         onClick={() => setIsExpanded(prev => !prev)}
@@ -728,6 +752,7 @@ export function Comments({ entityType, entityId, episodeId, entityName, fallback
                             {!composeLocked && (
                               <button
                                 onClick={() => {
+                                  if (requestTVWriting(entityType === 'forum_post' ? entityId : undefined, comment.id)) return;
                                   if (!user) { navigate('/auth'); return; }
                                   setReplyingId(prev => (prev === comment.id ? null : comment.id));
                                 }}

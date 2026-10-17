@@ -19,6 +19,7 @@ import { Capacitor, registerPlugin } from '@capacitor/core';
 import { isCapacitor } from '@/lib/platform/platform';
 
 type LocalProxyPlugin = {
+  unregisterSource(options: { token: string }): Promise<void>;
   ensureStarted(): Promise<{ success: boolean; baseUrl?: string }>;
   getBaseUrl(): Promise<{ success: boolean; baseUrl?: string }>;
   registerSource(options: {
@@ -34,6 +35,11 @@ type LocalProxyPlugin = {
   setCloudflareConfig(options: { enabled: boolean; flaresolverrUrl: string }): Promise<{ success: boolean }>;
   prepareRequestHeaders(options: { url: string; headers: Record<string, string> }): Promise<{ headers: Record<string, string> }>;
 };
+
+export async function unregisterNativeSource(url: string): Promise<void> {
+  const token = url.match(/\/stream\/([a-f0-9]{32})/)?.[1];
+  if (token) { try { await loadPlugin()?.unregisterSource({ token }); } catch { /* Older builds expire the token. */ } }
+}
 
 let plugin: LocalProxyPlugin | null = null;
 let baseUrl: string | null = null;

@@ -21,6 +21,9 @@ import { Skeleton } from "@/components/ui/skeleton-custom";
 import { VideoPlayer } from "@/components/video/VideoPlayer";
 import { MobileVideoPlayer } from "@/components/video/MobileVideoPlayer";
 import { NativeTorrentPlayer } from "@/components/video/NativeTorrentPlayer";
+import { isTV } from '@/core/tv/device';
+import { TVWatchView } from '@/pages/tv/TVWatchView';
+import { DownloadButton as TVDownloadButton } from '@/components/video/controls/DownloadButton';
 import { EmbedPlayer } from "@/components/video/EmbedPlayer";
 import {
   ArrowLeft,
@@ -3046,6 +3049,41 @@ export default function WatchPage() {
     setShowReviewPopup(true);
   };
 
+  const selectTVSource = (index: number) => {
+    if (!visibleSources[index]) return;
+      const source = visibleSources[index];
+      if (source.isTorrent === true || source.sourceType === 'torrent') { setPendingTorrentSource(source); return; }
+      if (torrentTakeoverActive) leaveTorrentSession();
+      pendingPlaybackCommitRef.current = true; selectRegularServer(-4); setSelectedLangCode(source.langCode); setPreferredServerName(source.providerName || null); setPreferredSourceUrl(source.url || null); setFailedServers(new Set());
+  };
+
+  if (isTV()) return <TVWatchView
+    title={animeData?.info.name || offlineManifest?.animeName || 'Watch'}
+    episodeTitle={currentEpisode ? `Episode ${currentEpisode.number} · ${currentEpisode.title || ''}` : undefined}
+    poster={animeData?.info.poster}
+    currentEpisodeId={decodedEpisodeId}
+    episodes={episodesData?.episodes || []}
+    loading={playbackLoading || loadingSources || fetchingSources}
+    unavailable={isCurrentUnaired ? `This episode has not aired yet. ${unairedAirDateText}` : undefined}
+    onEpisode={handleEpisodeChange}
+    onRefresh={handleForceRefreshSources}
+    sources={visibleSources.map((source, index) => ({ id: `${source.url}-${index}`, title: getSimpleSourceLabel(source, `Source ${index + 1}`), detail: [source.quality, source.language, source.sourceType, source.providerName].filter(Boolean).join(' · '), selected: activePlaybackSource?.url === source.url }))}
+    onSource={selectTVSource}
+    player={isOfflineMode && isMobileApp && offlineSources[0]?.url ? <NativeTorrentPlayer mediaId={animeId} episodeId={decodedEpisodeId} url={offlineSources[0].url} streamKind="offline" title={animeData?.info.name || offlineManifest?.animeName} subtitles={offlineSubtitles} initialSeekSeconds={initialSeekSeconds} onProgressUpdate={handleProgressUpdate} onEpisodeEnd={handleEpisodeEnd} onBack={() => navigate(-1)} /> : activePlaybackSource?.url ? activePlaybackSource.isEmbed ? <EmbedPlayer url={activePlaybackSource.url} poster={animeData?.info.poster} onError={handleVideoError} /> : isMobileApp ? <NativeTorrentPlayer
+      mimeType={activePlaybackSource.isM3U8 ? "application/x-mpegURL" : undefined} mediaId={animeId} episodeId={decodedEpisodeId} url={activePlaybackSource.url} headers={activePlaybackHeaders}
+      streamKind={activePlaybackSource.sourceType === 'debrid' ? 'debrid' : activePlaybackSource.sourceType === 'torrent' ? 'torrent' : isOfflineMode ? 'offline' : 'hls'}
+      title={animeData?.info.name} poster={animeData?.info.poster} subtitles={normalizedSubtitles} preferredAudioLanguage={category === 'dub' ? 'en' : 'ja'}
+      initialSeekSeconds={initialSeekSeconds} introWindow={sourceDataForPlayback?.intro || null} outroWindow={sourceDataForPlayback?.outro || null}
+      torrentStats={activePlaybackSource.sourceType === 'torrent' ? torrentLiveStats : null} onProgressUpdate={handleProgressUpdate} onEpisodeEnd={handleEpisodeEnd}
+      sources={visibleSources.map(source => ({ id: source.url, title: getSimpleSourceLabel(source, 'Server'), detail: [source.quality, source.language, source.sourceType, source.providerName].filter(Boolean).join(' · '), selected: activePlaybackSource?.url === source.url }))}
+      onSourceRequest={index => { if (index != null) { selectTVSource(index); return; } const button = document.querySelector<HTMLElement>('[data-tv-source-picker]'); button?.click(); button?.focus(); button?.scrollIntoView({ block: 'center' }); }}
+      onQueueRequest={() => { const button = document.querySelector<HTMLElement>('[data-tv-episode-picker]'); button?.click(); button?.focus(); button?.scrollIntoView({ block: 'center' }); }}
+      onBack={() => navigate(-1)} onError={handleTorrentNativeError}
+    /> : <VideoPlayer sources={playbackSources} subtitles={normalizedSubtitles} headers={activePlaybackHeaders} poster={animeData?.info.poster} onProgressUpdate={handleProgressUpdate} onEpisodeEnd={handleEpisodeEnd} initialSeekSeconds={initialSeekSeconds} /> : undefined}
+    downloads={!isOfflineMode && activePlaybackSource?.url ? <TVDownloadButton episodeId={decodedEpisodeId} animeId={animeId} animeName={animeData?.info.name} episodeNumber={currentEpisode?.number} posterUrl={animeData?.info.poster} sourceUrl={activePlaybackSource.url} sourceType={activePlaybackSource.sourceType} headers={activePlaybackHeaders} subtitles={normalizedSubtitles} /> : undefined}
+    dialogs={<TorrentSwitchDialog source={pendingTorrentSource} animeTitle={animeData?.info.name} episodeLabel={currentEpisode?.number ? `Episode ${currentEpisode.number}` : undefined} canPlayTorrent={torrentServiceAvailable} optimizeStorage={optimizeTorrentStorage} downloadPath={torrentDownloadPath || undefined} onCancel={() => setPendingTorrentSource(null)} onConfirm={source => { setPendingTorrentSource(null); setSelectedLangCode(source.langCode); setPreferredServerName(source.providerName || null); void playTorrentSource(source); }} />}
+  />;
+
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
       <Background />
@@ -3145,12 +3183,16 @@ export default function WatchPage() {
               ) : isMobileApp && (
                 activePlaybackSource?.sourceType === 'torrent'
                 || activePlaybackSource?.sourceType === 'debrid'
+                || isTV()
               ) ? (
                 <NativeTorrentPlayer
+                  headers={activePlaybackHeaders}
+                  onSourceRequest={() => { document.querySelector<HTMLElement>('[data-tv-source-picker]')?.focus(); }}
+                  onQueueRequest={() => { document.querySelector<HTMLElement>('[data-tv-episode-picker]')?.focus(); }}
                   mediaId={animeId}
                   episodeId={decodedEpisodeId}
                   url={activePlaybackSource.url}
-                  streamKind={activePlaybackSource.sourceType === 'debrid' ? 'debrid' : 'torrent'}
+                  streamKind={activePlaybackSource.sourceType === 'debrid' ? 'debrid' : activePlaybackSource.sourceType === 'torrent' ? 'torrent' : 'hls'}
                   title={animeData?.info.name}
                   poster={animeData?.info.poster}
                   subtitles={normalizedSubtitles}
@@ -3345,7 +3387,7 @@ export default function WatchPage() {
               <GlassPanel className="p-4 md:p-5">
                 <div className="flex flex-col gap-4 md:gap-6">
                   {/* Category Toggle */}
-                  <div className="space-y-2">
+                  <div className="space-y-2" data-tv-source-picker tabIndex={-1}>
                     <div className="flex items-center gap-2 text-xs md:text-sm font-medium text-muted-foreground">
                       <Volume2 className="w-4 h-4" />
                       {uiI18n.t('app.audio_acdac205')}
@@ -3723,7 +3765,7 @@ export default function WatchPage() {
                 {/* Episode Range Selector for 50+ episodes */}
                 {(episodesData?.totalEpisodes || 0) > 50 && (
                   <div className="mb-3 space-y-2">
-                    {/* Episode search */}
+                    <span data-tv-episode-picker tabIndex={-1} />{/* Episode search */}
                     <div className="relative">
                       <input
                         type="number"

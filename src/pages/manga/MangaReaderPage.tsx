@@ -1,4 +1,5 @@
 import uiI18n from '@/lib/uiI18n';
+import { useTVReader } from '@/core/tv/useTVReader';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode } from "react";
@@ -1062,6 +1063,7 @@ export default function MangaReaderPage() {
     nextChapter: () => navToChapter(nextChapter), prevChapter: () => navToChapter(prevChapter),
     toggleFullscreen, toggleDirection, zoomIn, zoomOut, toggleComments: isFs ? undefined : toggleComments, reload,
   }, !showSettings && !showCommentsDrawer);
+  useTVReader({ next: goNextPage, previous: goPrevPage, controls: () => setShowSettings(true) });
 
   const isCoarsePointer = useMemo(
     () =>

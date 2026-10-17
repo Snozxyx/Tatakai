@@ -1,4 +1,5 @@
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
+import { isTV } from '@/core/tv/device';
 import uiI18n from '@/lib/uiI18n';
 import { normalizeReleaseNotes } from './release-details';
 import { useEffect, useSyncExternalStore } from 'react';
@@ -203,9 +204,9 @@ function pickAndroidApkUrl(assets: unknown, latestVersion: string): string | und
         !!a && typeof a === 'object',
     );
     const exact = names.find(
-      (a) => String(a.name || '') === `Tatakai-v${latestVersion}-android.apk`,
+      (a) => String(a.name || '') === `Tatakai-v${latestVersion}-${isTV() ? 'android-tv' : 'android'}.apk`,
     );
-    const fallback = names.find((a) => String(a.name || '').toLowerCase().endsWith('android.apk'));
+    const fallback = names.find((a) => String(a.name || '').toLowerCase().endsWith(isTV() ? '-android-tv.apk' : '-android.apk'));
     const picked = exact || fallback;
     const url = String(picked?.browser_download_url || '').trim();
     return /^https:\/\//i.test(url) ? url : undefined;

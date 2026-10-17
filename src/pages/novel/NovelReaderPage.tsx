@@ -1,4 +1,5 @@
 import uiI18n from '@/lib/uiI18n';
+import { useTVReader } from '@/core/tv/useTVReader';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
  * NovelReaderPage — immersive text reader.
@@ -205,6 +206,11 @@ export default function NovelReaderPage() {
   const [showChapters, setShowChapters] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [controlsOpen, setControlsOpen] = useState(false);
+  useTVReader({
+    next: () => scrollRef.current?.scrollBy({ top: scrollRef.current.clientHeight * .85, behavior: 'auto' }),
+    previous: () => scrollRef.current?.scrollBy({ top: -scrollRef.current.clientHeight * .85, behavior: 'auto' }),
+    controls: () => setShowSettings(true),
+  });
   const [chapterSearch, setChapterSearch] = useState('');
 
   useEffect(() => {

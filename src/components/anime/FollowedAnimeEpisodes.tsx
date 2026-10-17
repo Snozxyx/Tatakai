@@ -15,15 +15,19 @@ function timeAgo(iso: string | null): string | null {
   if (!iso) return null;
   const then = new Date(iso).getTime();
   if (!Number.isFinite(then)) return null;
+  const es = uiI18n.language?.startsWith('es');
   const diff = Date.now() - then;
-  if (diff < 0) return "Airing soon";
+  if (diff < 0) return es ? 'Próximamente' : 'Airing soon';
   const mins = Math.floor(diff / 60000);
-  if (mins < 60) return mins <= 1 ? "Just now" : `${mins}m ago`;
+  if (mins < 60) {
+    if (mins <= 1) return es ? 'Ahora mismo' : 'Just now';
+    return es ? `hace ${mins} min` : `${mins}m ago`;
+  }
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) return es ? `hace ${hours} h` : `${hours}h ago`;
   const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  return new Date(then).toLocaleDateString(uiI18n.language);
+  if (days < 7) return es ? `hace ${days} d` : `${days}d ago`;
+  return new Date(then).toLocaleDateString(es ? 'es' : uiI18n.language);
 }
 
 const FollowedEpisodeCard = memo(function FollowedEpisodeCard({

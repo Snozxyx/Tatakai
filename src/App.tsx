@@ -14,10 +14,13 @@ import { MobileDeepLinkBridge } from "@/components/mobile/MobileDeepLinkBridge";
 import { LightboxProvider } from "@/components/media/ImageLightbox";
 import { ExtensionUpdateSheet } from "@/components/extensions/ExtensionUpdateSheet";
 import { toast } from "sonner";
-import { useEffect } from "react";
+import { useEffect, lazy, Suspense } from "react";
+import { isTV } from '@/core/tv/device';
+const TVLayout = lazy(() => import('@/layouts/TVLayout'));
 
 
 const App = () => {
+  const Layout = isTV() ? TVLayout : MainLayout;
   // Packaged desktop serves the renderer from a non-web scheme (app://tatakai.me/index.html
   // now, file:// as a fallback). On those origins the initial pathname is "/index.html", which
   // matches no route and lands on the 404 page under BrowserRouter. HashRouter ignores the
@@ -117,9 +120,9 @@ const App = () => {
                 <MobileDeepLinkBridge />
                 <SettingsModalProvider>
                   <LightboxProvider>
-                    <MainLayout>
+                    <Suspense fallback={<div role="status">Loading Tatakai…</div>}><Layout>
                       <AppRoutes />
-                    </MainLayout>
+                    </Layout></Suspense>
             <ExtensionUpdateSheet />
                   </LightboxProvider>
                 </SettingsModalProvider>

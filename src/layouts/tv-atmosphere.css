@@ -1,0 +1,35 @@
+.tatakai-tv { --tv-accent: 235,157,187; --tv-glass: 46,37,40; --tv-ink: 15,13,14; }
+.tatakai-tv .tv-shell { background: rgb(var(--tv-ink)); }
+/* Older Android WebViews need the WebKit rule as well as scrollbar-width. */
+.tatakai-tv *::-webkit-scrollbar:horizontal { height: 0 !important; display: none; }
+.tatakai-tv :is(.tv-rail-items, [role="tablist"], [class*="overflow-x-"]) { scrollbar-width: none; }
+.tatakai-tv .tv-content-card { background: rgba(var(--tv-glass), .8); border-color: rgba(var(--tv-accent), .22); }
+.tatakai-tv .tv-card-caption { background: linear-gradient(125deg, rgba(var(--tv-accent), .08), transparent); }
+.tatakai-tv .tv-content-card:is(:hover,:focus-visible) { background: rgba(var(--tv-glass), .98); outline-color: rgb(var(--tv-accent)); }
+.tatakai-tv .tv-card-preview { background: rgba(var(--tv-glass), .92); border-color: rgba(var(--tv-accent), .45); }
+.tatakai-tv .tv-card-tags > span { color: rgb(var(--tv-accent)); background: rgba(var(--tv-accent), .09); border-color: rgba(var(--tv-accent), .25); }
+.tatakai-tv .tv-header nav, .tatakai-tv .tv-side-menu, .tatakai-tv .tv-settings-content { background-color: rgba(var(--tv-glass), .65); }
+.tatakai-tv .tv-wallpaper-overlay { background: linear-gradient(90deg, rgba(var(--tv-ink), .82), rgba(var(--tv-ink), .42)), linear-gradient(0deg, rgba(var(--tv-ink), .78), transparent 80%); }
+.tv-wallpaper-presets { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 1vw; margin-block: 1.5em; }
+.tv-wallpaper-presets .tv-wallpaper-preset { display: block; overflow: hidden; padding: 0; text-align: left; border-radius: 14px; background: rgba(var(--tv-glass), .8); border: 1px solid rgba(var(--tv-accent), .2); }
+.tv-wallpaper-preset img { width: 100%; aspect-ratio: 16/9; object-fit: cover; }
+.tv-wallpaper-preset > span { display: flex; align-items: center; justify-content: space-between; gap: .4em; padding: .7em; font-size: .85em; }
+.tv-wallpaper-preset small { color: rgb(var(--tv-accent)); }
+.tv-wallpaper-preset[aria-pressed=true] { outline: 2px solid rgb(var(--tv-accent)); outline-offset: 3px; }
+.tv-wallpaper-presets .tv-wallpaper-preset[aria-pressed=true] { background: rgba(var(--tv-glass), .95); color: #fff5fc; }
+.tv-device-settings .tv-side-menu { position: sticky; top: 1.5vw; align-self: start; max-height: 88vh; overflow: auto; }
+.tv-wallpaper-preset:focus-visible { outline: 3px solid #fff5fc; outline-offset: 5px; }
+.tv-settings-content .tv-setting-row { display: flex; align-items: center; justify-content: space-between; gap: 1.5em; padding-block: 1.1em; border-bottom: 1px solid rgba(var(--tv-accent), .14); }
+.tv-setting-row > span { display: grid; gap: .35em; max-width: 52ch; }
+.tv-setting-row small { font-size: .85em; line-height: 1.5; color: #e3d8e3; }
+.tv-setting-row input[type=checkbox] { width: 1.6em; height: 1.6em; flex-shrink: 0; accent-color: rgb(var(--tv-accent)); }
+.tv-setting-row select { max-width: 16em; min-height: 3em; background: rgb(var(--tv-ink)); border-radius: 12px; padding: .5em; }
+.tv-custom-wallpaper { margin-top: 1.5em; }
+.tv-custom-wallpaper summary { cursor: pointer; padding: .8em; border-radius: 12px; background: rgba(var(--tv-accent), .08); }
+.tv-custom-wallpaper label { display: grid; gap: .5em; margin-block: 1em; }
+.tv-remote-guide > div { display: grid; grid-template-columns: minmax(7em, .5fr) 1fr; gap: 1em; padding-block: 1em; border-bottom: 1px solid rgba(var(--tv-accent), .12); }
+.tv-remote-guide dt { font-weight: 650; }
+.tv-remote-guide dd { color: #e3d8e3; line-height: 1.5; }
+.tv-settings-note { margin-block: 1.5em; padding: 1.2em; border-radius: 14px; background: rgba(var(--tv-accent), .07); }
+.tv-settings-note p { line-height: 1.6; }
+@media (prefers-reduced-motion: reduce) { .tatakai-tv img.tv-video-wallpaper { display: block; } }

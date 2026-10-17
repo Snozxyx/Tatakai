@@ -14,6 +14,18 @@ export interface ChangelogRelease {
 
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '6.2.0',
+    date: '2026-10-17',
+    changes: [
+      'Android TV app with remote navigation, discovery, profiles, library and native playback controls',
+      'Secure QR/PIN TV linking with companion approval and encrypted optional settings transfer',
+      'Experimental IPTV playlists, favorites and Now/Next guide',
+      'Lightweight TV wallpapers and reduced-motion support',
+      'Separate Android TV APK and flavor-aware updates',
+      'Reliable HLS/DASH proxy playback, source switching and focus-preserving pagination',
+    ],
+  },
+  {
     version: '6.1.2',
     date: '2026-10-15',
     changes: [

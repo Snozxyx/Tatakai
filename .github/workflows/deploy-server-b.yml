@@ -4,7 +4,7 @@ on:
     branches: [main]
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
   actions: read
 concurrency:
   group: tatakai-website-production
@@ -38,11 +38,17 @@ jobs:
           node -e 'require("fs").writeFileSync("server-release/release.json", JSON.stringify({component:"website",commit:process.env.GITHUB_SHA}))'
       - uses: actions/upload-artifact@v4
         id: release_artifact
+        continue-on-error: true
         with:
           name: tatakai-server-b
           path: server-release/
           retention-days: 7
           if-no-files-found: error
+      - name: Preserve verified build when Actions storage is full
+        if: steps.release_artifact.outcome == 'failure'
+        run: node scripts/publish-server-build.mjs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Configure congestion control for the measured lossy build-transfer path
         run: |
           sudo modprobe tcp_bbr 2>/dev/null || true
@@ -50,7 +56,7 @@ jobs:
             sudo sysctl -q -w net.ipv4.tcp_congestion_control=bbr
           fi
       - name: Deliver verified build archive to Server B
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && steps.release_artifact.outcome == 'success'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}

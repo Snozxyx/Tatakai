@@ -1065,6 +1065,7 @@
     "episodeTitle": "第{{number}}話：{{title}}",
     "animeEpisode": "{{name}} 第{{number}}話",
     "seriesInProgress": "{{count}}作品を視聴中",
+    "serieInProgress": "{{count}}作品を視聴中",
     "resumeRotation": "注目作品の自動切替を再開",
     "pauseRotation": "注目作品の自動切替を一時停止",
     "showSpotlight": "注目作品{{number}}を表示",

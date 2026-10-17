@@ -1,5 +1,20 @@
 import type { MediaRelation, StaffMember, ExternalLink, MediaTag } from "@/core/content/types";
 
+export interface MediaCardMetadata {
+  /** Additional catalogue fields consumed by the TV card only. */
+  tvMetadata?: Omit<MediaCardMetadata, "tvMetadata">;
+  episodes?: Partial<Episode>;
+  isAdult?: boolean;
+  banner?: string;
+  description?: string;
+  type?: string;
+  status?: string;
+  rating?: string | number;
+  year?: number;
+  genres?: string[];
+  tags?: Array<string | MediaTag>;
+}
+
 export interface Episode {
   sub: number;
   dub: number;
@@ -22,7 +37,7 @@ export interface SpotlightAnime {
   isAdult?: boolean;
 }
 
-export interface TrendingAnime {
+export interface TrendingAnime extends MediaCardMetadata {
   id: string;
   name: string;
   poster: string;
@@ -30,7 +45,7 @@ export interface TrendingAnime {
   isAdult?: boolean;
 }
 
-export interface TopAnime {
+export interface TopAnime extends MediaCardMetadata {
   id: string;
   name: string;
   poster: string;
@@ -41,7 +56,7 @@ export interface TopAnime {
   isAdult?: boolean;
 }
 
-export interface AnimeCard {
+export interface AnimeCard extends MediaCardMetadata {
   id: string;
   name: string;
   jname?: string;

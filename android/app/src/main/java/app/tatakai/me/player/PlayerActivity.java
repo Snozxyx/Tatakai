@@ -63,8 +63,9 @@ public class PlayerActivity extends AppCompatActivity {
     // player screen across episode changes.
     @Nullable private static volatile WeakReference<PlayerActivity> activeActivityRef;
     private final Handler handler = new Handler(Looper.getMainLooper());
-    private ExoPlayer player;
-    private Button skipButton;
+    protected ExoPlayer player;
+    protected PlayerView playerView;
+    protected Button skipButton;
     private long introStartMs = -1L;
     private long introEndMs = -1L;
     private long outroStartMs = -1L;
@@ -95,7 +96,7 @@ public class PlayerActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         activeActivityRef = new WeakReference<>(this);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR);
+        setRequestedOrientation(isTvPlayer() ? ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE : ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR);
 
         String url = getIntent().getStringExtra(EXTRA_URL);
         if (url == null || url.trim().isEmpty()) {
@@ -110,7 +111,7 @@ public class PlayerActivity extends AppCompatActivity {
 
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(0xFF000000);
-        PlayerView playerView = new PlayerView(this);
+        playerView = new PlayerView(this);
         playerView.setUseController(true);
         playerView.setControllerAutoShow(true);
         playerView.setKeepContentOnPlayerReset(true);
@@ -230,10 +231,13 @@ public class PlayerActivity extends AppCompatActivity {
             }
         });
         playerView.setPlayer(player);
+        configurePlayer();
 
         MediaItem mediaItem;
         try {
             MediaItem.Builder item = new MediaItem.Builder().setUri(url);
+            String mimeType = getIntent().getStringExtra("mimeType");
+            if (mimeType != null && !mimeType.isEmpty()) item.setMimeType(mimeType);
             List<MediaItem.SubtitleConfiguration> subtitles = readSubtitles();
             if (!subtitles.isEmpty()) item.setSubtitleConfigurations(subtitles);
             mediaItem = item.build();
@@ -251,7 +255,7 @@ public class PlayerActivity extends AppCompatActivity {
         long startPositionMs = Math.max(0L, getIntent().getLongExtra(EXTRA_START_POSITION_MS, 0L));
         if (startPositionMs > 0L) player.seekTo(startPositionMs);
         player.prepare();
-        player.play();
+        if (shouldAutoPlay()) player.play();
         handler.post(ticker);
     }
 
@@ -334,7 +338,10 @@ public class PlayerActivity extends AppCompatActivity {
         return player != null && start >= 0L && end > start && player.getCurrentPosition() >= start && player.getCurrentPosition() < end;
     }
 
-    private JSObject payload() {
+    protected boolean isTvPlayer() { return false; }
+    protected boolean shouldAutoPlay() { return true; }
+    protected void configurePlayer() { }
+    protected JSObject payload() {
         JSObject event = new JSObject();
         long position = player == null ? 0L : Math.max(0L, player.getCurrentPosition());
         long rawDuration = player == null ? C.TIME_UNSET : player.getDuration();
@@ -342,6 +349,9 @@ public class PlayerActivity extends AppCompatActivity {
         event.put("positionMs", position);
         event.put("durationMs", duration);
         event.put("completed", completed);
+        event.put("sessionId", getIntent().getStringExtra("sessionId"));
+        event.put("mediaId", getIntent().getStringExtra("mediaId"));
+        event.put("episodeId", getIntent().getStringExtra("episodeId"));
         return event;
     }
 
@@ -352,7 +362,7 @@ public class PlayerActivity extends AppCompatActivity {
     @Override
     public void onUserLeaveHint() {
         super.onUserLeaveHint();
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && player != null && !isInPictureInPictureMode()) {
+        if (!isTvPlayer() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && player != null && !isInPictureInPictureMode()) {
             Rational aspect = new Rational(Math.max(1, player.getVideoSize().width), Math.max(1, player.getVideoSize().height));
             enterPictureInPictureMode(new PictureInPictureParams.Builder().setAspectRatio(aspect).build());
         }

@@ -70,12 +70,17 @@ export const fetchLatestRelease = () =>
     "gh:tatakai:latest",
   );
 
-export const fetchAllReleases = (force = false) =>
-  ghFetch<GitHubRelease[]>(
+export function applicationReleases(releases: GitHubRelease[]): GitHubRelease[] {
+  return releases.filter((release) => /^v\d+\.\d+\.\d+(?:-|$)/.test(release.tag_name) && !release.draft);
+}
+export const fetchAllReleases = async (force = false) => {
+  const releases = await ghFetch<GitHubRelease[]>(
     `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases?per_page=20`,
     "gh:tatakai:releases",
     force,
   );
+  return releases ? applicationReleases(releases) : null;
+};
 export function platformForAsset(fileName: string): PlatformKey | null {
   const n = fileName.toLowerCase();
   if (/\.(exe|msi)$/.test(n) || /win(dows|32|64)?|setup|portable/.test(n)) return "windows";
@@ -112,7 +117,8 @@ export function pickPrimaryAsset(
   }
   if (key === "macos") return matches.find((a) => /\.dmg$/i.test(a.name)) || matches[0];
   if (key === "linux") return matches.find((a) => /\.appimage$/i.test(a.name)) || matches[0];
-  if (key === "android") return matches.find((a) => /\.apk$/i.test(a.name)) || matches[0];
+  // TV has a different application ID and cannot update the mobile app.
+  if (key === "android") return matches.find((a) => /\.apk$/i.test(a.name) && !/android-tv\.apk$/i.test(a.name));
   if (key === "ios") return matches.find((a) => /\.ipa$/i.test(a.name)) || matches[0];
   return matches[0];
 }

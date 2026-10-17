@@ -15,18 +15,22 @@ function formatAiring(airingAt: number): string {
   const ms = airingAt * 1000;
   const diff = ms - Date.now();
   const d = new Date(ms);
-  const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const locale = uiI18n.language?.startsWith('es') ? 'es' : undefined;
+  const time = d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
 
-  if (diff < 60 * 60 * 1000) return `in ${Math.max(1, Math.round(diff / 60000))}m`;
+  if (diff < 60 * 60 * 1000) {
+    const m = Math.max(1, Math.round(diff / 60000));
+    return uiI18n.language?.startsWith('es') ? `en ${m} min` : `in ${m}m`;
+  }
 
   const today = new Date();
   const isSameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
   const tomorrow = new Date(today);
   tomorrow.setDate(today.getDate() + 1);
 
-  if (isSameDay(d, today)) return `Today · ${time}`;
-  if (isSameDay(d, tomorrow)) return `Tomorrow · ${time}`;
-  return `${d.toLocaleDateString([], { weekday: 'short' })} · ${time}`;
+  if (isSameDay(d, today)) return uiI18n.language?.startsWith('es') ? `Hoy · ${time}` : `Today · ${time}`;
+  if (isSameDay(d, tomorrow)) return uiI18n.language?.startsWith('es') ? `Mañana · ${time}` : `Tomorrow · ${time}`;
+  return `${d.toLocaleDateString(locale, { weekday: 'short' })} · ${time}`;
 }
 
 export function AiringWidget({ className }: AiringWidgetProps) {

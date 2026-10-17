@@ -1,3 +1,4 @@
+import { isTV } from "@/core/tv/device";
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMemo } from 'react';
@@ -41,6 +42,10 @@ export function WatchlistTab({ watchlist, loading, isViewingOther, onNavigate }:
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         className="group cursor-pointer relative"
+        role={isTV() ? "button" : undefined}
+        tabIndex={isTV() ? -1 : undefined}
+        data-tv-focus={isTV() || undefined}
+        data-tv-key={isTV() ? `profile-card-${item.id}` : undefined}
         onClick={() => onNavigate(`/anime/${item.anime_id}`)}
       >
         <div className="relative aspect-[3/4] rounded-2xl overflow-hidden mb-3 shadow-xl group-hover:shadow-primary/20 transition-all duration-300 ring-1 ring-white/10 group-hover:ring-primary/50">

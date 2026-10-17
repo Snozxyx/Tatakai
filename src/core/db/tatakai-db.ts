@@ -14,6 +14,7 @@
  */
 
 import Dexie, { type EntityTable } from 'dexie';
+import type { IPTVPlaylist, IPTVChannel, IPTVProgram, IPTVFavorite } from '@/core/iptv/types';
 
 // ── Row shapes ────────────────────────────────────────────────────────────────
 
@@ -276,6 +277,10 @@ export interface MobileExtensionBundle {
 // ── Database ──────────────────────────────────────────────────────────────────
 
 class TatakaiDB extends Dexie {
+  iptvPlaylists!: EntityTable<IPTVPlaylist, 'id'>;
+  iptvChannels!: EntityTable<IPTVChannel, 'id'>;
+  iptvPrograms!: EntityTable<IPTVProgram, 'id'>;
+  iptvFavorites!: EntityTable<IPTVFavorite, 'id'>;
   cachedMedia!: EntityTable<CachedMedia, 'id'>;
   watchProgress!: EntityTable<WatchProgress, 'id'>;
   offlineEpisodes!: EntityTable<OfflineEpisode, 'id'>;
@@ -293,6 +298,12 @@ class TatakaiDB extends Dexie {
 
   constructor() {
     super('tatakai');
+    this.version(8).stores({
+      iptvPlaylists: 'id, updatedAt',
+      iptvChannels: 'id, playlistId, group, kind, [playlistId+tvgId]',
+      iptvPrograms: 'id, playlistId, channelId, [playlistId+channelId], start, stop, expiresAt',
+      iptvFavorites: 'id, channelId',
+    });
 
     // Keep version 1 for backward compatibility
     this.version(1).stores({

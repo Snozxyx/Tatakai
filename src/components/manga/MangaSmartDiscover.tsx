@@ -20,6 +20,7 @@ import { useTasteProfile } from "@/hooks/user/useTasteProfile";
 import { useContentSafetySettings } from "@/hooks/user/useContentSafetySettings";
 import { inferMangaAdultFlag } from "@/lib/contentSafety";
 import { getProxiedImageUrl } from "@/lib/api";
+import { formatSmartStatus, smartHint, smartReasons, translateGenre } from "@/lib/smartDiscoverI18n";
 import { HomeSectionHeading } from "@/components/home/HomeSectionHeading";
 import { AdultBadge } from "@/components/MediaCardBadges";
 import { Peekable } from "@/components/media/MediaQuickPeek";
@@ -32,9 +33,9 @@ type FormatFilter = "all" | "manga" | "manhwa" | "manhua";
 type StatusFilter = "all" | "ongoing" | "completed";
 
 const VARIANTS: Array<{ id: VariantId; label: string; hint: string; icon: typeof Target }> = [
-  { id: "best", get label() { return uiI18n.t('app.best_for_you_1d81530a'); }, hint: "Ranked by your taste + shelf", icon: Target },
-  { id: "gem", get label() { return uiI18n.t('app.hidden_gem_ce12647f'); }, hint: "High score, few readers", icon: Gem },
-  { id: "trending", get label() { return uiI18n.t('app.trending_now_18292796'); }, hint: "What readers open today", icon: Flame },
+  { id: "best", get label() { return uiI18n.t('app.best_for_you_1d81530a'); }, get hint() { return smartHint('best'); }, icon: Target },
+  { id: "gem", get label() { return uiI18n.t('app.hidden_gem_ce12647f'); }, get hint() { return smartHint('gem'); }, icon: Gem },
+  { id: "trending", get label() { return uiI18n.t('app.trending_now_18292796'); }, get hint() { return smartHint('trending'); }, icon: Flame },
 ];
 
 const FORMATS: Array<{ id: FormatFilter; label: string }> = [
@@ -45,12 +46,7 @@ const FORMATS: Array<{ id: FormatFilter; label: string }> = [
 ];
 
 function formatStatus(status?: string | null) {
-  const s = String(status || "").toUpperCase();
-  if (s.includes("RELEAS") || s.includes("PUBLISH")) return "Ongoing";
-  if (s.includes("FINISH") || s.includes("COMPLET")) return "Completed";
-  if (s.includes("HIATUS")) return "Hiatus";
-  if (s.includes("NOT_YET") || s.includes("UPCOMING")) return "Upcoming";
-  return null;
+  return formatSmartStatus(status);
 }
 
 function matchesStatus(item: MangaSearchItem, status: StatusFilter) {
@@ -66,14 +62,6 @@ function stripHtml(value?: string | null) {
     .replace(/<\/?[^>]+>/g, "")
     .replace(/\s+/g, " ")
     .trim();
-}
-
-function compact(n: number) {
-  try {
-    return new Intl.NumberFormat("en", { notation: "compact" }).format(n);
-  } catch {
-    return String(n);
-  }
 }
 
 function titleOf(item: MangaSearchItem) {
@@ -246,34 +234,17 @@ export const MangaSmartDiscover = memo(function MangaSmartDiscover() {
 
   const reasons = useMemo(() => {
     if (!active) return [];
-    const out: string[] = [];
-    if (genre !== "all") {
-      out.push(
-        genre === topTasteGenre
-          ? `${genre} — your top taste genre`
-          : `In ${genre}, filtered by you`,
-      );
-    } else if (topTasteGenre) {
-      out.push(`Pairs with your taste for ${topTasteGenre}`);
-    }
-    if (dominantFormat && String(active.mediaType || "").toLowerCase() === dominantFormat) {
-      out.push(`Fits your shelf — mostly ${dominantFormat}`);
-    }
-    if (typeof active.score === "number" && active.score >= 75) {
-      out.push(`Rated ${(active.score / 10).toFixed(1)}/10 by readers`);
-    }
-    if (variant === "gem" && typeof active.popularity === "number") {
-      out.push(`Under the radar — only ${compact(active.popularity)} follows`);
-    } else if (typeof active.popularity === "number" && active.popularity > 0 && variant !== "gem") {
-      out.push(`Loved by ${compact(active.popularity)} readers`);
-    }
-    const pretty = formatStatus(active.status);
-    if (pretty === "Completed") out.push("Completed — binge it cover to cover");
-    else if (pretty === "Ongoing") out.push("Ongoing — fresh chapters keep landing");
-    if (typeof active.chapters === "number" && active.chapters > 0) {
-      out.push(`${active.chapters} chapters to explore`);
-    }
-    return out.slice(0, 4);
+    return smartReasons({
+      genre,
+      topTasteGenre,
+      dominantFormat,
+      mediaType: active.mediaType,
+      score: active.score,
+      popularity: active.popularity,
+      status: active.status,
+      chapters: active.chapters,
+      variant,
+    });
   }, [active, genre, topTasteGenre, dominantFormat, variant]);
 
   const activeTitle = active ? titleOf(active) : "";
@@ -400,7 +371,7 @@ export const MangaSmartDiscover = memo(function MangaSmartDiscover() {
                   : "border-border text-muted-foreground hover:border-primary/30 hover:text-foreground",
               )}
             >
-              {g}
+              {translateGenre(g)}
               {g === topTasteGenre && <span className="ml-1 text-primary">★</span>}
             </button>
           ))}
@@ -561,7 +532,7 @@ export const MangaSmartDiscover = memo(function MangaSmartDiscover() {
                   </div>
                   <div className="flex flex-col items-center gap-0.5 px-2 py-3">
                     <span className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-white">
-                      {formatStatus(active.status) === "Ongoing" && (
+                      {(() => { const st = formatStatus(active.status); return st === "Ongoing" || st === "En curso"; })() && (
                         <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
                       )}
                       {formatStatus(active.status) ?? active.mediaType ?? "—"}

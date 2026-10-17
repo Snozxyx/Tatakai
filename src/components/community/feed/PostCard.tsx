@@ -1,4 +1,6 @@
+import { isTV } from "@/core/tv/device";
 import uiI18n from '@/lib/uiI18n';
+import { requestTVWriting } from '@/core/tv/writingHandoff';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -247,7 +249,7 @@ export function PostCard({ post, defaultShowComments = false, contextCommunityId
             avatarUrl={author?.avatar_url}
             rankScore={post.author_rank_score || 0}
           >
-            <button type="button" onClick={(e) => e.stopPropagation()} className="shrink-0 mt-0.5">
+            <button data-tv-key={isTV() ? `post-${post.id}-avatar` : undefined} type="button" onClick={(e) => e.stopPropagation()} className="shrink-0 mt-0.5">
               <Avatar className="h-11 w-11 ring-1 ring-white/10 transition-transform hover:scale-105">
                 <AvatarImage src={author?.avatar_url || undefined} className="object-cover" />
                 <AvatarFallback>{authorName[0]?.toUpperCase() || 'U'}</AvatarFallback>
@@ -267,6 +269,7 @@ export function PostCard({ post, defaultShowComments = false, contextCommunityId
                 <button
                   type="button"
                   onClick={(e) => e.stopPropagation()}
+                  data-tv-key={isTV() ? `post-${post.id}-author` : undefined}
                   className={cn('truncate text-[15px] font-bold text-foreground hover:underline decoration-white/30 underline-offset-2', rankStyle.className)}
                   style={rankStyle.style}
                 >
@@ -334,7 +337,7 @@ export function PostCard({ post, defaultShowComments = false, contextCommunityId
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
                 {isAuthor && (
-                  <DropdownMenuItem onClick={() => setEditOpen(true)}>
+                  <DropdownMenuItem onClick={() => { if (!requestTVWriting(post.id)) setEditOpen(true); }}>
                     <Pencil className="mr-2 h-4 w-4" /> {uiI18n.t('app.edit_post_e5157b9d')}
                   </DropdownMenuItem>
                 )}
@@ -437,7 +440,7 @@ export function PostCard({ post, defaultShowComments = false, contextCommunityId
                   <Repeat2 className="mr-2 h-4 w-4" />
                   {post.reposted ? uiI18n.t('app.undo_repost_e97ec486') : allowRepost ? uiI18n.t('app.repost_98dd4750') : uiI18n.t('app.reposting_disabled_aba14e2f')}
                 </DropdownMenuItem>
-                <DropdownMenuItem disabled={!allowRequote} onClick={() => setQuoteOpen(true)}>
+                <DropdownMenuItem disabled={!allowRequote} onClick={() => { if (!requestTVWriting(post.id)) setQuoteOpen(true); }}>
                   <QuoteIcon className="mr-2 h-4 w-4" />
                   {allowRequote ? uiI18n.t('app.quote_post_662231f9') : uiI18n.t('app.quoting_disabled_90c6c405')}
                 </DropdownMenuItem>

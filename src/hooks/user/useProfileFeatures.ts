@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { ANILIST_GRAPHQL_ENDPOINT } from '@/lib/api/backendOrigin';
-import { getProxiedJsonUrl } from '@/lib/api/proxy-utils';
+import { getProxiedJsonUrl, fetchJsonWithFallback } from '@/lib/api/proxy-utils';
 import { PREMIUM_BACKGROUND_EFFECTS, type ProfileAppSettings } from '@/lib/profileSettings';
 import { hasPremiumCosmetics } from '@/lib/profileCosmetics';
 
@@ -166,9 +166,11 @@ export async function fetchRandomAnimeImage(options?: {
   };
 
   // ── 2. Nekosia ───────────────────────────────────────────────────────────────
+  // Direct-first: nekosia sends CORS * so the browser succeeds with the user's
+  // own IP, while the shared backend IP is frequently rate-limited (403).
   const nekosiaFetch = async () => {
     const category = gender === 'male' ? 'boy' : (isBanner ? 'catgirl' : 'catgirl');
-    const res = await fetch(getProxiedJsonUrl(`${NEKOSIA_API}/images/${category}?count=${Math.min(limit, 10)}&additionalTags=cute`));
+    const res = await fetchJsonWithFallback(`${NEKOSIA_API}/images/${category}?count=${Math.min(limit, 10)}&additionalTags=cute`);
     if (!res.ok) return;
     const data = await res.json();
     (data.images ?? (data.image ? [data] : [])).forEach((item: any, i: number) => {
@@ -203,10 +205,11 @@ export async function fetchNekosBestGifs(category?: string, amount = 12): Promis
   const perCategory = Math.max(1, Math.ceil(amount / categories.length));
   const results = await Promise.allSettled(
     categories.map(async (cat) => {
-      // Proxied like waifu.im/nekosia: a direct browser fetch is refused with
+      // Proxied like waifu.im: a direct browser fetch may be refused with
       // a 403 + CORS error. Non-OK (including upstream rejections) yields []
-      // so one dead category never kills the gallery.
-      const res = await fetch(getProxiedJsonUrl(`${NEKOS_BEST_API}/${cat}?amount=${Math.min(perCategory, 20)}`));
+      // so one dead category never kills the gallery. nekos.best sends CORS *
+      // so direct-first avoids the shared-IP rate limit on the proxy.
+      const res = await fetchJsonWithFallback(`${NEKOS_BEST_API}/${cat}?amount=${Math.min(perCategory, 20)}`);
       if (!res.ok) return [] as NekosImage[];
       const data = await res.json();
       return (data?.results ?? []).map((r: any, i: number): NekosImage => ({
@@ -305,9 +308,10 @@ async function fetchNekosiaLandscape(limit = 8): Promise<NekosImage[]> {
 
   const results = await Promise.allSettled(
     // NOTE: `cosplay` is not a real nekosia category (upstream 400s it) —
-    // `maid` is verified working.
+    // `maid` is verified working. count=10 keeps each upstream response small
+    // (3 categories × 10) and stays clear of per-IP rate limits.
     ['catgirl', 'uniform', 'maid'].map(async (category) => {
-      const res = await fetch(getProxiedJsonUrl(`${NEKOSIA_API}/images/${category}?count=14`));
+      const res = await fetchJsonWithFallback(`${NEKOSIA_API}/images/${category}?count=10`);
       if (!res.ok) return [] as NekosImage[];
       const data = await res.json();
       const images = Array.isArray(data?.images) ? data.images : [];

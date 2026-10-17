@@ -35,7 +35,23 @@ public class NativePlayerPlugin extends Plugin {
             return;
         }
 
-        Intent intent = new Intent(getActivity(), PlayerActivity.class);
+        Class<?> activityClass = PlayerActivity.class;
+        if ("tv".equals(app.tatakai.me.BuildConfig.FLAVOR)) {
+            try { activityClass = Class.forName("app.tatakai.me.player.TvPlayerActivity"); }
+            catch (ClassNotFoundException error) { call.reject("TV player is missing from this build."); return; }
+        }
+        Intent intent = new Intent(getActivity(), activityClass);
+        intent.putExtra("sessionId", call.getString("sessionId", ""));
+        intent.putExtra("mimeType", call.getString("mimeType", ""));
+        intent.putExtra("mediaId", call.getString("mediaId", ""));
+        intent.putExtra("episodeId", call.getString("episodeId", ""));
+        intent.putExtra("live", call.getBoolean("live", false));
+        intent.putExtra("allowDisplaySwitch", call.getBoolean("allowDisplaySwitch", false));
+        intent.putExtra("queue", call.getArray("queue", new JSArray()).toString());
+        intent.putExtra("sources", call.getArray("sources", new JSArray()).toString());
+        intent.putExtra("canChangeSource", call.getBoolean("canChangeSource", false));
+        intent.putExtra("canBrowseQueue", call.getBoolean("canBrowseQueue", false));
+        intent.putExtra("playWhenReady", call.getBoolean("playWhenReady", true));
         intent.putExtra(PlayerActivity.EXTRA_URL, url);
         String title = call.getString("title", "");
         intent.putExtra(PlayerActivity.EXTRA_TITLE, title == null ? "" : title);

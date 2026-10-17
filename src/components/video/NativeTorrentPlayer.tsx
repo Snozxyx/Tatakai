@@ -6,6 +6,8 @@ import { AlertCircle, ArrowLeft, Loader2, RotateCcw } from 'lucide-react';
 import { closeNativePlayer, onNativePlayerEvent, openNativePlayer } from '@/core/player/mobile/nativePlayerBridge';
 import { isMobileProxyUrl, normalizeMobileHeaders, resolveMobileProxy } from '@/core/extensions/mobile/mobileProxy';
 import { useVideoSettings } from '@/hooks/media/useVideoSettings';
+import { resolveNativeSourceSelection } from '@/core/tv/playerSources';
+import { nativeMediaMime } from '@/core/player/mobile/mediaMime';
 
 type Subtitle = {
   lang: string;
@@ -24,9 +26,14 @@ export type NativeTorrentStats = {
 };
 
 type Props = {
+  mimeType?: string;
+  headers?: Record<string, string>;
+  onSourceRequest?: (sourceIndex?: number) => void;
+  sources?: Array<{ id: string; title: string; detail?: string; selected?: boolean }>;
+  onQueueRequest?: () => void;
   mediaId?: string; episodeId?: string;
   url: string;
-  streamKind?: 'torrent' | 'debrid' | 'offline';
+  streamKind?: 'torrent' | 'debrid' | 'offline' | 'hls';
   title?: string;
   poster?: string;
   subtitles?: Subtitle[];
@@ -79,6 +86,11 @@ function formatRate(bytesPerSecond?: number): string {
  * support.
  */
 export function NativeTorrentPlayer({
+  mimeType,
+  headers,
+  onSourceRequest,
+  sources,
+  onQueueRequest,
   mediaId, episodeId,
   url,
   streamKind = 'torrent',
@@ -136,10 +148,10 @@ export function NativeTorrentPlayer({
     }),
     [subtitles]);
   const nativeRequestHeaders = useMemo(() => {
-    const merged: Record<string, string> = {};
+    const merged: Record<string, string> = { ...headers };
     for (const track of nativeSubtitles) Object.assign(merged, track.headers || {});
     return merged;
-  }, [nativeSubtitles]);
+  }, [nativeSubtitles, headers]);
   const nativePreferences = useMemo(() => ({
     preferredAudioLanguage: nativeLanguage(preferredAudioLanguage),
     preferredSubtitleLanguage: nativeLanguage(
@@ -154,6 +166,10 @@ export function NativeTorrentPlayer({
   useEffect(() => { subtitlesRef.current = nativeSubtitles; }, [nativeSubtitles]);
   const titleRef = useRef(title);
   useEffect(() => { titleRef.current = title; }, [title]);
+  const sourceRef = useRef({ sources, onSourceRequest });
+  sourceRef.current = { sources, onSourceRequest };
+  const mimeRef = useRef<string>();
+  mimeRef.current = nativeMediaMime(resolveMobileProxy(url)?.url || url, mimeType);
 
   // Window refs: intro/outro objects are re-created upstream; only their
   // numeric bounds matter for the handoff, so the open effect must not
@@ -166,6 +182,16 @@ export function NativeTorrentPlayer({
   }, [introKey, outroKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const startPositionRef = useRef(Math.max(0, Number(initialSeekSeconds || 0) * 1000));
+  const playWhenReadyRef = useRef(true);
+  const nativeSessionRef = useRef('');
+  const identityRef = useRef({ mediaId, episodeId });
+  useEffect(() => {
+    if (identityRef.current.mediaId !== mediaId || identityRef.current.episodeId !== episodeId) {
+      startPositionRef.current = Math.max(0, Number(initialSeekSeconds || 0) * 1000);
+      playWhenReadyRef.current = true;
+      identityRef.current = { mediaId, episodeId };
+    }
+  }, [mediaId, episodeId, initialSeekSeconds]);
   useEffect(() => {
     // Only the mount-time resume position is used for the handoff; later
     // progress reports must not re-seek the native player.
@@ -176,6 +202,7 @@ export function NativeTorrentPlayer({
 
   useEffect(() => {
     let cancelled = false;
+    let returningToControls = false;
     let unsubscribe: (() => void) | null = null;
 
     completedRef.current = false;
@@ -185,8 +212,20 @@ export function NativeTorrentPlayer({
     if (streamKind === 'debrid') setMessage(uiI18n.t('app.opening_debrid_stream_f3282283'));
 
     const lease = coordinator.begin({ id: url, url, mode: streamKind, mediaId, episodeId }, initialSeekSeconds, 'native');
+    nativeSessionRef.current = crypto.randomUUID();
     unsubscribe = onNativePlayerEvent((event: any) => {
       if (cancelled) return;
+      if (event.sessionId && event.sessionId !== nativeSessionRef.current) return;
+      if (event.type === 'playerSourceRequested') {
+        returningToControls = true;
+        startPositionRef.current = Math.max(0, Number(event.positionMs) || 0);
+        playWhenReadyRef.current = event.playWhenReady !== false;
+        coordinator.reportNative(event, lease.generation);
+        sourceRef.current.onSourceRequest?.(resolveNativeSourceSelection(sourceRef.current.sources || [], event));
+        return;
+      }
+      if (event.type === 'playerQueueRequested' || event.type === 'playerPreviousRequested') { returningToControls = true; onQueueRequest?.(); return; }
+      if (event.type === 'playerNextRequested') { returningToControls = true; endedRef.current?.(); return; }
       const position = Number(event?.positionMs || 0) / 1000;
       const duration = Number(event?.durationMs || 0) / 1000;
       if (event?.type === 'playerProgress' || event?.type === 'playerClosed') {
@@ -199,6 +238,7 @@ export function NativeTorrentPlayer({
       }
       if (event?.type === 'playerClosed') {
         setStatus('closed');
+        if (returningToControls) return;
         // Hand control back to the watch page (resume/up-next already saved
         // via the progress callback above).
         backRef.current?.();
@@ -216,9 +256,16 @@ export function NativeTorrentPlayer({
     openedUrlRef.current = url;
     const windows = windowsRef.current;
     void openNativePlayer({
+      sessionId: nativeSessionRef.current,
+      mimeType: mimeRef.current,
+      mediaId, episodeId,
       url,
       title: titleRef.current,
+      sources: sourceRef.current.sources,
+      canChangeSource: !!sourceRef.current.onSourceRequest,
+      canBrowseQueue: !!onQueueRequest,
       startPositionMs: startPositionRef.current,
+      playWhenReady: playWhenReadyRef.current,
       intro: windows.intro,
       outro: windows.outro,
       subtitles: subtitlesRef.current,
@@ -253,6 +300,7 @@ export function NativeTorrentPlayer({
   }, [url, streamKind]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const retry = () => {
+    nativeSessionRef.current = crypto.randomUUID();
     openedUrlRef.current = null;
     completedRef.current = false;
     setStatus('opening');
@@ -260,9 +308,16 @@ export function NativeTorrentPlayer({
     const windows = windowsRef.current;
     if (streamKind === 'debrid') setMessage(uiI18n.t('app.opening_debrid_stream_f3282283'));
     void openNativePlayer({
+      sessionId: nativeSessionRef.current,
+      mimeType: mimeRef.current,
+      mediaId, episodeId,
       url,
       title,
+      sources: sourceRef.current.sources,
+      canChangeSource: !!sourceRef.current.onSourceRequest,
+      canBrowseQueue: !!onQueueRequest,
       startPositionMs: startPositionRef.current,
+      playWhenReady: playWhenReadyRef.current,
       intro: windows.intro,
       outro: windows.outro,
       subtitles: nativeSubtitles,

@@ -34,6 +34,7 @@ export function useReaderKeyboard(
     if (!enabled) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.defaultPrevented) return;
       const target = e.target as HTMLElement | null;
       const activeTag = (target?.tagName || document.activeElement?.tagName || '').toUpperCase();
       if (activeTag === 'INPUT' || activeTag === 'TEXTAREA' || target?.isContentEditable) return;

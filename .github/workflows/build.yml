@@ -46,7 +46,7 @@ jobs:
           # (spawnSync Unknown system error -88). Retry with --ignore-scripts then
           # manually invoke esbuild's install.js so the binary is present for the build.
           if ! npm ci; then
-            echo "::warning::npm ci failed — retrying with --ignore-scripts"
+            echo "::warning::npm ci failed ï¿½ retrying with --ignore-scripts"
             npm ci --ignore-scripts
             node node_modules/esbuild/install.js || true
           fi
@@ -99,7 +99,7 @@ jobs:
           # (spawnSync Unknown system error -88). Retry with --ignore-scripts then
           # manually invoke esbuild's install.js so the binary is present for the build.
           if ! npm ci; then
-            echo "::warning::npm ci failed — retrying with --ignore-scripts"
+            echo "::warning::npm ci failed ï¿½ retrying with --ignore-scripts"
             npm ci --ignore-scripts
             node node_modules/esbuild/install.js || true
           fi
@@ -206,7 +206,14 @@ jobs:
             exit 1
           fi
 
+      - name: Stage desktop files in the draft release
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: node scripts/publish-native-assets.mjs desktop
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Upload artifacts
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
         uses: actions/upload-artifact@v4
         with:
           name: tatakai-${{ matrix.platform }}
@@ -321,21 +328,31 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=8192
 
       - name: Build signed Android release
-        run: cd android && chmod +x gradlew && ./gradlew assembleRelease --no-daemon
+        run: cd android && chmod +x gradlew && ./gradlew assembleMobileRelease assembleTvRelease --no-daemon
 
       - name: Name Android artifact
         shell: bash
         run: |
           VERSION=$(node -p "require('./package.json').version")
-          APK=$(find android/app/build/outputs/apk/release -name '*.apk' -print -quit)
+          APK=$(find android/app/build/outputs/apk/mobile/release -name '*.apk' -print -quit)
           test -n "$APK"
           cp "$APK" "Tatakai-v${VERSION}-android.apk"
+          TV_APK=$(find android/app/build/outputs/apk/tv/release -name '*.apk' -print -quit)
+          test -n "$TV_APK"
+          cp "$TV_APK" "Tatakai-v${VERSION}-android-tv.apk"
+
+      - name: Stage android files in the draft release
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: node scripts/publish-native-assets.mjs android
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload signed Android artifact
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
         uses: actions/upload-artifact@v4
         with:
           name: tatakai-android
-          path: Tatakai-*-android.apk
+          path: Tatakai-*-android*.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -404,7 +421,14 @@ jobs:
           ditto "$APP_PATH" ios/package/Payload/Tatakai.app
           (cd ios/package && zip -qry "../../Tatakai-v${VERSION}-ios-unsigned.ipa" Payload)
 
+      - name: Stage ios files in the draft release
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: node scripts/publish-native-assets.mjs ios
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Upload unsigned iOS artifact
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
         uses: actions/upload-artifact@v4
         with:
           name: tatakai-ios-unsigned
@@ -415,50 +439,30 @@ jobs:
   release:
     needs: [build-desktop, build-android, build-ios-unsigned]
     runs-on: ubuntu-latest
-    # Run on tag pushes even if build-desktop partially failed (e.g. macOS
-    # runner issue) so Windows/Linux/mobile artifacts still get released.
+    # Publish only after every platform has staged its complete assets.
     if: |
       always() &&
       startsWith(github.ref, 'refs/tags/') &&
       needs.build-android.result == 'success' &&
-      (needs.build-desktop.result == 'success' || needs.build-desktop.result == 'failure')
+      needs.build-desktop.result == 'success' &&
+      needs.build-ios-unsigned.result == 'success'
 
     steps:
       - name: Checkout code (for AltStore source generator)
         uses: actions/checkout@v4
 
-      - name: Download desktop artifacts â€” Windows
-        uses: actions/download-artifact@v4
-        with:
-          name: tatakai-win
-          path: desktop-artifacts/windows
-          if-no-files-found: warn
-
-      - name: Download desktop artifacts â€” macOS
-        uses: actions/download-artifact@v4
-        with:
-          name: tatakai-mac
-          path: desktop-artifacts/macos
-          if-no-files-found: warn
-
-      - name: Download desktop artifacts â€” Linux
-        uses: actions/download-artifact@v4
-        with:
-          name: tatakai-linux
-          path: desktop-artifacts/linux
-          if-no-files-found: warn
-
-      - name: Download signed Android artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: tatakai-android
-          path: mobile-artifacts/android
-
-      - name: Download unsigned iOS artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: tatakai-ios-unsigned
-          path: mobile-artifacts/ios
+      - name: Collect staged native release assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p desktop-artifacts/{windows,macos,linux} mobile-artifacts/{android,ios}
+          gh release download "$GITHUB_REF_NAME" -D desktop-artifacts/windows -p '*win*.exe' -p '*win*.blockmap' -p 'latest.yml'
+          gh release download "$GITHUB_REF_NAME" -D desktop-artifacts/macos -p '*mac*.dmg' -p '*mac*.zip' -p '*mac*.blockmap' -p 'latest-mac.yml'
+          gh release download "$GITHUB_REF_NAME" -D desktop-artifacts/linux -p '*.AppImage' -p '*.deb' -p 'latest-linux.yml'
+          gh release download "$GITHUB_REF_NAME" -D mobile-artifacts/android -p '*-android*.apk'
+          gh release download "$GITHUB_REF_NAME" -D mobile-artifacts/ios -p '*-ios-unsigned.ipa'
 
       # Regenerate the AltStore/SideStore/StikStore source with the real IPA
       # byte size (the committed file ships size 0 as a placeholder). The
@@ -482,22 +486,7 @@ jobs:
       - name: Upload all artifacts to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            desktop-artifacts/windows/*.exe
-            desktop-artifacts/windows/*.exe.blockmap
-            desktop-artifacts/windows/*.zip
-            desktop-artifacts/windows/latest.yml
-            desktop-artifacts/macos/*.dmg
-            desktop-artifacts/macos/*.dmg.blockmap
-            desktop-artifacts/macos/*.zip
-            desktop-artifacts/macos/*.zip.blockmap
-            desktop-artifacts/macos/latest-mac.yml
-            desktop-artifacts/linux/*.AppImage
-            desktop-artifacts/linux/*.deb
-            desktop-artifacts/linux/latest-linux.yml
-            mobile-artifacts/android/*.apk
-            mobile-artifacts/ios/*.ipa
-            altstore-apps.json
+          files: altstore-apps.json
           draft: false
           prerelease: false
           append_body: true

@@ -1,4 +1,6 @@
 import uiI18n from '@/lib/uiI18n';
+import { isTV } from '@/core/tv/device';
+import { requestTVWriting } from '@/core/tv/writingHandoff';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -282,6 +284,7 @@ export function PostComposer({ onPosted, defaultCommunityId, defaultMedia }: { o
     </button>
   );
 
+  if (isTV()) return <button type="button" onClick={() => requestTVWriting()}>Create a post on your phone</button>;
   return (
     <GlassPanel
       className={cn('relative overflow-hidden rounded-3xl border-white/10 p-3 transition-shadow sm:p-4', dropActive && 'ring-2 ring-primary/60')}

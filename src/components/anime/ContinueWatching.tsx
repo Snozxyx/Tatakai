@@ -200,7 +200,7 @@ export function ContinueWatching() {
       <HomeSectionHeading
         icon={<Clock className="w-5 h-5 text-primary" />}
         title={<span id="continue-watching-heading">{t('discover.continueWatching')}</span>}
-        subtitle={t('migration.seriesInProgress', { count: items.length })}
+        subtitle={items.length === 1 ? t('migration.serieInProgress', { count: 1 }) : t('migration.seriesInProgress', { count: items.length })}
         action={
           <div className="flex items-center gap-3 shrink-0">
             <p className="hidden text-xs text-muted-foreground sm:block">

@@ -11,6 +11,7 @@ import { selectMediaTitle } from '@/lib/titleLanguage';
 
 import type {
   AnimeCard,
+  MediaCardMetadata,
   SpotlightAnime,
   TopAnime,
   HomeData,
@@ -337,6 +338,11 @@ export interface MangaSectionsPage {
 // ─── Adapter functions: TatakaiMedia → existing UI types ─────────────────────
 // These allow pages to use contentGraph without changing any component props.
 
+/** Preserve TV catalogue details without changing existing card fields or layouts. */
+function cardMetadataSnapshot(m: TatakaiMedia): MediaCardMetadata {
+  return { banner: m.bannerImage, description: m.description, status: m.status, genres: m.genres, tags: m.tags, type: m.format, rating: m.averageScore ? (m.averageScore / 10).toFixed(1) : undefined, year: m.seasonYear ?? m.startDate?.year, episodes: { sub: m.episodeSubCount ?? m.episodes ?? 0, dub: m.episodeDubCount ?? 0 }, isAdult: m.isAdult };
+}
+
 export function toAnimeCard(m: TatakaiMedia): AnimeCard {
   const primaryId =
     m.anilistId && m.anilistId > 0
@@ -349,6 +355,7 @@ export function toAnimeCard(m: TatakaiMedia): AnimeCard {
     name: selectMediaTitle(m),
     jname: m.titleNative ?? m.titleRomaji,
     poster: m.coverImageLarge ?? m.coverImageMedium ?? '',
+    tvMetadata: cardMetadataSnapshot(m),
     type: formatToDisplayType(m.format),
     duration: m.duration ? `${m.duration}m` : undefined,
     rating: m.averageScore ? `${(m.averageScore / 10).toFixed(1)}` : undefined,
@@ -419,6 +426,7 @@ export function toTopAnime(m: TatakaiMedia, rank: number): TopAnime {
     malId: m.malId,
     anilistId: m.anilistId,
     isAdult: m.isAdult,
+    tvMetadata: cardMetadataSnapshot(m),
   };
 }
 
@@ -435,6 +443,7 @@ export function toTrendingAnime(m: TatakaiMedia, rank: number): TrendingAnime {
     poster: m.coverImageLarge ?? m.coverImageMedium ?? '',
     rank,
     isAdult: m.isAdult,
+    tvMetadata: cardMetadataSnapshot(m),
   };
 }
 

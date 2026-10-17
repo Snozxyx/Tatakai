@@ -130,7 +130,7 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       // Model/browser test caches contain large files and OS-locked journals on Windows.
-      watch: { ignored: ['**/.tmp*/**', '**/.cache/**'] },
+      watch: { ignored: ['**/.tmp*/**', '**/.cache/**', '**/android/**/build/**', '**/ios/**/build/**', '**/tatakaiapi/node_modules/**', '**/tatakaiapi/dist/**'] },
       host: "::",
       port: isWebMode ? 8081 : 8090, // Standard port for Electron dev
       // Allow Discord Activity iframe to embed the app

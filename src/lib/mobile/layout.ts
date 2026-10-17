@@ -4,6 +4,7 @@ import './refreshed.css';
 /** Shared phone-width presentation, independent of the native shell. */
 export function applyMobileLayout(): void {
   const root = document.documentElement;
+  if (root.classList.contains('tatakai-tv')) { delete root.dataset.mobileLayout; return; }
   if (window.matchMedia('(max-width: 1023px)').matches) root.dataset.mobileLayout = loadMobileConfig().mobileLayout;
   else delete root.dataset.mobileLayout;
 }

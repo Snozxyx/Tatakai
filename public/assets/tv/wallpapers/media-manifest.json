@@ -1,0 +1,74 @@
+[
+  {
+    "id": "ember",
+    "maxWidth": 1280,
+    "source": "/assets/video/6.mp4",
+    "sourceBytes": 36922029,
+    "codec": "H.264 Baseline",
+    "outputBytes": 888833,
+    "maxHeight": 720,
+    "fps": 12,
+    "output": "/assets/tv/wallpapers/ember.mp4",
+    "audio": false
+  },
+  {
+    "id": "neon",
+    "maxWidth": 1280,
+    "source": "/assets/video/5.mp4",
+    "sourceBytes": 8504398,
+    "codec": "H.264 Baseline",
+    "outputBytes": 818286,
+    "maxHeight": 720,
+    "fps": 12,
+    "output": "/assets/tv/wallpapers/neon.mp4",
+    "audio": false
+  },
+  {
+    "id": "storm",
+    "maxWidth": 1280,
+    "source": "/assets/video/2.webm",
+    "sourceBytes": 8969223,
+    "codec": "H.264 Baseline",
+    "outputBytes": 1420306,
+    "maxHeight": 720,
+    "fps": 12,
+    "output": "/assets/tv/wallpapers/storm.mp4",
+    "audio": false
+  },
+  {
+    "id": "sakura",
+    "maxWidth": 1280,
+    "source": "/assets/video/bg-hero.mp4",
+    "sourceBytes": 3313698,
+    "codec": "H.264 Baseline",
+    "outputBytes": 981412,
+    "maxHeight": 720,
+    "fps": 12,
+    "output": "/assets/tv/wallpapers/sakura.mp4",
+    "audio": false
+  },
+  {
+    "id": "crimson",
+    "maxWidth": 1280,
+    "source": "/assets/video/1.mp4",
+    "sourceBytes": 4358015,
+    "codec": "H.264 Baseline",
+    "outputBytes": 860097,
+    "maxHeight": 720,
+    "fps": 12,
+    "output": "/assets/tv/wallpapers/crimson.mp4",
+    "audio": false
+  },
+  {
+    "id": "flame",
+    "maxWidth": 1280,
+    "source": "/assets/video/3.mp4",
+    "sourceBytes": 10161159,
+    "codec": "H.264 Baseline",
+    "outputBytes": 1976100,
+    "maxHeight": 720,
+    "fps": 12,
+    "output": "/assets/tv/wallpapers/flame.mp4",
+    "audio": false
+  }
+]

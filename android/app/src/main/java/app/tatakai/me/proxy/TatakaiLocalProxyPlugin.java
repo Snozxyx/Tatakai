@@ -65,6 +65,11 @@ import java.util.concurrent.Executors;
  */
 @CapacitorPlugin(name = "TatakaiLocalProxy")
 public class TatakaiLocalProxyPlugin extends Plugin {
+    @PluginMethod public void unregisterSource(PluginCall call) {
+        String token = call.getString("token", "");
+        if (token != null && token.matches("[a-f0-9]{32}")) tokenMap.remove(token);
+        call.resolve();
+    }
     private static final String TAG = "TatakaiLocalProxy";
     private static final long TOKEN_TTL_MS = 15L * 60L * 1000L;
     private static final String DEFAULT_UA =

@@ -1,4 +1,6 @@
 import uiI18n from '@/lib/uiI18n';
+import { isTV } from '@/core/tv/device';
+import { requestTVWriting } from '@/core/tv/writingHandoff';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { usePersistentState } from '@/hooks/ui/usePersistentState';
 import { useRef, useState, useCallback, useEffect } from 'react';
@@ -406,8 +408,9 @@ export function RichCommentComposer({
     </button>
   );
 
+  if (isTV()) return <button type="button" onClick={() => requestTVWriting()}>Write on your phone</button>;
   return (
-    <div
+    <div data-tv-comment-composer
       className={cn(
         'relative space-y-2',
         compact ? 'max-md:space-y-3' : 'rounded-xl border border-border/30 bg-card/50 p-3 max-md:p-4',

@@ -1,7 +1,7 @@
 {
   "name": "tatakai",
   "private": true,
-  "version": "6.1.2",
+  "version": "6.2.0",
   "description": "Tatakai â€” an extension-based otaku community for tracking anime & manga",
   "author": {
     "name": "Snozxyx",
@@ -34,7 +34,9 @@
     "mobile:ios": "npm run build && npx cap open ios",
     "mobile:sync": "npm run build && npx cap sync",
     "mobile:sync:ios": "npm run build && npx cap sync ios",
-    "mobile:build": "npm run build && npx cap sync android && cd android && chmod +x gradlew && ./gradlew assembleRelease",
+    "mobile:build": "node scripts/build-android.mjs mobile",
+    "tv:build": "node scripts/build-android.mjs tv",
+    "tv:dev": "cross-env VITE_TV_MODE=true vite",
     "mobile:build:ios": "npm run build && npx cap sync ios",
     "mobile:build:ios:unsigned": "npm run build && npx cap sync ios && xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath ios/build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO clean build",
     "altstore:generate": "node scripts/generate-altstore-source.mjs"
@@ -137,6 +139,7 @@
     "playwright": "^1.62.1",
     "playwright-extra": "^4.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "qrcode.react": "^4.2.0",
     "react": "^18.3.1",
     "react-blurhash": "^0.3.0",
     "react-day-picker": "^8.10.1",
@@ -180,6 +183,7 @@
     "eslint": "^9.32.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
+    "fake-indexeddb": "^6.2.5",
     "globals": "^15.15.0",
     "jsdom": "30.0.1",
     "libpg-query": "18.1.4",

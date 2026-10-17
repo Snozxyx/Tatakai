@@ -35,7 +35,7 @@ export function WatchTogetherWidget({ className }: WatchTogetherWidgetProps) {
     () =>
       activeRooms.slice(0, 3).map((r) => ({
         id: r.id,
-        title: r.anime_title || r.name || 'Watch Together',
+        title: r.anime_title || r.name || uiI18n.t('app.watch_together_195732a6'),
         image: r.anime_poster ? getProxiedImageUrl(r.anime_poster) : null,
       })),
     [activeRooms],
@@ -132,7 +132,7 @@ export function WatchTogetherWidget({ className }: WatchTogetherWidgetProps) {
                     <span>{watching} {uiI18n.t('app.watching_874e70e6')}</span>
                   </>
                 ) : (
-                  'Watch anime with friends'
+                  uiI18n.language?.startsWith('es') ? 'Mira anime con amigos' : 'Watch anime with friends'
                 )}
               </p>
             </div>

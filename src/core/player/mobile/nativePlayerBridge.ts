@@ -1,14 +1,32 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { isAndroid } from '@/lib/platform/platform';
+import { isTV } from '@/core/tv/device';
 
 type PlayerEvent = {
+  sessionId?: string;
+  mediaId?: string;
+  episodeId?: string;
   positionMs?: number;
   durationMs?: number;
   completed?: boolean;
   message?: string;
+  sourceIndex?: number;
+  sourceId?: string;
+  playWhenReady?: boolean;
 };
 
 export type NativePlayerOpenOptions = {
+  mimeType?: string;
+  sessionId?: string;
+  playWhenReady?: boolean;
+  sources?: Array<{ id: string; title: string; detail?: string; selected?: boolean }>;
+  canChangeSource?: boolean;
+  canBrowseQueue?: boolean;
+  mediaId?: string;
+  episodeId?: string;
+  live?: boolean;
+  allowDisplaySwitch?: boolean;
+  queue?: Array<{ id: string; title: string; url: string; mimeType?: string }>;
   url: string;
   title?: string;
   startPositionMs?: number;
@@ -21,7 +39,7 @@ export type NativePlayerOpenOptions = {
   subtitlesEnabled?: boolean;
 };
 
-export type NativePlayerEventName = 'playerProgress' | 'playerEnded' | 'playerClosed' | 'playerError';
+export type NativePlayerEventName = 'playerProgress' | 'playerEnded' | 'playerClosed' | 'playerError' | 'playerSourceRequested' | 'playerQueueRequested' | 'playerNextRequested' | 'playerPreviousRequested' | 'playerItemChanged';
 
 type NativePlayerPlugin = {
   open(options: NativePlayerOpenOptions): Promise<{ success: boolean; error?: string }>;
@@ -58,7 +76,7 @@ export function installNativePlayerBridge(): void {
     return () => listeners.delete(listener);
   };
 
-  (['playerProgress', 'playerEnded', 'playerClosed', 'playerError'] as const).forEach((eventName) => {
+  (['playerProgress', 'playerEnded', 'playerClosed', 'playerError', 'playerSourceRequested', 'playerQueueRequested', 'playerNextRequested', 'playerPreviousRequested', 'playerItemChanged'] as const).forEach((eventName) => {
     void plugin.addListener(eventName, (event) => {
       listeners.forEach((listener) => {
         try { listener({ ...event, type: eventName }); } catch { /* isolated listener */ }
@@ -86,7 +104,7 @@ export async function openNativePlayer(options: NativePlayerOpenOptions): Promis
   const runtime = readRuntime();
   if (!runtime) return { success: false, error: 'Native torrent playback is unavailable in this app build.' };
   try {
-    return await runtime.openNativePlayer(options);
+    return await runtime.openNativePlayer({ ...options, allowDisplaySwitch: options.allowDisplaySwitch ?? (isTV() && localStorage.getItem('tatakai-tv-disruptive-refresh') === 'true') });
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : String(error) };
   }

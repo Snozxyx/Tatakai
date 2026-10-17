@@ -1,4 +1,5 @@
 import uiI18n from '@/lib/uiI18n';
+import { requestTVWriting } from '@/core/tv/writingHandoff';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMemo, useState } from 'react';
 import { formatDistanceToNow } from '@/lib/localeFormat';
@@ -275,7 +276,7 @@ function ReplyRow({
               </button>
               {canReply && (
                 <button
-                  onClick={() => setReplying((r) => !r)}
+                  onClick={() => { if (!requestTVWriting(entityType === 'forum_post' ? entityId : undefined, reply.id)) setReplying((r) => !r); }}
                   className="flex items-center gap-1 rounded-lg px-2 py-0.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all"
                 >
                   <Reply className="h-3 w-3" /> {uiI18n.t('app.reply_6c2bb735')}

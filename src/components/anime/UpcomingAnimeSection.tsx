@@ -7,13 +7,21 @@ import { useRef } from "react";
 import { Peekable } from "@/components/media/MediaQuickPeek";
 import { peekFromAnime } from "@/components/media/quickPeekStore";
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const MONTHS_EN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const MONTHS_ES = ["ene.", "feb.", "mar.", "abr.", "may.", "jun.", "jul.", "ago.", "sep.", "oct.", "nov.", "dic."];
 
 function formatAirDate(media: UpcomingAnimeItem): string | null {
   const { year, month, day } = media.startDate || {};
+  const es = uiI18n.language?.startsWith('es');
   if (!year) return media.seasonYear ? String(media.seasonYear) : null;
-  if (month && day) return `${MONTHS[month - 1]} ${day}, ${year}`;
-  if (month) return `${MONTHS[month - 1]} ${year}`;
+  if (month && day) {
+    if (es) return `${day} ${MONTHS_ES[month - 1]} ${year}`;
+    return `${MONTHS_EN[month - 1]} ${day}, ${year}`;
+  }
+  if (month) {
+    if (es) return `${MONTHS_ES[month - 1]} ${year}`;
+    return `${MONTHS_EN[month - 1]} ${year}`;
+  }
   return String(year);
 }
 

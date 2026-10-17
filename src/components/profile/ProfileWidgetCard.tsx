@@ -1,3 +1,4 @@
+import { isTV } from "@/core/tv/device";
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { CachedProfileImage } from '@/components/ui/cached-profile-image';
@@ -235,6 +236,26 @@ export function ProfileWidgetCard({
     void triggerHaptic('tap');
     setOpen(false);
   };
+
+  if (isTV()) return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>{children}</DialogTrigger>
+      <DialogContent className="tv-profile-widget" aria-describedby={undefined}>
+        {banner && <div className="tv-profile-widget-cover"><CachedProfileImage className="tv-profile-widget-banner" src={banner} alt="" onError={event => { event.currentTarget.style.visibility = 'hidden'; }} /></div>}
+        <div className="tv-profile-widget-body" style={profileSurfaceStyle(customization)}>
+          <div className="tv-profile-widget-identity">
+            <div className="tv-profile-widget-avatar"><Avatar><AvatarImage src={avatar} /><AvatarFallback>{name[0]}</AvatarFallback></Avatar><AvatarDecoration decoration={avatarDecoration} /></div>
+            <div><DialogTitle><ProfileNameplate nameplate={nameplate}>{name}</ProfileNameplate></DialogTitle><p>@{handle || 'user'}</p><RankBadge score={rankScore} size="sm" /></div>
+          </div>
+          <UserBadges badges={badges} size={28} max={5} />
+          {bio && <p className="tv-profile-widget-bio">{bio}</p>}
+          {fetched && !fetched.is_public && !isSelf && <p>This profile is private.</p>}
+          <dl className="tv-profile-widget-stats"><div><dt>Followers</dt><dd>{followStats?.followers ?? '—'}</dd></div><div><dt>Following</dt><dd>{followStats?.following ?? '—'}</dd></div>{(isSelf || (fetched?.is_public && fetched.show_history !== false)) && <><div><dt>Episodes watched</dt><dd>{stats?.episodes ?? '—'}</dd></div><div><dt>Watch time</dt><dd>{stats ? formatWatchTime(stats.watchTimeSeconds) : '—'}</dd></div></>}</dl>
+          <div className="tv-profile-widget-actions"><Button disabled={!handle} onClick={() => { setOpen(false); navigate(`/user/${handle}`); }}>View full profile</Button>{canFollow && <Button variant="outline" disabled={isFollowingLoading || checkingFollow} onClick={() => isFollowing ? unfollow() : follow()}>{isFollowing ? <UserCheck /> : <UserPlus />}{isFollowing ? 'Following' : 'Follow'}</Button>}<Button variant="ghost" onClick={() => setOpen(false)}>Close</Button></div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
 
   const cardBody = (
     <div className="relative isolate overflow-hidden" style={profileSurfaceStyle(customization)}>

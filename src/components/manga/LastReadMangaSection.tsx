@@ -37,7 +37,9 @@ export function LastReadMangaSection() {
         title={uiI18n.t('app.last_read_manga_388a4686')}
         subtitle={
           continueRows.length > 0
-            ? uiI18n.t('app.i18n_value_0_i18n_value_1_in_progress_36edb6ba', { value0: continueRows.length, value1: continueRows.length === 1 ? 'title' : 'titles' })
+            ? uiI18n.language?.startsWith('es')
+              ? `${continueRows.length} ${continueRows.length === 1 ? 'título' : 'títulos'} en curso`
+              : uiI18n.t('app.i18n_value_0_i18n_value_1_in_progress_36edb6ba', { value0: continueRows.length, value1: continueRows.length === 1 ? 'title' : 'titles' })
             : undefined
         }
         action={

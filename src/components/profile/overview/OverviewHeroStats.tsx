@@ -70,13 +70,16 @@ export const OverviewHeroStats = memo(function OverviewHeroStats({
     : 0;
 
   // Primary top tiles
+  const es = uiI18n.language?.startsWith('es');
   const primaryStats = [
     {
       key: 'anime',
       get label() { return uiI18n.t('app.anime_watched_7702ac21'); },
       value: episodesCount,
-      suffix: 'eps',
-      subtext: `${completedAnimeCount} completed · ${watchingAnimeCount} watching`,
+      suffix: es ? (episodesCount === 1 ? 'cap.' : 'caps.') : 'eps',
+      subtext: es
+        ? `${completedAnimeCount} completados · ${watchingAnimeCount} viendo`
+        : `${completedAnimeCount} completed · ${watchingAnimeCount} watching`,
       icon: Play,
     },
     {
@@ -84,16 +87,20 @@ export const OverviewHeroStats = memo(function OverviewHeroStats({
       get label() { return uiI18n.t('app.watch_time_c49f058c'); },
       value: hoursSpent,
       decimals: 1,
-      suffix: 'hrs',
-      subtext: `${daysSpent} days continuous`,
+      suffix: es ? 'h' : 'hrs',
+      subtext: es
+        ? (daysSpent === 1 ? `${daysSpent} día continuo` : `${daysSpent} días continuos`)
+        : `${daysSpent} days continuous`,
       icon: Clock,
     },
     {
       key: 'reading',
       get label() { return uiI18n.t('app.manga_manhwa_3dfc1148'); },
       value: totalChaptersRead > 0 ? totalChaptersRead : totalReadingTitles,
-      suffix: totalChaptersRead > 0 ? 'chs' : 'titles',
-      subtext: `${mangaCount} Manga · ${manhwaCount} Manhwa`,
+      suffix: totalChaptersRead > 0 ? (es ? 'caps.' : 'chs') : (es ? 'títulos' : 'titles'),
+      subtext: es
+        ? `${mangaCount} mangas · ${manhwaCount} manhwas`
+        : `${mangaCount} Manga · ${manhwaCount} Manhwa`,
       icon: BookOpen,
     },
     {
@@ -102,23 +109,25 @@ export const OverviewHeroStats = memo(function OverviewHeroStats({
       value: reputationRate,
       decimals: 1,
       suffix: '%',
-      subtext: reputationRate >= 95 ? 'Elite Tier' : 'Active Member',
+      subtext: reputationRate >= 95 ? (es ? 'Nivel Élite' : 'Elite Tier') : (es ? 'Miembro activo' : 'Active Member'),
       icon: Award,
     },
     {
       key: 'community',
       get label() { return uiI18n.t('app.discussions_0474a6c6'); },
       value: commentCount + forumPostCount,
-      suffix: 'actions',
-      subtext: `${commentCount} comments · ${forumPostCount} topics`,
+      suffix: es ? 'acciones' : 'actions',
+      subtext: es
+        ? `${commentCount} comentarios · ${forumPostCount} temas`
+        : `${commentCount} comments · ${forumPostCount} topics`,
       icon: MessageSquare,
     },
     {
       key: 'streak',
       get label() { return uiI18n.t('app.streak_record_76f08e79'); },
       value: streakDays,
-      suffix: 'days',
-      subtext: `Best streak: ${longestStreak}d`,
+      suffix: es ? 'días' : 'days',
+      subtext: es ? `Mejor racha: ${longestStreak}d` : `Best streak: ${longestStreak}d`,
       icon: Flame,
       isActive: streakDays > 0,
     },

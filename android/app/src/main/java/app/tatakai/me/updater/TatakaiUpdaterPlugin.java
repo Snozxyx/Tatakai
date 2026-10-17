@@ -261,6 +261,11 @@ public class TatakaiUpdaterPlugin extends Plugin {
                 call.reject("The downloaded update was not found. Download it again.");
                 return;
             }
+            android.content.pm.PackageInfo archive = getContext().getPackageManager().getPackageArchiveInfo(apk.getAbsolutePath(), 0);
+            if (archive == null || !getContext().getPackageName().equals(archive.packageName)) {
+                call.reject("This update belongs to a different Tatakai edition. Download the correct APK.");
+                return;
+            }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 boolean allowed = getContext().getPackageManager().canRequestPackageInstalls();
                 if (!allowed) {

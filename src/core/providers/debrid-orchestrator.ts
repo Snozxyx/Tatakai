@@ -238,7 +238,8 @@ export class DebridOrchestrator {
   private epoch = 0;
   private cache = new Map<string, { url: string; expiresAt: number }>();
   private pending = new Map<string, { promise: Promise<string>; controller: AbortController; users: number }>();
-  private readonly storage: DebridStorage | null;
+  private storage: DebridStorage | null;
+  useStorage(storage: DebridStorage): void { this.storage = storage; this.loadAccounts(); }
 
   constructor(storage?: DebridStorage | null) {
     this.storage = storage === undefined

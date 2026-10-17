@@ -153,7 +153,7 @@ export function ReviewPopup({ isOpen: propIsOpen, onClose, animeId, animeName, u
                                     disabled={isSubmitting}
                                     className="w-full"
                                 >
-                                    {isSubmitting ? 'Submitting...' : uiI18n.t('app.submit_feedback_c5a35a73')}
+                                    {isSubmitting ? (uiI18n.language?.startsWith('es') ? 'Enviando...' : 'Submitting...') : uiI18n.t('app.submit_feedback_c5a35a73')}
                                 </Button>
                             </div>
                         )}

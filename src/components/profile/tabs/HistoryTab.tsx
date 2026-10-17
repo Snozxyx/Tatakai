@@ -1,3 +1,4 @@
+import { isTV } from "@/core/tv/device";
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { compareWatchHistory } from '@/lib/watchHistoryQuery';
@@ -159,6 +160,10 @@ export function HistoryTab({ history, mangaHistoryEntries, loading, isViewingOth
                                 <div
                                   key={item.id}
                                   className="flex items-center gap-4 p-4 hover:bg-white/[0.04] transition-colors cursor-pointer group"
+                                  role={isTV() ? "button" : undefined}
+                                  tabIndex={isTV() ? -1 : undefined}
+                                  data-tv-focus={isTV() || undefined}
+                                  data-tv-key={isTV() ? `profile-history-${item.id}` : undefined}
                                   onClick={() => onNavigate(`/watch/${encodeURIComponent(item.episode_id)}`)}
                                 >
                                   <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-black text-sm shadow-inner">

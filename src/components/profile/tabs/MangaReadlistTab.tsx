@@ -1,3 +1,4 @@
+import { isTV } from "@/core/tv/device";
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMemo } from 'react';
@@ -50,6 +51,10 @@ export function MangaReadlistTab({ mangaReadlist, loading, isViewingOther, onNav
         transition={{ delay: Math.min(index * 0.04, 0.4), type: 'spring', stiffness: 260, damping: 24 }}
         whileHover={{ y: -4 }}
         whileTap={{ scale: 0.985 }}
+        role={isTV() ? "button" : undefined}
+        tabIndex={isTV() ? -1 : undefined}
+        data-tv-focus={isTV() || undefined}
+        data-tv-key={isTV() ? `profile-card-${item.id}` : undefined}
         onClick={() => onNavigate(`/manga/${encodeURIComponent(item.resolved_manga_id || item.manga_id)}`)}
         className="group relative flex gap-4 p-4 w-full text-left rounded-2xl border border-white/[0.06] bg-gradient-to-br from-white/[0.05] to-white/[0.01] overflow-hidden shadow-lg transition-colors duration-300 hover:border-white/20 hover:shadow-[0_16px_40px_-12px_rgba(0,0,0,0.6)]"
       >

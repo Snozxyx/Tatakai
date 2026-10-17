@@ -173,6 +173,38 @@ export function getProxiedJsonUrl(rawUrl: string): string {
   return `${LOCAL_API_BASE}/api/proxy/json?url=${encodeURIComponent(url)}`;
 }
 
+/**
+ * Hosts that send `Access-Control-Allow-Origin: *` (verified: nekosia.cat,
+ * nekos.best). The shared backend IP is rate-limited by these upstreams
+ * (all users share one IP → frequent upstream 403s through /api/proxy/json),
+ * while a direct browser fetch carries the user's own IP and succeeds.
+ * Try direct first, fall back to the proxy (e.g. desktop renderer CORS edge).
+ */
+const DIRECT_FIRST_HOSTS = new Set(['api.nekosia.cat', 'nekos.best']);
+
+export function shouldFetchJsonDirectFirst(rawUrl: string): boolean {
+  try {
+    return DIRECT_FIRST_HOSTS.has(new URL(String(rawUrl || '')).hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
+/** GET JSON trying a direct fetch first, then the /api/proxy/json passthrough. */
+export async function fetchJsonWithFallback(rawUrl: string, init?: RequestInit): Promise<Response> {
+  const url = String(rawUrl || '').trim();
+  if (!shouldFetchJsonDirectFirst(url)) {
+    return fetch(getProxiedJsonUrl(url), init);
+  }
+  try {
+    const direct = await fetch(url, init);
+    if (direct.ok) return direct;
+  } catch {
+    /* CORS/network block — fall through to the proxy */
+  }
+  return fetch(getProxiedJsonUrl(url), init);
+}
+
 export function readProxyQuerySnapshot(rawUrl: string): {
   streamUrl?: string;
   referer?: string;

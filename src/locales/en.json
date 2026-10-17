@@ -1065,6 +1065,7 @@
     "episodeTitle": "Episode {{number}}: {{title}}",
     "animeEpisode": "{{name}} episode {{number}}",
     "seriesInProgress": "{{count}} series in progress",
+    "serieInProgress": "{{count}} series in progress",
     "resumeRotation": "Resume spotlight rotation",
     "pauseRotation": "Pause spotlight rotation",
     "showSpotlight": "Show spotlight {{number}}",

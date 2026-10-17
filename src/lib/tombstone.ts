@@ -10,16 +10,18 @@
  * Rows deleted before the moderation migration have no role → fall back to the
  * original author tombstone.
  */
-export function tombstoneLabel(deletedByRole?: string | null): string {
+export function tombstoneLabel(deletedByRole?: string | null, language?: string): string {
+  const lang = (language || (typeof localStorage !== 'undefined' ? localStorage.getItem('tatakai-ui-lang') : null) || 'en').split('-')[0];
+  const es = lang === 'es';
   switch (deletedByRole) {
     case 'admin':
-      return '[Deleted by Admin]';
+      return es ? '[Eliminado por un administrador]' : '[Deleted by Admin]';
     case 'moderator':
     case 'mod':
-      return '[Deleted by Moderator]';
+      return es ? '[Eliminado por un moderador]' : '[Deleted by Moderator]';
     case 'owner':
-      return '[Deleted by Owner]';
+      return es ? '[Eliminado por el propietario]' : '[Deleted by Owner]';
     default:
-      return '[DELETED By User]';
+      return es ? '[Eliminado por el usuario]' : '[DELETED By User]';
   }
 }

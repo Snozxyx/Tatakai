@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Hash, ArrowUpRight } from "lucide-react";
 import { useAniListGenres } from "@/hooks/api/useAniListGenres";
+import { translateGenre } from "@/lib/smartDiscoverI18n";
 
 interface GenreCloudProps {
   genres: string[];
@@ -70,7 +71,7 @@ export function GenreCloud({ genres }: GenreCloudProps) {
 
               <div className="relative z-10 flex items-center justify-between gap-2">
                 <span className="text-base font-bold text-foreground/80 group-hover:text-foreground transition-colors truncate">
-                  {genre}
+                  {translateGenre(genre)}
                 </span>
                 <ArrowUpRight
                   className={`w-4 h-4 shrink-0 text-muted-foreground/40 group-hover:${accent.text} transform -translate-x-1 translate-y-1 opacity-0 group-hover:translate-x-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300`}

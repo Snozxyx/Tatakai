@@ -1,3 +1,4 @@
+import { isTV } from "@/core/tv/device";
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { CachedProfileImage } from '@/components/ui/cached-profile-image';
@@ -92,7 +93,7 @@ const MANGA_STATUS_LABELS: Record<string, { label: string; color: string; bg: st
 
 const MANGA_READING_ONLY_STATUSES: MangaReadlistStatus[] = ['reading'];
 
-export default function ProfilePage() {
+export default function ProfilePage({ username: providedUsername }: { username?: string } = {}) {
   useUiTranslation();
   const navigate = useNavigate();
   const { username: usernameParam, atUsername, slug } = useParams<{ username?: string; atUsername?: string; slug?: string }>();
@@ -101,9 +102,10 @@ export default function ProfilePage() {
   const isDesktopApp = useIsDesktopApp();
   const isMobileApp = useIsMobileApp();
   const isMobile = useIsMobile();
-  const showSidebar = !isMobile;
+  const tv = isTV();
+  const showSidebar = !isMobile && !tv;
 
-  const viewingUsername = usernameParam ||
+  const viewingUsername = providedUsername || usernameParam ||
     (atUsername?.startsWith('@') ? atUsername.slice(1) : atUsername) ||
     (slug?.startsWith('@') ? slug.slice(1) : undefined);
 
@@ -328,10 +330,18 @@ export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState<string>('overview');
 
   // Allow deep-linking to a tab, e.g. Continue Watching's "History" button → /profile?tab=history.
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const changeProfileTab = (tab: string) => {
+    setActiveTab(tab);
+    if (tv) setSearchParams(previous => {
+      const next = new URLSearchParams(previous);
+      next.set('tab', tab);
+      return next;
+    }, { replace: true });
+  };
   useEffect(() => {
     const tab = searchParams.get('tab');
-    if (tab && ['overview', 'watchlist', 'manga-readlist', 'history', 'vault', 'streaks'].includes(tab)) {
+    if (tab && ['overview', 'watchlist', 'manga-readlist', 'novel-readlist', 'history', 'vault', 'streaks'].includes(tab)) {
       setActiveTab(tab);
     }
   }, [searchParams]);
@@ -360,7 +370,7 @@ export default function ProfilePage() {
             </div>
           </div>
         </main>
-        <MobileNav />
+        {!tv && <MobileNav />}
       </div>
     );
   }
@@ -410,6 +420,7 @@ export default function ProfilePage() {
 
   return (
     <div
+      data-tv-profile={tv || undefined}
       className="min-h-screen bg-background text-foreground overflow-x-hidden relative isolate"
       style={profileSurfaceStyle(customization)}
     >
@@ -448,7 +459,7 @@ export default function ProfilePage() {
         
         {/* ── Cinematic Hero Banner ── */}
         <div className={cn(
-          "h-[360px] md:h-[500px] relative w-full overflow-hidden group select-none",
+          "profile-banner h-[360px] md:h-[500px] relative w-full overflow-hidden group select-none",
           !isDesktopApp && "md:-ml-24 md:w-[calc(100%+6rem)]"
         )}>
           <ProfileCosmeticEffect effect={profileEffect} />
@@ -460,6 +471,7 @@ export default function ProfilePage() {
               <CachedProfileImage
                 src={profile.banner_url}
                 alt={uiI18n.t('app.profile_banner_7ed6014d')}
+                  onError={tv ? event => { event.currentTarget.style.opacity = "0"; } : undefined}
                 className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-[2s] ease-out group-hover:scale-[1.02]"
               />
             ) : (
@@ -499,19 +511,19 @@ export default function ProfilePage() {
         </div>
 
         {/* ── Profile Header Section ── */}
-        <div className="max-w-7xl mx-auto px-4 md:px-8 relative z-20 pb-20">
+        <div className="profile-content max-w-7xl mx-auto px-4 md:px-8 relative z-20 pb-20">
           
           <motion.div
             initial={isMobile ? false : { y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            className="flex flex-col xl:flex-row justify-between items-start xl:items-end gap-6 md:gap-10 -mt-20 md:-mt-24 mb-10"
+            className="profile-identity flex flex-col xl:flex-row justify-between items-start xl:items-end gap-6 md:gap-10 -mt-20 md:-mt-24 mb-10"
           >
             {/* Left side: Avatar and Core Details */}
             <div className="flex flex-col md:flex-row items-center md:items-end gap-6 md:gap-8 w-full xl:w-auto">
               
               {/* Avatar Container */}
               <div className="relative group shrink-0">
-                <div className="w-36 h-36 md:w-48 md:h-48 rounded-full overflow-hidden bg-background ring-[6px] md:ring-[8px] ring-background shadow-[0_0_40px_rgba(0,0,0,0.5)] border border-white/10 z-10 relative">
+                <div className="profile-avatar w-36 h-36 md:w-48 md:h-48 rounded-full overflow-hidden bg-background ring-[6px] md:ring-[8px] ring-background shadow-[0_0_40px_rgba(0,0,0,0.5)] border border-white/10 z-10 relative">
                   <Avatar className="w-full h-full">
                     <AvatarImage src={profile?.avatar_url || undefined} className="object-cover w-full h-full transition-transform duration-700 group-hover:scale-105" />
                     <AvatarFallback className="bg-gradient-to-br from-primary to-purple-600 text-white text-5xl font-black uppercase">
@@ -687,7 +699,7 @@ export default function ProfilePage() {
 
           {/* ── Content Tabs ── */}
           <div className="mt-4">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
+            <Tabs value={activeTab} onValueChange={changeProfileTab} className="space-y-8">
                   <TabsList
                     className="
                       bg-white/[0.03]
@@ -708,42 +720,42 @@ export default function ProfilePage() {
                     "
                   >
                 <TabsTrigger
-                  value="overview"
+                  data-tv-key={tv ? "profile-tab-overview" : undefined} value="overview"
                   className="shrink-0 gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_20px_rgba(var(--primary),0.4)] rounded-full px-4 py-2.5 text-sm font-bold whitespace-nowrap transition-all sm:px-5"
                 >
                   <LayoutGrid className="w-4 h-4" />
                   {uiI18n.t('app.overview_0efc2e6b')}
                 </TabsTrigger>
                 {showWatchlistTab && (
-                  <TabsTrigger value="watchlist" className="shrink-0 md:flex-none gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_20px_rgba(var(--primary),0.4)] rounded-full px-4 py-2.5 text-sm font-bold transition-all sm:px-6">
+                  <TabsTrigger data-tv-key={tv ? "profile-tab-watchlist" : undefined} value="watchlist" className="shrink-0 md:flex-none gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_20px_rgba(var(--primary),0.4)] rounded-full px-4 py-2.5 text-sm font-bold transition-all sm:px-6">
                     <List className="w-4 h-4" />
                     {uiI18n.t('app.watchlist_48a616d9')}
                   </TabsTrigger>
                 )}
                 {showWatchlistTab && (
-                  <TabsTrigger value="manga-readlist" className="shrink-0 md:flex-none gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_20px_rgba(var(--primary),0.4)] rounded-full px-4 py-2.5 text-sm font-bold transition-all sm:px-6">
+                  <TabsTrigger data-tv-key={tv ? "profile-tab-manga-readlist" : undefined} value="manga-readlist" className="shrink-0 md:flex-none gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_20px_rgba(var(--primary),0.4)] rounded-full px-4 py-2.5 text-sm font-bold transition-all sm:px-6">
                     <BookOpen className="w-4 h-4" />
                     {uiI18n.t('app.manga_readlist_2bfa7178')}
                   </TabsTrigger>
                 )}
-                {showWatchlistTab && (
-                  <TabsTrigger value="novel-readlist" className="shrink-0 md:flex-none gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_20px_rgba(var(--primary),0.4)] rounded-full px-4 py-2.5 text-sm font-bold transition-all sm:px-6">
+                {showWatchlistTab && (!tv || !isViewingOther) && (
+                  <TabsTrigger data-tv-key={tv ? "profile-tab-novel-readlist" : undefined} value="novel-readlist" className="shrink-0 md:flex-none gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_20px_rgba(var(--primary),0.4)] rounded-full px-4 py-2.5 text-sm font-bold transition-all sm:px-6">
                     <BookOpen className="w-4 h-4" />
                     {uiI18n.t('app.novels_4ae488fd')}
                   </TabsTrigger>
                 )}
                 {showHistoryTab && (
-                  <TabsTrigger value="history" className="shrink-0 md:flex-none gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_20px_rgba(var(--primary),0.4)] rounded-full px-4 py-2.5 text-sm font-bold transition-all sm:px-6">
+                  <TabsTrigger data-tv-key={tv ? "profile-tab-history" : undefined} value="history" className="shrink-0 md:flex-none gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_20px_rgba(var(--primary),0.4)] rounded-full px-4 py-2.5 text-sm font-bold transition-all sm:px-6">
                     <History className="w-4 h-4" />
                     {uiI18n.t('app.history_90ccd649')}
                   </TabsTrigger>
                 )}
-                <TabsTrigger value="vault" className="shrink-0 md:flex-none gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_20px_rgba(var(--primary),0.4)] rounded-full px-4 py-2.5 text-sm font-bold transition-all sm:px-6">
+                <TabsTrigger data-tv-key={tv ? "profile-tab-vault" : undefined} value="vault" className="shrink-0 md:flex-none gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_20px_rgba(var(--primary),0.4)] rounded-full px-4 py-2.5 text-sm font-bold transition-all sm:px-6">
                   <Library className="w-4 h-4" />
                   {uiI18n.t('app.vault_fb46e374')}
                 </TabsTrigger>
                 {(!isViewingOther || showHistoryTab) && (
-                  <TabsTrigger value="streaks" className="shrink-0 md:flex-none gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_20px_rgba(var(--primary),0.4)] rounded-full px-4 py-2.5 text-sm font-bold transition-all sm:px-6">
+                  <TabsTrigger data-tv-key={tv ? "profile-tab-streaks" : undefined} value="streaks" className="shrink-0 md:flex-none gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_20px_rgba(var(--primary),0.4)] rounded-full px-4 py-2.5 text-sm font-bold transition-all sm:px-6">
                     <Flame className="w-4 h-4" />
                     {uiI18n.t('app.streaks_0de6ad7d')}
                   </TabsTrigger>
@@ -799,7 +811,7 @@ export default function ProfilePage() {
                   achievements={achievements}
                   externalStats={externalStats}
                   externalStatsLoading={externalStatsLoading}
-                  onNavigateTab={(tabKey) => setActiveTab(tabKey)}
+                  onNavigateTab={changeProfileTab}
                 />
               </TabsContent>
 
@@ -872,7 +884,7 @@ export default function ProfilePage() {
         </div>
       </main>
 
-      <MobileNav />
+      {!tv && <MobileNav />}
     </div>
   );
 }
