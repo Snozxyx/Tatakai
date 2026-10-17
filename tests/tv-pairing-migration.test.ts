@@ -25,3 +25,13 @@ test('TV pairing state is service-only, expiring, and lookup attempts are bounde
     expect((await db.query<{attempts:number}>("SELECT attempts FROM tv_pairing_requests WHERE pin_hash='active'")).rows[0].attempts).toBe(10);
   } finally {await db.close();}
 },30000);
+
+test('release metadata accepts Android TV without changing existing platform records',async()=>{
+ const db=new PGlite();
+ try{
+  await db.exec("CREATE TABLE app_releases(platform text CONSTRAINT app_releases_platform_check CHECK(platform IN ('win','mac','linux','android'))); INSERT INTO app_releases VALUES('android'),('win');");
+  await db.exec(readFileSync(new URL('../supabase/migrations/20261017000001_android_tv_releases.sql',import.meta.url),'utf8'));
+  await db.exec("INSERT INTO app_releases VALUES('android-tv')");
+  expect((await db.query<{platform:string}>('SELECT platform FROM app_releases ORDER BY platform')).rows.map(r=>r.platform)).toEqual(['android','android-tv','win']);
+ }finally{await db.close();}
+},30000);

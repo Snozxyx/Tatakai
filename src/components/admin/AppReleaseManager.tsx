@@ -11,14 +11,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import {
     Download, Plus, Trash2, Edit2, CheckCircle,
-    XCircle, Monitor, Apple, Terminal, Save, X
+    XCircle, Monitor, Apple, Terminal, Smartphone, Tv, Save, X
 } from 'lucide-react';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 
 interface AppRelease {
     id: string;
     version: string;
-    platform: 'win' | 'mac' | 'linux' | 'android';
+    platform: 'win' | 'mac' | 'linux' | 'android' | 'android-tv';
     url: string;
     notes: string | null;
     metadata: any;
@@ -35,7 +35,7 @@ export function AppReleaseManager() {
 
     // Form state
     const [version, setVersion] = useState('');
-    const [platform, setPlatform] = useState<'win' | 'mac' | 'linux' | 'android'>('win');
+    const [platform, setPlatform] = useState<'win' | 'mac' | 'linux' | 'android' | 'android-tv'>('win');
     const [url, setUrl] = useState('');
     const [notes, setNotes] = useState('');
     const [isLatest, setIsLatest] = useState(true);
@@ -151,6 +151,8 @@ export function AppReleaseManager() {
             case 'win': return <Monitor className="w-4 h-4" />;
             case 'mac': return <Apple className="w-4 h-4 fill-current" />;
             case 'linux': return <Terminal className="w-4 h-4" />;
+            case 'android': return <Smartphone className="w-4 h-4" />;
+            case 'android-tv': return <Tv className="w-4 h-4" />;
             default: return <Download className="w-4 h-4" />;
         }
     };
@@ -203,6 +205,8 @@ export function AppReleaseManager() {
                                     <option value="win">{uiI18n.t('app.windows_26d9c28d')}</option>
                                     <option value="mac">{uiI18n.t('app.macos_cd6fdcbf')}</option>
                                     <option value="linux">{uiI18n.t('app.linux_83ad8510')}</option>
+                                    <option value="android">Android</option>
+                                    <option value="android-tv">Android TV</option>
                                 </select>
                             </div>
                         </div>

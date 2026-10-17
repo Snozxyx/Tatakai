@@ -18,6 +18,7 @@ import {
   Apple,
   Terminal,
   Smartphone,
+  Tv,
   Package,
   Tag,
   PlusCircle,
@@ -46,6 +47,8 @@ const PLATFORM_ICON: Record<PlatformKey, LucideIcon> = {
   macos: Apple,
   linux: Terminal,
   android: Smartphone,
+  'android-tv': Tv,
+  ios: Smartphone,
 };
 
 /** Strips a leading `v` so a GitHub tag maps to the policy's semver field. */

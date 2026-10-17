@@ -22,6 +22,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       'Experimental IPTV playlists, favorites and Now/Next guide',
       'Lightweight TV wallpapers and reduced-motion support',
       'Separate Android TV APK and flavor-aware updates',
+      'Android TV downloads on the website and separate TV analytics and release management in admin',
       'Reliable HLS/DASH proxy playback, source switching and focus-preserving pagination',
     ],
   },

@@ -12,6 +12,7 @@ All notable changes to Tatakai are documented here.
 - Experimental IPTV playlists, channel favorites, and Now/Next guide support.
 - Lightweight TV video wallpapers with still-image and reduced-motion fallbacks.
 - Separate Android TV APK and flavor-aware updates that preserve the existing mobile application.
+- Android TV download option on the website, plus distinct TV download analytics and release management in admin.
 
 ### Fixed
 - Retain HLS/DASH transport hints through local proxy URLs and TV source changes.

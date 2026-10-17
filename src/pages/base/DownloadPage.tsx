@@ -4,7 +4,7 @@ import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 
 import { useEffect, useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Monitor, Apple, Download, X, Smartphone, DownloadCloud, CheckCircle, Shield, Sparkles, RefreshCw } from "lucide-react";
+import { ArrowRight, Monitor, Apple, Download, X, Smartphone, Tv, DownloadCloud, CheckCircle, Shield, Sparkles, RefreshCw } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Navigation } from "@/components/ui/navbar";
 import { FooterSection } from "@/components/ui/footer";
@@ -101,6 +101,15 @@ const DEFAULT_DOWNLOADS: DownloadItem[] = [
     requirements: "Android 8.0 or later (64-bit)",
     link: "https://github.com/snozxyx/tatakai/releases",
     versions: []
+  },
+  {
+    name: "Android TV",
+    category: "TV App",
+    icon: Tv,
+    description: "Remote-first app for Android TV and Google TV. Link your account using a QR code or PIN.",
+    requirements: "Android TV / Google TV 9.0 or later",
+    link: GITHUB_RELEASES_URL,
+    versions: [],
   },
   {
     name: "iOS",
@@ -494,6 +503,11 @@ export function DownloadSection() {
             </div>
 
             {/* Mobile install instructions */}
+            {selectedDownload?.name === "Android TV" && (
+              <p className="text-sm text-muted-foreground">
+                Install the Android TV APK on your TV, then open tatakai.me/link on a signed-in phone or computer and approve the code displayed on the TV. The TV APK is separate from the phone app.
+              </p>
+            )}
             {selectedDownload?.category === "Mobile App" && (
               <div className="space-y-2 py-3 px-4 bg-amber-500/10 rounded-xl border border-amber-500/30">
                 <p className="text-[11px] font-bold uppercase tracking-wider text-amber-300 font-mono">

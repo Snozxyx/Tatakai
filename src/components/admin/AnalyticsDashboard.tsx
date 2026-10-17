@@ -79,6 +79,7 @@ export function AnalyticsDashboard() {
       // than buried inside the desktop installer total.
       let mobileDownloads = 0;
       let mobileDownloadsDesktop = 0;
+      let tvDownloads = 0;
 
       const platform = new Map<string, number>();
       releases.forEach((r) =>
@@ -87,18 +88,20 @@ export function AnalyticsDashboard() {
           if (k) {
             platform.set(k, (platform.get(k) || 0) + (a.download_count || 0));
             if (k === 'android' || k === 'ios') mobileDownloads += a.download_count || 0;
+            else if (k === 'android-tv') tvDownloads += a.download_count || 0;
             else mobileDownloadsDesktop += a.download_count || 0;
           }
         })
       );
       const colors = ['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b'];
       const perPlatform = Array.from(platform.entries())
-        .map(([name, value], i) => ({ name, value, color: colors[i % colors.length] }))
+        .map(([name, value], i) => ({ name: name === 'android-tv' ? 'Android TV' : name, value, color: colors[i % colors.length] }))
         .sort((a, b) => b.value - a.value);
 
       return {
         totalDownloads,
         mobileDownloads,
+        tvDownloads,
         desktopDownloads: mobileDownloadsDesktop,
         stars: repo?.stargazers_count || 0,
         forks: repo?.forks_count || 0,
@@ -229,7 +232,7 @@ export function AnalyticsDashboard() {
         <p className="text-xs text-muted-foreground mb-5">
           {uiI18n.t('app.signup_new_account_activation_watched_within_the_4bc00698')}
         </p>
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
           {[
             { get label() { return uiI18n.t('app.visitors_f8f3b6f9'); }, value: funnel?.visitors ?? 0, rate: null as number | null },
             { get label() { return uiI18n.t('app.signups_09c26725'); }, value: funnel?.signups ?? 0, rate: funnel?.signupRate ?? 0 },
@@ -567,11 +570,12 @@ export function AnalyticsDashboard() {
             </a>
           </div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
             {[
               { icon: Download, get label() { return uiI18n.t('app.total_downloads_85b696f8'); }, value: formatCompact(githubData.totalDownloads), color: 'text-violet-400' },
               { icon: Smartphone, get label() { return uiI18n.t('app.mobile_downloads_cfebdf6a'); }, value: formatCompact(githubData.mobileDownloads), color: 'text-emerald-400' },
               { icon: Monitor, get label() { return uiI18n.t('app.desktop_downloads_620f5c47'); }, value: formatCompact(githubData.desktopDownloads), color: 'text-blue-400' },
+              { icon: Monitor, label: 'Android TV downloads', value: githubData.tvDownloads.toLocaleString(uiI18n.language), color: 'text-primary' },
               { icon: Star, get label() { return uiI18n.t('app.github_stars_d00bd5ef'); }, value: formatCompact(githubData.stars), color: 'text-amber-400' },
               { icon: TrendingUp, get label() { return uiI18n.t('app.latest_version_2a2e9c3f'); }, value: `v${githubData.latestVersion}`, color: 'text-emerald-400' },
             ].map((s) => (

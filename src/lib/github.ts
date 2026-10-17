@@ -7,7 +7,7 @@ export const GITHUB_REPO = "tatakai";
 export const GITHUB_REPO_URL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}`;
 export const GITHUB_RELEASES_URL = `${GITHUB_REPO_URL}/releases`;
 
-export type PlatformKey = "windows" | "macos" | "linux" | "android" | "ios";
+export type PlatformKey = "windows" | "macos" | "linux" | "android" | "android-tv" | "ios";
 
 export interface GitHubReleaseAsset {
   name: string;
@@ -83,6 +83,7 @@ export const fetchAllReleases = async (force = false) => {
 };
 export function platformForAsset(fileName: string): PlatformKey | null {
   const n = fileName.toLowerCase();
+  if (/-android-tv\.apk$/.test(n)) return "android-tv";
   if (/\.(exe|msi)$/.test(n) || /win(dows|32|64)?|setup|portable/.test(n)) return "windows";
   if (/\.(dmg|pkg)$/.test(n) || /mac(os)?|darwin|osx|apple|universal/.test(n)) return "macos";
   if (/\.(appimage|deb|rpm|snap|flatpak)$/.test(n) || /linux/.test(n)) return "linux";
@@ -119,6 +120,7 @@ export function pickPrimaryAsset(
   if (key === "linux") return matches.find((a) => /\.appimage$/i.test(a.name)) || matches[0];
   // TV has a different application ID and cannot update the mobile app.
   if (key === "android") return matches.find((a) => /\.apk$/i.test(a.name) && !/android-tv\.apk$/i.test(a.name));
+  if (key === "android-tv") return matches.find((a) => /-android-tv\.apk$/i.test(a.name));
   if (key === "ios") return matches.find((a) => /\.ipa$/i.test(a.name)) || matches[0];
   return matches[0];
 }
@@ -133,6 +135,9 @@ export function platformKeyForName(name: string): PlatformKey | null {
       return "linux";
     case "android":
       return "android";
+    case "android tv":
+    case "android-tv":
+      return "android-tv";
     case "ios":
       return "ios";
     default:
