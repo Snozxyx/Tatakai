@@ -38,6 +38,7 @@ import { SubtitleOverlay } from "./overlays/SubtitleOverlay";
 import { Anime4KRenderer, type Anime4KMode } from "@/lib/video/anime4k/Anime4KRenderer";
 import { isDesktop, isMobileNative } from "@/lib/platform/platform";
 import { ensureCustomSubtitleFontLoaded } from "@/lib/video/customSubtitleFont";
+import { selectPreferredSource } from "@/lib/video/preferredSource";
 
 // Controls
 import { PlaybackControls } from "./controls/PlaybackControls";
@@ -69,7 +70,6 @@ import { LongPressSpeed } from "./gestures/LongPressSpeed";
 import type {
   VideoPlayerProps,
   VideoPlayerExtendedProps,
-  PlaybackSource,
   CustomSubtitle,
   InternalSubtitleTrack,
   AudioTrack,
@@ -77,52 +77,8 @@ import type {
 } from "./VideoPlayer.types";
 
 // ---------------------------------------------------------------------------
-// Quality selection helper
+// Quality selection: shared helper lives in @/lib/video/preferredSource.
 // ---------------------------------------------------------------------------
-
-function parseQualityScore(quality?: string): number | null {
-  const normalized = String(quality || "").toLowerCase();
-  const match = normalized.match(/(\d{3,4})\s*p?/);
-  if (!match) return null;
-  const value = Number(match[1]);
-  return Number.isFinite(value) ? value : null;
-}
-
-function selectPreferredSource(
-  sources: PlaybackSource[],
-  preferredQuality: "auto" | "1080p" | "720p" | "480p" | "360p",
-) {
-  if (!sources.length) return undefined;
-  if (preferredQuality === "auto") return sources[0];
-
-  const preferredScore = parseQualityScore(preferredQuality);
-  if (!preferredScore) {
-    return (
-      sources.find(
-        (source) => String(source.quality || "").toLowerCase() === preferredQuality,
-      ) || sources[0]
-    );
-  }
-
-  const candidates = sources
-    .map((source) => ({ source, score: parseQualityScore(source.quality) }))
-    .filter(
-      (entry): entry is { source: PlaybackSource; score: number } => entry.score != null,
-    )
-    .sort((left, right) => {
-      const distanceDiff =
-        Math.abs(left.score - preferredScore) - Math.abs(right.score - preferredScore);
-      if (distanceDiff !== 0) return distanceDiff;
-      return right.score - left.score;
-    });
-
-  if (candidates.length > 0) return candidates[0].source;
-  return (
-    sources.find(
-      (source) => String(source.quality || "").toLowerCase() === preferredQuality,
-    ) || sources[0]
-  );
-}
 
 function isTransientTorrentStartupError(message: string): boolean {
   const normalized = String(message || "").toLowerCase();
@@ -143,6 +99,9 @@ const FS_HINT_SEEN_KEY = "tatakai:player:fs-hint-seen";
 
 // Click vs double-click disambiguation window (ms).
 const DBL_CLICK_DELAY_MS = 260;
+
+// Idle time after which the mouse cursor hides over the player while playing.
+const CURSOR_IDLE_MS = 6000;
 
 // ---------------------------------------------------------------------------
 // Component
@@ -434,6 +393,61 @@ export function VideoPlayer({
     setShowControls: setControlsVisible,
     showControlsTemporarily,
   } = useControlsVisibility({ isPlaying, isMobile });
+
+  // Hide the mouse cursor after CURSOR_IDLE_MS of stillness while playing
+  // (desktop only). Any pointer activity restores it immediately; pausing
+  // keeps the cursor visible. Scoped to the player container, so a parked
+  // cursor over the settings sheet (portaled outside) stays visible.
+  const [cursorIdle, setCursorIdle] = useState(false);
+  const cursorIdleRef = useRef(false);
+  const cursorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isPlayingRef = useRef(isPlaying);
+  isPlayingRef.current = isPlaying;
+  const quickMenuOpenRef = useRef(false);
+  quickMenuOpenRef.current =
+    showSubtitleMenu || showAudioMenu || showSettings || showSettingsPanel;
+
+  const hideCursorSoon = useCallback(() => {
+    if (cursorTimerRef.current) clearTimeout(cursorTimerRef.current);
+    if (cursorIdleRef.current) {
+      cursorIdleRef.current = false;
+      setCursorIdle(false);
+    }
+    cursorTimerRef.current = setTimeout(() => {
+      cursorTimerRef.current = null;
+      if (isPlayingRef.current && !quickMenuOpenRef.current) {
+        cursorIdleRef.current = true;
+        setCursorIdle(true);
+      }
+    }, CURSOR_IDLE_MS);
+  }, []);
+
+  useEffect(() => {
+    if (isMobile) return;
+    if (isPlaying) {
+      hideCursorSoon();
+      return () => {
+        if (cursorTimerRef.current) {
+          clearTimeout(cursorTimerRef.current);
+          cursorTimerRef.current = null;
+        }
+      };
+    }
+    if (cursorIdleRef.current) {
+      cursorIdleRef.current = false;
+      setCursorIdle(false);
+    }
+    if (cursorTimerRef.current) {
+      clearTimeout(cursorTimerRef.current);
+      cursorTimerRef.current = null;
+    }
+    return undefined;
+  }, [isPlaying, isMobile, hideCursorSoon]);
+
+  const handleContainerMouseMove = useCallback(() => {
+    showControlsTemporarily();
+    hideCursorSoon();
+  }, [showControlsTemporarily, hideCursorSoon]);
 
   const { keybinds } = useKeybinds();
 
@@ -821,7 +835,14 @@ export function VideoPlayer({
   // Subtitle change on settings change
   // ---------------------------------------------------------------------------
 
+  const syncedSubtitlePrefRef = useRef<string | null>(null);
   useEffect(() => {
+    // Re-apply the language preference only when its value actually changes.
+    // This effect also re-ran whenever `handleSubtitleChange` was re-created
+    // (e.g. every time a subtitle blob finished loading), which silently
+    // reverted the subtitle the user had picked mid-episode.
+    if (syncedSubtitlePrefRef.current === settings.subtitleLanguage) return;
+    syncedSubtitlePrefRef.current = settings.subtitleLanguage;
     handleSubtitleChange(settings.subtitleLanguage);
   }, [settings.subtitleLanguage, handleSubtitleChange]);
 
@@ -835,6 +856,13 @@ export function VideoPlayer({
     subtitleApplyStateRef.current = null;
     subtitleTrackSignatureRef.current = "";
   }, [subtitleKey, sourceKey]);
+
+  useEffect(() => {
+    // A source switch invalidates the previous source's selection key. Resolve
+    // from the language preference instead, so the menus and the player
+    // re-establish the selection on the new track list.
+    setCurrentSubtitle(settings.subtitleLanguage);
+  }, [sourceKey, settings.subtitleLanguage, setCurrentSubtitle]);
 
   // ---------------------------------------------------------------------------
   // Skip times
@@ -1459,8 +1487,8 @@ export function VideoPlayer({
   return (
     <div
       ref={containerRef}
-      className="relative aspect-video min-h-[12rem] bg-black rounded-xl md:rounded-2xl overflow-hidden group touch-manipulation video-player-container video-player-modern"
-      onMouseMove={!isMobile ? showControlsTemporarily : undefined}
+      className={`relative aspect-video min-h-[12rem] bg-black rounded-xl md:rounded-2xl overflow-hidden group touch-manipulation video-player-container video-player-modern ${!isMobile && cursorIdle ? "cursor-none" : ""}`}
+      onMouseMove={!isMobile ? handleContainerMouseMove : undefined}
       onMouseLeave={() => !isMobile && isPlaying && setControlsVisible(false)}
       onTouchStart={showControlsTemporarily}
     >

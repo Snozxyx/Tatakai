@@ -12,6 +12,7 @@ import {
   useAnimeInfo,
 } from "@/hooks/api/useAnimeData";
 import { useCombinedSourcesWithRefetch } from "@/hooks/media/useCombinedSources";
+import { resolveExtensionApiBase } from "@/hooks/media/useExtensionSourceStream";
 import type { EpisodeServer, Subtitle } from "@/types/anime";
 import { Background } from "@/components/layout/Background";
 import { Sidebar } from "@/components/layout/Sidebar";
@@ -1580,15 +1581,26 @@ export default function WatchPage() {
       if (anilistId || animeData?.info.name) {
         void import('@/core/extensions/mobile/mobileExtensionHost').then(
           ({ mobileExtensionDispatch }) =>
-            mobileExtensionDispatch
-              .resolveSources('toko', 'sources', {
-                anilistId: anilistId ?? undefined,
-                titles: animeData?.info.name ? [animeData.info.name] : undefined,
-                episode: nextEpisode.number,
-                resolution: '1080p',
-                preferredLanguage: category,
-              })
-              .catch(() => {}),
+            (async () => {
+              // Warm every mounted extension's in-WebView cache (generic —
+              // anything with a sources/stream route), so advancing to the
+              // next episode resolves instantly.
+              const base = await resolveExtensionApiBase(true).catch(() => null);
+              const namespaces = (base?.baseUrl ? base.namespaces || [] : [])
+                .filter((ns) => (ns.routes || []).includes('sources') || (ns.routes || []).includes('stream'))
+                .map((ns) => ns.namespace);
+              for (const namespace of namespaces) {
+                mobileExtensionDispatch
+                  .resolveSources(namespace, 'sources', {
+                    anilistId: anilistId ?? undefined,
+                    titles: animeData?.info.name ? [animeData.info.name] : undefined,
+                    episode: nextEpisode.number,
+                    resolution: '1080p',
+                    preferredLanguage: category,
+                  })
+                  .catch(() => {});
+              }
+            })().catch(() => {}),
         ).catch(() => {});
       }
     }

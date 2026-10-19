@@ -4,6 +4,15 @@ All notable changes to Tatakai are documented here.
 
 ---
 
+## [6.2.3] - 2026-10-19
+
+### Fixed
+- Resolve playback sources from every installed extension that supports source streaming, so one unavailable provider no longer blocks results from the others.
+- Keep quality selection within the chosen provider, preserve subtitle selections across track loading, and keep the page from scrolling behind CSS fullscreen playback.
+- Hide the desktop playback cursor after inactivity and include extensions listening on port 8098 in host discovery.
+
+---
+
 ## [6.2.2] - 2026-10-19
 
 ### Fixed

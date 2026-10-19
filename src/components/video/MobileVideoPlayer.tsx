@@ -46,6 +46,7 @@ import { UpNextOverlay } from "./overlays/UpNextOverlay";
 import { VideoSettingsPanel } from "./VideoSettingsPanel";
 import { buildSubtitleCueStyle } from "@/lib/video/subtitleStyle";
 import { ensureCustomSubtitleFontLoaded } from "@/lib/video/customSubtitleFont";
+import { selectPreferredSource } from "@/lib/video/preferredSource";
 import { triggerHaptic } from "@/lib/haptics";
 import { useActiveCues } from "./hooks/useActiveCues";
 import { useAmbientMode } from "./hooks/usePlayerEnhancements";
@@ -98,40 +99,7 @@ interface MobileVideoPlayerProps {
 }
 
 // formatTime + subtitle helper functions moved to @/core/player/*
-
-function parseQualityScore(quality?: string): number | null {
-  const normalized = String(quality || '').toLowerCase();
-  const match = normalized.match(/(\d{3,4})\s*p?/);
-  if (!match) return null;
-  const value = Number(match[1]);
-  return Number.isFinite(value) ? value : null;
-}
-
-function selectPreferredSource(
-  sources: Array<{ url: string; isM3U8: boolean; quality?: string }>,
-  preferredQuality: 'auto' | '1080p' | '720p' | '480p' | '360p',
-) {
-  if (!sources.length) return undefined;
-  if (preferredQuality === 'auto') return sources[0];
-
-  const preferredScore = parseQualityScore(preferredQuality);
-  if (!preferredScore) {
-    return sources.find((source) => String(source.quality || '').toLowerCase() === preferredQuality) || sources[0];
-  }
-
-  const candidates = sources
-    .map((source) => ({ source, score: parseQualityScore(source.quality) }))
-    .filter((entry): entry is { source: { url: string; isM3U8: boolean; quality?: string }; score: number } => entry.score != null)
-    .sort((left, right) => {
-      const distanceDiff = Math.abs(left.score - preferredScore) - Math.abs(right.score - preferredScore);
-      if (distanceDiff !== 0) return distanceDiff;
-      return right.score - left.score;
-    });
-
-  if (candidates.length > 0) return candidates[0].source;
-
-  return sources.find((source) => String(source.quality || '').toLowerCase() === preferredQuality) || sources[0];
-}
+// Quality selection helper lives in @/lib/video/preferredSource.
 
 function normalizeSubtitleLanguage(value?: string): string {
   const normalized = String(value || '').trim().toLowerCase();

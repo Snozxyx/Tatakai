@@ -999,6 +999,22 @@ html.mobile-player-fullscreen [data-mobile-nav] {
   z-index: 99999 !important;
 }
 
+/* Freeze the document behind the fullscreen player. The Electron window-
+   fullscreen path and the CSS-fallback paths keep the page mounted behind the
+   player, so without this the root scrollbar stays visible and wheel-scrollable
+   while "fullscreen". Real Fullscreen-API fullscreen uses the top layer and
+   needs no rule. */
+html.app-fullscreen,
+html.app-fullscreen body {
+  overflow: hidden !important;
+  scrollbar-width: none;
+}
+html.app-fullscreen::-webkit-scrollbar,
+html.app-fullscreen body::-webkit-scrollbar {
+  display: none;
+}
+
+
 /* ── Hide title bar (user preference) ─────────────────────────────────────────
  * Applied to <html> when the "Hide title bar" toggle is on (persisted in
  * localStorage as `tatakai_hide_titlebar`). Unlike .app-fullscreen this only

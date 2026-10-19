@@ -261,7 +261,25 @@ export function useSubtitleManager({
         return;
       }
 
+      // A language preference ("auto", "english", "spanish", …) resolves to one
+      // concrete track. Record that track's *selection key* (e.g. "sub:<url>")
+      // so the quick selector and the settings panel highlight the option that
+      // is actually playing — preference names never match a listed key and
+      // used to make every menu show "nothing selected".
+      const findResolvableSubIndex = (preference?: string | null, startIndex = 0): number => {
+        for (let i = Math.max(0, startIndex); i < orderedSubtitles.length; i++) {
+          const sub = orderedSubtitles[i];
+          if (!String(sub.url || "").trim()) continue;
+          if (preference && !doesSubtitleTrackMatchPreference({ language: sub.lang, label: sub.label }, preference)) {
+            continue;
+          }
+          return i;
+        }
+        return -1;
+      };
+
       let selectedIndex = -1;
+      let resolvedKey: string | null = null;
       const trackElements = video.querySelectorAll("track");
 
       // 2. Try to match tracks by their DOM element src attribute
@@ -302,6 +320,7 @@ export function useSubtitleManager({
               // the Anime4K canvas. Only ever enable ONE track.
               track.mode = "hidden";
               selectedIndex = subIndex;
+              resolvedKey = getSubtitleSelectionKey(sub, subIndex);
               break;
             }
           }
@@ -320,12 +339,16 @@ export function useSubtitleManager({
 
         if (lang === "auto") {
           selectedIndex = englishIndex >= 0 ? englishIndex : tracks.length > 0 ? 0 : -1;
+          const englishSubIndex = findResolvableSubIndex("english");
+          const fallbackSubIndex = englishSubIndex >= 0 ? englishSubIndex : findResolvableSubIndex();
+          resolvedKey = fallbackSubIndex >= 0 ? getSubtitleSelectionKey(orderedSubtitles[fallbackSubIndex], fallbackSubIndex) : null;
         } else {
           for (let i = 0; i < tracks.length; i++) {
             const mappedSubtitle = orderedSubtitles[i];
             const mappedKey = mappedSubtitle ? getSubtitleSelectionKey(mappedSubtitle, i).toLowerCase() : "";
             if (mappedKey === selectedKeyLower) {
               selectedIndex = i;
+              resolvedKey = getSubtitleSelectionKey(mappedSubtitle, i);
               break;
             }
           }
@@ -337,6 +360,13 @@ export function useSubtitleManager({
                 selectedIndex = i;
                 break;
               }
+            }
+            if (selectedIndex >= 0) {
+              const preferenceSubIndex = findResolvableSubIndex(selectedKey);
+              resolvedKey =
+                preferenceSubIndex >= 0
+                  ? getSubtitleSelectionKey(orderedSubtitles[preferenceSubIndex], preferenceSubIndex)
+                  : null;
             }
           }
         }
@@ -352,7 +382,7 @@ export function useSubtitleManager({
         trackCount: tracks.length,
       };
 
-      setCurrentSubtitle(lang);
+      setCurrentSubtitle(resolvedKey || lang);
     },
     [allRenderedSubtitles, subtitleBlobs, videoRef, setCurrentSubtitle],
   );

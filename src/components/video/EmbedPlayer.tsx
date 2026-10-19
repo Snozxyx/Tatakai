@@ -280,12 +280,16 @@ export function EmbedPlayer({ url, poster, language, referer, onError }: EmbedPl
           } catch {
             lockAncestors();
             node.classList.add("is-player-fullscreen");
+            // Locks the document behind the player (scrollbar/wheel) while the
+            // CSS fallback is active — see html.app-fullscreen in index.css.
+            document.documentElement.classList.add("app-fullscreen");
             setIsFullscreen(true);
           }
         }
       } else {
         releaseAncestors();
         node.classList.remove("is-player-fullscreen");
+        document.documentElement.classList.remove("app-fullscreen");
         setIsFullscreen(false);
         if (isMobile) {
           await showStatusBar();
@@ -329,6 +333,7 @@ export function EmbedPlayer({ url, poster, language, referer, onError }: EmbedPl
       try { unlockAncestorsRef.current?.(); } catch { /* ignore */ }
       unlockAncestorsRef.current = null;
       containerRef.current?.classList.remove("is-player-fullscreen");
+      document.documentElement.classList.remove("app-fullscreen");
     };
   }, [desktop.isDesktop]);
 

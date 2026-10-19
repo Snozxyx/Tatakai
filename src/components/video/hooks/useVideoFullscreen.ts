@@ -69,12 +69,16 @@ export function useVideoFullscreen({ containerRef, isMobile }: UseVideoFullscree
           releaseAncestors();
           unlockAncestorsRef.current = lockFullscreenAncestors(container);
           container.classList.add("is-player-fullscreen");
+          // Locks the document behind the player (scrollbar/wheel) while the
+          // CSS fallback is active — see html.app-fullscreen in index.css.
+          document.documentElement.classList.add("app-fullscreen");
           fullscreenRef.current = true;
           setIsFullscreen(true);
         }
         await lockLandscapeOnMobile();
       } else {
         container.classList.remove("is-player-fullscreen");
+        document.documentElement.classList.remove("app-fullscreen");
         releaseAncestors();
         fullscreenRef.current = false;
         setIsFullscreen(false);
@@ -104,6 +108,7 @@ export function useVideoFullscreen({ containerRef, isMobile }: UseVideoFullscree
       setIsFullscreen(activeFullscreen);
       if (!activeFullscreen) {
         containerRef.current?.classList.remove("is-player-fullscreen");
+        document.documentElement.classList.remove("app-fullscreen");
         releaseAncestors();
         unlockOrientationOnMobile();
       }
@@ -133,6 +138,7 @@ export function useVideoFullscreen({ containerRef, isMobile }: UseVideoFullscree
       document.removeEventListener("keydown", handleKeyEscape);
       releaseAncestors();
       containerRef.current?.classList.remove("is-player-fullscreen");
+      document.documentElement.classList.remove("app-fullscreen");
     };
   }, [containerRef, desktop.isDesktop, unlockOrientationOnMobile, releaseAncestors]);
 

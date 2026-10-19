@@ -1,13 +1,14 @@
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useRemoteExtensionSources } from "./useRemoteExtensionSources";
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchCombinedSources } from "@/lib/api";
+import { EXTENSION_INSTALLED_EVENT } from "@/core/extensions/ecosystems";
 import type { StreamingData } from "@/lib/api";
 import { getCachedCombinedSources, getCombinedSourceCacheKey, setCachedCombinedSources } from "@/lib/watch/sourceIntelligence";
 import type { EpisodeServer, StreamingSource, Subtitle } from "@/types/anime";
-import { useExtensionSourceStream } from "@/hooks/media/useExtensionSourceStream";
+import { useExtensionSourceStream, resolveExtensionApiBase, type ExtensionStreamPhase } from "@/hooks/media/useExtensionSourceStream";
 
 type CombinedResult = StreamingData & {
   hasTatakaiProviders: boolean;
@@ -16,6 +17,78 @@ type CombinedResult = StreamingData & {
   nextEpisodeEstimates?: Array<{ lang?: string; server?: string; label: string }>;
   providerStatus?: Array<{ provider: string; status: string; resultCount?: number; durationMs?: number; error?: string }>;
 };
+
+/**
+ * Namespaces the extension host mounted that expose stream sources.
+ *
+ * Every installed extension declares its own `apiServer.namespace` in its
+ * manifest, so the watch page fans out over whatever the host reports instead
+ * of a hardcoded list — installing or removing an extension changes the
+ * subscription set on its own. Retries briefly while nothing is registered
+ * (bundles mount a beat after the player) and settles with `ready: true` so
+ * the caller can hand off to the one-shot fallback when the host truly has
+ * nothing stream-capable.
+ */
+const NS_RETRY_MS = 500;
+const NS_RETRY_MAX = 10;
+
+function useStreamCapableNamespaces(enabled: boolean) {
+  const [state, setState] = useState<{ namespaces: string[]; ready: boolean }>({
+    namespaces: [],
+    ready: false,
+  });
+
+  useEffect(() => {
+    if (!enabled) {
+      setState({ namespaces: [], ready: false });
+      return;
+    }
+    let cancelled = false;
+    let attempts = 0;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const resolve = async () => {
+      const base = await resolveExtensionApiBase(true);
+      if (cancelled) return;
+      const found = (base?.baseUrl ? base.namespaces || [] : [])
+        .filter((ns) => !!ns?.namespace && ((ns.routes || []).includes("sources") || (ns.routes || []).includes("stream")))
+        .map((ns) => ns.namespace);
+      if (found.length > 0) {
+        setState({ namespaces: Array.from(new Set(found)), ready: true });
+        return;
+      }
+      attempts += 1;
+      if (attempts >= NS_RETRY_MAX) {
+        setState({ namespaces: [], ready: true });
+        return;
+      }
+      timer = setTimeout(resolve, NS_RETRY_MS);
+    };
+
+    void resolve();
+
+    // Installing, removing or reloading an extension changes the namespace
+    // list mid-session — re-resolve fresh.
+    const onExtensionsChanged = () => {
+      if (timer) clearTimeout(timer);
+      attempts = 0;
+      void resolve();
+    };
+    if (typeof window !== "undefined") {
+      window.addEventListener(EXTENSION_INSTALLED_EVENT, onExtensionsChanged);
+    }
+
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+      if (typeof window !== "undefined") {
+        window.removeEventListener(EXTENSION_INSTALLED_EVENT, onExtensionsChanged);
+      }
+    };
+  }, [enabled]);
+
+  return state;
+}
 
 interface MapContext {
   category: string;
@@ -441,19 +514,82 @@ export function useCombinedSourcesWithRefetch(
     !!episodeId && (hasAnilist || !!animeName) && typeof episodeNumber === "number" && !!episodeNumber;
 
   const remote = useRemoteExtensionSources(hasAnilist ? anilistIdNum : undefined, animeName, episodeNumber, category === "dub");
-  const stream = useExtensionSourceStream("toko", {
+
+  // Fan out over every stream-capable namespace the extension host has
+  // mounted — one SSE subscription per extension, merged progressively below.
+  // Hook slots are fixed at the top level (rules of hooks); each binds to the
+  // discovered namespace at that index and idle while the list is shorter.
+  // Nothing extension-specific is hardcoded here: an extension contributes
+  // sources purely by being installed with a `sources`/`stream` route.
+  const { namespaces: streamNamespaces, ready: namespacesReady } = useStreamCapableNamespaces(streamEnabled);
+  const capped = (n: number) => Array.from({ length: n }, (_, i) => streamNamespaces[i] || "");
+
+  const streamParams = {
     anilistId: hasAnilist ? anilistIdNum : undefined,
     titles: animeName ? [animeName] : undefined,
     episode: episodeNumber ?? undefined,
     resolution: "1080p",
     preferredLanguage: category,
-    route: "sources",
-    enabled: streamEnabled,
-  });
+    route: "sources" as const,
+  };
+  const SLOT_COUNT = 8;
+  const enabledFor = (i: number) => streamEnabled && !!streamNamespaces[i];
+  const slot0 = useExtensionSourceStream(capped(SLOT_COUNT)[0], { ...streamParams, enabled: enabledFor(0) });
+  const slot1 = useExtensionSourceStream(capped(SLOT_COUNT)[1], { ...streamParams, enabled: enabledFor(1) });
+  const slot2 = useExtensionSourceStream(capped(SLOT_COUNT)[2], { ...streamParams, enabled: enabledFor(2) });
+  const slot3 = useExtensionSourceStream(capped(SLOT_COUNT)[3], { ...streamParams, enabled: enabledFor(3) });
+  const slot4 = useExtensionSourceStream(capped(SLOT_COUNT)[4], { ...streamParams, enabled: enabledFor(4) });
+  const slot5 = useExtensionSourceStream(capped(SLOT_COUNT)[5], { ...streamParams, enabled: enabledFor(5) });
+  const slot6 = useExtensionSourceStream(capped(SLOT_COUNT)[6], { ...streamParams, enabled: enabledFor(6) });
+  const slot7 = useExtensionSourceStream(capped(SLOT_COUNT)[7], { ...streamParams, enabled: enabledFor(7) });
+  const allSlots = [slot0, slot1, slot2, slot3, slot4, slot5, slot6, slot7];
+  const activeSlots = allSlots.filter((_, i) => !!streamNamespaces[i]);
+
+  // Merged view across subscriptions: sources concatenate (providerKey differs
+  // per extension) and diagnostics concatenate; the one-shot fallback takes
+  // over only when the host reports nothing stream-capable, or every active
+  // namespace is down or has failed with zero sources.
+  const merged = useMemo(() => {
+    const sources: any[] = [];
+    const providerStatus: Array<{ provider: string; status: string; resultCount?: number; durationMs?: number; error?: string }> = [];
+    for (let i = 0; i < allSlots.length; i++) {
+      if (!streamNamespaces[i]) continue;
+      for (const s of allSlots[i].sources) sources.push(s);
+      for (const d of allSlots[i].providerStatus) providerStatus.push(d);
+    }
+    return { sources, providerStatus };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slot0.sources, slot0.providerStatus, slot1.sources, slot1.providerStatus, slot2.sources, slot2.providerStatus,
+    slot3.sources, slot3.providerStatus, slot4.sources, slot4.providerStatus, slot5.sources, slot5.providerStatus,
+    slot6.sources, slot6.providerStatus, slot7.sources, slot7.providerStatus, streamNamespaces]);
+
+  const phases = activeSlots.map((s) => s.phase);
+  const mergedPhase: ExtensionStreamPhase =
+    phases.some((p) => p === "connecting") ? "connecting"
+    : phases.some((p) => p === "streaming") ? "streaming"
+    : phases.some((p) => p === "done") ? "done"
+    : phases.every((p) => p === "unavailable") ? "unavailable"
+    : phases.every((p) => p === "error") ? "error"
+    : phases.every((p) => p === "idle") ? "idle"
+    : "done";
+  const hostReportedNothing = namespacesReady && activeSlots.length === 0;
+  const activeUnavailable = activeSlots.length > 0 &&
+    activeSlots.every((s) => s.baseResolved && (!s.baseUrl || !s.namespaceMounted));
+  const activeAllFailed = activeSlots.length > 0 &&
+    activeSlots.every((s) => s.phase === "error" && s.sources.length === 0) &&
+    merged.sources.length === 0;
+
+  const mergedReload = useCallback(() => {
+    slot0.reload(); slot1.reload(); slot2.reload(); slot3.reload();
+    slot4.reload(); slot5.reload(); slot6.reload(); slot7.reload();
+    // Individual `reload` fns are stable (deps []), so depending on the slot
+    // objects would only churn this callback per render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slot0.reload, slot1.reload, slot2.reload, slot3.reload, slot4.reload, slot5.reload, slot6.reload, slot7.reload]);
 
   // The stream can't serve → run the one-shot fallback query.
-  const streamUnavailable = stream.baseResolved && (!stream.baseUrl || !stream.namespaceMounted);
-  const streamFailed = stream.phase === "error" && stream.sources.length === 0;
+  const streamUnavailable = activeUnavailable || hostReportedNothing;
+  const streamFailed = (mergedPhase === "error" && merged.sources.length === 0) || activeAllFailed;
   const useFallback = !streamEnabled || streamUnavailable || streamFailed;
 
   const fallback = useCombinedSources(
@@ -471,15 +607,14 @@ export function useCombinedSourcesWithRefetch(
   // Build progressive data from the accumulated stream sources.
   const streamData = useMemo<CombinedResult | undefined>(() => {
     if (!streamEnabled) return undefined;
-    if (stream.sources.length === 0 && stream.phase !== "done") return undefined;
-    const sd = mapRawSourcesToStreamingData(stream.sources, { category, knownAnilistId, knownMalId });
+    if (merged.sources.length === 0 && mergedPhase !== "done") return undefined;
+    const sd = mapRawSourcesToStreamingData(merged.sources, { category, knownAnilistId, knownMalId });
     return {
       ...sd,
       hasTatakaiProviders: (sd.providerServers?.length || 0) > 0,
-      providerStatus: stream.providerStatus,
+      providerStatus: merged.providerStatus,
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [streamEnabled, stream.sources, stream.phase, stream.providerStatus, category, knownAnilistId, knownMalId]);
+  }, [streamEnabled, merged, mergedPhase, category, knownAnilistId, knownMalId]);
 
   const baseData = useFallback ? fallback.data : (streamData ?? fallback.data);
   const data = useMemo(() => {
@@ -494,11 +629,17 @@ export function useCombinedSourcesWithRefetch(
     } as CombinedResult;
   }, [baseData, remote.data, category, knownAnilistId, knownMalId]);
 
+  const anyConnectingOrStreaming = activeSlots.some((s) => s.phase === "connecting" || s.phase === "streaming");
+  const mergedBaseResolved = hostReportedNothing || activeSlots.some((s) => s.baseResolved);
   const isLoading = (useFallback ? fallback.isLoading : data === undefined) || (remote.isLoading && !data?.sources.length);
-  const isFetching = remote.isFetching || (useFallback ? fallback.isFetching : !stream.baseResolved || stream.phase === "connecting" || stream.phase === "streaming");
-  const error = useFallback ? fallback.error : stream.phase === "error" ? stream.error : null;
+  const isFetching = remote.isFetching || (useFallback ? fallback.isFetching : !mergedBaseResolved || anyConnectingOrStreaming);
+  const error = useFallback
+    ? fallback.error
+    : mergedPhase === "error" && merged.sources.length === 0
+      ? (activeSlots.find((s) => s.phase === "error" && s.error)?.error ?? null)
+      : null;
 
-  const streamReload = stream.reload;
+  const streamReload = mergedReload;
   const fallbackRefetch = fallback.refetch;
   const refetch = useCallback(async () => {
     streamReload();
@@ -507,19 +648,18 @@ export function useCombinedSourcesWithRefetch(
   }, [streamReload, fallbackRefetch, remote.refetch]);
 
   // Additive diagnostics so callers can explain an empty server list instead
-  // of a dead "No servers found" — distinguishes "toko host unreachable /
-  // namespace not mounted" from "resolution ran but returned zero sources"
-  // from "not enabled (missing anilistId/name/episode)". WatchPage ignores it.
+  // of a dead "No servers found" — distinguishes "host unreachable / namespace
+  // not mounted" from "resolution ran but returned zero sources" from "not
+  // enabled (missing anilistId/name/episode)". WatchPage ignores it.
   const diagnostics = {
     streamEnabled,
-    phase: stream.phase,
-    baseResolved: stream.baseResolved,
-    namespaceMounted: stream.namespaceMounted,
-    hasBaseUrl: !!stream.baseUrl,
+    phase: mergedPhase,
+    namespaces: streamNamespaces,
+    baseResolved: mergedBaseResolved,
     streamUnavailable,
     usingFallback: useFallback,
-    sourceCount: stream.sources.length,
-    providerStatus: stream.providerStatus,
+    sourceCount: merged.sources.length,
+    providerStatus: merged.providerStatus,
   };
 
   return { data, isLoading, isFetching, error, refetch, diagnostics: { ...diagnostics, remoteProviders: remote.data?.statuses, remoteFetching: remote.isFetching } };
