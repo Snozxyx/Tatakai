@@ -31,6 +31,8 @@ jobs:
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_BACKEND_ORIGIN: https://api.tatakai.me
           VITE_TATAKAI_API_URL: https://api.tatakai.me/api/v3
+          VITE_EXTENSION_API_URL: ${{ secrets.VITE_EXTENSION_API_URL }}
+          VITE_EXTENSION_PORTAL_URL: ${{ secrets.VITE_EXTENSION_PORTAL_URL }}
           VITE_OPERATIONS_AUTH_ENABLED: 'true'
           VITE_TURNSTILE_SITE_KEY: ${{ secrets.VITE_TURNSTILE_SITE_KEY }}
           VITE_POSTHOG_KEY: ${{ secrets.VITE_POSTHOG_KEY }}

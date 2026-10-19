@@ -115,6 +115,8 @@ jobs:
         shell: bash
         env:
           DESKTOP_DOTENV: ${{ secrets.DESKTOP_DOTENV }}
+          VITE_EXTENSION_API_URL: ${{ secrets.VITE_EXTENSION_API_URL }}
+          VITE_EXTENSION_PORTAL_URL: ${{ secrets.VITE_EXTENSION_PORTAL_URL }}
         run: |
           if [ -n "$DESKTOP_DOTENV" ]; then
             printf '%s\n' "$DESKTOP_DOTENV" > .env
@@ -122,6 +124,7 @@ jobs:
           else
             echo "::warning::DESKTOP_DOTENV secret is empty — VITE_* will be blank in this build; the packaged app will show a configuration-error screen instead of connecting to the backend."
           fi
+          printf '\nVITE_EXTENSION_API_URL=%s\nVITE_EXTENSION_PORTAL_URL=%s\n' "$VITE_EXTENSION_API_URL" "$VITE_EXTENSION_PORTAL_URL" >> .env
 
       # ELECTRON_BUILD=true makes vite emit base:'./' so assets resolve under
       # file:// in the packaged app (without it, base is '/' and the packaged
@@ -306,6 +309,8 @@ jobs:
         shell: bash
         env:
           DESKTOP_DOTENV: ${{ secrets.DESKTOP_DOTENV }}
+          VITE_EXTENSION_API_URL: ${{ secrets.VITE_EXTENSION_API_URL }}
+          VITE_EXTENSION_PORTAL_URL: ${{ secrets.VITE_EXTENSION_PORTAL_URL }}
         run: |
           if [ -n "$DESKTOP_DOTENV" ]; then
             printf '%s\n' "$DESKTOP_DOTENV" > .env
@@ -313,6 +318,7 @@ jobs:
           else
             echo "::warning::DESKTOP_DOTENV is empty — VITE_* will be blank, so the mobile app will not connect to the backend."
           fi
+          printf '\nVITE_EXTENSION_API_URL=%s\nVITE_EXTENSION_PORTAL_URL=%s\n' "$VITE_EXTENSION_API_URL" "$VITE_EXTENSION_PORTAL_URL" >> .env
 
       - name: Build web app
         run: npx cross-env NODE_ENV=production vite build
@@ -380,6 +386,8 @@ jobs:
         shell: bash
         env:
           DESKTOP_DOTENV: ${{ secrets.DESKTOP_DOTENV }}
+          VITE_EXTENSION_API_URL: ${{ secrets.VITE_EXTENSION_API_URL }}
+          VITE_EXTENSION_PORTAL_URL: ${{ secrets.VITE_EXTENSION_PORTAL_URL }}
         run: |
           if [ -n "$DESKTOP_DOTENV" ]; then
             printf '%s\n' "$DESKTOP_DOTENV" > .env
@@ -387,6 +395,7 @@ jobs:
           else
             echo "::warning::DESKTOP_DOTENV is empty — VITE_* will be blank, so the mobile app will not connect to the backend."
           fi
+          printf '\nVITE_EXTENSION_API_URL=%s\nVITE_EXTENSION_PORTAL_URL=%s\n' "$VITE_EXTENSION_API_URL" "$VITE_EXTENSION_PORTAL_URL" >> .env
 
       - name: Build web app
         run: npx cross-env NODE_ENV=production vite build

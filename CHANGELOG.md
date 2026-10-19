@@ -4,6 +4,14 @@ All notable changes to Tatakai are documented here.
 
 ---
 
+## [6.2.1] - 2026-10-19
+
+### Added
+- Connect the desktop and mobile extension store to the standalone extension catalog API and publisher portal.
+- Publish Toko, HentaiDB, and the Latino/SpanishPack extension through the new catalog service.
+
+---
+
 ## [6.2.0] - 2026-10-17
 
 ### Added
