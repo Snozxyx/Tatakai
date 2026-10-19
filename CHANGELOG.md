@@ -4,6 +4,14 @@ All notable changes to Tatakai are documented here.
 
 ---
 
+## [6.2.2] - 2026-10-19
+
+### Fixed
+- Install extensions from the web catalog by opening Tatakai and handing the selected catalog entry to the in-app installer, including Stremio and Seanime manifests.
+- Keep extension installs on the verified package download and remote-manifest validation paths.
+
+---
+
 ## [6.2.1] - 2026-10-19
 
 ### Added
