@@ -83,7 +83,7 @@ For a new Tatakai checkout, use `git clone --recurse-submodules`.
 | Web | Available |
 | Desktop | Available |
 | Android | Available |
-| Android TV | Planned |
+| Android | Available |
 | iOS | Available |
 
 ## Roadmap
