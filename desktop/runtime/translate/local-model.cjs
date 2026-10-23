@@ -52,13 +52,8 @@ async function ensureRuntime(root,onProgress=()=>{},options={}){
                 await fs.mkdir(path.dirname(destination),{recursive:true});await fs.writeFile(destination,contents,{flag:'wx'});
             }
         }else{
-            const tar=require('tar');const archive=path.join(staging,'.runtime.tar.gz');await fs.writeFile(archive,bytes,{flag:'wx'});
-            await tar.x({file:archive,cwd:staging,strict:true,filter:(name,entry)=>{
-                const destination=path.resolve(staging,name);if(!contained(staging,destination)||path.isAbsolute(name)||name.includes('\\'))throw Error('Unsafe runtime archive path');
-                total+=Number(entry.size||0);if(total>512*1024*1024)throw Error('Runtime expands beyond its size limit');
-                if(entry.type==='SymbolicLink'||entry.type==='Link'){const target=entry.type==='Link'?path.resolve(staging,entry.linkpath):path.resolve(path.dirname(destination),entry.linkpath);if(!contained(staging,target))throw Error('Unsafe runtime archive link');}
-                return ['File','Directory','SymbolicLink','Link'].includes(entry.type);
-            }});await fs.unlink(archive);
+            const archive=path.join(staging,'.runtime.tar.gz');await fs.writeFile(archive,bytes,{flag:'wx'});
+            await require('./runtime-archive.cjs').extractRuntimeArchive(archive,staging);await fs.unlink(archive);
         }
         const files=await inventory(staging);const executable=files.find(file=>path.basename(file.name)===(process.platform==='win32'?'llama-server.exe':'llama-server'))?.name;
         if(!executable)throw Error('The downloaded runtime does not contain llama-server');
