@@ -20,6 +20,15 @@ export function Translate() {
           <h2 id="translate-heading" className="font-display text-3xl font-bold tracking-tight sm:text-5xl">{uiI18n.t('extensionUpdate.translateTitle')}</h2>
           <p className="text-lg text-muted-foreground">{uiI18n.t('extensionUpdate.translateBody')}</p>
         </div>
+        <img
+          src={`${import.meta.env.BASE_URL}assets/brand/${encodeURIComponent('Tatakai — The Otaku Community for Anime & Manga Fans 23-10-2026 19_21_39.png')}`}
+          alt="Tatakai Translate desktop workspace with page thumbnails, editing tools, and text layer properties"
+          className="mb-10 w-full rounded-2xl border border-border"
+          width={1920}
+          height={1020}
+          loading="lazy"
+          decoding="async"
+        />
         <ol className="grid gap-6 md:grid-cols-3">
           {steps.map(({ icon: Icon, title, body }, index) => (
             <li key={title} className="flex flex-col gap-3 border-t border-border pt-6">

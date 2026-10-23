@@ -40,7 +40,9 @@
 | **Linux** | ✅ Supported | AppImage, Flatpak, Snap |
 | **Android** | ✅ Supported | Play Store + direct APK |
 | **iOS** | ✅ Supported | Sideload only (AltStore, TrollStore) |
-| **Smart TVs** | 🚧 Coming Soon | Android TV, tvOS targets |
+| **Smart TVs** | ✅ Supported | Android TV, tvOS targets |
+| **Web** | ✅ Supported | Connect with the [Tatakai Server] |
+
 
 ---
 
@@ -153,9 +155,11 @@ Not a wrapper — a custom ML pipeline analyzing:
 | Area | Status |
 |------|--------|
 | Core App (Web/Desktop/Android) | ✅ Stable |
-| Extension System (Native + Stremio) | ✅ Stable |
-| Seanime Compatibility | 🚧 In Progress |
-| iOS / Smart TV | 🚧 Planned |
+| Extension System (Native + Stremio ) | ✅ Stable |
+| Seanime Compatibility |💚 Beta |
+| Aniyomi/Mihon Compatibility |💚 Beta |
+| Cloudstream Compatibility |💚 Beta |
+| iOS / Smart TV | 💚 Beta |
 | Discord Integration | 🚧 Planned |
 | Home Server (Self-hosted) | ✅ Available |
 

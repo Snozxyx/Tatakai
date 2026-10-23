@@ -236,7 +236,6 @@ export default function ExtensionHubPage() {
         >
           <ArrowLeft className="h-4 w-4" /> {uiI18n.t('app.home_70f8bb9a')}
         </Link>
-        <details className="mb-6 rounded-xl border border-border p-4"><summary className="cursor-pointer font-semibold">Extension Servers</summary><div className="mt-4"><ExtensionServersSettings /></div></details>
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-primary">
@@ -308,7 +307,7 @@ export default function ExtensionHubPage() {
             </Button>
           </div>
         </header>
-        <ExtensionServerStatus/>
+      
       <div className="mt-5 space-y-4"><div className="flex flex-wrap gap-3">
         <label className="flex flex-col gap-1.5 text-sm">Language <ThemedSelect value={language} onChange={e=>setLanguage(e.target.value)}><option value="all">All languages</option>{['en','es','ja','hi','fr','de','pt','it','ar','ru','ko','zh','mul','und'].map(code=><option key={code} value={code}>{code==='mul'?'Multilingual':code==='und'?'Not specified':new Intl.DisplayNames(['en'],{type:'language'}).of(code)}</option>)}</ThemedSelect></label>
         <label className="flex flex-col gap-1.5 text-sm">{uiI18n.t('app.ecosystem_9f12cdfc')} <ThemedSelect className="min-w-[10rem] rounded-full" value={ecosystem} onChange={e => setEcosystem(e.target.value)}><option value="all">{uiI18n.t('app.all_ecosystems_73e7f63d')}</option>{ECOSYSTEMS.map(e => <option key={e} value={e}>{e}</option>)}</ThemedSelect></label>
@@ -438,6 +437,8 @@ export default function ExtensionHubPage() {
               installer={installer}
               onInstall={handleInstall}
             />
+  <ExtensionServerStatus/>
+                <details className="mb-6 rounded-xl border border-border p-4"><summary className="cursor-pointer font-semibold">Extension Servers</summary><div className="mt-4"><ExtensionServersSettings /></div></details>
 
             <section className="space-y-4">
               <SectionHeading
