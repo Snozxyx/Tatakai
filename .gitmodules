@@ -1,0 +1,4 @@
+[submodule "tatakai-server"]
+	path = tatakai-server
+	url = https://github.com/Snozxyx/TatakaiServer.git
+	branch = main

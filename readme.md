@@ -47,6 +47,7 @@
 
 ## Contents
 
+- [Extension Server](https://github.com/Snozxyx/TatakaiServer#readme)
 - [Overview](#overview)
 - [Platforms](#platforms)
 - [Roadmap](#roadmap)
@@ -59,6 +60,21 @@
 ## Overview
 
 Tatakai brings anime discovery, streaming, manga reading, and community features together in one customizable app. Instead of relying on a single built-in provider, its extension-first design lets users choose their sources.
+
+Host your own sources with **[Tatakai Extension Server](https://github.com/Snozxyx/TatakaiServer)**:
+setup, built-in proxy, live logs, and deployment buttons for Vercel, Cloudflare,
+Heroku and Render. Set its API in **Settings → Extension Hub → Extension Servers**,
+or [configure a connection](https://tatakai.me/connect-server).
+
+The service is maintained independently in
+[`Snozxyx/TatakaiServer`](https://github.com/Snozxyx/TatakaiServer) and included here
+as the `tatakai-server/` Git submodule. Initialize it in an existing checkout:
+
+```sh
+git submodule update --init --recursive
+```
+
+For a new Tatakai checkout, use `git clone --recurse-submodules`.
 
 ## Platforms
 
