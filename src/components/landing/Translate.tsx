@@ -21,7 +21,7 @@ export function Translate() {
           <p className="text-lg text-muted-foreground">{uiI18n.t('extensionUpdate.translateBody')}</p>
         </div>
         <img
-          src={`${import.meta.env.BASE_URL}assets/brand/${encodeURIComponent('Tatakai — The Otaku Community for Anime & Manga Fans 23-10-2026 19_21_39.png')}`}
+          src={`${import.meta.env.BASE_URL}assets/brand/translate-workspace.png`}
           alt="Tatakai Translate desktop workspace with page thumbnails, editing tools, and text layer properties"
           className="mb-10 w-full rounded-2xl border border-border"
           width={1920}
