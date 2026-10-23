@@ -72,6 +72,8 @@ Extension compatibility, translation tools, community features, and playback imp
 
 ### Build and documentation
 
+- Keep compatibility runtime downloads checksum-pinned when upstream rolling releases replace assets, and support unauthenticated local translation providers on systems without an unlocked OS keychain.
+
 - Add desktop compatibility-runtime preparation and packaging, Android compatibility-host integration, native translation-engine builds, and dedicated translation verification workflows. Build the embedded server before Electron packaging and make Rust/process checks blocking in desktop CI.
 - Share validated public build configuration across website, desktop, and mobile builds so MAL, AniList, MangaBaka, extension services, and other integrations retain their settings. Exclude provider/admin secrets and reject missing essential OAuth IDs or local callback URLs.
 - Update Windows portable packaging and record startup timing for future performance comparisons.

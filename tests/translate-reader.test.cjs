@@ -32,7 +32,7 @@ test("reader imports only chapter-owned downloaded files and rejects traversal",
     );
     fs.writeFileSync(path.join(chapter, "001.png"), "fixture");
     const result = resolveChapter(root, 123, "one");
-    assert.equal(result.paths[0], path.join(chapter, "001.png"));
+    assert.equal(result.paths[0], fs.realpathSync(path.join(chapter, "001.png")));
     assert.equal(result.title, "Series");
     assert.equal(resolveChapter(root, 123, "missing"), null);
     manifest.pages[0].file = "../../outside.png";

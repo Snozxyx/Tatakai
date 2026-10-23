@@ -4,17 +4,21 @@
   "version": "2.0.17",
   "licenseSha256": "82de8e7a46e3d6ae407757f2b1ea2e1d1a2f7eb1bfaaf9f4a768984aeda2288e",
   "desktop": {
-    "name": "aniyomiDesktop-plugin.jar", "bytes": 65352900,
-    "url": "https://api.github.com/repos/aayush2622/DartotsuExtensionBridge/releases/assets/660474061",
+    "name": "aniyomiDesktop-plugin.jar",
+    "bytes": 65352900,
+    "url": "https://github.com/Snozxyx/TatakaiServer/releases/download/compat-runtime-bridge-2.0.17/aniyomiDesktop-plugin.jar",
     "sha256": "8544730c81718c3edd24331208b499fc41c11c36e808fe141d86f8703b85eb42"
   },
   "android": {
-    "name": "aniyomiAndroid-plugin.apk", "version": "2.0.12", "bytes": 11823531,
-    "url": "https://api.github.com/repos/aayush2622/DartotsuExtensionBridge/releases/assets/660473970",
+    "name": "aniyomiAndroid-plugin.apk",
+    "version": "2.0.12",
+    "bytes": 11823531,
+    "url": "https://github.com/Snozxyx/TatakaiServer/releases/download/compat-runtime-bridge-2.0.17/aniyomiAndroid-plugin.apk",
     "sha256": "f21aa9de9ceb5ead0f17b9ef7bc2c3555bb87d07c41b5e2d654516ef5580d8ff"
   },
   "verifier": {
-    "name": "apksig-8.13.0.jar", "bytes": 506969,
+    "name": "apksig-8.13.0.jar",
+    "bytes": 506969,
     "url": "https://dl.google.com/dl/android/maven2/com/android/tools/build/apksig/8.13.0/apksig-8.13.0.jar",
     "sha256": "c070ed1394629d74641aa0906f60b2ffa1ee77e6366a1f93437f59717b1aeb89",
     "source": "https://dl.google.com/dl/android/maven2/com/android/tools/build/apksig/8.13.0/apksig-8.13.0-sources.jar",

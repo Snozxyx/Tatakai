@@ -211,9 +211,17 @@ fn key(p: &Provider) -> Result<String> {
             .clone()
             .context("Load a local GGUF model in Settings before processing");
     }
-    match keyring::Entry::new("app.tatakai.translate", &p.id)?.get_password() {
+    let stored = keyring::Entry::new("app.tatakai.translate", &p.id)
+        .and_then(|entry| entry.get_password());
+    provider_key(p, stored)
+}
+fn provider_key(p: &Provider, stored: std::result::Result<String, keyring::Error>) -> Result<String> {
+    match stored {
         Ok(k) => Ok(k),
-        Err(keyring::Error::NoEntry)
+        // Local OpenAI-compatible servers may intentionally need no API key.
+        // Headless Linux and locked desktop keychains cannot report NoEntry;
+        // do not make an unauthenticated loopback service depend on that store.
+        Err(_)
             if reqwest::Url::parse(&p.endpoint)?
                 .host_str()
                 .is_some_and(|h| ["localhost", "127.0.0.1", "[::1]"].contains(&h)) =>
@@ -473,6 +481,16 @@ pub fn parse_json<T: serde::de::DeserializeOwned>(value: &str) -> Result<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn loopback_without_auth_does_not_require_an_os_key_store() {
+        let mut provider = Provider { id: "fixture".into(), name: "Local".into(), kind: "openai-compatible".into(), endpoint: "http://127.0.0.1:1234/v1".into(), model: "fixture".into() };
+        let unavailable = || keyring::Error::NoStorageAccess(Box::new(std::io::Error::other("locked")));
+        assert_eq!(provider_key(&provider, Err(unavailable())).unwrap(), "");
+        assert_eq!(provider_key(&provider, Ok("configured-key".into())).unwrap(), "configured-key");
+        provider.endpoint = "https://api.example.com/v1".into();
+        assert!(provider_key(&provider, Err(unavailable())).is_err());
+        assert!(provider_key(&provider, Err(keyring::Error::NoEntry)).is_err());
+    }
     #[test]
     fn offline_policy_rejects_remote_and_ambiguous_hosts() {
         let mut settings = Settings::default();
