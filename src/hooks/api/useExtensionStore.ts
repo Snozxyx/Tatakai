@@ -559,7 +559,7 @@ export function useExtensionInstaller() {
         const url=new URL(extension.sourceUrl||'');
         if(url.protocol!=='https:'||url.username||url.password||url.search||url.hash||url.pathname!=='/')throw Error('Invalid community server address');
         const path='/extensionserver/'+encodeURIComponent(url.origin);
-        if(isNative())navigate(path);else window.location.href='tatakai://extensionserver/'+encodeURIComponent(url.origin);
+        navigate(path);
         return {targetId,loaded:false,openedInApp:true};
       }
 

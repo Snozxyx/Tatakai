@@ -21,7 +21,7 @@ if(!gh(['release','view',tag,'--repo',repo],true)){
 }
 const component=process.argv[2];
 const files=component==='desktop'
- ?readdirSync('dist_electron').filter(n=>/\.(exe|dmg|zip|AppImage|deb|yml|blockmap)$/.test(n)).map(n=>'dist_electron/'+n)
+ ?readdirSync('dist_electron').filter(n=>/\.(exe|dmg|zip|AppImage|deb|blockmap)$/.test(n)||/^latest(?:-[a-z]+)?\.yml$/.test(n)).map(n=>'dist_electron/'+n)
  :readdirSync('.').filter(n=>n.startsWith(`Tatakai-v${version}-`)&&(component==='android'?/-android(?:-tv)?\.apk$/.test(n):/-ios-unsigned\.ipa$/.test(n)));
 if(!files.length)throw new Error('No native release files');
 gh(['release','upload',tag,'--repo',repo,'--clobber',...files]);

@@ -1926,6 +1926,7 @@ export function VideoPlayer({
       {/* Settings Panel */}
       <VideoSettingsPanel
         isOpen={showSettingsPanel}
+        portalContainer={isFullscreen ? containerRef.current : undefined}
         onClose={() => setShowSettingsPanel(false)}
         currentSubtitle={currentSubtitle}
         onSubtitleChange={handleSubtitleChange}

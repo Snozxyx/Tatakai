@@ -213,7 +213,7 @@ function SubtitleTranslationSection() {
           <SelectTrigger className="h-9 min-w-40 flex-1 rounded-lg text-sm" aria-label={uiI18n.t('translation.subtitlesLanguage')}>
             <SelectValue placeholder={uiI18n.t('translation.auto')} />
           </SelectTrigger>
-          <SelectContent className="max-h-72 z-[215]">
+          <SelectContent className="max-h-72">
             <SelectItem value="auto">{uiI18n.t('translation.followTarget')}</SelectItem>
             {TRANSLATION_LANGUAGES.map((language) => (
               <SelectItem key={language.code} value={language.code}>
@@ -1025,8 +1025,7 @@ export function VideoSettingsPanel({
       <SheetContent
         side={isMobile ? 'bottom' : 'right'}
         portalContainer={portalContainer}
-        className="z-[210] flex max-w-full flex-col gap-0 overflow-hidden border-white/10 bg-background/95 p-0 backdrop-blur-xl md:w-[400px] md:max-w-[400px] max-md:max-h-[85dvh] max-md:rounded-t-2xl"
-        overlayClassName="z-[209]"
+        className="flex max-w-full flex-col gap-0 overflow-hidden border-white/10 bg-background/95 p-0 backdrop-blur-xl md:w-[400px] md:max-w-[400px] max-md:max-h-[85dvh] max-md:rounded-t-2xl"
       >
         <SheetTitle className="shrink-0 px-4 py-4 pr-14 text-lg font-semibold">{uiI18n.t('app.player_settings_c1823e10')}</SheetTitle>
         <SheetDescription className="sr-only">{uiI18n.t('app.adjust_playback_video_subtitles_and_audio_99dd0126')}</SheetDescription>

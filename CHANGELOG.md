@@ -7,6 +7,7 @@ All notable changes to Tatakai are documented here.
 ## Unreleased
 
 - Play community-server media directly through its existing proxy, preserving signed tickets and HLS segments instead of nesting another streaming proxy.
+- Keep mobile-web video settings and their menus inside fullscreen, and connect community servers in the browser instead of opening the installed app.
 
 ## [6.3.0] - 2026-10-23
 
