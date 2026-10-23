@@ -4,6 +4,10 @@ All notable changes to Tatakai are documented here.
 
 ---
 
+## Unreleased
+
+- Play community-server media directly through its existing proxy, preserving signed tickets and HLS segments instead of nesting another streaming proxy.
+
 ## [6.3.0] - 2026-10-23
 
 Extension compatibility, translation tools, community features, and playback improvements. Native runtime additions require updated app packages; extension compatibility depends on the platform and source.

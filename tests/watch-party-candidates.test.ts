@@ -7,3 +7,9 @@ test('desktop and mobile never disclose host share tokens to another proxy',()=>
  expect(buildProxyCandidateUrls(share,undefined,undefined,'https://proxy.invalid')).toEqual([share]);
  expect(buildMobilePlaybackCandidates(share,{proxiedUrl:'https://proxy.invalid'})).toEqual([share]);
 });
+
+test('server media capabilities stay on their own proxy for desktop and mobile',()=>{
+ const media=`https://community.example/api/server/v1/media/${'a'.repeat(16)}.${'b'.repeat(64)}`;
+ expect(buildProxyCandidateUrls(media,undefined,undefined,'https://proxy.invalid')).toEqual([media]);
+ expect(buildMobilePlaybackCandidates(media,{proxiedUrl:'https://proxy.invalid'})).toEqual([media]);
+});
