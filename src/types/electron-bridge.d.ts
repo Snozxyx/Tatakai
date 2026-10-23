@@ -14,6 +14,8 @@ export interface ElectronThemePersistPayload {
 }
 
 export interface ElectronBridge {
+  pickExtensionPackage?: () => Promise<{ name: string; bytes: Uint8Array } | null>;
+  translate?: import('@/core/translate/types').TranslationBridge;
   getPlatform?: () => Promise<string>;
   persistTheme?: (payload: ElectronThemePersistPayload) => Promise<{ success?: boolean; error?: string }>;
   debridRequest?: (payload: {

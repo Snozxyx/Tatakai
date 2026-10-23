@@ -1,110 +1,334 @@
 # Architecture Overview
 
-Tatakai is one React codebase that ships to three targets, backed by a thin API
-proxy and a Supabase project. Understanding the **four planes** below is enough
-to place almost any file in the repo.
+Tatakai follows a **four-plane architecture** separating concerns across the web app, desktop shell, API proxy, and data layer.
+
+---
+
+## The Four Planes
 
 ```
-                         ┌─────────────────────────────────────────┐
-                         │            React app  (src/)             │
-                         │  Vite build → web · desktop · Android    │
-                         └───────────────┬─────────────────────────┘
-             ┌───────────────────────────┼───────────────────────────┐
-             ▼                            ▼                           ▼
-   ┌───────────────────┐      ┌────────────────────────┐   ┌───────────────────┐
-   │  Web  (Vercel)    │      │  Desktop (Electron)     │   │  Android (Capacitor)│
-   │  static + PWA     │      │  desktop/ main + runtime │   │  android/          │
-   └─────────┬─────────┘      └───────────┬────────────┘   └─────────┬─────────┘
-             │                            │                           │
-             └────────────┬───────────────┴───────────────┬──────────┘
-                          ▼                                ▼
-              ┌────────────────────────┐        ┌────────────────────────┐
-              │  TatakaiAPI proxy       │        │  Supabase               │
-              │  (tatakaiapi/ + toko)   │        │  auth · Postgres · RPCs │
-              │  provider aggregation,  │        │  storage · edge funcs   │
-              │  CORS/proxy, webhooks   │        │  (supabase/)            │
-              └────────────────────────┘        └────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           PLANE 1: WEB APP (React SPA)                      │
+│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────────┐  │
+│  │   Routing    │ │   Contexts   │ │  Data Fetch  │ │     UI Layer     │  │
+│  │  (React      │ │  (Auth,      │ │  (TanStack   │ │  (Components,    │  │
+│  │   Router)    │ │   Settings,  │ │   Query)     │ │   Theme,         │  │
+│  │              │ │   Extensions)│ │              │ │   Animations)    │  │
+│  └──────────────┘ └──────────────┘ └──────────────┘ └──────────────────┘  │
+│         │                │                │                    │          │
+│         └────────────────┼────────────────┼────────────────────┘          │
+│                          ▼                ▼                               │
+│                   ┌──────────────────────────────┐                        │
+│                   │       CORE DOMAIN LAYER      │                        │
+│                   │  extensions/  content/  api/ │                        │
+│                   └──────────────────────────────┘                        │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                    ┌─────────────────┼─────────────────┐
+                    ▼                 ▼                 ▼
+         ┌──────────────────┐ ┌───────────────┐ ┌──────────────────┐
+         │ PLANE 2: DESKTOP │ │ PLANE 3: API  │ │ PLANE 4: DATA    │
+         │    SHELL         │ │    PROXY      │ │     LAYER        │
+         │   (Electron)     │ │  (TatakaiAPI) │ │   (Supabase)     │
+         ├──────────────────┤ ├───────────────┤ ├──────────────────┤
+         │ • Main Process   │ │ • Rate Limit  │ │ • PostgreSQL     │
+         │ • Preload/IPC    │ │ • Cache       │ │ • Auth (OAuth,   │
+         │ • Native Services│ │ • Auth Proxy  │ │   Email, Magic)  │
+         │   - Torrent      │ │ • Request     │ │ • Realtime       │
+         │   - Proxy/WARP   │ │   Transform   │ │ • Storage        │
+         │   - Extension    │ │ • Edge Funcs  │ │ • Edge Functions │
+         │     Host         │ │               │ │                  │
+         │ • Background     │ │               │ │                  │
+         │   Workers        │ │               │ │                  │
+         └──────────────────┘ └───────────────┘ └──────────────────┘
 ```
 
-## 1. The React app (`src/`)
+---
 
-A single Vite + React + TypeScript application is the source of truth for all
-three client targets. Key top-level folders:
+## Plane 1: Web App (React SPA)
 
-| Folder | Purpose |
-| --- | --- |
-| `src/pages/` | Route screens, grouped by domain (`base`, `auth`, `watch`, `manga`, `community`, `profile`, `admin`, `forum`, `novel`, `custom`, `legal`, `error`). |
-| `src/routes/` | Central route composition that wires the page domains together. |
-| `src/components/` | Reusable UI, grouped by domain (`anime`, `manga`, `reader`, `watch`, `community`, `playlist`, `profile`, `settings`, `admin`, `moderation`, `extensions`, `layout`, `ui`, …). |
-| `src/core/` | Framework-agnostic domain logic: `providers`, `player`, `content`, `download`, `recommendations`, `extensions`, `cache`, `network`, `analytics`, `profile`, `db`, `feature-flags`. |
-| `src/contexts/` | App-wide React contexts: `AuthContext`, `BackendStatusContext`, `SettingsModalContext`, `IdleReclaimProvider`. |
-| `src/hooks/` | Reusable hooks (`api/`, `ui/`, `user/`, …). |
-| `src/integrations/` | External-service integration (Supabase client, AniList/MAL). |
-| `src/lib/` | Small shared utilities (including `lib/changelog.ts`, the in-app changelog data). |
-| `src/services/` | Client-side service wrappers. |
-| `src/locales/` | i18n resources. |
+**Entry:** `src/main.tsx` → `App.tsx` → Router
 
-See [frontend.md](frontend.md) for how these fit together.
+### Key Architectural Decisions
 
-## 2. The desktop shell (`desktop/`)
+| Aspect | Choice | Rationale |
+|--------|--------|-----------|
+| **State** | Zustand (global) + TanStack Query (server) | Separation of client vs server state |
+| **Routing** | React Router v7 | Nested routes, lazy loading, data loaders |
+| **Styling** | Tailwind CSS + CSS Variables | Theming, design tokens, dark/light |
+| **Components** | shadcn/ui + custom | Accessible, customizable, copy-pasteable |
+| **Animation** | CSS + Framer Motion (selective) | Performance, reduced-motion support |
 
-The Electron layer wraps the same web build and adds native capabilities the
-browser can't provide: local media serving, torrent streaming, request proxying,
-an in-process extension-API host, an optional home server, and OS integration.
+### Core Domain Layer (`src/core/`)
 
-- `desktop/main.cjs` — main-process entry.
-- `desktop/preload.cjs` — the `window.electron` bridge exposed to the renderer.
-- `desktop/ipc/` — one module per IPC domain (media, library, download managers
-  for anime and manga, torrent, runtime, system, theme, home-server).
-- `desktop/runtime/` — long-running subsystems: `torrent`, `proxy`,
-  `extension-api-host`, `home-server`, `library`, `download`, `share-tunnel`,
-  `warp`, `security`, `extension`.
-- `desktop/services/` — background services (auto-downloader, update-manager,
-  discord-rpc, crash-service, external-player, media-probe, perf-monitor, …).
-- `desktop/window/` — window creation and global shortcuts.
+```
+src/core/
+├── api/              # API clients (Supabase, TatakaiAPI, AniList, MAL)
+├── content/          # Media types, sources, custom-source runtime
+├── extensions/       # Extension system (registry, loader, bootstrap, SDK)
+├── database/         # Local DB (Dexie/IndexedDB) for offline
+├── hooks/            # Shared domain hooks
+├── utils/            # Domain utilities
+└── types/            # Shared TypeScript types
+```
 
-See [desktop.md](desktop.md).
+### Feature Modules (`src/features/`)
 
-## 3. The API proxy (`tatakaiapi/` + provider extensions)
+Each feature is self-contained:
+```
+features/
+├── anime/            # Calendar, details, watch page
+├── manga/            # Reader, library, discovery
+├── novels/           # Reader, TTS, library
+├── player/           # Video player, controls, subtitles
+├── community/        # Posts, profiles, watch-together
+├── recommendations/  # Engine, 3D graph, signals
+├── downloads/        # Queue, manager, offline access
+├── search/           # Universal search, filters, image search
+├── settings/         # All settings panels
+└── extensions/       # Extension management UI
+```
 
-A thin server-side layer aggregates streaming/manga providers, handles CORS and
-request proxying, holds provider secrets, and fans out webhooks. It exists so the
-clients never talk to raw provider hosts directly and so secrets stay server-side.
-Provider logic increasingly lives in **extensions** (e.g. `extension/toko`) that
-expose an extension-API surface consumed by both the proxy and the desktop
-extension-API host.
+---
 
-See [backend-and-data.md](backend-and-data.md#the-api-proxy).
+## Plane 2: Desktop Shell (Electron)
 
-## 4. Supabase (`supabase/`)
+**Entry:** `desktop/main.ts`
 
-Auth, Postgres, storage, RPCs, and edge functions. Notable characteristics that
-shape how you work with it:
+### Process Model
 
-- **Two id-spaces in `profiles`** — `profiles.id` and `profiles.user_id` are
-  different; mixing them silently returns no rows. See
-  [backend-and-data.md](backend-and-data.md#profiles-and-the-two-id-spaces).
-- **Writes go through RPCs** — column-level grants mean privileged profile
-  writes use `SECURITY DEFINER` functions rather than direct `UPDATE`s.
-- **Migrations are written, not auto-applied** in this workflow, and the history
-  is not cleanly replayable from scratch. `scripts/check-migrations.mjs`
-  validates them. See [guides/development.md](../guides/development.md).
+```
+┌────────────────────────────────────────────────────────────┐
+│                    MAIN PROCESS (Node)                      │
+│  ┌─────────────┐  ┌─────────────┐  ┌────────────────────┐  │
+│  │   IPC       │  │  Extension  │  │  Background        │  │
+│  │   Handlers  │  │  API Host   │  │  Services          │  │
+│  │             │  │  (HTTP +    │  │  • Torrent Engine  │  │
+│  │  • Window   │  │   IPC)      │  │  • Proxy/WARP      │  │
+│  │  • Menu     │  │             │  │  • Download Mgr    │  │
+│  │  • Tray     │  │  Bundle     │  │  • Update Checker  │  │
+│  │  • Dialogs  │  │  Loader     │  │  • Sync Scheduler  │  │
+│  │  • Native   │  │             │  │                    │  │
+│  │    APIs     │  │  kai-format │  │                    │  │
+│  └─────────────┘  └─────────────┘  └────────────────────┘  │
+└────────────────────────────────────────────────────────────┘
+                              │
+              ┌───────────────┼───────────────┐
+              ▼               ▼               ▼
+       ┌──────────┐    ┌────────────┐  ┌──────────────┐
+       │ Renderer │    │ Renderer 2 │  │ Renderer N   │
+       │ Process  │    │ Process    │  │ Process      │
+       │ (Web App)│    │ (Ext UI)   │  │ (Ext UI)     │
+       └──────────┘    └────────────┘  └──────────────┘
+```
 
-## The extension system spans planes
+### Native Services (in `desktop/runtime/`)
 
-Extensions are the throughline of V6. A single extension can contribute **data**
-(streaming/manga sources, custom verticals) that runs in the Node/host plane, and
-**code** (themes, analytics, services, React pages/slots) that runs in the
-renderer plane with app privileges behind a trust gate. This is documented in
-depth in [extension/](../extension/README.md).
+| Service | Technology | Purpose |
+|---------|------------|---------|
+| **Extension API Host** | Node (Express-like) | Loads extension bundles, exposes HTTP + IPC |
+| **Torrent Engine** | WebTorrent + native addon | Streaming + downloading torrents |
+| **Proxy Service** | Custom HTTP/HTTPS proxy | Referer/UA injection, geo-bypass |
+| **WARP Client** | cloudflare-warp (Rust) | Privacy routing, region unlock |
+| **Home Server** | Optional self-hosted | Remote access, library server |
 
-## Where a change usually goes
+### IPC Surface (`desktop/ipc/`)
 
-| Task | Likely location |
-| --- | --- |
-| New screen or route | `src/pages/<domain>/` + `src/routes/` |
-| New reusable UI | `src/components/<domain>/` |
-| Provider / player / download logic | `src/core/` (client) and/or the API proxy / an extension |
-| Native/desktop capability | `desktop/runtime/` + `desktop/ipc/` + `desktop/preload.cjs` |
-| Schema change | a new file in `supabase/migrations/` (written, validated, not applied) |
-| New source/theme/UI as an add-on | an **extension** — see [extension/](../extension/README.md) |
+- **`extension:invoke`** — Call extension methods (fallback to HTTP)
+- **`torrent:*`** — Add, remove, stream, progress
+- **`proxy:*`** — Configure, test, status
+- **`download:*`** — Queue, pause, resume, cancel
+- **`window:*`** — Minimize, maximize, fullscreen, tray
+- **`settings:*`** — Read/write encrypted settings
+
+### Security
+
+- **Context Isolation** — Enabled
+- **Node Integration** — Disabled in renderer
+- **Preload Scripts** — Expose only safe APIs via `contextBridge`
+- **CSP** — Strict policy, nonces for inline scripts
+
+---
+
+## Plane 3: API Proxy (TatakaiAPI)
+
+**Location:** `supabase/functions/tatakai-api/`
+
+### Responsibilities
+
+| Function | Description |
+|----------|-------------|
+| **Rate Limiting** | Per-user, per-endpoint, sliding window |
+| **Caching** | Redis-backed, TTL per endpoint |
+| **Auth Proxy** | Validate Supabase JWT, forward claims |
+| **Request Transform** | Normalize external API responses |
+| **Edge Functions** | Serverless logic (webhooks, scheduled jobs) |
+
+### Endpoints
+
+| Path | Purpose |
+|------|---------|
+| `/anime/*` | Search, details, episodes, sources |
+| `/manga/*` | Search, details, chapters, pages |
+| `/novels/*` | Search, details, chapters, content |
+| `/extensions/*` | Manifest validation, catalog |
+| `/community/*` | Posts, profiles, notifications |
+| `/recommendations/*` | Engine queries, graph data |
+| `/sync/*` | MAL/AniList/MangaBaka sync |
+
+### Deployment
+
+- **Production:** Supabase Edge Functions (Deno)
+- **Local:** `pnpm supabase:start` → `http://localhost:54321/functions/v1/tatakai-api`
+
+---
+
+## Plane 4: Data Layer (Supabase)
+
+### Database Schema (Key Tables)
+
+| Table | Purpose |
+|-------|---------|
+| `profiles` | User profiles, settings, stats (two id-spaces: `auth` + `public`) |
+| `media_lists` | Unified anime/manga/novel lists (status, progress, scores) |
+| `media_entries` | Cached media metadata (titles, images, genres) |
+| `watch_progress` | Episode timestamps, auto-skip marks |
+| `read_progress` | Chapter/page positions, scroll offsets |
+| `downloads` | Download queue, files, progress |
+| `extensions` | Installed extensions, manifests, trust status |
+| `community_posts` | Posts, comments, reactions |
+| `watch_sessions` | Watch-together session state |
+| `recommendation_signals` | ML features for recommendation engine |
+| `ranks_badges` | User ranks, badge definitions, awards |
+
+### Auth & Identity
+
+- **Supabase Auth** — Email/password, OAuth (Discord, Google, GitHub), Magic Link
+- **Two ID Spaces:**
+  - `auth.uid()` — Supabase auth user (private)
+  - `public_user_id` — Stable public identifier (for profiles, leaderboards)
+- **Row Level Security (RLS)** — All tables protected, policies in migrations
+
+### Realtime
+
+| Channel | Events |
+|---------|--------|
+| `community:posts` | New posts, updates, deletions |
+| `watch_together:*` | Playback state, user join/leave |
+| `notifications:*` | Mentions, replies, system alerts |
+| `downloads:*` | Progress, completion, errors |
+| `sync:*` | MAL/AniList sync status |
+
+### Migrations
+
+- Versioned SQL in `supabase/migrations/`
+- Applied via `supabase db push` (local) or dashboard (prod)
+- **Never edit applied migrations** — create new ones
+
+---
+
+## Data Flow Examples
+
+### 1. Playing an Anime Episode
+
+```
+User clicks "Watch" on Episode 5
+        │
+        ▼
+Watch Page (React) → useEpisodeSources(animeId, epNum)
+        │
+        ▼
+Extension Registry → fans out to ALL extensions with `sources` capability
+        │
+        ▼
+Each Extension (Node bundle) → sourcesAll({ titles, anilistId })
+        │
+        ▼
+Host aggregates → returns SourceResult[] (HLS, MP4, torrent)
+        │
+        ▼
+applyProxy() → rewrites headed URLs to local proxy tokens
+        │
+        ▼
+VideoPlayer (MediaChrome + HLS.js) → plays source
+```
+
+### 2. Installing an Extension
+
+```
+User drops .kai file / clicks "Install from URL"
+        │
+        ▼
+kai-format.cjs → validates manifest, signature, structure
+        │
+        ▼
+Extension Registry → assigns namespace, stores manifest
+        │
+        ▼
+Extension Host → loads bundle.js, starts HTTP server on random port
+        │
+        ▼
+If renderer.js exists → Renderer Loader dynamically imports it
+        │
+        ▼
+activate(ctx) → registers UI slots, pages, services, modules
+        │
+        ▼
+UI updates → new sources appear, new theme available, new pages mounted
+```
+
+### 3. Cross-Platform Sync (MAL)
+
+```
+User connects MAL in Settings
+        │
+        ▼
+OAuth flow → MAL access_token stored (encrypted) in profiles
+        │
+        ▼
+Sync Scheduler (desktop background) → runs every 30 min
+        │
+        ▼
+TatakaiAPI /sync/mal → fetches user's list, compares with local
+        │
+        ▼
+Bidirectional merge → local changes ↑, remote changes ↓
+        │
+        ▼
+Realtime → pushes updates to all connected clients
+```
+
+---
+
+## Extension System Architecture
+
+See [Extension System Overview](extensions/overview.md) for full details.
+
+**Key Files:**
+- `src/core/extensions/sdk/types.ts` — Manifest types, capability contracts
+- `src/core/extensions/ExtensionRegistry.ts` — Renderer-side pub/sub registry
+- `src/core/extensions/rendererLoader.ts` — Dynamic `import()` of renderer bundles
+- `desktop/runtime/extension-api-host/host-server.cjs` — Node bundle loader + HTTP router
+- `desktop/runtime/extension/kai-format.cjs` — `.kai` validation, signing
+
+---
+
+## Deployment Targets
+
+| Target | Build Command | Output |
+|--------|---------------|--------|
+| **Web** | `pnpm build` | `dist/` (static SPA) |
+| **Desktop (Win)** | `pnpm build:desktop --win` | `desktop/dist/*.exe`, `*.msi` |
+| **Desktop (macOS)** | `pnpm build:desktop --mac` | `desktop/dist/*.dmg`, `*.app` |
+| **Desktop (Linux)** | `pnpm build:desktop --linux` | `desktop/dist/*.AppImage`, `*.deb`, `*.rpm` |
+| **Android** | `pnpm cap:run:android --prod` | `mobile/android/app/build/outputs/*.apk` |
+| **iOS** | `pnpm cap:run:ios --prod` | Xcode Archive → TestFlight/App Store |
+
+---
+
+## Related Documents
+
+- [Frontend Architecture](architecture/frontend.md) — React app deep dive
+- [Desktop Architecture](architecture/desktop.md) — Electron, native services, IPC
+- [Backend & Data](architecture/backend.md) — Supabase schema, API, migrations
+- [Extension System](extensions/overview.md) — Extension architecture, capabilities

@@ -1,6 +1,10 @@
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { PostDrafts } from '@/components/community/PostDrafts';
+import { PostPreview } from '@/components/community/PostPreview';
+import { GeneralCommunityLanguageWarning } from '@/components/community/GeneralCommunityLanguageWarning';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { MobileNav } from '@/components/layout/MobileNav';
@@ -33,6 +37,9 @@ export default function ForumNewPostPage() {
   const createPost = useCreateForumPost();
 
   const [title, setTitle] = useState('');
+  const [preview, setPreview] = useState(false);
+  const [draftId, setDraftId] = useState('');
+  const draftPublishRef = useRef<(() => void) | null>(null);
   const [content, setContent] = useState('');
   const [flair, setFlair] = useState<string>('');
   const [isSpoiler, setIsSpoiler] = useState(false);
@@ -97,8 +104,13 @@ export default function ForumNewPostPage() {
     setIsSubmitting(true);
 
     try {
-      let imageUrl: string | undefined;
+      let imageUrl: string | undefined = imagePreview && !imageFile ? imagePreview : undefined;
 
+      if (!imageFile && imagePreview?.startsWith('data:')) {
+        setUploadingImage(true);
+        const blob = await (await fetch(imagePreview)).blob();
+        imageUrl = await uploadImage(new File([blob], 'draft-image', { type: blob.type }));
+      }
       // Upload image if present
       if (imageFile) {
         setUploadingImage(true);
@@ -114,6 +126,7 @@ export default function ForumNewPostPage() {
         image_url: imageUrl,
       });
 
+      draftPublishRef.current?.();
       if (imageUrl) {
         toast({
           get title() { return uiI18n.t('app.post_submitted_for_approval_4ce5da04'); },
@@ -165,7 +178,7 @@ export default function ForumNewPostPage() {
           <GlassPanel className="p-6 md:p-8">
             <h1 className="text-3xl font-bold mb-6">{uiI18n.t('app.create_a_post_b4596254')}</h1>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={(event) => { event.preventDefault(); setPreview(true); }} className="space-y-6">
               {/* Flair */}
               <div className="space-y-2">
                 <Label htmlFor="flair">{uiI18n.t('app.flair_optional_ccaaa5f9')}</Label>
@@ -211,6 +224,7 @@ export default function ForumNewPostPage() {
                 <Label htmlFor="content">
                   {uiI18n.t('app.content_4f9be057')} <span className="text-destructive">*</span>
                 </Label>
+                <GeneralCommunityLanguageWarning content={`${title}\n${content}`} />
                 <Textarea
                   id="content"
                   value={content}
@@ -305,8 +319,9 @@ export default function ForumNewPostPage() {
               {/* Actions */}
               <div className="flex gap-4 pt-4">
                 <Button
-                  type="submit"
-                  disabled={isSubmitting || uploadingImage || !title.trim() || !content.trim()}
+                  type="button"
+                  onClick={() => setPreview(true)}
+                  disabled={isSubmitting || uploadingImage}
                   className="gap-2"
                 >
                   <Send className="w-4 h-4" />
@@ -316,6 +331,22 @@ export default function ForumNewPostPage() {
                   {uiI18n.t('app.cancel_77dfd213')}
                 </Button>
               </div>
+              <Dialog open={preview} onOpenChange={setPreview}>
+                <DialogContent>
+                  <DialogHeader><DialogTitle>Review your post</DialogTitle><DialogDescription>Preview your post, save a draft, or publish when ready.</DialogDescription></DialogHeader>
+              <PostDrafts userId={user.id} scope="forum" title={title} disabled={isSubmitting || uploadingImage} publishRef={draftPublishRef} selectedId={draftId} onSelectedIdChange={setDraftId}
+                value={{ title, content, flair, isSpoiler, imagePreview }} onRestore={(draft) => {
+                  setTitle(draft.title); setContent(draft.content); setFlair(draft.flair); setIsSpoiler(draft.isSpoiler);
+                  setImageFile(null); setImagePreview(draft.imagePreview); setPreview(false);
+                }} />
+              <PostPreview title={title} content={content} rich={false} spoiler={isSpoiler} images={imagePreview ? [imagePreview] : []} attachments={flair ? [flair] : []} />
+
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <Button type="button" variant="ghost" onClick={() => setPreview(false)}>Keep editing</Button>
+                    <Button type="button" disabled={isSubmitting || uploadingImage || !title.trim() || !content.trim()} onClick={handleSubmit}>{isSubmitting ? 'Posting...' : 'Publish post'}</Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </form>
           </GlassPanel>
 

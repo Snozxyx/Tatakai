@@ -31,10 +31,24 @@ export function useActiveCues(
     let activeTrack: TextTrack | null = null;
     const cleanups: Array<() => void> = [];
 
+    // Flicker guard. Empty reads are not always real gaps between cues: track
+    // mode churn (re-application passes, MSE/hls.js resets rebuilding tracks
+    // while their cues are still parsing) and activeCues lagging an event can
+    // produce transient empty reads. Hold the last rendered lines briefly
+    // before hiding, so the overlay doesn't blink off for a frame or two.
+    const HOLD_EMPTY_MS = 400;
+    let lastNonEmptyAt = 0;
+
     const readCues = () => {
       const track = activeTrack;
       if (!track) {
-        setLines((prev) => (prev.length ? [] : prev));
+        setLines((prev) => {
+          if (!prev.length) return prev;
+          if (lastNonEmptyAt > 0 && performance.now() - lastNonEmptyAt < HOLD_EMPTY_MS) {
+            return prev;
+          }
+          return [];
+        });
         return;
       }
       const next: string[] = [];
@@ -60,9 +74,20 @@ export function useActiveCues(
           }
         }
       }
-      setLines((prev) =>
-        prev.length === next.length && prev.every((line, idx) => line === next[idx]) ? prev : next,
-      );
+      if (next.length) {
+        lastNonEmptyAt = performance.now();
+      }
+      setLines((prev) => {
+        if (!next.length) {
+          if (!prev.length) return prev;
+          // Real inter-cue gap: stay shown for the grace window, then clear.
+          if (lastNonEmptyAt > 0 && performance.now() - lastNonEmptyAt < HOLD_EMPTY_MS) {
+            return prev;
+          }
+          return [];
+        }
+        return prev.length === next.length && prev.every((line, idx) => line === next[idx]) ? prev : next;
+      });
     };
 
     const pickActiveTrack = (): TextTrack | null => {

@@ -78,6 +78,7 @@ import {
 } from '@/lib/externalIntegrations';
 import { parseExternalAnimeId, buildExternalAnimeRouteId, toPositiveInt } from '@/lib/animeIdMapping';
 import { cn } from '@/lib/utils';
+import { ExtensionLibrary } from '@/components/extensions/ExtensionLibrary';
 
 type TabType =
   | 'for-you'

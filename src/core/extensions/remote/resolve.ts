@@ -1,4 +1,6 @@
 import { searchStremioTargets } from './stremio-search';
+import { resolveServerSources } from '../server/client';
+import { compatibilityMappedStreams } from '../compatibility/content';
 import { automaticTitleMatch, titleSearchQueries, type TitleMatchOptions } from './title-match';
 import { proxyRemoteSources, proxyRemoteUrl } from './media';
 import { languageLabel } from './metadata';
@@ -7,6 +9,24 @@ import { fetchAniZipMapping } from '@/lib/mapping/anizip';
 import { fetchExtensionJson } from './transport';
 import { supportsResource, stremioResourceUrl, normalizeStremioStream, type StremioManifest } from './stremio';
 import { listRemoteExtensions, invokeRemote, updateRemoteExtension, type RemoteExtension } from './installed';
+import type { WatchExtensionBatch } from '../compatibility/watch-batches';
+import { throwCompatibilityAbort } from '../compatibility/abort';
+import { mapProviderTasks } from '../compatibility/scheduling';
+import { watchLookupCache } from '../compatibility/lookup-cache';
+import { extensionDeadline } from './deadline';
+import { isExplicitExtensionContent, showAdultExtensionContent } from '@/lib/contentSafety';
+
+export async function resolveRemainingCompatibilitySources(options: { anilistId?: number; title?: string; episode?: number; dub?: boolean }, sourceIds: string[], signal: AbortSignal, onProgress: (batch: WatchExtensionBatch) => void): Promise<WatchExtensionBatch> {
+  const statuses: ExtensionSourceReport[] = [];
+  const mapping = options.anilistId ? fetchAniZipMapping(options.anilistId, { signal }).catch(() => null) : Promise.resolve(null);
+  throwCompatibilityAbort(signal);
+  const sources = await compatibilityMappedStreams({ ...options, sourceIds, titleAliases: mapping.then(value => [value?.preferredTitle || '', ...(value?.aliases || [])]) }, signal, report => {
+    const index = statuses.findIndex(row => row.provider === report.provider);
+    if (index < 0) statuses.push(report); else statuses[index] = report;
+  }, sources => { if (!signal.aborted) onProgress({ sources, subtitles: [], statuses: [...statuses] }); });
+  throwCompatibilityAbort(signal);
+  return { sources, subtitles: [], statuses };
+}
 
 export async function matchRemoteTitle(row: RemoteExtension, opts: TitleMatchOptions, signal?: AbortSignal): Promise<string> {
   const key = String(opts.media?.id || opts.query) + (typeof opts.dub === 'boolean' ? `:${opts.dub ? 'dub' : 'sub'}` : '');
@@ -25,21 +45,34 @@ export async function matchRemoteTitle(row: RemoteExtension, opts: TitleMatchOpt
   if (!selected) throw new Error('No matching title found automatically');
   row.matches[key] = selected; await updateRemoteExtension(row, false); return selected;
 }
-export async function resolveRemoteSources(options: { anilistId?: number; title?: string; episode?: number; dub?: boolean }, signal?: AbortSignal): Promise<{ sources: any[]; subtitles: any[]; statuses: ExtensionSourceReport[] }> {
-  const rows = (await listRemoteExtensions()).filter(row => row.enabled && (row.ecosystem === 'stremio' || ['onlinestream-provider', 'anime-torrent-provider'].includes(row.manifest.type)));
-  const mapping = rows.length ? await fetchAniZipMapping(options.anilistId, { signal }).catch(() => null) : null;
+export async function resolveRemoteSources(options: { anilistId?: number; title?: string; episode?: number; dub?: boolean }, signal?: AbortSignal, onProgress?: (value: { sources: any[]; subtitles: any[]; statuses: ExtensionSourceReport[] }) => void): Promise<{ sources: any[]; subtitles: any[]; statuses: ExtensionSourceReport[] }> {
+  const statuses: ExtensionSourceReport[] = [];
+  const mappingPromise = options.anilistId ? fetchAniZipMapping(options.anilistId, { signal }).catch(() => null) : Promise.resolve(null);
+  let nativeSources: any[] = [];
+  let serverBatch: WatchExtensionBatch = { sources: [], subtitles: [], statuses: [] };
+  const remoteSources: any[] = [], subtitles: any[] = [];
+  const publish = () => { if (!signal?.aborted) onProgress?.({ sources: [...nativeSources, ...remoteSources, ...serverBatch.sources], subtitles: [...subtitles, ...serverBatch.subtitles], statuses: [...statuses, ...serverBatch.statuses] }); };
+  const servers = resolveServerSources(options, signal, batch => { serverBatch = batch; publish(); });
+  // The catalog title is sufficient for a first match. Aliases are enrichment,
+  // so a slow metadata service must not gate original extension execution.
+  const compatibility = compatibilityMappedStreams({ ...options, titleAliases: mappingPromise.then(value => [value?.preferredTitle || '', ...(value?.aliases || [])]) }, signal, report => { const index = statuses.findIndex(row => row.provider === report.provider); if (index < 0) statuses.push(report); else statuses[index] = report; }, sources => {
+    nativeSources = sources; publish();
+  }).catch(() => []);
+  const rows = watchLookupCache().order.sort((await listRemoteExtensions()).filter(row => row.enabled && (showAdultExtensionContent() || !isExplicitExtensionContent(row.manifest)) && (row.ecosystem === 'stremio' || ['onlinestream-provider', 'anime-torrent-provider'].includes(row.manifest.type))));
+  const mapping = rows.length ? await mappingPromise : null;
   // Share catalog/metadata lookups across installed addons in this request.
   const searches = new Map<string, Promise<any>>();
   const searchJson = (url: string) => { if (!searches.has(url)) searches.set(url, fetchExtensionJson(url, signal)); return searches.get(url)!; };
-  const subtitles: any[] = [];
-  const statuses: ExtensionSourceReport[] = [];
   const report = (row: RemoteExtension, started: number, status: string, count: number, subtitleCount: number, error?: string, lookup?: 'mapping' | 'catalog-search', attempts?: number) => {
     const item: ExtensionSourceReport = { provider: row.id, name: row.manifest.name, ecosystem: row.ecosystem, kind: 'anime', status, count, subtitleCount, durationMs: Math.round(performance.now() - started), lookup, attempts, error: error?.replace(/https?:\/\/[^\s)]+/gi, '[URL]').slice(0, 300) };
     recordSourceReport(item); statuses.push(item);
+    if (count) watchLookupCache().order.record(row.id, true, item.durationMs);
+    else if (status === 'error' && !signal?.aborted) watchLookupCache().order.record(row.id, false, item.durationMs);
   };
-  const settled = await Promise.all(rows.map(async row => {
+  const settled = await mapProviderTasks(rows, async row => {
     const started = performance.now(); let subtitleCount = 0; let subtitleError: string | undefined; let lookup: 'mapping' | 'catalog-search' | undefined; let attempts = 0;
     try {
+      return await extensionDeadline(async signal => {
       signal?.throwIfAborted();
       let sources: any[];
       if (row.ecosystem === 'stremio') {
@@ -73,6 +106,7 @@ export async function resolveRemoteSources(options: { anilistId?: number; title?
           try {
             const subs = await fetchExtensionJson(stremioResourceUrl(row.manifestUrl, 'subtitles', type, id), signal);
             const tracks = await Promise.all((subs.subtitles || []).filter((s: any) => typeof s.url === 'string' && /^https?:\/\//i.test(s.url)).map(async (s: any) => ({ url: await proxyRemoteUrl(s.url, s.headers), language: s.lang, lang: s.lang, label: `${languageLabel(s.lang)} · ${row.manifest.name}`, providerName: row.manifest.name })));
+            signal.throwIfAborted();
             subtitleCount = tracks.length;
             subtitles.push(...tracks);
           } catch (error) { subtitleError = error instanceof Error ? error.message : 'Subtitle lookup failed'; }
@@ -87,12 +121,18 @@ export async function resolveRemoteSources(options: { anilistId?: number; title?
         sources = sources.map(s => ({ ...s, language: languageLabel(s.audioLanguage || s.language || row.manifest.lang), languageLabel: languageLabel(s.audioLanguage || s.language || row.manifest.lang), providerKey: row.id, providerName: row.manifest.name, source: row.manifest.name }));
       }
       signal?.throwIfAborted();
-      sources = await proxyRemoteSources(sources);
-      report(row, started, subtitleError ? 'partial' : sources.length || subtitleCount ? 'ok' : 'empty', sources.length, subtitleCount + sources.reduce((n, s) => n + (s.subtitles?.length || 0), 0), subtitleError, lookup, attempts); return sources;
+      sources = await proxyRemoteSources(sources.map(source => ({ ...source, extensionId: row.id, extensionName: row.manifest.name, ecosystem: row.ecosystem })));
+      signal.throwIfAborted();
+      report(row, started, subtitleError ? 'partial' : sources.length || subtitleCount ? 'ok' : 'empty', sources.length, subtitleCount + sources.reduce((n, s) => n + (s.subtitles?.length || 0), 0), subtitleError, lookup, attempts);
+      remoteSources.push(...sources); publish(); return sources;
+      }, 30000, signal);
     } catch (error) {
       report(row, started, 'error', 0, subtitleCount, error instanceof Error ? error.message : 'Provider failed', lookup, attempts); return [];
     }
-  }));
-  const merged = settled.flat().map(source => ({ ...source, subtitles: [...new Map([...(source.subtitles || []), ...subtitles].map(t => [t.url, t])).values()] }));
-  return { sources: merged, subtitles: [...new Map(subtitles.map(t => [t.url, t])).values()], statuses };
+  }, signal);
+  const compatibleSources = await compatibility;
+  serverBatch = await servers;
+  signal?.throwIfAborted();
+  const merged = [...settled.flat(), ...compatibleSources, ...serverBatch.sources].map(source => ({ ...source, subtitles: [...new Map([...(source.subtitles || []), ...subtitles].map(t => [t.url, t])).values()] }));
+  return { sources: merged, subtitles: [...new Map([...subtitles, ...serverBatch.subtitles].map(t => [t.url, t])).values()], statuses: [...statuses, ...serverBatch.statuses] };
 }

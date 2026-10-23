@@ -1,4 +1,5 @@
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
+import { extensionDeadline } from './deadline';
 
 export interface ExtensionResponse {
   ok: boolean; status: number; statusText: string; url: string;
@@ -8,6 +9,9 @@ export interface ExtensionResponse {
 }
 /** Native HTTP on installed apps, standard CORS fetch in a browser. */
 export async function extensionFetch(url: string, init: RequestInit = {}): Promise<ExtensionResponse> {
+  return extensionDeadline(signal => fetchWithDeadline(url, { ...init, signal }), 15000, init.signal ?? undefined);
+}
+async function fetchWithDeadline(url: string, init: RequestInit): Promise<ExtensionResponse> {
   const parsed = new URL(url);
   if (!['https:', 'http:'].includes(parsed.protocol)) throw new Error('Unsupported extension URL protocol');
   init.signal?.throwIfAborted();

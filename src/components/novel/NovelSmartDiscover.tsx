@@ -1,3 +1,4 @@
+import { ThemedSelect } from '@/components/ui/themed-select';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { memo, useEffect, useMemo, useRef, useState } from "react";
@@ -284,7 +285,7 @@ export const NovelSmartDiscover = memo(function NovelSmartDiscover() {
       {/* Filters: status + genres */}
       <div className="mb-5 rounded-2xl border border-border bg-muted/30 p-3 backdrop-blur-sm">
         <div className="flex flex-wrap items-center gap-2">
-        <select
+        <ThemedSelect
           aria-label={uiI18n.t('app.publication_status_084ea620')}
           value={status}
           onChange={(e) => setStatus(e.target.value as StatusFilter)}
@@ -293,7 +294,7 @@ export const NovelSmartDiscover = memo(function NovelSmartDiscover() {
           <option value="all">{uiI18n.t('app.any_status_55201ac9')}</option>
           <option value="ongoing">{uiI18n.t('app.ongoing_2e0254c2')}</option>
           <option value="completed">{uiI18n.t('app.completed_1798b3ba')}</option>
-        </select>
+        </ThemedSelect>
 
         <div className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto py-0.5" style={{ scrollbarWidth: "none" }}>
           <button

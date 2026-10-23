@@ -1,4 +1,5 @@
 import { recordSourceReport } from '@/core/extensions/remote/diagnostics';
+import { serverMappedChapters, serverMappedPages } from '@/core/extensions/server/client';
 import { declaresNovelContent } from '@/lib/reader/mangaSourceFormat';
 /**
  * Desktop manga extension bridge.
@@ -13,6 +14,7 @@ import { declaresNovelContent } from '@/lib/reader/mangaSourceFormat';
  */
 
 import { remoteMangaChapters, remoteMangaPages } from "@/core/extensions/remote/manga";
+import { compatibilityMappedChapters, compatibilityMappedPages } from '@/core/extensions/compatibility/content';
 
 import type {
   MangaChapterResponse,
@@ -343,10 +345,10 @@ function mergeFlatRows(
   }
 }
 
-export async function fetchExtensionMangaChapters(params: { anilistId?: number; malId?: number; title?: string }): Promise<MangaChaptersPayload> {
-  const [native, remote] = await Promise.all([fetchNativeMangaChapters(params).catch(() => ({ chapters: [], providersAvailable: [], failedProviders: [] })), remoteMangaChapters(params).catch(() => ({ chapters: [], providersAvailable: [], failedProviders: [] }))]);
+export async function fetchExtensionMangaChapters(params: { anilistId?: number; malId?: number; title?: string; titles?: string[] }): Promise<MangaChaptersPayload> {
+  const [native, remote, compatibility, servers] = await Promise.all([fetchNativeMangaChapters(params).catch(() => ({ chapters: [], providersAvailable: [], failedProviders: [] })), remoteMangaChapters(params).catch(() => ({ chapters: [], providersAvailable: [], failedProviders: [] })), compatibilityMappedChapters(params).catch(() => ({ chapters: [], providersAvailable: [], failedProviders: [] })), serverMappedChapters(params).catch(() => ({ chapters: [], providersAvailable: [], failedProviders: [] }))]);
   const byNumber = new Map<number, MangaChapterAggregate>();
-  for (const chapter of [...native.chapters, ...remote.chapters]) {
+  for (const chapter of [...native.chapters, ...remote.chapters, ...compatibility.chapters, ...servers.chapters]) {
     if (declaresNovelContent(chapter)) continue;
     chapter.sources = chapter.sources.filter(source => !declaresNovelContent(source));
     if (!chapter.sources.length) continue;
@@ -354,7 +356,7 @@ export async function fetchExtensionMangaChapters(params: { anilistId?: number; 
     if (prior) prior.sources.push(...chapter.sources.filter((source: any) => !prior.sources.some(s => s.provider === source.provider && s.providerChapterId === source.providerChapterId)));
     else byNumber.set(chapter.number, chapter);
   }
-  return { chapters: [...byNumber.values()].sort((a,b) => a.number - b.number), providersAvailable: [...new Set([...native.providersAvailable, ...remote.providersAvailable])], failedProviders: [...native.failedProviders, ...remote.failedProviders] };
+  return { chapters: [...byNumber.values()].sort((a,b) => a.number - b.number), providersAvailable: [...new Set([...native.providersAvailable, ...remote.providersAvailable, ...compatibility.providersAvailable, ...servers.providersAvailable])], failedProviders: [...native.failedProviders, ...remote.failedProviders, ...compatibility.failedProviders, ...servers.failedProviders] };
 }
 
 async function fetchNativeMangaChapters(params: {
@@ -588,6 +590,8 @@ async function fetchOneSourcePages(params: {
   anilistId?: number;
 }): Promise<MangaReadResponse> {
   if (params.extensionId.startsWith('seanime-')) return remoteMangaPages(params);
+  if (params.extensionId.startsWith('server-')) return serverMappedPages(params);
+  if (params.extensionId.startsWith('compat-')) return compatibilityMappedPages(params);
   // `extensionId` here is really the source's sub-provider name (mangadex/
   // allmanga/…) threaded from the reader URL — see subProviderToNamespace.
   const env = await resolveMangaHttpEnv();

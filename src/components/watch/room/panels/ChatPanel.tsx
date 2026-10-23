@@ -1,3 +1,4 @@
+import { NotificationSoundToggle } from '@/components/community/NotificationSoundToggle';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -46,6 +47,8 @@ export function ChatPanel() {
                     </button>
                 )}
             </div>
+
+            <div className="px-4"><NotificationSoundToggle /></div>
 
             {/* Chat Area */}
             {messages.length === 0 ? (

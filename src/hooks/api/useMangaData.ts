@@ -1,11 +1,13 @@
 import { useEffect } from "react";
-import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
+import { useQuery, useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
+import { EXTENSION_INSTALLED_EVENT } from '@/core/extensions/ecosystems';
 import {
   searchManga,
   getMangaDetail,
   getMangaChapters,
   getMangaReadByKey,
   mangaChaptersCacheKey,
+  clearMangaChaptersCache,
   type MangaSearchOptions,
 } from "@/core/content/manga-client";
 import { fetchMangaBakaSeries, type MangaBakaSeries } from "@/lib/mapping/mangabaka";
@@ -118,7 +120,14 @@ export function useMangaDetail(id: string | undefined) {
 }
 
 export function useMangaChapters(id: string | undefined, providers?: string, language?: string) {
+  const client = useQueryClient();
   const cacheKey = id ? mangaChaptersCacheKey(id, providers, language) : "";
+  useEffect(() => {
+    if (!id) return;
+    const changed = () => { void clearMangaChaptersCache(id).then(() => client.invalidateQueries({ queryKey: ['manga-chapters', id] })); };
+    window.addEventListener(EXTENSION_INSTALLED_EVENT, changed);
+    return () => window.removeEventListener(EXTENSION_INSTALLED_EVENT, changed);
+  }, [id, client]);
 
   // Warm the in-memory cache tier from Dexie on mount so revisits after an app
   // restart can seed instantly too. Correctness is already handled inside
@@ -131,7 +140,10 @@ export function useMangaChapters(id: string | undefined, providers?: string, lan
 
   return useQuery({
     queryKey: ["manga-chapters", id, providers, language],
-    queryFn: () => getMangaChapters(id!, providers, language),
+    queryFn: () => {
+      const metadata = client.ensureQueryData({ queryKey: ['manga-detail', id], queryFn: () => getMangaDetail(id!), staleTime: MEDIA_METADATA_STALE_TIME }).catch(() => null);
+      return getMangaChapters(id!, providers, language, metadata);
+    },
     enabled: !!id,
     staleTime: FORCE_FRESH_MANGA_READS ? 0 : STALE_TIME.chapters,
     refetchOnMount: FORCE_FRESH_MANGA_READS ? "always" : true,

@@ -44,7 +44,13 @@ dist.zip
 # — so the ~55 MB binary never enters the repo.
 resources/bin/cloudflared
 resources/bin/cloudflared.exe
-!resources/bin/.gitkeep
+# Tatakai Translate engine sidecar binary is built from translate-engine/
+# by scripts/build-translate-engine.mjs (cargo --release), same policy as
+# cloudflared: never tracked, produced next to the other resource binaries.
+resources/bin/translate-engine/
+!resources/bin/translate-engine/.gitkeep
+translate-engine/target/
+/.cache/translate-toolchain/
 
 # NSIS installer graphics are generated from brand tokens by
 # scripts/generate-installer-assets.cjs (locally + in CI). Keep the generated
@@ -131,3 +137,15 @@ coverage/
 /.claude/
 /skills-lock.json
 /tests/operations-api.test.ts
+# Generated original runtime assets, validated by prepare-compatibility-assets.mjs.
+/android/app/src/main/assets/compatibility/
+/android/app/src/main/assets/public/
+/android/app/src/main/assets/aniyomi-runtime.json
+/android/app/src/main/assets/capacitor.config.json
+/android/app/src/main/assets/capacitor.plugins.json
+
+# Separate provider workspaces and local investigation output.
+/tatakai-latino/
+/research/
+/.playwright-mcp/
+/agent.md

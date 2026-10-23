@@ -6,7 +6,10 @@
  * stay independent.
  */
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
+import { useAuth } from '@/contexts/AuthContext';
+import { db } from '@/core/db/tatakai-db';
+import { libraryKey } from '@/core/extensions/compatibility/library';
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   listAllCustomSources,
@@ -23,9 +26,20 @@ import {
   type CustomReadData,
 } from "@/core/content/custom-source-runtime";
 import type { CustomSearchFilters } from "@/core/extensions/sdk/types";
+import { groupCustomSources } from '@/core/content/custom-source-model';
+import { useContentSafetySettings } from '@/hooks/user/useContentSafetySettings';
+import { isExplicitExtensionContent } from '@/lib/contentSafety';
+import { extensionDeadline } from '@/core/extensions/remote/deadline';
+
+export function useCustomProviderGroups() {
+  const result = useCustomSources();
+  const data = useMemo(() => groupCustomSources(result.data || []), [result.data]);
+  return { ...result, data };
+}
 
 /** Every custom source across every installed extension (powers the sidebar). */
 export function useCustomSources() {
+  const { settings: safety } = useContentSafetySettings();
   const queryClient = useQueryClient();
   useEffect(() => {
     const refresh = () => {
@@ -38,7 +52,8 @@ export function useCustomSources() {
 
   return useQuery<CustomSourceEntry[]>({
     queryKey: ["custom-sources"],
-    queryFn: listAllCustomSources,
+    queryFn: () => listAllCustomSources(),
+    select: rows => safety.showAdultEverywhere ? rows : rows.filter(row => !isExplicitExtensionContent(row)),
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
@@ -52,10 +67,13 @@ export function useCustomSource(namespace?: string, sourceId?: string) {
   return { source, ...rest };
 }
 
-export function useCustomHome(namespace?: string, sourceId?: string) {
+export function useCustomHome(namespace?: string, sourceId?: string, page = 1) {
+  const { settings: safety } = useContentSafetySettings();
   return useQuery<CustomHomeData>({
-    queryKey: ["custom", namespace, sourceId, "home"],
-    queryFn: () => fetchCustomHome(namespace!, sourceId!),
+    queryKey: ["custom", namespace, sourceId, "home", page],
+    queryFn: ({ signal }) => extensionDeadline(deadline => fetchCustomHome(namespace!, sourceId!, page, deadline), 45000, signal),
+    retry: false,
+    select: data => safety.showAdultEverywhere ? data : { ...data, sections: data.sections.map(section => ({ ...section, items: section.items.filter(item => !isExplicitExtensionContent(item)) })) },
     enabled: Boolean(namespace && sourceId),
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
@@ -71,6 +89,7 @@ export function useCustomSearch(
   filters?: CustomSearchFilters,
 ) {
   const trimmed = query.trim();
+  const { settings: safety } = useContentSafetySettings();
   const filterKey = filters ? JSON.stringify(filters) : "";
   const hasFilters = Boolean(
     filters &&
@@ -79,7 +98,9 @@ export function useCustomSearch(
   );
   return useQuery<CustomSearchData>({
     queryKey: ["custom", namespace, sourceId, "search", trimmed, page, filterKey],
-    queryFn: () => fetchCustomSearch(namespace!, sourceId!, trimmed, page, filters),
+    queryFn: ({ signal }) => extensionDeadline(deadline => fetchCustomSearch(namespace!, sourceId!, trimmed, page, filters, deadline), 45000, signal),
+    retry: false,
+    select: data => safety.showAdultEverywhere ? data : { ...data, results: data.results.filter(item => !isExplicitExtensionContent(item)) },
     enabled: Boolean(namespace && sourceId && (trimmed || hasFilters)),
     staleTime: 2 * 60 * 1000,
     gcTime: 15 * 60 * 1000,
@@ -88,9 +109,19 @@ export function useCustomSearch(
 }
 
 export function useCustomInfo(namespace?: string, sourceId?: string, id?: string) {
+  const { user } = useAuth();
   return useQuery<CustomInfoData | null>({
-    queryKey: ["custom", namespace, sourceId, "info", id],
-    queryFn: () => fetchCustomInfo(namespace!, sourceId!, id!),
+    queryKey: ["custom", namespace, sourceId, "info", id, user?.id || 'guest'],
+    queryFn: async ({ signal }) => {
+      try { return await extensionDeadline(deadline => fetchCustomInfo(namespace!, sourceId!, id!, deadline), 45000, signal); }
+      catch (error) {
+        if (signal.aborted) throw error;
+        const row = await db.kv.get(libraryKey(user?.id || 'guest', { namespace: namespace!, sourceId: sourceId!, id: id! }));
+        if (!row) throw error;
+        const cached = JSON.parse(row.value);
+        return { id: id!, title: cached.title, image: cached.image, entries: cached.catalog || [] };
+      }
+    },
     enabled: Boolean(namespace && sourceId && id),
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
@@ -101,7 +132,8 @@ export function useCustomInfo(namespace?: string, sourceId?: string, id?: string
 export function useCustomWatch(namespace?: string, sourceId?: string, id?: string, episodeId?: string) {
   return useQuery<CustomWatchData>({
     queryKey: ["custom", namespace, sourceId, "watch", id, episodeId],
-    queryFn: () => fetchCustomWatch(namespace!, sourceId!, id!, episodeId!),
+    queryFn: ({ signal }) => extensionDeadline(() => fetchCustomWatch(namespace!, sourceId!, id!, episodeId!), 45000, signal),
+    retry: false,
     enabled: Boolean(namespace && sourceId && id && episodeId),
     staleTime: 60 * 1000,
     gcTime: 10 * 60 * 1000,
@@ -112,7 +144,8 @@ export function useCustomWatch(namespace?: string, sourceId?: string, id?: strin
 export function useCustomRead(namespace?: string, sourceId?: string, id?: string, chapterId?: string) {
   return useQuery<CustomReadData>({
     queryKey: ["custom", namespace, sourceId, "read", id, chapterId],
-    queryFn: () => fetchCustomRead(namespace!, sourceId!, id!, chapterId!),
+    queryFn: ({ signal }) => extensionDeadline(() => fetchCustomRead(namespace!, sourceId!, id!, chapterId!), 45000, signal),
+    retry: false,
     enabled: Boolean(namespace && sourceId && id && chapterId),
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,

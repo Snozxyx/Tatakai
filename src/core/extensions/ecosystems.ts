@@ -1,4 +1,4 @@
-export const ECOSYSTEMS = ['tatakai', 'stremio', 'seanime', 'mihon', 'aniyomi', 'cloudstream', 'kodi'] as const;
+export const ECOSYSTEMS = ['tatakai', 'stremio', 'seanime', 'mihon', 'aniyomi', 'cloudstream', 'sora', 'mangayomi', 'kodi'] as const;
 export type ExtensionEcosystem = typeof ECOSYSTEMS[number];
 export type Compatibility = 'supported' | 'limited' | 'external' | 'unavailable';
 export function ecosystemOf(value: unknown): ExtensionEcosystem {

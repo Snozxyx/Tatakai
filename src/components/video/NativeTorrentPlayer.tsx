@@ -153,12 +153,12 @@ export function NativeTorrentPlayer({
     return merged;
   }, [nativeSubtitles, headers]);
   const nativePreferences = useMemo(() => ({
-    preferredAudioLanguage: nativeLanguage(preferredAudioLanguage),
+    preferredAudioLanguage: nativeLanguage(settings.audioLanguage === 'auto' ? preferredAudioLanguage : settings.audioLanguage),
     preferredSubtitleLanguage: nativeLanguage(
       settings.subtitleLanguage === 'auto' ? 'english' : settings.subtitleLanguage,
     ),
     subtitlesEnabled: settings.subtitleLanguage !== 'off',
-  }), [preferredAudioLanguage, settings.subtitleLanguage]);
+  }), [preferredAudioLanguage, settings.audioLanguage, settings.subtitleLanguage]);
   // Read via ref in the open effect: subtitle arrays get new identities when
   // upstream metadata re-resolves, and reopening the native Activity for that
   // would kill mid-playback video. One open per URL; retry picks up latest.

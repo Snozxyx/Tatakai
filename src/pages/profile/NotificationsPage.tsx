@@ -1,3 +1,4 @@
+import { NotificationSoundToggle } from '@/components/community/NotificationSoundToggle';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
@@ -94,6 +95,7 @@ export default function NotificationsPage() {
             </div>
           </div>
 
+          <NotificationSoundToggle />
           <div className="flex items-center gap-2">
             <div className="flex rounded-lg bg-muted/40 p-1">
               {(['all', 'unread'] as const).map((f) => (

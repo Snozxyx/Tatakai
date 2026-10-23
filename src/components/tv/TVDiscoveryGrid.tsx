@@ -2,17 +2,18 @@ import { useContentSafetySettings } from "@/hooks/user/useContentSafetySettings"
 import { useTVCatalogue } from "@/core/tv/catalogue";
 import { TVContentCard, type TVCard } from "./TVContentCard";
 import { TVLoadMore } from "./TVLoadMore";
-export function TVDiscoveryGrid({ onFocus }: { onFocus?(item: TVCard): void }) {
+import { memo, useMemo } from "react";
+export const TVDiscoveryGrid = memo(function TVDiscoveryGrid({ onFocus }: { onFocus?(item: TVCard): void }) {
   const { settings } = useContentSafetySettings();
   const result = useTVCatalogue('', undefined, settings.showAdultEverywhere);
-  const items = [
+  const items = useMemo(() => [
     ...new Map(
       (result.data?.pages.flatMap((page) => page.animes) || []).map((item) => [
         item.id,
         item,
       ])
     ).values(),
-  ];
+  ], [result.data?.pages]);
   return (
     <section className="tv-discovery-grid">
       <h2>Keep exploring</h2>
@@ -32,4 +33,4 @@ export function TVDiscoveryGrid({ onFocus }: { onFocus?(item: TVCard): void }) {
       />
     </section>
   );
-}
+});

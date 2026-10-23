@@ -1,3 +1,4 @@
+import { ThemedSelect } from '@/components/ui/themed-select';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useEffect, useState } from 'react';
@@ -24,8 +25,8 @@ export function TtsIntegrationSettings({ engine }: { engine: ExternalTtsEngine }
     <p className="text-sm leading-relaxed text-muted-foreground">{engine === 'openai' ? uiI18n.t('app.read_aloud_with_an_ai_generated_openai_voice_cha_f59c9518') : engine === 'elevenlabs' ? uiI18n.t('app.use_your_elevenlabs_account_chapter_text_is_sent_0772a564') : uiI18n.t('app.connect_a_running_model_server_with_an_openai_co_1fd62494')}</p>
     {engine === 'openai' ? <>
       {field('openAIKey', 'API key', true)}
-      <label className="block space-y-2 text-sm font-medium">{uiI18n.t('app.model_68c2cc7f')}<select className="flex h-10 w-full rounded-lg border border-input bg-background px-3 text-sm" value={config.openAIModel} onChange={event => { const model=event.target.value; const voices=openAiVoicesForModel(model); save({...config,openAIModel:model,openAIVoice:voices.includes(config.openAIVoice)?config.openAIVoice:voices[0]}); }}>{['gpt-4o-mini-tts','tts-1','tts-1-hd'].map(model => <option key={model}>{model}</option>)}</select></label>
-      <label className="block space-y-2 text-sm font-medium">{uiI18n.t('app.voice_3091c844')}<select className="flex h-10 w-full rounded-lg border border-input bg-background px-3 text-sm" value={config.openAIVoice} onChange={event => update('openAIVoice',event.target.value)}>{openAiVoicesForModel(config.openAIModel).map(voice => <option key={voice}>{voice}</option>)}</select></label>
+      <label className="block space-y-2 text-sm font-medium">{uiI18n.t('app.model_68c2cc7f')}<ThemedSelect className="flex h-10 w-full rounded-lg border border-input bg-background px-3 text-sm" value={config.openAIModel} onChange={event => { const model=event.target.value; const voices=openAiVoicesForModel(model); save({...config,openAIModel:model,openAIVoice:voices.includes(config.openAIVoice)?config.openAIVoice:voices[0]}); }}>{['gpt-4o-mini-tts','tts-1','tts-1-hd'].map(model => <option key={model}>{model}</option>)}</ThemedSelect></label>
+      <label className="block space-y-2 text-sm font-medium">{uiI18n.t('app.voice_3091c844')}<ThemedSelect className="flex h-10 w-full rounded-lg border border-input bg-background px-3 text-sm" value={config.openAIVoice} onChange={event => update('openAIVoice',event.target.value)}>{openAiVoicesForModel(config.openAIModel).map(voice => <option key={voice}>{voice}</option>)}</ThemedSelect></label>
       <a className="inline-block text-sm text-primary underline underline-offset-4" href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer">{uiI18n.t('app.manage_openai_api_keys_fb90aeb0')}</a>
     </> : engine === 'elevenlabs' ? <>
       {field('elevenLabsKey', 'API key', true)}

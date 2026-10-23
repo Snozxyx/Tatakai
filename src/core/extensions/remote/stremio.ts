@@ -1,4 +1,5 @@
 import { streamMetadata, languageLabel } from './metadata';
+import { isDebridDirectUrl } from '@/core/player/debrid-url';
 
 export interface StremioManifest {
   id: string; name: string; version: string; description?: string; logo?: string;
@@ -26,7 +27,7 @@ export function normalizeStremioStream(stream: any, providerId: string, provider
   if (typeof url !== 'string' || !/^(https?:\/\/|magnet:\?)/i.test(url)) return null;
   return { url, originalUrl: url, providerKey: providerId, providerName, source: providerName,
     ...streamMetadata(stream), title: stream.description || stream.title, headers: stream.behaviorHints?.proxyHeaders?.request || {},
-    sourceType: hash ? 'torrent' : /\.m3u8(?:\?|$)/i.test(url) ? 'hls' : 'mp4', isTorrent: !!hash,
+      sourceType: hash ? 'torrent' : isDebridDirectUrl(url) ? 'debrid' : /\.m3u8(?:\?|$)/i.test(url) ? 'hls' : 'mp4', isTorrent: !!hash,
     magnetLink: hash ? url : undefined, infoHash: hash || undefined,
     fileIndex: Number.isInteger(stream.fileIdx) && stream.fileIdx >= 0 ? stream.fileIdx : undefined,
     subtitles: (stream.subtitles || []).map((s: any) => ({ url: s.url, language: s.lang, lang: s.lang, label: languageLabel(s.lang) })),

@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { EXTENSION_INSTALLED_EVENT } from '@/core/extensions/ecosystems';
 import { listRemoteExtensions, setRemoteEnabled, removeRemoteExtension, installRemoteExtension, updateRemoteExtension, type RemoteExtension } from '@/core/extensions/remote/installed';
+import { ExtensionLogo } from './ExtensionLogo';
 
 export function RemoteExtensionsPanel() {
   useUiTranslation();
@@ -19,7 +20,7 @@ export function RemoteExtensionsPanel() {
     setBusy(row.id); try { await action(); refresh(); } catch (e) { toast.error(e instanceof Error ? e.message : uiI18n.t('app.extension_action_failed_e61657dd')); } finally { setBusy(undefined); }
   };
   return <section className="space-y-3" aria-label={uiI18n.t('app.stremio_and_seanime_extensions_6b715b83')}>{rows.map(row => <div key={row.id} className="space-y-3 rounded-lg border border-border p-4">
-    <div><p className="font-medium">{row.manifest.name}</p><p className="text-sm capitalize text-muted-foreground">{row.ecosystem} · {row.manifest.version} · {row.enabled ? uiI18n.t('app.enabled_df174a3f') : uiI18n.t('app.disabled_f4f4473d')}</p></div>
+    <div className="flex min-w-0 items-center gap-3"><ExtensionLogo name={row.manifest.name} src={row.manifest.logo || row.manifest.icon} /><div className="min-w-0"><p className="break-words font-medium">{row.manifest.name}</p><p className="text-sm capitalize text-muted-foreground">{row.ecosystem} · {row.manifest.version} · {row.enabled ? uiI18n.t('app.enabled_df174a3f') : uiI18n.t('app.disabled_f4f4473d')}</p></div></div>
     <div className="flex flex-wrap gap-2">
       <Button size="sm" variant="outline" disabled={busy === row.id} onClick={() => void run(row, () => setRemoteEnabled(row.id, !row.enabled))}>{row.enabled ? uiI18n.t('app.disable_9a7d4e06') : uiI18n.t('app.enable_20063ad9')}</Button>
       <Button size="sm" variant="outline" disabled={busy === row.id || !row.manifestUrl} onClick={() => void run(row, () => installRemoteExtension(row.manifestUrl, undefined, row.id))}>{uiI18n.t('app.update_fb91e24f')}</Button>

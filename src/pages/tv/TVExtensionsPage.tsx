@@ -1,4 +1,6 @@
 import { TVLoadMore } from "@/components/tv/TVLoadMore";
+import { CompatibilityExtensionsPanel } from '@/components/extensions/CompatibilityExtensionsPanel';
+import { InstalledCompatibilityExtensions } from '@/components/extensions/InstalledCompatibilityExtensions';
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Download, Check, Trash2, Puzzle } from "lucide-react";
@@ -62,6 +64,7 @@ export default function TVExtensionsPage({
           </button>
         ))}
       </div>
+      {!extensionId && <InstalledCompatibilityExtensions search={query} ecosystem="all" type={tab === 'installed' ? 'all' : tab === 'custom' ? 'manga' : tab} compatibility="all" />}
       {catalog.isLoading && <p role="status">Loading extensions…</p>}
       {catalog.serviceError && (
         <div role="status">
@@ -154,6 +157,7 @@ export default function TVExtensionsPage({
         load={() => setPage((value) => value + 1)}
         label="More extensions"
       />
+      <CompatibilityExtensionsPanel />
       {!catalog.isLoading && !items.length && (
         <p>No extensions match this filter.</p>
       )}

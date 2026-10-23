@@ -22,6 +22,7 @@ import { ProtectedRoute } from "@/routes/AppRoutes";
 import { TVVideoWallpaper } from "@/components/tv/TVVideoBackdrop";
 import "./tv.css";
 import "./tv-atmosphere.css";
+import "./tv-refined.css";
 const Home = lazy(() => import("@/pages/tv/TVHomePage"));
 const SearchPage = lazy(() => import("@/pages/tv/TVSearchPage"));
 const Details = lazy(() => import("@/pages/tv/TVAnimePage"));

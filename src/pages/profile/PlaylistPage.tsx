@@ -1,3 +1,4 @@
+import { ThemedSelect } from '@/components/ui/themed-select';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useEffect, useMemo, useState } from 'react';
@@ -261,26 +262,6 @@ export default function PlaylistsPage() {
     setDeleteId(null);
   };
 
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-background text-foreground">
-        <Sidebar />
-        <main className="relative z-10 pl-0 md:pl-20 lg:pl-24 w-full flex items-center justify-center min-h-[80vh]">
-          <GlassPanel className="max-w-md mx-auto p-10 text-center rounded-3xl border-border/30 shadow-2xl">
-            <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
-              <Music2 className="w-10 h-10 text-primary" />
-            </div>
-            <h1 className="text-3xl font-bold mb-3 tracking-tight">{uiI18n.t('app.your_library_fd740ffd')}</h1>
-            <p className="text-muted-foreground mb-8 text-lg">{uiI18n.t('app.sign_in_to_curate_share_and_manage_your_personal_57122058')}</p>
-            <Button size="lg" className="w-full rounded-full h-12 text-base font-semibold" onClick={() => navigate('/auth')}>
-              {uiI18n.t('app.sign_in_to_continue_90fc26ef')}
-            </Button>
-          </GlassPanel>
-        </main>
-        <MobileNav />
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-background text-foreground relative">
@@ -300,16 +281,16 @@ export default function PlaylistsPage() {
                   <Music2 className="w-6 h-6" />
                 </div>
                 <h1 className="font-display text-4xl md:text-5xl font-extrabold tracking-tight">
-                  {uiI18n.t('app.my_playlists_f67e00ef')}
+                  {user?uiI18n.t('app.my_playlists_f67e00ef'):'Public playlists'}
                 </h1>
               </div>
-              <p className="text-muted-foreground text-lg ml-1">
+              {user?<p className="text-muted-foreground text-lg ml-1">
                 {playlists.length} {playlists.length === 1 ? uiI18n.t('app.collection_2037de43') : uiI18n.t('app.collections_fa4b9d69')} {uiI18n.t('app.crafted_by_you_337389c4')}
-              </p>
+              </p>:<p className="text-muted-foreground text-lg">Explore community collections. Sign in to create and save playlists.</p>}
             </div>
 
             <Dialog open={showCreate} onOpenChange={setShowCreate}>
-              <DialogTrigger asChild>
+              <DialogTrigger asChild disabled={!user}>
                 <Button size="lg" className="gap-2 rounded-full shadow-lg shadow-primary/20 transition-all hover:scale-105 active:scale-95">
                   <Plus className="w-5 h-5" />
                   {uiI18n.t('app.create_playlist_86374904')}
@@ -371,7 +352,7 @@ export default function PlaylistsPage() {
           </div>
 
           {/* User's Playlists Grid */}
-          {isLoading ? (
+          {user && (isLoading ? (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
               {[...Array(5)].map((_, i) => (
                 <div key={i} className="space-y-3">
@@ -409,12 +390,12 @@ export default function PlaylistsPage() {
               <p className="text-muted-foreground mb-6 max-w-sm mx-auto">
                 {uiI18n.t('app.create_your_first_playlist_to_start_organizing_y_592f3e95')}
               </p>
-              <Button onClick={() => setShowCreate(true)} className="gap-2 rounded-full">
+              <Button onClick={() => user ? setShowCreate(true) : navigate("/auth")} className="gap-2 rounded-full">
                 <Plus className="w-5 h-5" />
                 {uiI18n.t('app.create_your_first_playlist_2f9f306a')}
               </Button>
             </div>
-          )}
+          ))}
 
           {/* Saved Playlists */}
           {savedPlaylists.length > 0 && (
@@ -1248,7 +1229,7 @@ export function PlaylistViewPage() {
 
                       {canManageCollaborators ? (
                         <div className="flex items-center gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
-                          <select
+                          <ThemedSelect
                             value={collaborator.role}
                             onChange={(e) => handleUpdateCollaboratorRole(collaborator.id, e.target.value as CollaboratorRole)}
                             className="h-8 rounded-lg bg-background border border-border text-xs font-medium px-2 outline-none focus:ring-1 focus:ring-primary"
@@ -1256,7 +1237,7 @@ export function PlaylistViewPage() {
                             <option value="viewer">{uiI18n.t('app.viewer_dbad9f12')}</option>
                             <option value="editor">{uiI18n.t('app.editor_c7e9fb2e')}</option>
                             <option value="admin">{uiI18n.t('app.admin_4e7afebc')}</option>
-                          </select>
+                          </ThemedSelect>
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10" onClick={() => handleRemoveCollaborator(collaborator.id)}>
                             <Trash2 className="w-4 h-4" />
                           </Button>
@@ -1283,7 +1264,7 @@ export function PlaylistViewPage() {
                         className="pl-9 h-10 bg-muted/50 border-transparent focus-visible:border-primary rounded-xl"
                       />
                     </div>
-                    <select
+                    <ThemedSelect
                       value={newCollaboratorRole}
                       onChange={(e) => setNewCollaboratorRole(e.target.value as CollaboratorRole)}
                       className="h-10 rounded-xl bg-muted/50 border-transparent px-3 text-sm font-medium outline-none focus:ring-1 focus:ring-primary"
@@ -1291,7 +1272,7 @@ export function PlaylistViewPage() {
                       <option value="viewer">{uiI18n.t('app.viewer_dbad9f12')}</option>
                       <option value="editor">{uiI18n.t('app.editor_c7e9fb2e')}</option>
                       <option value="admin">{uiI18n.t('app.admin_4e7afebc')}</option>
-                    </select>
+                    </ThemedSelect>
                   </div>
 
                   {collaboratorSearch.trim().length >= 2 && (

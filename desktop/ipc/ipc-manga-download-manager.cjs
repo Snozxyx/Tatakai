@@ -146,7 +146,7 @@ async function downloadImage(url, dir, baseName, headers, signal) {
 module.exports = function registerMangaDownloadManager(ipcMain, app, fs, path, logger, getMainWindow, runtimeApi) {
     const recovery = require('../runtime/download/recovery-store.cjs').getRecoveryStore(app);
     const storageManager = new DownloadStorageManager({ app, fs, path });
-    const { registry, workerPool, ensureExtensionFetchProxy } = runtimeApi || {};
+    const { registry, workerPool, ensureExtensionFetchProxy, compatibilityBroker } = runtimeApi || {};
 
     /** jobId → { cancelled, abort } */
     const activeDownloads = new Map();
@@ -228,6 +228,12 @@ module.exports = function registerMangaDownloadManager(ipcMain, app, fs, path, l
     }
 
     async function resolveSingleSourcePages(source, chapter, mangaExts) {
+        if (String(source.provider || '').startsWith('compat-mihon-')) {
+            if (!compatibilityBroker) throw Error('Local Mihon download host is unavailable');
+            const result = await compatibilityBroker.request({ op: 'pages', requestId: require('node:crypto').randomUUID(), sourceId: source.provider, chapterId: source.providerChapterId });
+            if (!result.pages?.length) throw Error('Original source returned no chapter pages');
+            return result.pages.map(page => ({ imageUrl: page.imageUrl, headers: page.headers || null, resourceIdentity: page.resourceIdentity }));
+        }
         let lastError = null;
         for (const { id, entry } of mangaExts) {
             try {
@@ -304,8 +310,8 @@ module.exports = function registerMangaDownloadManager(ipcMain, app, fs, path, l
 
         const root = resolveDownloadRoot(series);
         const title = sanitizeName(series.title);
-        const seriesDir = path.join(root, 'Manga', title);
-        const chapDir = path.join(seriesDir, chapterFolder(chapter.chapterNumber, chapter.chapterKey));
+        const seriesDir = path.join(root, 'Manga', series.anilistId < 0 ? `${title}_${Math.abs(series.anilistId)}` : title);
+        const chapDir = path.join(seriesDir, series.anilistId < 0 ? `Chapter_${require('node:crypto').createHash('sha256').update(chapter.chapterKey).digest('hex').slice(0, 32)}` : chapterFolder(chapter.chapterNumber, chapter.chapterKey));
         logger.info(`[MangaDL] start ${jobId} — provider=${chapter.provider || '?'} → ${chapDir}`);
 
         try {
@@ -319,7 +325,7 @@ module.exports = function registerMangaDownloadManager(ipcMain, app, fs, path, l
             const sources = buildChapterSources(chapterWithAnilist);
             if (!workerPool) throw new Error('extension worker pool unavailable (runtimeApi not wired)');
             const mangaExts = listMangaExtensionEntries();
-            if (mangaExts.length === 0) throw new Error('No manga extension loaded');
+            if (mangaExts.length === 0 && !sources.some(source => String(source.provider || '').startsWith('compat-mihon-'))) throw new Error('No manga extension loaded');
             if (ensureExtensionFetchProxy) await ensureExtensionFetchProxy();
 
             let pages = [];
@@ -344,7 +350,7 @@ module.exports = function registerMangaDownloadManager(ipcMain, app, fs, path, l
                 if (state.cancelled) throw new Error('cancelled');
 
                 const sourceIdentity = JSON.stringify([source.provider, source.chapterKey, source.providerChapterId,
-                    candidatePages.map(page => { try { return require('../runtime/download/resource-identity.cjs')(page.imageUrl); } catch (_) { return page.imageUrl; } })]);
+                    candidatePages.map(page => { if (page.resourceIdentity) return page.resourceIdentity; try { return require('../runtime/download/resource-identity.cjs')(page.imageUrl); } catch (_) { return page.imageUrl; } })]);
                 const sourceCheckpoint = path.join(chapDir, 'resume-source.json');
                 let previousIdentity;
                 try { previousIdentity = fs.readFileSync(sourceCheckpoint, 'utf8'); } catch (_) {}

@@ -95,6 +95,9 @@ export function getFriendlyServerName(serverName: string): string {
 export function getSimpleServerDisplayName(serverName: string, fallback?: string): string {
   const key = normalizeKey(serverName);
   const fallbackKey = normalizeKey(fallback);
+  // Extension servers qualify source identities with server/installation UUIDs.
+  // Keep those identities for selection, and use supplied names for display.
+  if (/^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}\//i.test(key)) return String(fallback || '').trim() || 'Extension server';
   if (/^(stremio|seanime)[- ]/i.test(key) && String(fallback || "").trim()) return String(fallback).trim();
 
   for (const candidate of [key, fallbackKey]) {

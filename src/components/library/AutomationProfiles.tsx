@@ -1,3 +1,4 @@
+import { ThemedSelect } from '@/components/ui/themed-select';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useEffect, useState } from 'react';
@@ -52,7 +53,7 @@ export function AutomationProfiles() {
         <div className="min-w-0 flex-1 basis-48"><h3 className="break-words text-sm font-semibold">{rule.title}</h3><p className="mt-1 text-xs text-muted-foreground">{uiI18n.t('app.next_episode_b0056b01')} {rule.nextEpisode}</p></div>
         <Button variant="ghost" size="icon" className="sm:col-start-4 sm:row-start-1" aria-label={uiI18n.t('app.unsubscribe_from_i18n_value_0_ac67f5f9', { value0: rule.title })} disabled={!!busy} onClick={() => void run('remove', async () => { await autoDownloadApi.unsubscribe(rule.animeId); setResults(undefined); await load(); })}><Trash2 className="h-4 w-4 text-muted-foreground" /></Button>
         <div className="col-span-2 flex min-w-0 gap-2 sm:col-start-2 sm:row-start-1">
-        <select aria-label={uiI18n.t('app.scoring_profile_for_i18n_value_0_bc07a759', { value0: rule.title })} disabled={!!busy} className="h-10 min-w-0 flex-1 max-w-full rounded-lg border border-input bg-background px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring" value={rule.scoringProfile || 'legacy'} onChange={event => {
+        <ThemedSelect aria-label={uiI18n.t('app.scoring_profile_for_i18n_value_0_bc07a759', { value0: rule.title })} disabled={!!busy} className="h-10 min-w-0 flex-1 max-w-full rounded-lg border border-input bg-background px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring" value={rule.scoringProfile || 'legacy'} onChange={event => {
           const profile = event.target.value as ScoringProfile;
           void run('profile', async () => {
             const desktop = (window as any).electron?.autoDownload;
@@ -60,7 +61,7 @@ export function AutomationProfiles() {
             else await db.downloadRules.update(rule.id!, { scoringProfile: profile });
             setResults(undefined); await load();
           });
-        }}><option value="legacy" disabled>{uiI18n.t('app.existing_preferences_1b2a3f88')}</option><option value="balanced">{uiI18n.t('app.balanced_1080p_6dcc69a4')}</option><option value="best-quality">{uiI18n.t('app.best_quality_d92ffe94')}</option><option value="data-saver">{uiI18n.t('app.data_saver_720p_7298ed49')}</option></select>
+        }}><option value="legacy" disabled>{uiI18n.t('app.existing_preferences_1b2a3f88')}</option><option value="balanced">{uiI18n.t('app.balanced_1080p_6dcc69a4')}</option><option value="best-quality">{uiI18n.t('app.best_quality_d92ffe94')}</option><option value="data-saver">{uiI18n.t('app.data_saver_720p_7298ed49')}</option></ThemedSelect>
         <Button variant="outline" disabled={!!busy} onClick={() => void run(rule.id || rule.animeId, async () => {
           setResults(undefined); setPreviewTitle(`${rule.title} - episode ${rule.nextEpisode}`);
           setResults(await simulateAutoDownload(rule.id || rule.animeId, rule.nextEpisode));

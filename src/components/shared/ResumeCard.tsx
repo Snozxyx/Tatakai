@@ -113,7 +113,7 @@ export function ResumeCard({
         ) : (
           <span className="absolute inset-0 flex items-center justify-center bg-black/55 opacity-0 backdrop-blur-[2px] transition-opacity duration-300 group-hover:opacity-100">
             <span className="flex h-9 w-9 scale-75 items-center justify-center rounded-full bg-primary text-primary-foreground transition-transform duration-300 group-hover:scale-100">
-              <OverlayIcon className="h-4 w-4" fill="currentColor" />
+              <OverlayIcon className="h-4 w-4" fill={OverlayIcon === Play ? "currentColor" : "none"} aria-hidden="true" />
             </span>
           </span>
         )}

@@ -3,7 +3,7 @@ import { ecosystemOf, type ExtensionEcosystem, type Compatibility } from "./ecos
  * Client for the extension service (docs/Plans.md §3 — "Extension Service API").
  *
  * Six read-only endpoints under `VITE_EXTENSION_API_URL`, which is
- * `https://extension.tatakai.me/api` in production and a Supabase edge function
+ * `https://extensions.tatakai.me/api` in production and a Supabase edge function
  * in staging. Nothing here sends credentials: every route is public, and
  * `/extension/:id` and `/download/...` deliberately have side effects on the
  * service (they bump `view_count` / `download_count`), which is why the detail
@@ -14,6 +14,7 @@ import { ecosystemOf, type ExtensionEcosystem, type Compatibility } from "./ecos
  * translation happens, so a field the service renames breaks in one file.
  */
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
+import { extensionDeadline } from './remote/deadline';
 
 /** A published build. `download_url` is the release asset itself. */
 export interface StoreVersionRow {
@@ -32,6 +33,9 @@ export interface StoreVersionRow {
 }
 
 export interface StoreExtensionRow {
+  languages?: string[];
+  priority?: number;
+  nsfw?: boolean;
   ecosystem?: string; manifest_url?: string | null; compatibility?: Compatibility; compatibility_reason?: string | null; source_url?: string | null; catalog_available?: boolean;
   upstream_type?: string | null;
   id: string;
@@ -98,6 +102,9 @@ export interface StoreVersion {
 
 /** The shape every store surface renders. */
 export interface StoreExtension {
+  languages?: string[];
+  priority?: number;
+  nsfw?: boolean;
   upstreamType?: string;
   ecosystem?: ExtensionEcosystem; manifestUrl?: string; compatibility?: Compatibility; compatibilityReason?: string; sourceUrl?: string;
   /** Service uuid — what `/extension/:extension` and the routes key on. */
@@ -143,7 +150,11 @@ function trimSlashes(value: string): string {
  * string rather than undefined — both mean "no service configured", and every
  * call short-circuits instead of fetching `/extension` off the app's own origin.
  */
-export const EXTENSION_API_BASE = trimSlashes(String(import.meta.env.VITE_EXTENSION_API_URL ?? ''));
+function normalizedServiceBase(value: string): string {
+  if (!value.trim()) return '';
+  try { const url = new URL(value.trim()); url.pathname = url.pathname.replace(/\/{2,}/g, '/'); return trimSlashes(url.href); } catch { return trimSlashes(value); }
+}
+export const EXTENSION_API_BASE = normalizedServiceBase(String(import.meta.env.VITE_EXTENSION_API_URL ?? ''));
 
 const ASSET_BASE = trimSlashes(String(import.meta.env.VITE_EXTENSION_ASSET_BASE ?? ''));
 
@@ -207,7 +218,7 @@ export function extensionDownloadUrl(idOrSlug: string, version = 'latest'): stri
  */
 export const EXTENSION_PORTAL_URL =
   trimSlashes(String(import.meta.env.VITE_EXTENSION_PORTAL_URL ?? '')) ||
-  'https://extension.tatakai.me';
+  'https://extensions.tatakai.me';
 
 const TYPES: StoreExtensionType[] = ['torrent', 'onlinestream', 'custom'];
 
@@ -245,6 +256,7 @@ export function toStoreExtension(row: StoreExtensionRow): StoreExtension {
   const latest = row.latest_version ? toVersion(row.latest_version) : versions[0];
 
   return {
+    nsfw: row.nsfw === true,
     id: row.id,
     ecosystem: ecosystemOf(row.ecosystem), manifestUrl: row.manifest_url ?? undefined,
     compatibility: row.catalog_available === false ? "unavailable" : row.compatibility ?? "supported", compatibilityReason: row.compatibility_reason ?? undefined, sourceUrl: row.source_url ?? undefined,
@@ -263,6 +275,8 @@ export function toStoreExtension(row: StoreExtensionRow): StoreExtension {
     tags: tagNames(row.tags),
     githubRepoUrl: row.github_repo_url ?? undefined,
     healthScore: typeof row.health_score === 'number' ? row.health_score : undefined,
+    languages: row.languages ?? [],
+    priority: row.priority ?? 100,
     isFeatured: Boolean(row.is_featured),
     views: Number(row.view_count ?? 0) || 0,
     downloads: Number(row.download_count ?? 0) || 0,
@@ -286,8 +300,9 @@ export function toStoreExtension(row: StoreExtensionRow): StoreExtension {
  */
 export function resolveInstallUrl(extension: StoreExtension, version?: StoreVersion): string {
   const target = version ?? extension.latestVersion;
-  if (target?.downloadUrl) return target.downloadUrl;
   if (target?.downloadEndpoint) return target.downloadEndpoint;
+  if (EXTENSION_API_BASE && /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(extension.id)) return extensionDownloadUrl(extension.id, target?.version ?? 'latest');
+  if (target?.downloadUrl) return target.downloadUrl;
   if (!version && extension.downloadEndpoint) return extension.downloadEndpoint;
   return extensionDownloadUrl(extension.slug || extension.id, target?.version ?? 'latest');
 }
@@ -304,6 +319,9 @@ export class StoreHttpError extends Error {
 }
 
 async function requestJson<T>(path: string, signal?: AbortSignal): Promise<T> {
+  return extensionDeadline(deadline => requestJsonWithDeadline<T>(path, deadline), 15000, signal);
+}
+async function requestJsonWithDeadline<T>(path: string, signal: AbortSignal): Promise<T> {
   if (!EXTENSION_API_BASE) {
     throw new Error('Extension service is not configured (VITE_EXTENSION_API_URL is empty)');
   }
@@ -360,6 +378,7 @@ export function extensionAliases(extension: Pick<StoreExtension, 'id' | 'slug'>)
 }
 
 export interface StoreListParams {
+  language?: string;
   search?: string;
   ecosystem?: string; compatibility?: string;
   limit?: number;
@@ -394,6 +413,7 @@ export async function fetchStoreExtensions(
   signal?: AbortSignal,
 ): Promise<StoreListResult> {
   const query = new URLSearchParams();
+  if (params.language && params.language !== 'all') query.set('language', params.language);
   if (params.ecosystem && params.ecosystem !== 'all') query.set('ecosystem', params.ecosystem);
   if (params.compatibility && params.compatibility !== 'all') query.set('compatibility', params.compatibility);
   if (params.limit) query.set('limit', String(params.limit));

@@ -5,6 +5,8 @@ import { cn } from '@/lib/utils';
 import { getGlobalVideo } from '@/core/player/global-video-ref';
 import { SpoilerSpan } from '@/components/community/SpoilerSpan';
 import { splitCommentBlocks } from '@/lib/commentQuotes';
+import { COMMENT_INLINE_TOKEN_RE, decodeHtmlEntities, TIMESTAMP_RE } from '@/lib/commentMarkup';
+import { ExternalLinkEmbeds } from '@/components/community/ExternalLinkEmbeds';
 
 /**
  * Comment body renderer. Comments are stored as plain text with a small,
@@ -27,24 +29,9 @@ const LINK_CLASS =
 const TIMESTAMP_CLASS =
   'inline-flex items-center rounded bg-primary/15 px-1.5 py-0.5 font-mono text-[0.85em] text-primary hover:bg-primary/25 transition-colors cursor-pointer';
 
-// Timestamp token: mm:ss or hh:mm:ss. The surrounding \b-ish guards (via the
-// alternation order) keep it from swallowing bare numbers. Seconds/minutes are
-// 2 digits; hours 1-2. Matched only when it looks like a real time.
-const TIMESTAMP_RE = /\b(?:(\d{1,2}):)?([0-5]?\d):([0-5]\d)\b/;
+// Timestamp token: mm:ss or hh:mm:ss — see commentMarkup.ts.
 
-const INLINE = new RegExp(
-  [
-    '\\|\\|[^|]+\\|\\|',
-    '`[^`]+`',
-    '\\*\\*[^*]+\\*\\*',
-    '~~[^~]+~~',
-    '\\*[^*\\n]+\\*',
-    '@[a-zA-Z0-9_]{2,32}',
-    'https?://[^\\s<]+',
-    '(?:\\d{1,2}:)?[0-5]?\\d:[0-5]\\d',
-  ].join('|'),
-  'g',
-);
+const INLINE = COMMENT_INLINE_TOKEN_RE;
 
 /** Parse "1:23" / "1:02:03" → total seconds, or null if not a timestamp. */
 export function parseTimestamp(token: string): number | null {
@@ -194,7 +181,9 @@ export function CommentContent({
   /** Collapse long bodies to ~6 lines behind a "Show more" toggle. */
   clamp?: boolean;
 }) {
-  const text = String(content ?? '').replace(/\r\n/g, '\n');
+  // Legacy rows were stored HTML-escaped (see commentQuotes); decode once so
+  // entities never surface as literal text and translation gets clean prose.
+  const text = decodeHtmlEntities(String(content ?? '').replace(/\r\n/g, '\n'));
   const blocks = splitCommentBlocks(text);
 
   const { t } = useTranslation();
@@ -225,11 +214,12 @@ export function CommentContent({
     </div>
   );
 
-  if (!clamp) return body;
+  if (!clamp) return <>{body}<ExternalLinkEmbeds content={text} /></>;
 
   return (
     <div>
       {body}
+      <ExternalLinkEmbeds content={text} />
       {(overflows || expanded) && (
         <button
           type="button"

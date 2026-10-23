@@ -1,3 +1,4 @@
+import { FollowButton } from '@/components/community/FollowButton';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState } from 'react';
@@ -101,12 +102,17 @@ export default function CommunitySpacePage() {
       )}
 
       <main className={cn('relative z-10 w-full', isDesktopApp ? 'pl-24 lg:pl-28' : 'pl-0 md:pl-24 lg:pl-28')}>
-        {/* Shared bounds: hero banner + header + feed all align to the same
-            max-width column so the banner's edges line up with the content
-            (and the sidebar clearance) instead of bleeding full-width. */}
-        <div className="mx-auto max-w-screen-2xl">
+        {/* Full-width cinematic banner; content retains its readable bounds. */}
+        <div className="w-full">
         {/* ── Cinematic hero banner ── */}
-        <div className="group relative h-[270px] w-full select-none overflow-hidden md:h-[390px]">
+        {/* Escape the content gutter: desktop starts at the 80px rail edge;
+            web banners extend behind the floating navigation. */}
+        <div className={cn(
+          'group relative h-[300px] select-none overflow-hidden md:h-[clamp(390px,36vw,580px)]',
+          isDesktopApp
+            ? '-ml-4 w-[calc(100%+1rem)] lg:-ml-8 lg:w-[calc(100%+2rem)]'
+            : 'w-full md:-ml-24 md:w-[calc(100%+6rem)] lg:-ml-28 lg:w-[calc(100%+7rem)]',
+        )}>
           {community.banner_url ? (
             <img
               src={getProxiedImageUrl(community.banner_url)}
@@ -131,7 +137,7 @@ export default function CommunitySpacePage() {
         </div>
 
         {/* ── Community header + feed ── */}
-        <div className="px-4 pb-10 md:px-8">
+        <div className="mx-auto max-w-screen-2xl px-4 pb-10 md:px-8">
           <motion.div
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -159,6 +165,7 @@ export default function CommunitySpacePage() {
                 >
                   <Info className="h-4 w-4" /> <span className="hidden sm:inline">{uiI18n.t('app.info_4b631f69')}</span>
                 </Button>
+                <FollowButton kind="community" id={community.id} />
                 {canManage && (
                   <>
                     <Button

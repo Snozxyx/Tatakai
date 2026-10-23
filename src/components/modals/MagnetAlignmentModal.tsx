@@ -1,3 +1,4 @@
+import { ThemedCheckbox } from '@/components/ui/themed-checkbox';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import React, { useState, useEffect, useRef } from 'react';
@@ -643,7 +644,7 @@ export function MagnetAlignmentModal({ isOpen, onClose, initialMagnet, initialTo
                         </div>
                       )}
                       <label className="flex items-center gap-2 text-xs text-muted-foreground px-2">
-                        <input
+                        <ThemedCheckbox
                           type="checkbox"
                           checked={confirmLowConfidence}
                           onChange={(e) => setConfirmLowConfidence(e.target.checked)}

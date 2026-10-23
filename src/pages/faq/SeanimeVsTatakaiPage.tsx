@@ -153,7 +153,7 @@ const DIMENSIONS: Dimension[] = [
   },
   {
     name: "Extensions System",
-    tatakai: ".kai plugins, Stremio no-exec HTTP, Seanime JS/TS sandboxes, and a built-in extension storefront",
+    get tatakai() { return uiI18n.t('extensionUpdate.aTypes'); },
     seanime: "5 distinct types (torrent, manga, online stream, custom source, plugin) run via Goja VMs with a marketplace",
     edge: "tie",
   },

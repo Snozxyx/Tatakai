@@ -1,72 +1,141 @@
 # Tatakai Documentation
 
-Tatakai is an **extension-based otaku community and companion app** for tracking,
-discovering, reading, and watching together — available as a web app, a desktop
-app (Electron), and Android (Capacitor). Most advanced capabilities are delivered
-through a modular **extension system** rather than being hard-coded.
+Welcome to the official documentation for **Tatakai** — an all-in-one platform for discovering, watching, reading, tracking, and discussing anime, manga, manhwa, manhua, comics, and novels.
 
-> This documentation describes how the project is structured and how its major
-> systems work. For the user-facing release history, see the root
-> [`CHANGELOG.md`](../CHANGELOG.md) or **Settings → Changelog** in the app.
+---
 
-## Start here
+## 🚀 Quick Links
 
-| If you want to… | Read |
-| --- | --- |
-| Understand the whole system at a glance | [architecture/overview.md](architecture/overview.md) |
-| Work on the web/React app | [architecture/frontend.md](architecture/frontend.md) |
-| Work on the desktop (Electron) app | [architecture/desktop.md](architecture/desktop.md) |
-| Understand the backend & database | [architecture/backend-and-data.md](architecture/backend-and-data.md) |
-| Set up, build, and verify locally | [guides/development.md](guides/development.md) |
-| Build an extension | [extension/README.md](extension/README.md) |
+| I want to… | Start here |
+|------------|------------|
+| **Understand what Tatakai is** | [Overview](overview.md) |
+| **Set up the project locally** | [Development Setup](development.md) |
+| **Learn the architecture** | [Architecture Overview](architecture/overview.md) |
+| **Build an extension** | [Extension System](extensions/overview.md) |
+| **See all features** | [Features Reference](reference/features.md) |
+| **Contribute to the codebase** | [Contributing](contributing.md) |
 
-## Architecture
+---
 
-- **[overview.md](architecture/overview.md)** — the four planes (web app, desktop
-  shell, API proxy, Supabase) and how they fit together. **Read this first.**
-- **[frontend.md](architecture/frontend.md)** — the React app: routing, contexts,
-  data fetching, the `core/` domain layer, and UI structure.
-- **[desktop.md](architecture/desktop.md)** — the Electron main process, IPC
-  surface, runtime hosts (torrent, proxy, extension-API host, home server), and
-  background services.
-- **[backend-and-data.md](architecture/backend-and-data.md)** — the TatakaiAPI
-  proxy, the Supabase schema, the two id-spaces in `profiles`, the RPC-based
-  write model, ranks/badges, and how migrations are handled.
+## 📚 Documentation Structure
 
-## Features
+```
+docs/
+├── README.md                    # This file
+├── overview.md                  # Product overview & vision
+├── development.md               # Local setup, build, test
+├── contributing.md              # Contribution guidelines
+├── architecture/
+│   ├── overview.md              # System architecture (4 planes)
+│   ├── frontend.md              # React app structure
+│   ├── desktop.md               # Electron shell & services
+│   └── backend.md               # API proxy, database, auth
+├── extensions/
+│   ├── overview.md              # Extension system architecture
+│   ├── manifest.md              # manifest.json reference
+│   ├── capabilities/
+│   │   ├── sources.md           # Anime streaming sources
+│   │   ├── manga.md             # Manga chapter sources
+│   │   ├── custom-source.md     # Isolated read/watch verticals
+│   │   ├── themes.md            # Custom themes
+│   │   ├── analytics.md         # Analytics integrations
+│   │   ├── ui-slots.md          # React pages & UI slots
+│   │   └── services.md          # Services & platform modules
+│   ├── renderer-loader.md       # How renderer bundles load
+│   ├── security.md              # Trust model & permissions
+│   ├── migration.md             # Migration from old format
+│   └── build-first.md           # Step-by-step extension guide
+├── features/
+│   ├── playback.md              # Video player & streaming
+│   ├── manga.md                 # Manga/manhwa reader
+│   ├── novels.md                # Novel reader & TTS
+│   ├── downloads.md             # Offline downloads
+│   ├── recommendations.md       # AI recommendation engine
+│   ├── community.md             # Social & community features
+│   ├── search.md                # Unified search & discovery
+│   └── settings.md              # Themes, customization, advanced
+└── reference/
+    ├── features.md              # Complete feature list (preserved)
+    ├── design-guidelines.md     # UI/design system (preserved)
+    └── ai-disclaimer.md         # AI usage transparency (preserved)
+```
 
-Deep dives on the major product systems live in **[features/](features/README.md)**:
+---
 
-- [Streaming & playback](features/streaming-playback.md)
-- [Manga](features/manga.md)
-- [Downloads & offline](features/downloads-and-offline.md)
-- [Watch2Together](features/watch-together.md)
-- [Community](features/community.md)
-- [Recommendations](features/recommendations.md)
-- [Ranks & badges](features/ranks-and-badges.md)
-- [Admin & moderation](features/admin-and-moderation.md)
+## 🎯 What is Tatakai?
 
-## Extensions
+**One app. Every story. Every device.**
 
-The extension system has its own documentation set under
-**[extension/](extension/README.md)** — the execution planes, the manifest
-reference, per-capability guides (sources, manga, custom sources, themes,
-analytics, services/modules, UI slots/pages), the renderer loader, and the
-security/trust model.
+Tatakai combines:
+- **Anime streaming** — Advanced player with 4K upscaling, auto-skip, multi-audio, subtitles
+- **Manga/Manhwa/Comics reader** — Vertical scroll, multiple modes, customizable appearance
+- **Novel/Light Novel reader** — Custom fonts, backgrounds, **multi-provider TTS** (System, KittenTTS, OpenAI, ElevenLabs, Local)
+- **Extension ecosystem** — Add sources, themes, analytics, UI, services without modifying core
+- **Smart recommendations** — Hybrid ML engine (genre, studio, era, theme, community signals)
+- **Community features** — Posts, tier lists, playlists, watch-together, profiles, leaderboards
+- **Cross-platform sync** — MAL, AniList, MangaBaka integration
+- **Offline access** — Download anime, manga, novels for offline viewing
+- **Torrent & Debrid** — Built-in torrent engine, proxy, WARP, Real-Debrid, TorBox, AllDebrid, Premiumize
 
-## Guides & reference
+**Platforms:** Windows, macOS (sideload), Linux, Android, iOS (sideload), Smart TVs (coming)
 
-- [guides/development.md](guides/development.md) — local setup, build, and
-  verification (including known build/type-check caveats).
-- [guides/desktop-signing.md](guides/desktop-signing.md) — desktop code signing.
-- [guides/home-server.md](guides/home-server.md) — the optional self-hosted home
-  server.
-- [reference/design-guidelines.md](reference/design-guidelines.md) — UI/design
-  conventions.
-- [reference/ai-disclaimer.md](reference/ai-disclaimer.md) — AI-usage disclaimer.
+---
 
-## Other artifacts
+## 🔧 Tech Stack
 
-- [`tatakai-architecture.html`](tatakai-architecture.html) — a generated,
-  standalone visual architecture snapshot (large; open in a browser).
-- [toko/](toko/) — integration notes for the Toko provider/extension work.
+| Layer | Technology |
+|-------|------------|
+| **Frontend** | React 19, TypeScript, Tailwind CSS, TanStack Query, Zustand |
+| **Desktop** | Electron (main + sandboxed workers) |
+| **Mobile** | Capacitor (Android/iOS) |
+| **Backend** | TatakaiAPI proxy → Supabase (PostgreSQL + Auth + Realtime) |
+| **Extensions** | Custom `.kai` format + Stremio/Seanime compatibility |
+| **Media** | HLS.js, MediaChrome, WebTorrent, FFmpeg.wasm |
+
+---
+
+## 📖 Key Concepts
+
+### Extension System
+Most capabilities are **not hardcoded**. Extensions provide:
+- **Data-driven**: Streaming/manga sources, themes, analytics (JSON + Node bundle)
+- **Code-driven**: React pages, UI slots, services, modules (Renderer bundle)
+- **Trust model**: Code-driven contributions only load for trusted extensions
+
+### Two Execution Planes
+1. **Main Process (Node)** — Data plane: scraping, source resolution, HTTP API
+2. **Renderer (Browser)** — Code plane: React components, UI, app-privileged code
+
+### Cross-Platform Architecture
+- **Web App** → React SPA (Vite)
+- **Desktop** → Electron wraps web app + adds native services (torrent, proxy, extension host)
+- **Mobile** → Capacitor wraps web app + native bridges
+
+---
+
+## 🤝 Contributing
+
+We welcome contributions! See [CONTRIBUTING.md](contributing.md) for:
+- Code style & conventions
+- Pull request process
+- Issue reporting
+- Extension development guidelines
+
+---
+
+## 📄 License
+
+MIT License — see [LICENSE](../LICENSE) for details.
+
+---
+
+## 🔗 Links
+
+- **GitHub:** [github.com/snozxyx/Tatakai](https://github.com/snozxyx/Tatakai)
+- **Website:** [tatakai.me](https://tatakai.me)
+- **Discord:** [Join our community](https://discord.gg/tatakai)
+- **Changelog:** [CHANGELOG.md](../CHANGELOG.md)
+
+---
+
+*Last updated: 2026*

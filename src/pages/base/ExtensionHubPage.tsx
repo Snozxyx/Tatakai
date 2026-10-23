@@ -1,8 +1,14 @@
+import { ExtensionServerStatus } from '@/components/extensions/ExtensionServerStatus';
+import { ExtensionStacks } from '@/components/extensions/ExtensionStacks';
+import { ExtensionServersSettings } from '@/components/settings/ExtensionServersSettings';
+import { ThemedSelect } from '@/components/ui/themed-select';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { isMangaExtension } from '@/core/extensions/store-category';
 import { ECOSYSTEMS } from "@/core/extensions/ecosystems";
 import { RemoteExtensionsPanel } from "@/components/extensions/RemoteExtensionsPanel";
+import { CompatibilityExtensionsPanel } from '@/components/extensions/CompatibilityExtensionsPanel';
+import { InstalledCompatibilityExtensions } from '@/components/extensions/InstalledCompatibilityExtensions';
 /**
  * The extension store (`/extensions`), laid out the way the Microsoft Store lays
  * out its home page: a wide spotlight card with stacked promo tiles beside it,
@@ -23,7 +29,7 @@ import { RemoteExtensionsPanel } from "@/components/extensions/RemoteExtensionsP
  * gone rather than reimplemented, because inventing activity in a store that
  * tracks real install counts is worse than an emptier page.
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -39,7 +45,6 @@ import {
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Background } from '@/components/layout/Background';
 import { useIsDesktopApp, useIsNativeApp } from '@/hooks/ui/useIsNativeApp';
 import { isIOS } from '@/lib/platform/platform';
 import { SideloadExtensionModal } from '@/components/extensions/SideloadExtensionModal';
@@ -135,7 +140,7 @@ function RowShelf({
 }) {
   useUiTranslation();
   if (items.length === 0) return null;
-  const pages = chunk(items, SHELF_PAGE_SIZE);
+  const pages = chunk(items.slice(0, SHELF_PAGE_SIZE * 3), SHELF_PAGE_SIZE);
 
   return (
     <StoreShelf title={title} eyebrow={eyebrow} scrollable={pages.length > 1}>
@@ -175,13 +180,16 @@ export default function ExtensionHubPage() {
   const isDesktopApp = useIsDesktopApp();
   const isIos = isIOS();
 
+  const [language, setLanguage] = useState('all');
   const [ecosystem, setEcosystem] = useState('all');
   const [compatibility, setCompatibility] = useState('all');
   const [search, setSearch] = useState('');
   const [type, setType] = useState<TypeFilter>('all');
   const [sideloadOpen, setSideloadOpen] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(48);
+  useEffect(() => setVisibleCount(48), [search, type, ecosystem, compatibility, language]);
 
-  const catalogue = useStoreCatalogue({ search, type: type === 'manga' ? 'all' : type, ecosystem, compatibility });
+  const catalogue = useStoreCatalogue({ search, type: type === 'manga' ? 'all' : type, ecosystem, compatibility, language });
   const installer = useExtensionInstaller();
   const typeFilters = isIos ? TYPE_FILTERS.filter((option) => option.id !== 'torrent') : TYPE_FILTERS;
   const visibleItems = useMemo(
@@ -214,10 +222,7 @@ export default function ExtensionHubPage() {
   }, [visibleItems, visibleFeatured, installer]);
 
   return (
-    <div className="relative min-h-screen">
-      <Background />
-
-
+    <div className="relative min-h-screen bg-background text-foreground">
       <div
         className={cn(
           'relative z-10 mx-auto max-w-[1800px] px-4 py-6 pb-24 sm:px-6 md:pb-6',
@@ -231,6 +236,7 @@ export default function ExtensionHubPage() {
         >
           <ArrowLeft className="h-4 w-4" /> {uiI18n.t('app.home_70f8bb9a')}
         </Link>
+        <details className="mb-6 rounded-xl border border-border p-4"><summary className="cursor-pointer font-semibold">Extension Servers</summary><div className="mt-4"><ExtensionServersSettings /></div></details>
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-primary">
@@ -302,9 +308,11 @@ export default function ExtensionHubPage() {
             </Button>
           </div>
         </header>
+        <ExtensionServerStatus/>
       <div className="mt-5 space-y-4"><div className="flex flex-wrap gap-3">
-        <label className="text-sm">{uiI18n.t('app.ecosystem_9f12cdfc')} <select className="rounded border border-border bg-background p-2" value={ecosystem} onChange={e => setEcosystem(e.target.value)}><option value="all">{uiI18n.t('app.all_ecosystems_73e7f63d')}</option>{ECOSYSTEMS.map(e => <option key={e} value={e}>{e}</option>)}</select></label>
-        <label className="text-sm">{uiI18n.t('app.compatibility_5d60c7dd')} <select className="rounded border border-border bg-background p-2" value={compatibility} onChange={e => setCompatibility(e.target.value)}><option value="all">{uiI18n.t('app.all_compatibility_376b79c8')}</option>{['supported','limited','external','unavailable'].map(e => <option key={e} value={e}>{uiI18n.t(({"supported":"app.supported_2a5e9b1b","limited":"app.limited_1eb7d5c2","external":"app.external_59d8f3ec","unavailable":"app.unavailable_1d5ee313"})[e])}</option>)}</select></label>
+        <label className="flex flex-col gap-1.5 text-sm">Language <ThemedSelect value={language} onChange={e=>setLanguage(e.target.value)}><option value="all">All languages</option>{['en','es','ja','hi','fr','de','pt','it','ar','ru','ko','zh','mul','und'].map(code=><option key={code} value={code}>{code==='mul'?'Multilingual':code==='und'?'Not specified':new Intl.DisplayNames(['en'],{type:'language'}).of(code)}</option>)}</ThemedSelect></label>
+        <label className="flex flex-col gap-1.5 text-sm">{uiI18n.t('app.ecosystem_9f12cdfc')} <ThemedSelect className="min-w-[10rem] rounded-full" value={ecosystem} onChange={e => setEcosystem(e.target.value)}><option value="all">{uiI18n.t('app.all_ecosystems_73e7f63d')}</option>{ECOSYSTEMS.map(e => <option key={e} value={e}>{e}</option>)}</ThemedSelect></label>
+        <label className="flex flex-col gap-1.5 text-sm">{uiI18n.t('app.compatibility_5d60c7dd')} <ThemedSelect className="min-w-[10rem] rounded-full" value={compatibility} onChange={e => setCompatibility(e.target.value)}><option value="all">{uiI18n.t('app.all_compatibility_376b79c8')}</option>{['supported','limited','external','unavailable'].map(e => <option key={e} value={e}>{uiI18n.t(({"supported":"app.supported_2a5e9b1b","limited":"app.limited_1eb7d5c2","external":"app.external_59d8f3ec","unavailable":"app.unavailable_1d5ee313"})[e])}</option>)}</ThemedSelect></label>
       </div></div>
 
         {catalogue.serviceError || !catalogue.isServiceConfigured ? (
@@ -346,6 +354,8 @@ export default function ExtensionHubPage() {
           />
         </div>
 
+        <InstalledCompatibilityExtensions search={search} ecosystem={ecosystem} type={type} compatibility={compatibility} />
+
         {catalogue.isLoading ? (
           <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {Array.from({ length: 8 }).map((_, index) => (
@@ -371,7 +381,7 @@ export default function ExtensionHubPage() {
               meta={`${visibleItems.length} ${visibleItems.length === 1 ? 'match' : 'matches'}`}
             />
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {visibleItems.map((extension) => (
+              {visibleItems.slice(0, visibleCount).map((extension) => (
                 <ExtensionTile
                   key={extension.id}
                   extension={extension}
@@ -380,30 +390,14 @@ export default function ExtensionHubPage() {
                 />
               ))}
             </div>
+            {visibleItems.length > visibleCount && <Button variant="outline" onClick={() => setVisibleCount(count => count + 48)}>Show more extensions</Button>}
           </section>
         ) : (
           <div className="mt-8 space-y-12">
-            {spotlight ? (
-              <section className="grid gap-4 lg:grid-cols-[1.65fr_1fr]">
-                <ExtensionHeroCard
-                  extension={spotlight}
-                  state={installer.stateFor(spotlight)}
-                  onInstall={() => handleInstall(spotlight)}
-                />
-                {promos.length > 0 ? (
-                  <div className="flex flex-col gap-4">
-                    {promos.map((extension) => (
-                      <ExtensionPromoTile
-                        key={extension.id}
-                        extension={extension}
-                        state={installer.stateFor(extension)}
-                        onInstall={() => handleInstall(extension)}
-                      />
-                    ))}
-                  </div>
-                ) : null}
-              </section>
-            ) : null}
+            {visibleFeatured.some(item=>item.banner) ? <StoreShelf title="Featured extensions" eyebrow="Showcase" scrollable>
+              {visibleFeatured.filter(item=>item.banner).slice(0,8).map(extension=><ExtensionHeroCard key={extension.id} extension={extension} state={installer.stateFor(extension)} onInstall={()=>handleInstall(extension)} className="w-[min(85vw,42rem)] shrink-0 snap-start"/>)}
+            </StoreShelf> : spotlight ? <ExtensionHeroCard extension={spotlight} state={installer.stateFor(spotlight)} onInstall={()=>handleInstall(spotlight)}/> : null}
+            <ExtensionStacks installer={installer}/>
 
             {installed.length > 0 ? (
               <RowShelf
@@ -454,7 +448,7 @@ export default function ExtensionHubPage() {
                 )} installs`}
               />
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {visibleItems.map((extension) => (
+                {visibleItems.slice(0, visibleCount).map((extension) => (
                   <ExtensionTile
                     key={extension.id}
                     extension={extension}
@@ -463,12 +457,14 @@ export default function ExtensionHubPage() {
                   />
                 ))}
               </div>
+              {visibleItems.length > visibleCount && <Button variant="outline" onClick={() => setVisibleCount(count => count + 48)}>Show more extensions</Button>}
             </section>
           </div>
         )}
       </div>
 
       <div className="mx-auto max-w-7xl px-4 pb-8"><RemoteExtensionsPanel /></div>
+      <CompatibilityExtensionsPanel />
       <SideloadExtensionModal isOpen={sideloadOpen} onClose={() => setSideloadOpen(false)} />
     </div>
   );

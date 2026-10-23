@@ -2,6 +2,13 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      // Remove connection credentials before analytics or external resources load.
+      if (location.pathname.indexOf('/extensionserver/') === 0 || location.pathname === '/connect-server') {
+        window.__tatakaiServerLink = { pathname: location.pathname, search: location.search };
+        history.replaceState(null, '', location.pathname.indexOf('/extensionserver/') === 0 ? '/extensionserver/confirm' : '/connect-server');
+      }
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
     
     <!-- Static SEO (never entity-specific) -->

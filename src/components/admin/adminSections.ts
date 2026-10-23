@@ -46,6 +46,7 @@ import {
   Trophy,
   Users,
   Webhook,
+  Database,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -131,6 +132,7 @@ const NAV: readonly AdminNavGroup[] = [
     id: 'catalogue',
     get label() { return uiI18n.t('app.catalogue_5a241023'); },
     items: [
+      { value: 'catalog', label: 'Catalog entries', icon: Database, roles: ADMIN, keywords: 'anime manga novels content database supabase' },
       { value: 'popups', get label() { return uiI18n.t('app.popups_ads_6a58f867'); }, icon: Megaphone, roles: ADMIN, keywords: 'banners' },
     ],
   },

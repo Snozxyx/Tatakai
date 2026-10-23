@@ -267,6 +267,7 @@ require('./ipc/ipc-manga-library.cjs')(ipcMain, app, shell, fs, path, logger);
 require('./services/kitten-tts.cjs')(ipcMain, app, fs, path, logger, getMainWindow);
 const torrentRuntimeApi = require('./ipc/ipc-torrent.cjs')(ipcMain, app, fs, path, logger, getMainWindow);
 require('./ipc/ipc-system.cjs')(ipcMain, app, dialog, autoUpdater, fs, path, logger, getMainWindow, appCID, isDev);
+require('./ipc/ipc-translate.cjs')({ ipcMain, app, dialog, getMainWindow });
 require('./ipc/ipc-theme.cjs')(ipcMain, app, fs, path);
 require('./ipc/ipc-media.cjs')(ipcMain, app, logger);
 require('./ipc/ipc-debrid.cjs')(ipcMain);
@@ -276,6 +277,7 @@ require('./ipc/ipc-home-server.cjs')(ipcMain, app, fs, path, logger, getMainWind
 });
 
 app.on('ready', () => {
+    logger.info('[Startup] Electron ready', { elapsedMs: Math.round(process.uptime() * 1000) });
     if (!isDev) {
         protocol.registerFileProtocol('file', (request, callback) => {
             const url = request.url.substr(7);
@@ -367,7 +369,7 @@ app.on('ready', () => {
         // chance to settle, instead of on the module-load critical path. Kept
         // automatic (no feature change) — just moved off the hot boot window.
         setTimeout(startDeferredRuntimeServices, 1200);
-    }, 1500);
+    }, 0);
 });
 
 app.on('window-all-closed', () => {

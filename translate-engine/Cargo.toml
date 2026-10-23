@@ -1,0 +1,31 @@
+[package]
+name = "tatakai-translate"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+anyhow = "1.0"
+base64 = "0.22"
+blake3 = "1.8"
+cosmic-text = "0.14"
+fs2 = "0.4"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "gif", "bmp"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+uuid = { version = "1.18", features = ["v4", "serde"] }
+walkdir = "2.5"
+zip = { version = "2.4", default-features = false, features = ["deflate"] }
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+keyring = { version = "3.6", features = ["apple-native", "windows-native", "sync-secret-service"] }
+sha2 = "0.10"
+sysinfo = "0.33"
+hayro = { version = "=0.8.0", features = ["embed-fonts"] }
+unrar-ng = "=0.7.7"
+
+[dev-dependencies]
+tempfile = "3.23"
+
+[profile.release]
+lto = "thin"
+strip = true

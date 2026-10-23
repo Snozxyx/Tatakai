@@ -7,6 +7,7 @@ import { Background } from "@/components/layout/Background";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
 import { Header } from "@/components/layout/Header";
+import { ExtensionContinue } from '@/components/extensions/ExtensionContinue';
 import { useIsNativeApp, useIsDesktopApp } from "@/hooks/ui/useIsNativeApp";
 import { useIsMobile } from "@/hooks/ui/use-mobile";
 import { cn } from "@/lib/utils";

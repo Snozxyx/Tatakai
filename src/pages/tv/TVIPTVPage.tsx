@@ -1,3 +1,4 @@
+import { ThemedSelect } from '@/components/ui/themed-select';
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -412,13 +413,13 @@ export default function TVIPTVPage() {
           </label>
           <label>
             Type
-            <select
+            <ThemedSelect
               value={sourceKind}
               onChange={(e) => setSourceKind(e.target.value)}
             >
               <option value="m3u">M3U</option>
               <option value="xtream">Xtream Codes</option>
-            </select>
+            </ThemedSelect>
           </label>
           <label>
             {sourceKind === "m3u" ? "Playlist URL" : "Server URL"}

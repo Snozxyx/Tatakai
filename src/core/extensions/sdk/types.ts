@@ -95,7 +95,7 @@ export interface SourceResult {
    * Source type for this result, used to determine download strategy.
    * 'torrent' = magnet/torrent, 'hls' = HLS stream (will be transcoded to MP4).
    */
-  sourceType?: 'torrent' | 'hls' | 'mp4' | 'custom';
+  sourceType?: 'torrent' | 'debrid' | 'hls' | 'dash' | 'mp4' | 'custom';
 
   /**
    * Optional server/group label. When an extension exposes the same episode on
@@ -178,10 +178,12 @@ export interface ExtensionApiServer {
 
 /**
  * Describes a single custom source (an isolated read/watch vertical) an extension provides.
- * Custom sources have their own home/info/watch/read UI and are NEVER tied to the
- * app's anime/manga watchlist or readlist.
+ * Custom sources have their own home/info/watch/read UI and local progress.
+ * Catalogue actions require a separate verified link; source IDs remain isolated.
  */
 export interface CustomSourceDescriptor {
+  /** Mature sources are hidden unless the global mature-content setting is enabled. */
+  nsfw?: boolean;
   /** Stable id, unique within the extension (used in routes: `/x/<namespace>/<id>`). */
   id: string;
 
@@ -196,6 +198,11 @@ export interface CustomSourceDescriptor {
 
   /** Short description shown in the source's home header. */
   description?: string;
+  /** Language variants share this key only within the same owning extension. */
+  providerGroup?: string;
+  language?: string;
+  /** Opt in to verified catalogue links; source IDs themselves are never catalogue IDs. */
+  catalogMediaType?: 'anime' | 'manga' | 'novel';
 }
 
 /**
@@ -403,11 +410,14 @@ export interface ExtensionInvokeResult {
 // methods below; the app renders generic, anime-styled UI over the returned data.
 // `customWatch` reuses `SourceResult` so the existing VideoPlayer consumes it
 // unchanged; `customRead` reuses the manga-page shape so the existing reader does.
-// Custom sources MUST NOT touch the anime/manga watchlist or readlist.
+// Runtime source IDs MUST NOT be used as catalogue/watchlist/comment IDs.
 // ---------------------------------------------------------------------------
 
 /** A single card in a home row or search grid. */
 export interface CustomMediaCard {
+  nsfw?: boolean;
+  isAdult?: boolean;
+  genres?: string[];
   /** Stable id used to fetch info (`/x/<ns>/<sourceId>/info/<id>`). */
   id: string;
 
@@ -499,6 +509,9 @@ export interface CustomInfoResult {
   title: string;
   image?: string;
   description?: string;
+  /** Explicit upstream catalogue references, verified by the app before use. */
+  catalogIds?: { anilist?: number | string; mal?: number | string };
+  banner?: string;
   /** Freeform key/value metadata shown in the header (e.g. { Status: "Ongoing" }). */
   meta?: Record<string, string>;
   /** Episodes (kind=watch) or chapters (kind=read). */

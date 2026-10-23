@@ -1,4 +1,4 @@
-export type PlaybackMode = 'hls' | 'direct' | 'torrent' | 'offline' | 'debrid';
+export type PlaybackMode = 'hls' | 'dash' | 'direct' | 'torrent' | 'offline' | 'debrid';
 export type PlaybackBackend = 'html' | 'native' | 'external';
 
 export interface PlaybackSubtitle {
@@ -12,6 +12,7 @@ export interface PlaybackSubtitle {
 export interface PlaybackSource {
   id: string;
   url: string;
+  originalUrl?: string;
   mode: PlaybackMode;
   quality?: string;
   episodeNumber?: number;

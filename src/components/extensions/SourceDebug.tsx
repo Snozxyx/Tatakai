@@ -25,6 +25,8 @@ export function SourceDebug({ kind, sources = [], diagnostics = [], unit }: { ki
   }, [enabled]);
 
   if (!enabled) return null;
+  const scopedReports = reports.filter(r => r.kind === kind || kind === 'manga' && r.kind === 'pages');
+  const reported = new Set(scopedReports.map(report => report.provider));
 
   const counts = new Map<string, { name: string; count: number }>();
 
@@ -46,7 +48,7 @@ export function SourceDebug({ kind, sources = [], diagnostics = [], unit }: { ki
 
       {[...counts].map(([id, entry]) => <div key={id}>{entry.name}: {entry.count} {uiI18n.t('app.available_7b231a50')}</div>)}
 
-      {diagnostics.filter(d => !/^(seanime|stremio)-/.test(d.provider)).map(d => <div key={d.provider}>
+      {diagnostics.filter(d => !/^(seanime|stremio)-/.test(d.provider) && !reported.has(d.provider)).map(d => <div key={d.provider}>
 
         <strong>{counts.get(d.provider)?.name || d.provider}</strong> {uiI18n.t('app.sources_955e4eba')} {d.resultCount ?? counts.get(d.provider)?.count ?? 0} · {d.status} · {d.durationMs ?? 0} {uiI18n.t('app.ms_26cc3217')}
 
@@ -54,13 +56,13 @@ export function SourceDebug({ kind, sources = [], diagnostics = [], unit }: { ki
 
       </div>)}
 
-      {reports.filter(r => r.kind === kind || kind === 'manga' && r.kind === 'pages').map(r => <div key={r.provider + r.kind}>
+      {scopedReports.map(r => <div key={r.provider + r.kind}>
 
         <strong>{r.name}</strong> ({r.ecosystem}) · {r.kind === 'pages' ? uiI18n.t('app.pages_eec6542d') : uiI18n.t('app.sources_bce16dd0')}: {r.count} {uiI18n.t('app.subtitles_2b0bb9df')} {r.subtitleCount || 0} · {r.status} · {r.durationMs} {uiI18n.t('app.ms_26cc3217')}
 
         {r.lookup && <span> · {r.lookup === 'catalog-search' ? uiI18n.t('app.search_fallback_02ac9eb8') : uiI18n.t('app.mapped_id_36308965')} {uiI18n.t('app.stream_attempts_62867e35')} {r.attempts || 0}</span>}
 
-        {r.error && <div className="text-destructive">{r.error}</div>}
+        {r.error && <div className={r.status === 'unmatched' || r.status === 'skipped' ? 'break-words text-muted-foreground' : 'break-words text-destructive'}>{r.error}</div>}
 
       </div>)}
 

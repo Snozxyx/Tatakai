@@ -1,0 +1,89 @@
+/* TV's lightweight presentation. Translucency follows the wallpaper palette;
+   live backdrop filters and scaling whole shelves are deliberately avoided. */
+.tatakai-tv * { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+.tatakai-tv .tv-shell { padding: 0 4.4vw 5vh; scroll-behavior: auto; }
+.tatakai-tv .tv-header { min-height: 78px; height: 12vh; gap: 2vw; }
+.tatakai-tv .tv-header nav {
+  gap: .25vw; padding: .4vw; border-radius: 999px;
+  background: rgba(var(--tv-glass), .84); border: 1px solid rgba(var(--tv-accent), .12);
+  box-shadow: none;
+}
+.tatakai-tv .tv-header nav a {
+  padding: .7em 1.15em; min-height: 42px; border-radius: 999px;
+  color: #e6e1e8; font-size: clamp(16px, 1.2vw, 27px); font-weight: 550;
+  transition: color 100ms, background-color 100ms; transform: none;
+}
+.tatakai-tv .tv-header nav a.active { color: #1c1620; background: #fff6fc; font-weight: 700; }
+.tatakai-tv .tv-header nav a:focus-visible { color: #1c1620 !important; background: #fff6fc !important; outline: 2px solid rgb(var(--tv-accent)); outline-offset: 3px; transform: none; }
+.tatakai-tv .tv-profile-link { gap: .65em; border-radius: 12px; }
+.tatakai-tv .tv-avatar { border-radius: 12px; width: clamp(38px, 3.1vw, 72px); height: clamp(38px, 3.1vw, 72px); }
+.tatakai-tv .tv-brand { font-size: clamp(26px, 2.55vw, 56px); }
+.tatakai-tv .tv-brand span { font-size: .25em; letter-spacing: .22em; }
+.tatakai-tv .tv-video-wallpaper { opacity: .4; }
+.tatakai-tv .tv-wallpaper-overlay {
+  background: linear-gradient(90deg, rgba(var(--tv-ink), .86), rgba(var(--tv-ink), .52)), linear-gradient(0deg, rgba(var(--tv-ink), .7), transparent 85%);
+}
+.tatakai-tv .tv-ambient { display: none; }
+
+/* Artwork leads; information and actions remain anchored on the left. */
+.tatakai-tv .tv-cinema {
+  height: 56vh; min-height: 380px; max-height: 760px;
+  border-radius: 22px; margin-bottom: 3vw; background: rgb(var(--tv-ink));
+  box-shadow: none;
+}
+.tatakai-tv .tv-cinema-art { width: 88%; object-position: center 32%; }
+.tatakai-tv .tv-cinema-scrim {
+  background: linear-gradient(90deg, rgb(var(--tv-ink)) 0%, rgba(var(--tv-ink), .95) 20%, rgba(var(--tv-ink), .62) 43%, rgba(var(--tv-ink), .05) 75%), linear-gradient(0deg, rgba(var(--tv-ink), .7), transparent 60%);
+}
+.tatakai-tv .tv-cinema-copy { left: 3vw; bottom: 3vw; width: 49%; max-width: 780px; }
+.tatakai-tv .tv-cinema h1 { font-size: clamp(32px, 3.2vw, 70px); line-height: 1.1; font-weight: 700; max-width: 23ch; }
+.tatakai-tv .tv-cinema .tv-title-logo { height: 13vh; margin-bottom: 1.35vw; }
+.tatakai-tv .tv-cinema .tv-title-logo img { max-width: 33vw; filter: none; }
+.tatakai-tv .tv-cinema-description { -webkit-line-clamp: 2; max-width: 44ch; margin-bottom: 1.6vw; font-size: clamp(16px, 1.3vw, 28px); line-height: 1.5; text-shadow: none; color: #e8e1eb; }
+.tatakai-tv .tv-cinema .tv-hero-facts { font-size: clamp(14px, 1.15vw, 25px); margin-bottom: 1vw; }
+.tatakai-tv .tv-cinema-actions > :is(a, button) { border-radius: 12px; padding: .8em 1.5em; min-height: 48px; box-shadow: none; }
+.tatakai-tv .tv-cinema-actions > .tv-secondary { background: rgba(255, 245, 252, .13); border-color: rgba(255, 245, 252, .2); }
+.tatakai-tv .tv-cinema-navigation { top: 1.7vw; right: 1.7vw; gap: .7vw; }
+.tatakai-tv .tv-cinema-navigation button { background: rgba(var(--tv-ink), .72); border-color: rgba(255, 245, 252, .2); }
+
+/* Compact shelves keep more titles in view without losing unified metadata. */
+.tatakai-tv .tv-rail { margin-bottom: 2.8vw; }
+.tatakai-tv .tv-rail h2, .tatakai-tv .tv-discovery-grid h2 { font-size: clamp(20px, 1.65vw, 36px); font-weight: 600; letter-spacing: -.02em; margin-bottom: 1vw; }
+.tatakai-tv .tv-rail-items { gap: 1.25vw; padding: .4vw .35vw .7vw; scroll-behavior: auto; }
+.tatakai-tv .tv-content-card {
+  width: 18.6vw; min-width: 210px; border-radius: 14px; padding: 0;
+  border: 1px solid rgba(var(--tv-accent), .1); background: rgba(var(--tv-glass), .5);
+  outline: 2px solid transparent; outline-offset: 3px; box-shadow: none;
+  transform: none; transition: border-color 100ms, background-color 100ms;
+}
+.tatakai-tv .tv-content-card:is(:hover, :focus-visible) {
+  transform: none; outline: 2px solid #fff6fc; outline-offset: 3px;
+  border-color: transparent; color: #fff6fc; background: rgba(var(--tv-glass), .92) !important;
+}
+.tatakai-tv .tv-card-art { border: 0; border-radius: 13px 13px 0 0; outline: none; box-shadow: none; }
+.tatakai-tv .tv-content-card:is(:hover, :focus-visible) .tv-card-art { outline: none; transform: none; }
+.tatakai-tv .tv-card-art img { transform: none; transition: none; }
+.tatakai-tv .tv-card-caption { padding: .85em .85em .95em; background: none; }
+.tatakai-tv .tv-content-card strong { min-height: 0; margin: 0 0 .65em; font-size: clamp(15px, 1.14vw, 25px); font-weight: 600; line-height: 1.25; }
+.tatakai-tv .tv-card-facts { gap: .4em .55em; font-size: clamp(12px, .94vw, 21px); line-height: 1.45; }
+.tatakai-tv .tv-card-facts > :not(.badge-18plus) { background: transparent; border: 0; padding: 0; border-radius: 0; font-size: inherit; }
+.tatakai-tv .tv-card-tags { gap: .45em; margin-top: .65em; }
+.tatakai-tv .tv-card-tags > span { padding: .18em .6em; border-radius: 6px; font-size: clamp(11px, .86vw, 19px); background: rgba(var(--tv-accent), .07); border: 0; }
+.tatakai-tv .tv-card-status, .tatakai-tv .tv-card-badge { background: #211d28; border: 0; border-radius: 5px; padding: .3em .55em; font-size: clamp(11px, .84vw, 19px); }
+.tatakai-tv .tv-card-art progress { accent-color: rgb(var(--tv-accent)); height: 3px; }
+.tatakai-tv .tv-rank { left: .12em; bottom: -.08em; font-size: 3.5em; text-shadow: 0 2px 5px #000; }
+.tatakai-tv .tv-card-preview { background: #221d28; border: 0; border-radius: 16px; box-shadow: 0 18px 38px rgba(0,0,0,.45); animation: none; }
+.tatakai-tv .tv-card-preview-art > div { background: linear-gradient(0deg, #221d28, transparent 80%); }
+
+/* Shared TV pages use the same quiet surfaces and fast focus feedback. */
+.tatakai-tv .tv-shell :is(.tv-settings-content, .tv-side-menu, .tv-extension, .tv-source-option, .tv-download-row, .tv-library-card) { border-radius: 14px; background: rgba(var(--tv-glass), .8); box-shadow: none; }
+.tatakai-tv .tv-shell :is(button, a, input, select, [role="tab"]):focus-visible { outline-width: 2px; outline-offset: 3px; }
+.tatakai-tv .tv-shell :is(.tv-extension, .tv-source-option, .tv-download-row):is(:focus-visible, :hover) { transform: none; }
+.tatakai-tv .tv-side-menu :is(a, button) { border-radius: 10px; }
+.tatakai-tv .tv-search-results { gap: 1.7vw 1.25vw; }
+.tatakai-tv .tv-search-results .tv-content-card { width: auto; min-width: 0; }
+.tatakai-tv .tv-shared-profile :is([role="tablist"], .profile-identity, .profile-stat-card) { box-shadow: none; }
+.tatakai-tv .tv-shell :is(.tv-shared-profile, .tv-community-feed) { --tw-backdrop-blur: none; }
+@media (prefers-reduced-motion: reduce) {
+  .tatakai-tv .tv-shell *, .tatakai-tv .tv-card-preview { transition: none !important; animation: none !important; }
+}

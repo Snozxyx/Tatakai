@@ -187,6 +187,11 @@ export interface EpisodeData {
 }
 
 export interface EpisodeServer {
+  extensionServerName?: string;
+  sourceName?: string;
+  extensionId?: string;
+  extensionName?: string;
+  ecosystem?: string;
   serverId: number;
   serverName: string;
   providerKey?: string;
@@ -230,6 +235,11 @@ export interface EpisodeServer {
 }
 
 export interface StreamingSource {
+  extensionServerName?: string;
+  sourceName?: string;
+  extensionId?: string;
+  extensionName?: string;
+  ecosystem?: string;
   fileIndex?: number;
   url: string;
   isM3U8: boolean;

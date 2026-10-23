@@ -123,11 +123,13 @@ const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 /**
  * Ports probed when the preload bridge can't name the host.
  *
- * `host-server.cjs` prefers 8099 and walks upward on EADDRINUSE, and the
- * standalone `extension/toko/api` dev server defaults to the same 8099. When both
- * are around the loser moves up, so the base URL is only knowable by asking.
+ * `host-server.cjs` prefers 8099 and walks upward on EADDRINUSE, and standalone
+ * extension-api dev servers also listen in this loopback band (in ascending
+ * numeric order so the lowest live responder wins). Any extension that runs a
+ * dev API server in this band is discoverable — nothing here is tied to a
+ * specific extension namespace.
  */
-const PROBE_PORTS = [8099, 8100, 8101, 8102];
+const PROBE_PORTS = [8098, 8099, 8100, 8101, 8102];
 
 /**
  * Read `/api/v3/health` and translate it into a namespace list.

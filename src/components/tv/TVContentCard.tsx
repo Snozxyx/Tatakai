@@ -5,11 +5,12 @@ import {
 } from "@/core/tv/cardMetadata";
 import { TVCardFacts, TVCardTags } from "./TVCardMetadata";
 import { resolveTatakaiAnimeViewId } from "@/components/media/TatakaiAnimeViews";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import { Info } from "lucide-react";
 import { useTVTitleArt } from "@/core/tv/useTVTitleArt";
+import { observeTVVisibility } from "@/core/tv/visibility";
 export interface TVCard extends TVCardMetadataInput {
   id: string;
   name: string;
@@ -21,7 +22,7 @@ export interface TVCard extends TVCardMetadataInput {
   subtitle?: string;
   description?: string;
 }
-export function TVContentCard({
+export const TVContentCard = memo(function TVContentCard({
   item,
   onFocus,
 }: {
@@ -80,18 +81,13 @@ export function TVContentCard({
     : undefined;
   useEffect(() => {
     if (!anchor.current) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => setVisible(entry.isIntersecting),
-      { rootMargin: "120px" }
-    );
-    observer.observe(anchor.current);
-    return () => observer.disconnect();
+    return observeTVVisibility(anchor.current, setVisible);
   }, []);
   function show() {
-    onFocus?.(item);
     clearTimeout(timer.current);
+    onFocus?.(item);
     timer.current = setTimeout(() => {
-      if (!anchor.current) return;
+      if (!anchor.current || (!anchor.current.matches(':hover') && document.activeElement !== anchor.current)) return;
       const rect = anchor.current.getBoundingClientRect();
       const width = Math.min(
         Math.max(rect.width * 1.23, 340),
@@ -117,15 +113,16 @@ export function TVContentCard({
     setOpen(false);
   }
   useEffect(() => {
+    if (!open) return;
     const close = () => setOpen(false);
     window.addEventListener("scroll", close, true);
     window.addEventListener("resize", close);
     return () => {
-      clearTimeout(timer.current);
       window.removeEventListener("scroll", close, true);
       window.removeEventListener("resize", close);
     };
-  }, []);
+  }, [open]);
+  useEffect(() => () => clearTimeout(timer.current), []);
   useLayoutEffect(() => {
     if (!open || !panel.current) return;
     const resize = new ResizeObserver(() => {
@@ -164,6 +161,7 @@ export function TVContentCard({
           {item.poster && (
             <img
               loading="lazy"
+              decoding="async"
               src={item.tvMetadata?.banner || item.banner || item.poster}
               alt=""
             />
@@ -260,4 +258,4 @@ export function TVContentCard({
         )}
     </>
   );
-}
+});

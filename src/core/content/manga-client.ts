@@ -22,6 +22,7 @@ import {
 } from "@/lib/cache/extensionResultCache";
 import { isCapacitor } from "@/lib/platform/platform";
 import { removeMangaChapterOutliers } from '@/lib/reader/mangaChapterReliability';
+import { mangaExtensionContext } from '@/core/extensions/compatibility/title-context';
 
 /** Cache-key builder shared by the client + the query hook's placeholder. */
 let chaptersCacheGeneration = 0;
@@ -250,7 +251,10 @@ async function apiGet<T>(path: string, params?: Record<string, string | number |
     }
   }
   const res = await fetch(url.toString(), { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(timeoutMs) });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(`HTTP ${res.status}${typeof body?.error === 'string' ? `: ${body.error}` : ''}`);
+  }
   const json = await res.json();
   if (json?.meta) onMeta?.(json.meta);
   return (json?.data ?? json) as T;
@@ -454,7 +458,7 @@ export async function getMangaDetail(id: string): Promise<MangaDetailResponse> {
   };
 }
 
-export async function getMangaChapters(id: string, _providers?: string, _language?: string): Promise<MangaChapterResponse> {
+export async function getMangaChapters(id: string, _providers?: string, _language?: string, metadata?: MangaDetailResponse | null | Promise<MangaDetailResponse | null>): Promise<MangaChapterResponse> {
   const generation = chaptersCacheGeneration;
   const { fetchMangaDexChapters } = await import('./mangadex-api');
   const { fetchMangaUpdatesCatalog, applyMangaUpdatesCatalog } = await import('./mangaupdates-api');
@@ -463,7 +467,7 @@ export async function getMangaChapters(id: string, _providers?: string, _languag
   const [mangaDex, updatesCatalog, extensionPayload] = await Promise.all([
     fetchMangaDexChapters(id),
     fetchMangaUpdatesCatalog(id),
-    runtime.fetchExtensionMangaChapters({anilistId:Number.isFinite(anilistId)?anilistId:undefined})
+    (async () => runtime.fetchExtensionMangaChapters(mangaExtensionContext(id, metadata === undefined ? await getMangaDetail(id).catch(() => undefined) : await metadata || undefined)))()
       .catch(() => ({chapters:[],providersAvailable:[],failedProviders:[]})),
   ]);
   const empty: MangaChapterResponse = {anilistId:Number.isFinite(anilistId)?anilistId:0,partial:false,failedProviders:[],chapters:[],mappedChapters:[]};
@@ -701,7 +705,7 @@ export async function getMangaReadByKey(
     }
     return failure;
   }
-  if (isNative && provider && provider !== "tatakai_media") {
+  if ((isNative || provider?.startsWith('server-')) && provider && provider !== "tatakai_media") {
     const { fetchExtensionMangaPages } = await import("@/core/content/manga-extension-runtime");
     const anilistId = Number(String(id).replace(/^anilist:/i, ""));
     return fetchExtensionMangaPages({
@@ -720,7 +724,7 @@ export async function getMangaReadByKey(
       code: "EXTENSION_RUNTIME_REQUIRED",
       message: isNative
         ? "Install a manga extension and open a provider source from the chapter hierarchy."
-        : "Manga reader requires the Tatakai desktop app with extensions.",
+        : "Connect an extension server in Extensions Hub and select a provider source from the chapter list.",
       retryable: false,
     },
   };

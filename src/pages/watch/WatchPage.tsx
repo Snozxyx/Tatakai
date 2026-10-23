@@ -1,3 +1,4 @@
+import { watchMainClass, WATCH_GRID_CLASS, watchPlayerColumnClass, watchPlayerFrameClass, WATCH_EPISODE_PANEL_CLASS } from "@/components/watch/watchLayout";
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { TorrentPreloadController } from '@/core/player/TorrentPreloadController';
@@ -12,6 +13,7 @@ import {
   useAnimeInfo,
 } from "@/hooks/api/useAnimeData";
 import { useCombinedSourcesWithRefetch } from "@/hooks/media/useCombinedSources";
+import { resolveExtensionApiBase } from "@/hooks/media/useExtensionSourceStream";
 import type { EpisodeServer, Subtitle } from "@/types/anime";
 import { Background } from "@/components/layout/Background";
 import { Sidebar } from "@/components/layout/Sidebar";
@@ -894,7 +896,7 @@ export default function WatchPage() {
     // Load saved language preference from continue watching
     const savedHistory = getLocalContinueWatching();
     const saved = savedHistory.find(h => h.episodeId === decodeURIComponent(episodeId || ''));
-    return saved?.languageCode || null;
+    return saved?.languageCode || (settings.audioLanguage === 'auto' ? null : settings.audioLanguage);
   });
   const [selectedProviderServerKey, setSelectedProviderServerKey] = useState<string | null>(null);
   const [preferredServerName, setPreferredServerName] = useState<string | null>(() => {
@@ -1580,15 +1582,26 @@ export default function WatchPage() {
       if (anilistId || animeData?.info.name) {
         void import('@/core/extensions/mobile/mobileExtensionHost').then(
           ({ mobileExtensionDispatch }) =>
-            mobileExtensionDispatch
-              .resolveSources('toko', 'sources', {
-                anilistId: anilistId ?? undefined,
-                titles: animeData?.info.name ? [animeData.info.name] : undefined,
-                episode: nextEpisode.number,
-                resolution: '1080p',
-                preferredLanguage: category,
-              })
-              .catch(() => {}),
+            (async () => {
+              // Warm every mounted extension's in-WebView cache (generic —
+              // anything with a sources/stream route), so advancing to the
+              // next episode resolves instantly.
+              const base = await resolveExtensionApiBase(true).catch(() => null);
+              const namespaces = (base?.baseUrl ? base.namespaces || [] : [])
+                .filter((ns) => (ns.routes || []).includes('sources') || (ns.routes || []).includes('stream'))
+                .map((ns) => ns.namespace);
+              for (const namespace of namespaces) {
+                mobileExtensionDispatch
+                  .resolveSources(namespace, 'sources', {
+                    anilistId: anilistId ?? undefined,
+                    titles: animeData?.info.name ? [animeData.info.name] : undefined,
+                    episode: nextEpisode.number,
+                    resolution: '1080p',
+                    preferredLanguage: category,
+                  })
+                  .catch(() => {});
+              }
+            })().catch(() => {}),
         ).catch(() => {});
       }
     }
@@ -1616,6 +1629,8 @@ export default function WatchPage() {
     isFetching: fetchingSources,
     error: sourcesError,
     refetch: refetchSources,
+    searchRemainingSources, remainingSourceCount, continuingSources, cancelRemainingSources, continuationError,
+    cancelExtensionLookup, extensionLookupRunning,
   } = useCombinedSourcesWithRefetch(
     decodedEpisodeId,
     animeData?.info.name,
@@ -1870,13 +1885,16 @@ export default function WatchPage() {
     const type = String(source.sourceType || "").toLowerCase();
     const isTorrent = source.isTorrent === true || type === "torrent";
     if (extra?.count && extra.count > 0) push("Sources", extra.count);
+    push("Extension", source.extensionName || source.extensionId);
+    push("Server", source.extensionServerName);
+    push("Source", source.sourceName || source.providerName);
+    if (Number.isFinite(source.providerPriority)) push("Extension priority", source.providerPriority);
+    push("Ecosystem", source.ecosystem);
     push("Type", source.sourceType || (source.isEmbed ? "embed" : source.isM3U8 ? "hls" : undefined));
     push("Quality", source.quality);
     push("Audio", source.languageLabel || source.language);
     if (source.language && source.language !== (source.languageLabel || "")) push("Language", source.language);
     push("Provider", source.providerName);
-    push("Key", source.providerKey);
-    push("Server", source.server);
     push("Format", source.fileFormat);
     push("Size", source.fileSize);
     if (isTorrent) {
@@ -2413,7 +2431,7 @@ export default function WatchPage() {
         const identityKey = `${providerId}#${nth}`;
         identityBySource.set(source, identityKey);
         keys.push(identityKey);
-        fallbackByKey[identityKey] = String(source?.providerName || providerId);
+        fallbackByKey[identityKey] = String(source?.extensionServerName || source?.providerName || providerId);
       });
     });
 
@@ -2458,7 +2476,7 @@ export default function WatchPage() {
     );
     return (
       uniqueLabelMap.labels[providerId] ||
-      getSimpleServerDisplayName(providerId, String(source?.providerName || fallbackKey))
+      getSimpleServerDisplayName(providerId, String(source?.extensionServerName || source?.providerName || fallbackKey))
     );
   };
 
@@ -3089,10 +3107,7 @@ export default function WatchPage() {
       <Background />
       <Sidebar />
 
-      <main className={cn(
-        "relative z-10 pr-4 md:pr-6 py-4 md:py-6 max-w-[1800px] mx-auto pb-24 md:pb-6",
-        isDesktop ? "pl-4 md:pl-6" : "pl-4 md:pl-32"
-      )}>
+      <main className={watchMainClass(isDesktop)}>
         {/* Header */}
         <div className="flex items-center justify-between gap-2 mb-4 md:mb-6">
           <div className="flex items-center gap-3">
@@ -3126,17 +3141,14 @@ export default function WatchPage() {
 
         {/* Main Content - Stack on mobile, grid on desktop */}
         <div className={cn(
-          "flex flex-col gap-4 md:gap-6",
+          WATCH_GRID_CLASS,
           !isGenericTorrent && "xl:grid xl:grid-cols-12"
         )}>
           {/* Video Player Column */}
-          <div className={cn(
-            "space-y-4 md:space-y-6",
-            !isGenericTorrent ? "xl:col-span-9" : "w-full"
-          )}>
+          <div className={watchPlayerColumnClass(isGenericTorrent)}>
             {/* Live torrent session state renders below the player (TorrentSessionPanel) */}
 
-            <div className={cn("rounded-xl md:rounded-2xl border border-border/30 bg-card/60", isMobileApp ? "overflow-visible" : "overflow-hidden")}>
+            <div className={watchPlayerFrameClass(isMobileApp)}>
 
               {/* Unreleased episode: schedule visibility only — never resolve or
                   play, so a fallback can never substitute another show's streams. */}
@@ -3382,13 +3394,13 @@ export default function WatchPage() {
             </div>
 
             {/* Server & Category Selection - Hide in offline mode, generic torrent, or unreleased episode */}
-            {!isOfflineMode && !isGenericTorrent && !isCurrentUnaired && <ExtensionRequired kind="anime" hasContent={visibleSources.length > 0} />}
+            {!isOfflineMode && !isGenericTorrent && !isCurrentUnaired && !fetchingSources && !loadingSources && <ExtensionRequired kind="anime" hasContent={visibleSources.length > 0} />}
             {!isOfflineMode && !isGenericTorrent && !isCurrentUnaired && (
               <GlassPanel className="p-4 md:p-5">
                 <div className="flex flex-col gap-4 md:gap-6">
                   {/* Category Toggle */}
                   <div className="space-y-2" data-tv-source-picker tabIndex={-1}>
-                    <div className="flex items-center gap-2 text-xs md:text-sm font-medium text-muted-foreground">
+                    <div className="flex flex-wrap items-center gap-2 text-xs md:text-sm font-medium text-muted-foreground">
                       <Volume2 className="w-4 h-4" />
                       {uiI18n.t('app.audio_acdac205')}
                     </div>
@@ -3438,7 +3450,8 @@ export default function WatchPage() {
                           <Eye className="w-3.5 h-3.5" />
                         </button>
                       )}
-                      <div className="ml-auto flex items-center gap-2">
+                      <div className="ml-auto flex min-w-0 flex-wrap items-center gap-2">
+                        {extensionLookupRunning && <Button size="sm" variant="ghost" onClick={() => void cancelExtensionLookup()}>Stop extension lookup</Button>}
                         <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full">
                           {providerSourceCount} {uiI18n.t('app.sources_bce16dd0')}
                         </span>
@@ -3493,7 +3506,6 @@ export default function WatchPage() {
                               const providerSourceCount = (server as any).sourceCount ?? visibleSources.filter((s: any) => String(s.server || s.providerKey || s.providerName || "") === String(server.serverName)).length;
                               const serverHoverRows = buildSourceHoverRows(serverSource || server, { count: providerSourceCount });
                               const serverRealProvider = (serverSource as any)?.providerName || server.providerName || server.serverName;
-                              const serverRealKey = (serverSource as any)?.providerKey || server.providerKey;
 
                               return (
                                 <TooltipProvider key={server.serverId}>
@@ -3510,7 +3522,8 @@ export default function WatchPage() {
                                           setPreferredServer(server.serverName);
                                           setRefererRetryIndex(0);
                                         }}
-                                        title={serverDescription}
+                                        title={[serverSource?.extensionName || server.extensionName, serverDescription].filter(Boolean).join(' · ')}
+                                        aria-label={[serverLabel, serverSource?.extensionName || server.extensionName].filter(Boolean).join(' · ')}
                                         className={`h-9 px-3 md:px-4 rounded-xl font-medium transition-all text-sm flex items-center justify-center gap-1.5 ${idx === selectedServerIndex
                                           ? "bg-foreground text-background shadow-lg"
                                           : failedServers.has(server.serverName)
@@ -3528,8 +3541,8 @@ export default function WatchPage() {
                                       <div className="space-y-1.5 p-1">
                                         <div className="flex items-center justify-between gap-2">
                                           <span className="text-xs font-semibold">{serverLabel}</span>
-                                          <span className="text-[10px] text-muted-foreground truncate max-w-[10rem]" title={serverRealKey ? uiI18n.t('app.i18n_value_0_i18n_value_1_8568f691', { value0: serverRealProvider, value1: serverRealKey }) : serverRealProvider}>
-                                            {serverRealProvider}{serverRealKey ? uiI18n.t('app.i18n_value_0_92e4cd32', { value0: serverRealKey }) : ""}
+                                          <span className="text-[10px] text-muted-foreground truncate max-w-[10rem]" title={serverSource?.extensionName || server.extensionName || serverRealProvider}>
+                                            {serverSource?.extensionName || server.extensionName || serverRealProvider}
                                           </span>
                                         </div>
                                         {serverHoverRows.length > 0 && (
@@ -3591,11 +3604,11 @@ export default function WatchPage() {
                           activeLanguage={activeSourceLanguage}
                           onLanguageChange={setActiveSourceLanguage}
                         />
-                        {Object.entries(filteredLanguageGroups).map(([lang, sources]) => (
-                          <div key={lang} className="flex flex-col gap-2">
+                        {Object.entries(filteredLanguageGroups).map(([language, sources]) => (
+                          <div key={language} className="flex min-w-0 flex-col gap-2">
                             <div className="text-xs text-muted-foreground font-medium flex items-center gap-2">
                               <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-                              {lang} {uiI18n.t('app.sources_2eb56be3')}
+                              {language}
                             </div>
                             <div className="flex flex-wrap gap-2">
                               {sources.map((source, sIdx) => {
@@ -3609,16 +3622,15 @@ export default function WatchPage() {
                                       preferredServerName === source.providerName
                                 );
                                 const nextEstimate = getNextEpisodeEstimate(source);
-                                const label = getSimpleSourceLabel(source, `${lang}-${sIdx}`);
+                                const label = getSimpleSourceLabel(source, `${language}-${sIdx}`);
                                 const sourceServerName = source.server || source.providerKey || source.langCode || source.providerName || `source-${sIdx}`;
                                 const sourceComboKey = comboFailureKey(decodedEpisodeId, sourceServerName, category);
                                 const failCount = getSourceFailureCount(sourceComboKey);
                                 const healthScore = getSourceHealthScore(sourceServerName);
                                 const workingState = failCount >= 2 ? "Not working" : "Working";
-                                const hoverInfo = `${workingState} • Health ${healthScore}/100 • Fails ${failCount} • Source ${sourceServerName} • ${getUrlHost(source.url)}`;
+                                const hoverInfo = `${workingState} • Health ${healthScore}/100 • Fails ${failCount} • Source ${source.sourceName || source.providerName || 'Unknown'} • ${getUrlHost(source.url)}`;
                                 const sourceHoverRows = buildSourceHoverRows(source);
                                 const sourceRealProvider = source.providerName || source.server || sourceServerName;
-                                const sourceRealKey = source.providerKey;
 
                                 return (
                                   <TooltipProvider key={`${source.langCode}-${source.providerName}-${sIdx}`}>
@@ -3654,13 +3666,15 @@ export default function WatchPage() {
                                             setPreferredSourceUrl(source.url || null);
                                             setFailedServers(new Set());
                                           }}
-                                          className={`h-9 px-3 md:px-4 rounded-xl font-medium transition-all text-sm flex items-center gap-2 ${isSelected
+                                          className={`min-h-9 max-w-full px-3 md:px-4 py-2 rounded-xl font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 text-sm flex items-center gap-2 ${isSelected
                                             ? "bg-foreground text-background shadow-lg"
                                             : getSourceTypeColorClass(source)}`}
-                                          title={hoverInfo}
+                                          title={[source.extensionName, source.ecosystem, hoverInfo].filter(Boolean).join(' · ')}
+                                          aria-label={[label, source.languageLabel || source.language, source.extensionName].filter(Boolean).join(' · ')}
                                         >
                                           {source.isEmbed ? <Globe className="w-3 h-3" /> : <Server className="w-3 h-3 text-muted-foreground" />}
-                                          {label}
+                                          <span className="truncate">{label}</span>
+                                          <span className="text-xs opacity-75 shrink-0">{source.languageLabel || source.language}</span>
                                           <SourceTypeBadge
                                             isM3U8={source.isM3U8}
                                             isEmbed={source.isEmbed}
@@ -3684,8 +3698,8 @@ export default function WatchPage() {
                                           )}
                                           <div className="flex items-center justify-between gap-2">
                                             <span className="text-xs font-semibold">{label}</span>
-                                            <span className="text-[10px] text-muted-foreground truncate max-w-[10rem]" title={sourceRealKey ? uiI18n.t('app.i18n_value_0_i18n_value_1_8568f691', { value0: sourceRealProvider, value1: sourceRealKey }) : sourceRealProvider}>
-                                              {sourceRealProvider}{sourceRealKey ? uiI18n.t('app.i18n_value_0_92e4cd32', { value0: sourceRealKey }) : ""}
+                                            <span className="text-[10px] text-muted-foreground truncate max-w-[10rem]" title={source.extensionName || sourceRealProvider}>
+                                              {source.extensionName || sourceRealProvider}
                                             </span>
                                           </div>
                                           {sourceHoverRows.length > 0 && (
@@ -3716,7 +3730,7 @@ export default function WatchPage() {
                         ))}
 
                         {/* No Servers Message */}
-                        {!loadingSources && availableServers.length === 0 && Object.keys(languageGroups).length === 0 && (
+                        {!loadingSources && !fetchingSources && availableServers.length === 0 && Object.keys(languageGroups).length === 0 && (
                           <div className="flex flex-col items-center justify-center p-6 text-center bg-muted/20 rounded-2xl border border-dashed border-border/50">
                             <AlertCircle className="w-8 h-8 text-muted-foreground mb-2 opacity-50" />
                             <p className="text-sm text-muted-foreground">
@@ -3731,6 +3745,13 @@ export default function WatchPage() {
                           </div>
                         )}
 
+                        {(remainingSourceCount > 0 || continuingSources) && <div className="flex flex-wrap items-center gap-2 text-sm">
+                          <Button variant="outline" disabled={fetchingSources} onClick={() => void searchRemainingSources()}>
+                            {continuingSources ? 'Searching remaining sources…' : `Search remaining sources (${remainingSourceCount})`}
+                          </Button>
+                          {continuingSources ? <Button variant="ghost" onClick={cancelRemainingSources}>Cancel search</Button> : <span className="text-muted-foreground">Continue with sources that have not been searched yet.</span>}
+                        </div>}
+                        {continuationError && <p role="alert" className="break-words text-sm text-destructive">{continuationError}</p>}
                         <SourceDebug kind="anime" sources={sourcesData?.sources || []} diagnostics={(sourcesData as any)?.providerStatus || []} />
                         {isDeveloperMode && showSourceDebug && (
                           <div className="rounded-xl border border-white/10 bg-black/30 p-3 text-xs font-mono overflow-auto max-h-64">
@@ -3753,7 +3774,7 @@ export default function WatchPage() {
           {/* Sidebar - Episode List */}
           {!isGenericTorrent && (
             <div className="xl:col-span-3">
-              <GlassPanel className="p-4 md:p-5 max-h-[400px] xl:max-h-[700px] flex flex-col">
+              <GlassPanel className={WATCH_EPISODE_PANEL_CLASS}>
                 <div className="flex items-center gap-3 mb-3 md:mb-4">
                   <ListVideo className="w-5 h-5 text-primary" />
                   <h3 className="font-display text-base md:text-lg font-semibold">{uiI18n.t('app.episodes_49d641ba')}</h3>

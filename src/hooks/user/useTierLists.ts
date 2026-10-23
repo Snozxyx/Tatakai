@@ -212,7 +212,7 @@ export function usePublicTierLists(limit = 20) {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ['tier_lists', 'public', limit],
+    queryKey: ['tier_lists', 'public', limit, user?.id ?? 'guest'],
     queryFn: async () => {
       const primary = await supabase
         .from('tier_lists')
@@ -275,13 +275,11 @@ export function useTierListByShareCode(shareCode: string) {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ['tier_list', 'share', shareCode],
+    queryKey: ['tier_list', 'share', shareCode, user?.id ?? 'guest'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('tier_lists')
-        .select('*')
-        .eq('share_code', shareCode)
-        .single();
+      let query=supabase.from('tier_lists').select('*').eq('share_code',shareCode);
+      if(!user)query=query.eq('is_public',true);
+      const {data,error}=await query.single();
 
       if (error) {
         console.error('Failed to fetch tier list by share code:', error);

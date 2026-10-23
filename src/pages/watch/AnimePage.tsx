@@ -1,3 +1,6 @@
+import { MobileDetailQuickActions } from '@/components/anime/MobileDetailQuickActions';
+import '@/components/anime/mobile-detail.css';
+import type { CatalogDetailProps } from "@/components/extensions/CatalogSourceContext";
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
@@ -29,6 +32,7 @@ import { GlassPanel } from "@/components/ui/GlassPanel";
 import { Skeleton } from "@/components/ui/skeleton-custom";
 import { AnimeGrid } from "@/components/anime/AnimeGrid";
 import { VideoBackground } from "@/components/anime/VideoBackground";
+import { AnimeDetailHero, AnimeDetailPoster, AnimeDetailContent, AnimeDetailTitle, AnimeDetailDescription, AnimeDetailFacts, AnimeDetailActions, AnimeDetailPrimaryAction } from '@/components/anime/AnimeDetailLayout';
 import { EpisodeComments } from "@/components/video/EpisodeComments";
 import { RatingsSection } from "@/components/anime/RatingsSection";
 import { AnimeCommunityPosts } from "@/components/anime/AnimeCommunityPosts";
@@ -191,15 +195,17 @@ function RelationTree({ relations }: { relations: MediaRelation[] }) {
   );
 }
 
-export default function AnimePage() {
+export default function AnimePage({ catalogId, sourceContext }: CatalogDetailProps = {}) {
   useUiTranslation();
-  const { animeId } = useParams<{ animeId: string }>();
+  const { animeId: routeId } = useParams<{ animeId: string }>();
+  const animeId = catalogId || routeId;
   const navigate = useNavigate();
   const routeAnimeId = animeId;
   const { isAdmin } = useAuth();
   const [editOpen, setEditOpen] = useState(false);
 
   const { data: animeData, isLoading: loadingInfo, error: animeError } = useAnimeInfo(routeAnimeId);
+  useEffect(() => { if (sourceContext && !loadingInfo && (!animeData || animeError)) sourceContext.onUnavailable(); }, [sourceContext, loadingInfo, animeData, animeError]);
   const { data: mappingDebug } = useQuery({
     queryKey: ["anime-mapping-debug", routeAnimeId],
     queryFn: async () => {
@@ -323,7 +329,7 @@ export default function AnimePage() {
   const [episodeQuery, setEpisodeQuery] = useState("");
   const [episodeLayout, setEpisodeLayout] = useState<"grid" | "compact">("compact");
 
-  const { data: episodesData, isLoading: loadingEpisodes } = useEpisodes(contentAnimeId);
+  const { data: episodesData, isLoading: loadingEpisodes } = useEpisodes(sourceContext ? undefined : contentAnimeId);
   const { data: nextEpisodeSchedule } = useNextEpisodeSchedule(contentAnimeId);
 
   /**
@@ -517,6 +523,7 @@ export default function AnimePage() {
 
   // Start at the first aired episode (unaired entries are schedule-only).
   const handleWatchNow = () => {
+    if (sourceContext) { sourceContext.open(); return; }
     const firstAired = episodesData?.episodes.find((e) => !isEpisodeUnaired(e));
     const target = firstAired ?? episodesData?.episodes[0];
     if (target) {
@@ -822,39 +829,50 @@ export default function AnimePage() {
         <VideoBackground
           animeId={contentAnimeId!}
           poster={info.poster}
-          anilistId={parsedAniListId}
+          anilistId={sourceContext ? undefined : parsedAniListId}
           titles={previewTitles}
         >
           <main className={cn(
             "relative z-10 pr-6 py-6 max-w-[1800px] mx-auto pb-24 md:pb-6",
             isDesktopApp ? "pl-6" : "pl-6 md:pl-32" // Original web padding
           )}>
+            {sourceContext?.header}
             {/* Back Button */}
             <button
               onClick={() => navigate(-1)}
-              className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-8"
+              className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors min-h-11 md:min-h-0 mb-4 md:mb-8"
             >
               <ArrowLeft className="w-5 h-5" />
               <span>{uiI18n.t('app.back_b52b36b7')}</span>
             </button>
 
             {/* Hero Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-16 pt-12 md:pt-24">
+            <AnimeDetailHero className="mobile-detail-hero">
               {/* Poster */}
-              <GlassPanel className="overflow-hidden self-start">
+              <AnimeDetailPoster className="mobile-detail-poster">
                 <img
                   src={hqPoster ?? getProxiedImageUrl(info.poster)}
                   alt={info.name}
                   className="w-full aspect-[2/3] object-cover"
                 />
-              </GlassPanel>
+              </AnimeDetailPoster>
 
               {/* Info */}
-              <div className="lg:col-span-2 space-y-6">
+              <AnimeDetailContent>
                 <div>
-                  <h1 className="font-display text-4xl md:text-5xl font-bold mb-4">
+                  <AnimeDetailTitle className="mobile-detail-title">
                     {info.name}
-                  </h1>
+                  </AnimeDetailTitle>
+                  <MobileDetailQuickActions target="anime-episodes-section" label={uiI18n.t('app.episodes_49d641ba')}>
+                    <AnimeDetailPrimaryAction
+                      className="w-full justify-center"
+                      onClick={handleWatchNow}
+                      disabled={sourceContext ? !sourceContext.canOpen : loadingEpisodes || !episodesData?.episodes[0]}
+                    >
+                      <Play className="h-4 w-4 fill-background" />
+                      {sourceContext?.resume ? 'Resume' : uiI18n.t('app.watch_now_fe70cb6e')}
+                    </AnimeDetailPrimaryAction>
+                  </MobileDetailQuickActions>
                   <ExtensionSlot slotId="anime-details-after-title" props={{ anime: animeData }} />
 
                   {/* Provenance badge (all visitors) + admin edit button */}
@@ -994,9 +1012,9 @@ export default function AnimePage() {
                   )}
 
                   {/* Description */}
-                  <p className="text-muted-foreground leading-relaxed">
+                  <AnimeDetailDescription>
                     {info.description}
-                  </p>
+                  </AnimeDetailDescription>
 
                   {/* Also known as — AniList titles + synonyms + ani.zip's localized
                       titles. Collapsed by default because popular shows can carry
@@ -1022,7 +1040,7 @@ export default function AnimePage() {
                 </div>
 
                 {/* More Info */}
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <AnimeDetailFacts>
                   {moreInfo.aired && (
                     <div>
                       <span className="text-xs text-muted-foreground uppercase tracking-wider">{uiI18n.t('app.aired_7487695a')}</span>
@@ -1114,7 +1132,7 @@ export default function AnimePage() {
                       </div>
                     </div>
                   )}
-                </div>
+                </AnimeDetailFacts>
 
                 {/* AniList rankings (highest rated / most popular, all-time + seasonal) */}
                 {Array.isArray(moreInfo.rankings) && moreInfo.rankings.length > 0 && (
@@ -1137,15 +1155,16 @@ export default function AnimePage() {
                 )}
 
                 {/* Action Buttons */}
-                <div className="flex flex-wrap items-center gap-3 pt-4">
-                  <button
+                <AnimeDetailActions>
+                  {sourceContext?.actions}
+                  <AnimeDetailPrimaryAction
+                    className="hidden md:flex"
                     onClick={handleWatchNow}
-                    disabled={loadingEpisodes || !episodesData?.episodes[0]}
-                    className="h-12 sm:h-14 px-6 sm:px-8 rounded-full bg-foreground text-background font-bold text-base sm:text-lg hover:scale-105 active:scale-95 transition-all flex items-center gap-2 glow-primary disabled:opacity-50"
+                    disabled={sourceContext ? !sourceContext.canOpen : loadingEpisodes || !episodesData?.episodes[0]}
                   >
                     <Play className="w-4 h-4 sm:w-5 sm:h-5 fill-background" />
-                    {uiI18n.t('app.watch_now_fe70cb6e')}
-                  </button>
+                    {sourceContext?.resume ? 'Resume' : uiI18n.t('app.watch_now_fe70cb6e')}
+                  </AnimeDetailPrimaryAction>
                   <WatchlistButton
                     animeId={contentAnimeId!}
                     animeName={info.name}
@@ -1185,9 +1204,9 @@ export default function AnimePage() {
                       <Download className="w-6 h-6" />
                     </button>
                   )}
-                </div>
-              </div>
-            </div>
+                </AnimeDetailActions>
+              </AnimeDetailContent>
+            </AnimeDetailHero>
           </main>
         </VideoBackground>
 
@@ -1214,11 +1233,12 @@ export default function AnimePage() {
           )}
 
           {/* Episodes */}
-          <section className="mb-16">
+<div id="anime-episodes-section" className="detail-entry-section">
+{sourceContext ? sourceContext.entries : (          <section className="mb-16">
             <div className="flex flex-col gap-4 mb-6">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="font-display text-2xl font-semibold">{uiI18n.t('app.episodes_49d641ba')}</h2>
-                <div className="flex flex-wrap items-center gap-3">
+                <div className="flex w-full flex-wrap items-center gap-3 md:w-auto">
                   <span className="text-sm text-muted-foreground">
                     {isFilteringEpisodes
                       ? uiI18n.t('app.i18n_value_0_of_i18n_value_1_fc894332', { value0: matchedEpisodes, value1: totalEpisodes })
@@ -1227,7 +1247,7 @@ export default function AnimePage() {
 
                   {showEpisodeToolbar && (
                     <>
-                      <div className="relative">
+                      <div className="relative flex-1 md:flex-none">
                         <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
                         <input
                           type="search"
@@ -1235,7 +1255,7 @@ export default function AnimePage() {
                           onChange={(event) => setEpisodeQuery(event.target.value)}
                           placeholder={uiI18n.t('app.search_number_or_title_d78dfd53')}
                           aria-label={uiI18n.t('app.search_episodes_53e727c8')}
-                          className="h-9 w-48 md:w-60 pl-8 pr-3 rounded-full bg-muted/50 border border-border text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                          className="h-11 md:h-9 w-full min-w-0 md:w-60 pl-8 pr-3 rounded-full bg-muted/50 border border-border text-base md:text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
                         />
                       </div>
                       <div className="flex items-center rounded-full border border-border overflow-hidden">
@@ -1244,7 +1264,7 @@ export default function AnimePage() {
                           aria-label={uiI18n.t('app.thumbnail_view_8ab530e9')}
                           aria-pressed={episodeLayout === "grid"}
                           className={cn(
-                            "px-3 h-9 transition-colors",
+                            "px-3 h-11 md:h-9 transition-colors",
                             episodeLayout === "grid"
                               ? "bg-primary text-primary-foreground"
                               : "bg-muted/50 text-muted-foreground hover:text-foreground"
@@ -1257,7 +1277,7 @@ export default function AnimePage() {
                           aria-label={uiI18n.t('app.compact_view_e3719eae')}
                           aria-pressed={episodeLayout === "compact"}
                           className={cn(
-                            "px-3 h-9 transition-colors",
+                            "px-3 h-11 md:h-9 transition-colors",
                             episodeLayout === "compact"
                               ? "bg-primary text-primary-foreground"
                               : "bg-muted/50 text-muted-foreground hover:text-foreground"
@@ -1271,7 +1291,7 @@ export default function AnimePage() {
                 </div>
               </div>
               {hasEpisodeGroups && (
-                <div className="flex flex-wrap gap-2">
+                <div className="detail-entry-groups flex flex-wrap gap-2">
                   {episodeGroups.map((group, index) => {
                     // Labelled by the episode numbers actually in the group rather
                     // than by slice arithmetic — with a search active the groups no
@@ -1284,6 +1304,7 @@ export default function AnimePage() {
                       <button
                         key={`${start}-${end}-${index}`}
                         onClick={() => setSelectedEpisodeGroup(index)}
+                        aria-pressed={isActive}
                         className={`px-4 py-2 rounded-full text-sm font-semibold transition-all border ${isActive
                           ? "bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20"
                           : "bg-muted/50 text-muted-foreground border-border hover:bg-muted hover:text-foreground"}`}
@@ -1492,7 +1513,8 @@ export default function AnimePage() {
                 ))}
               </div>
             )}
-          </section>
+          </section>)}
+          </div>
 
           {/* Watch Order / Seasons Section */}
           {allSeasons.length > 1 && (

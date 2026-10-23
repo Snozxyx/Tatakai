@@ -1,3 +1,5 @@
+import { useReadingViewTracker } from '@/hooks/user/useReadingViews';
+import { readingViewId } from '@/lib/readingViewId';
 import uiI18n from '@/lib/uiI18n';
 import { useTVReader } from '@/core/tv/useTVReader';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
@@ -17,6 +19,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft, ChevronLeft, ChevronRight, Settings2, Loader2, MessageSquare,
   Play, Pause, Square, Maximize, Minimize, List, Volume2, ChevronDown, ChevronUp,
+  Languages,
 } from 'lucide-react';
 import { getNovelContentByKey } from '@/core/content/novel-client';
 import { getOfflineNovelChapters } from '@/core/download/novelOffline';
@@ -35,6 +38,8 @@ import { setReadingNovelRpc, clearDiscordRpc } from '@/lib/discordRpc';
 import { ParagraphCommentButton, ParagraphThread } from '@/components/novel/ParagraphComments';
 import { useIsNativeApp } from '@/hooks/ui/useIsNativeApp';
 import { useIsMobile } from '@/hooks/ui/use-mobile';
+import { useNovelTranslation, type NovelTranslationState } from '@/hooks/translation/useNovelTranslation';
+import { useTranslationConfig } from '@/hooks/translation/useTranslationConfig';
 import { cn } from '@/lib/utils';
 import type { NovelChapterSource } from '@/types/novel';
 import { toast } from 'sonner';
@@ -122,6 +127,8 @@ export default function NovelReaderPage() {
     gcTime: 30 * 60 * 1000,
     retry: 1,
   });
+
+  useReadingViewTracker('novel',readingViewId(novelId),!!data&&!isLoading&&!error);
 
   useEffect(() => {
     if (isFetching || !data) return;
@@ -295,6 +302,21 @@ export default function NovelReaderPage() {
     io.observe(el);
     return () => io.disconnect();
   }, [settings.continuousScroll, nextChapter, appended, total, novelId, resolvedProvider, isOfflineChapter]);
+
+  // Translation (Settings → Translation applies per surface; the reader shows a
+  // "Show original" toggle whenever the novel surface is enabled).
+  const translationConfig = useTranslationConfig();
+  const novelTranslationEnabled = translationConfig.enabled && translationConfig.translateNovels;
+  const translatedParagraphs = useNovelTranslation(paragraphs);
+  const translatedAppended = useNovelTranslation(appended?.paragraphs ?? []);
+  const [novelShowOriginal, setNovelShowOriginal] = useState(false);
+  const useTranslatedNovelTexts = novelTranslationEnabled && !novelShowOriginal;
+  const novelText = (p: { index: number; text: string }, source: NovelTranslationState) =>
+    useTranslatedNovelTexts ? source.map[p.index] ?? p.text : p.text;
+  const showTranslationToggle =
+    novelTranslationEnabled &&
+    (translatedParagraphs.status !== 'idle' ||
+      Object.keys(translatedParagraphs.map).length > 0);
 
   const percent = total > 0 ? Math.min(100, Math.round(((paraIndex + 1) / total) * 100)) : 0;
 
@@ -575,6 +597,15 @@ export default function NovelReaderPage() {
             className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 hover:bg-white/10">
             <List className="w-4 h-4" />
           </button>
+          {showTranslationToggle && (
+            <button onClick={() => setNovelShowOriginal(value => !value)}
+              title={novelShowOriginal ? uiI18n.t('translation.comment.showTranslation') : uiI18n.t('translation.comment.showOriginal')}
+              className={cn('flex h-9 w-9 items-center justify-center rounded-xl border transition-colors',
+                !novelShowOriginal ? 'border-primary/50 bg-primary/15 text-primary' : 'border-white/10 bg-white/5 hover:bg-white/10',
+                translatedParagraphs.status === 'translating' && 'opacity-75')}>
+              {translatedParagraphs.status === 'translating' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Languages className="w-4 h-4" />}
+            </button>
+          )}
           <button onClick={() => setShowSettings(true)} title={uiI18n.t('app.reader_settings_bf922fa5')}
             className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 hover:bg-white/10">
             <Settings2 className="w-4 h-4" />
@@ -646,7 +677,7 @@ export default function NovelReaderPage() {
                         background: activeUtterPara === p.index ? 'rgba(255,255,255,0.06)' : undefined,
                       }}
                     >
-                      {p.text}
+                      {novelText(p, translatedParagraphs)}
                     </p>
                     {settings.showParagraphComments && novelId && (
                       <div className="absolute -right-1 top-0 translate-x-full hidden md:block opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity pl-2">
@@ -672,7 +703,7 @@ export default function NovelReaderPage() {
                     <span className="h-px flex-1 bg-current" />
                   </div>
                   {appended.paragraphs.map((p, i) => (
-                    <p key={`next-${i}`} data-reader-text data-quote-chapter={nextChapter?.sources?.find(s => s.provider === resolvedProvider)?.chapterKey || nextChapter?.sources?.[0]?.chapterKey} style={{ marginBottom: `${settings.paragraphSpacing}em` }}>{p.text}</p>
+                    <p key={`next-${i}`} data-reader-text data-quote-chapter={nextChapter?.sources?.find(s => s.provider === resolvedProvider)?.chapterKey || nextChapter?.sources?.[0]?.chapterKey} style={{ marginBottom: `${settings.paragraphSpacing}em` }}>{novelText(p, translatedAppended)}</p>
                   ))}
                   {nextChapter && (
                     <button onClick={() => navToChapter(nextChapter, 0)}

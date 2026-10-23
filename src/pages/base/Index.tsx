@@ -21,6 +21,7 @@ import { GenreCloud } from "@/components/anime/GenreCloud";
 import { AnimeGrid } from "@/components/anime/AnimeGrid";
 import { ContinueWatching } from "@/components/anime/ContinueWatching";
 import { LocalContinueWatching } from "@/components/anime/LocalContinueWatching";
+import { ExtensionContinue } from '@/components/extensions/ExtensionContinue';
 import { UpcomingAnimeSection } from "@/components/anime/UpcomingAnimeSection";
 import { InfiniteHomeSections } from "@/components/anime/InfiniteHomeSections";
 import { MobileInfiniteHomeSections } from "@/components/anime/MobileInfiniteHomeSections";
@@ -121,7 +122,7 @@ const Index = () => {
         <div className="hidden md:block h-4 lg:h-6" aria-hidden />
 
         {/* Extension mount point — top of home. */}
-        <ExtensionSlot slotId="home-top" />
+
 
         {isLoading ? (
           <>
@@ -148,6 +149,8 @@ const Index = () => {
             {/* ── Pick up where you left off ── */}
             <ContinueWatching />
             <LocalContinueWatching />
+                    <ExtensionSlot slotId="home-top" />
+        <ExtensionContinue kind="watch" />
             <TorrentSessionBanner />
             <LastReadMangaSection />
             <LastReadNovelSection />

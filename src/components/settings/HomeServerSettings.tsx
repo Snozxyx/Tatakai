@@ -100,6 +100,7 @@ export function HomeServerSettings() {
   const [requireConsent, setRequireConsent] = useState(true);
   const [viewerName, setViewerName] = useState('viewer');
   const [viewerPassword, setViewerPassword] = useState('');
+  const [extensionBootstrap, setExtensionBootstrap] = useState('');
   const [busy, setBusy] = useState(false);
   const [deviceToken, setDeviceToken] = useState('');
   const [consentRequests, setConsentRequests] = useState<ConsentRequest[]>([]);
@@ -119,6 +120,7 @@ export function HomeServerSettings() {
     if (config?.remoteBaseUrl) setRemoteBaseUrl(config.remoteBaseUrl);
     if (typeof config?.shareCatalog === 'boolean') setShareCatalog(config.shareCatalog);
     if (typeof config?.requireConsent === 'boolean') setRequireConsent(config.requireConsent);
+    setExtensionBootstrap(config?.extensionServerBootstrap || '');
     setConsentRequests(Array.isArray(consent?.requests) ? consent.requests : []);
   }, []);
 
@@ -236,8 +238,8 @@ export function HomeServerSettings() {
 
   return (
     <SettingsSection
-      title={uiI18n.t('app.tatakai_home_server_6be8a5a3')}
-      description={uiI18n.t('app.share_your_download_catalog_so_household_devices_f42d610c')}
+      title="Tatakai Extension Server"
+      description="Host extension sources and a media proxy, with your existing library and household sharing."
       bodyClassName="space-y-6"
       action={
         <div className="flex items-center gap-2">
@@ -258,6 +260,11 @@ export function HomeServerSettings() {
         </div>
       }
     >
+      <div className="flex flex-wrap gap-2">
+        <Button variant="outline" disabled={!status.running} asChild><a href={primaryUrl} target="_blank" rel="noreferrer">Open extension setup</a></Button>
+        <Button variant="outline" disabled={!extensionBootstrap} onClick={() => { void navigator.clipboard.writeText(extensionBootstrap).then(() => toast.success('Bootstrap secret copied')); }}>Copy setup secret</Button>
+        <Button variant="outline" disabled={!status.running} asChild><a href={`${primaryUrl}/home`} target="_blank" rel="noreferrer">Open shared library</a></Button>
+      </div>
       <div className="flex flex-col">
 
         <SettingRow

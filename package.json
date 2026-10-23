@@ -1,7 +1,7 @@
 {
   "name": "tatakai",
   "private": true,
-  "version": "6.2.0",
+  "version": "6.3.0",
   "description": "Tatakai â€” an extension-based otaku community for tracking anime & manga",
   "author": {
     "name": "Snozxyx",
@@ -12,6 +12,9 @@
   "main": "desktop/main.cjs",
   "type": "module",
   "scripts": {
+    "translate:build": "node scripts/build-translate-engine.mjs",
+    "translate:build:dev": "node scripts/build-translate-engine.mjs --dev",
+    "translate:test": "cargo test --locked --manifest-path translate-engine/Cargo.toml",
     "postinstall": "node scripts/fix-electron-install.cjs",
     "dev": "concurrently \"npm:dev:web\" \"npm:dev:api\"",
     "dev:web": "vite",
@@ -25,11 +28,14 @@
     "test:watch": "bun test --watch tests",
     "preview": "vite preview --host 0.0.0.0",
     "start": "cross-env NODE_ENV=production electron .",
-    "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:8090 && cross-env ELECTRON_DEVTOOLS=1 electron desktop/main.cjs\"",
+    "electron:dev": "npm run translate:build:dev && concurrently \"vite\" \"wait-on http://localhost:8090 && cross-env ELECTRON_DEVTOOLS=1 electron desktop/main.cjs\"",
     "assets:installer": "node scripts/generate-installer-assets.cjs",
     "assets:cloudflared": "node scripts/fetch-cloudflared.cjs",
-    "electron:build": "npm run assets:installer && npm run assets:cloudflared && cross-env ELECTRON_BUILD=true NODE_OPTIONS=--max-old-space-size=6144 vite build && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --config.npmRebuild=false --config.electronDist=node_modules/electron/dist",
+    "electron:build": "npm run server:build && npm run translate:build && npm run assets:installer && npm run assets:cloudflared && cross-env ELECTRON_BUILD=true NODE_OPTIONS=--max-old-space-size=6144 vite build && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --config.npmRebuild=false --config.electronDist=node_modules/electron/dist",
     "assets:generate": "node scripts/generate-assets.cjs",
+    "server:build": "node tatakai-server/scripts/build.mjs",
+    "server:start": "node tatakai-server/src/node.mjs",
+    "server:test": "node --test tatakai-server/test/*.test.mjs",
     "mobile:dev": "npm run build && npx cap open android",
     "mobile:ios": "npm run build && npx cap open ios",
     "mobile:sync": "npm run build && npx cap sync",
@@ -108,6 +114,7 @@
     "@tiptap/starter-kit": "^2.27.3",
     "@tiptap/suggestion": "^2.27.3",
     "@types/dompurify": "^3.0.5",
+    "ag-psd": "31.0.3",
     "animejs": "^4.5.0",
     "axios": "^1.13.4",
     "blurhash": "^2.0.5",
@@ -115,10 +122,12 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
+    "dashjs": "5.2.1",
     "date-fns": "^3.6.0",
     "dexie": "^4.4.2",
     "discord-rpc": "^4.0.1",
     "dompurify": "^3.3.1",
+    "dotenv": "16.6.1",
     "electron-updater": "^6.7.3",
     "embla-carousel-react": "^8.6.0",
     "fast-check": "^4.7.0",
@@ -132,6 +141,7 @@
     "icon-gen": "^5.0.0",
     "input-otp": "^1.4.2",
     "jszip": "^3.10.2",
+    "linkedom": "0.18.12",
     "lucide-react": "^0.462.0",
     "next-themes": "^0.3.0",
     "onnxruntime-web": "^1.27.0",
@@ -140,6 +150,7 @@
     "playwright-extra": "^4.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
     "qrcode.react": "^4.2.0",
+    "quickjs-emscripten": "0.32.0",
     "react": "^18.3.1",
     "react-blurhash": "^0.3.0",
     "react-day-picker": "^8.10.1",
@@ -157,6 +168,7 @@
     "supabase": "^2.72.3",
     "tailwind-merge": "^2.6.1",
     "tailwindcss-animate": "^1.0.7",
+    "tar": "7.5.22",
     "vaul": "^0.9.9",
     "webtorrent": "^2.5.1",
     "workbox-precaching": "^7.4.0",
@@ -208,13 +220,19 @@
   "build": {
     "appId": "app.tatakai.me",
     "productName": "Tatakai",
+    "beforePack": "scripts/prepare-compatibility-package.cjs",
+    "afterPack": "scripts/verify-translate-package.cjs",
     "directories": {
       "output": "dist_electron",
       "buildResources": "resources"
     },
     "files": [
+      "shared/aniyomi/java/**",
       "dist/**/*",
       "desktop/**/*",
+      "tatakai-server/src/**/*",
+      "tatakai-server/dist/**/*",
+      "tatakai-server/package.json",
       "resources/**/*",
       "!resources/bin/**",
       "package.json",
@@ -223,6 +241,13 @@
       "src/core/download/candidate-evaluator.cjs"
     ],
     "extraResources": [
+      {
+        "from": ".cache/compatibility-runtime-assets/desktop",
+        "to": "compatibility-runtimes",
+        "filter": [
+          "**/*"
+        ]
+      },
       {
         "from": "extension",
         "to": "extension",
@@ -235,11 +260,13 @@
         "from": "resources/bin",
         "to": "bin",
         "filter": [
-          "**/*"
+          "**/*",
+          "!**/development/**"
         ]
       }
     ],
     "asarUnpack": [
+      "desktop/runtime/compatibility/expand-runtime.ps1",
       "**/node_modules/@ffmpeg-installer/**",
       "**/node_modules/ffmpeg-static/**",
       "**/*.node"
@@ -276,7 +303,8 @@
       "include": "build/installer.nsh"
     },
     "portable": {
-      "artifactName": "${productName}-${version}-${os}-${arch}-portable.${ext}"
+      "artifactName": "${productName}-${version}-${os}-${arch}-portable.${ext}",
+      "useZip": true
     },
     "mac": {
       "target": [

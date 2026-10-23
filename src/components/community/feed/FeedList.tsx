@@ -46,7 +46,7 @@ export function FeedList({
     search,
   });
 
-  const items = data?.pages.flat() ?? [];
+  const items = (data?.pages.flat() ?? []).filter((item) => item.kind !== 'post' || !item.post.is_deleted);
 
   // Pinned posts logic (Community pin vs Global pin)
   const isCommunityView = !!communityId;

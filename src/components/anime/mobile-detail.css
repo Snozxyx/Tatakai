@@ -1,0 +1,35 @@
+/* Mobile ergonomics use the existing detail-page surfaces and tokens. */
+@media (max-width: 767px) {
+  :root .mobile-detail-hero {
+    gap: 1.5rem;
+    padding-top: 0;
+    margin-bottom: 2rem;
+  }
+
+  :root .mobile-detail-poster {
+    width: 8rem;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+
+  :root .mobile-detail-title {
+    font-size: 1.75rem;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+  }
+
+  :root .detail-entry-groups {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
+  }
+
+  .detail-entry-groups > button {
+    flex-shrink: 0;
+    min-height: 2.75rem;
+  }
+
+  .detail-entry-section {
+    scroll-margin-top: calc(env(safe-area-inset-top, 0px) + 1rem);
+  }
+}

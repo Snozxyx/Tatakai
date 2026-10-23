@@ -66,6 +66,10 @@ module.exports = function registerRuntimeHandlers(ipcMain, app, fs, path, logger
         },
     });
     const localProxy = new LocalProxyServer(logger, emitRuntimeEvent);
+    const compatibilityBroker = require('./ipc-compatibility.cjs')({ ipcMain, app, getMainWindow, proxy: async (url, headers) => {
+        await localProxy.ensureStarted();
+        return localProxy.registerSource({ url, headers });
+    } });
     const ensureExtensionFetchProxy = async () => {
         const proxyBaseUrl = await localProxy.ensureStarted();
         workerPool.setFetchProxyBaseUrl(proxyBaseUrl);
@@ -1562,6 +1566,7 @@ module.exports = function registerRuntimeHandlers(ipcMain, app, fs, path, logger
 
     // Expose registry/workerPool and autoLoadBundledExtensions for main.cjs
     return {
+        compatibilityBroker,
         registry,
         workerPool,
         autoLoadBundledExtensions,

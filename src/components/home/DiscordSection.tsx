@@ -6,7 +6,7 @@ import { Check, ExternalLink, RefreshCw } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { GlassPanel } from '@/components/ui/GlassPanel';
-import { getProxiedJsonUrl } from '@/lib/api/proxy-utils';
+import { fetchJsonWithFallback } from '@/lib/api/proxy-utils';
 
 const DISCORD_INVITE = 'https://dsc.gg/tatakai';
 
@@ -19,18 +19,14 @@ const PERKS = [
 type Character = { url: string; source: string };
 type Source = { name: string; fetchUrl: () => Promise<string | undefined> };
 
-// Routed through the local API's /api/proxy/json passthrough — direct fetches to
-// these hosts are blocked (403/CORS) from the desktop renderer and spam the console.
+// nekos.best sends CORS * so direct-first avoids the shared-IP rate limit on the proxy.
 const CHARACTER_SOURCES: Source[] = [
-  // waifu.im (verified working)
-
-  // nekosia.cat (verified working, provides palette)
   {
-    name: 'nekosia.cat',
+    name: 'nekos.best',
     fetchUrl: () =>
-      fetch(getProxiedJsonUrl('https://api.nekosia.cat/api/v1/images/random'))
-        .then((r) => r.json())
-        .then((d) => d?.image?.original?.url),
+      fetchJsonWithFallback('https://nekos.best/api/v2/neko', { signal: AbortSignal.timeout(8000) })
+        .then((r) => { if (!r.ok) throw new Error('Character artwork unavailable'); return r.json(); })
+        .then((d) => d?.results?.[0]?.url),
   },
 ];
 

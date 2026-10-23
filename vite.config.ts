@@ -77,6 +77,7 @@ export default defineConfig(({ mode }) => {
         'react/jsx-runtime',
         '@tanstack/react-query',
         'react-router-dom',
+        'linkedom/worker',
       ],
     },
     build: {

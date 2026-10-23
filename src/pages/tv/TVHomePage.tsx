@@ -1,6 +1,6 @@
 import { TVCinematicHero } from "@/components/tv/TVCinematicHero";
 import { TVDiscoveryGrid } from "@/components/tv/TVDiscoveryGrid";
-import { useState, useEffect, useRef } from "react";
+import { memo, useCallback, useMemo, useState, useEffect, useRef } from "react";
 import { publishTVSuggestions } from "@/core/tv/TVLauncherSync";
 import { Link } from "react-router-dom";
 import { Play, Info, ChevronLeft, ChevronRight } from "lucide-react";
@@ -10,7 +10,7 @@ import { TVContentCard, type TVCard } from "@/components/tv/TVContentCard";
 import { useQuery } from "@tanstack/react-query";
 import { useTVTitleArt } from "@/core/tv/useTVTitleArt";
 import { db } from "@/core/db/tatakai-db";
-export function TVRail({
+export const TVRail = memo(function TVRail({
   title,
   items,
   onFocus,
@@ -30,7 +30,7 @@ export function TVRail({
       </div>
     </section>
   );
-}
+});
 export default function TVHomePage() {
   const { data, isLoading, error, refetch } = useHomeData();
   const { data: history = [] } = useWatchHistory(20);
@@ -40,15 +40,13 @@ export default function TVHomePage() {
       db.iptvChannels.where("kind").equals("live").limit(10).toArray(),
   });
   const [featuredIndex, setFeaturedIndex] = useState(0);
-  const [ambient, setAmbient] = useState<TVCard>();
   const [preview, setPreview] = useState<TVCard>();
   const previewTimer = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => () => clearTimeout(previewTimer.current), []);
-  function focusCard(item: TVCard) {
-    setAmbient(item);
+  const focusCard = useCallback((item: TVCard) => {
     clearTimeout(previewTimer.current);
-    previewTimer.current = setTimeout(() => setPreview(item), 1500);
-  }
+    previewTimer.current = setTimeout(() => setPreview(item), 1000);
+  }, []);
   const features = (data?.spotlightAnimes || [])
     .filter((item) => item.banner || item.poster)
     .slice(0, 8);
@@ -56,7 +54,6 @@ export default function TVHomePage() {
   function changeFeature(delta: number) {
     clearTimeout(previewTimer.current);
     setPreview(undefined);
-    setAmbient(undefined);
     setFeaturedIndex(
       (value) => (value + delta + features.length) % features.length
     );
@@ -88,7 +85,7 @@ export default function TVHomePage() {
       (preview ? preview.banner || preview.poster : originalHero.banner),
     logo: enriched.data?.logo,
     description:
-      enriched.data?.description || (preview ? "" : originalHero.description),
+      enriched.data?.description || (preview ? preview.description || "" : originalHero.description),
     otherInfo: enriched.data
       ? [
           enriched.data.format,
@@ -97,9 +94,9 @@ export default function TVHomePage() {
         ]
           .filter(Boolean)
           .map(String)
-      : originalHero.otherInfo,
+      : preview ? [] : originalHero.otherInfo,
   };
-  const resume: TVCard[] = history
+  const resume: TVCard[] = useMemo(() => history
     .filter((item) => !item.completed)
     .map((item) => ({
       id: item.id,
@@ -115,7 +112,11 @@ export default function TVHomePage() {
         item.progress_seconds / (item.duration_seconds || 1)
       ),
       subtitle: `Resume episode ${item.episode_number}`,
-    }));
+    })), [history]);
+  const nextWatch = useMemo(() => resume.length ? resume : (data?.mostPopularAnimes || []).slice(0, 12), [resume, data?.mostPopularAnimes]);
+  const trendingCards = useMemo(() => (data?.trendingAnimes || []).map(item => ({ ...item, rank: undefined })), [data?.trendingAnimes]);
+  const liveCards = useMemo(() => channels.map(item => ({ id: item.id, name: item.name, poster: item.logo, href: `/tv/iptv?channel=${encodeURIComponent(item.id)}`, subtitle: item.group })), [channels]);
+  const topCards = useMemo(() => (data?.top10Animes?.today || []).slice(0, 10).map((item, index) => ({ ...item, rank: index + 1 })), [data?.top10Animes?.today]);
   if (isLoading)
     return (
       <div className="tv-state" role="status">
@@ -132,16 +133,6 @@ export default function TVHomePage() {
     );
   return (
     <>
-      <div
-        className="tv-ambient"
-        style={{
-          backgroundImage: `url("${(
-            ambient?.banner ||
-            hero?.banner ||
-            ""
-          ).replace(/"/g, "%22")}")`,
-        }}
-      />
       {hero ? (
         <TVCinematicHero
           title={hero.name}
@@ -176,34 +167,21 @@ export default function TVHomePage() {
       )}
       <TVRail
         title="Your Next Watch"
-        items={
-          resume.length ? resume : (data?.mostPopularAnimes || []).slice(0, 12)
-        }
+        items={nextWatch}
         onFocus={focusCard}
       />
       <TVRail
         title="Trending This Season"
-        items={(data?.trendingAnimes || []).map((item) => ({
-          ...item,
-          rank: undefined,
-        }))}
+        items={trendingCards}
         onFocus={focusCard}
       />
       <TVRail
         title="Live IPTV Channels"
-        items={channels.map((item) => ({
-          id: item.id,
-          name: item.name,
-          poster: item.logo,
-          href: `/tv/iptv?channel=${encodeURIComponent(item.id)}`,
-          subtitle: item.group,
-        }))}
+        items={liveCards}
       />
       <TVRail
         title="Top 10 in Anime Today"
-        items={(data?.top10Animes?.today || [])
-          .slice(0, 10)
-          .map((item, index) => ({ ...item, rank: index + 1 }))}
+        items={topCards}
         onFocus={focusCard}
       />
       <TVRail

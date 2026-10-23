@@ -1,3 +1,4 @@
+import {useNavigate} from 'react-router-dom';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { installRemoteExtension, listRemoteExtensions, removeRemoteExtension } from "@/core/extensions/remote/installed";
@@ -23,10 +24,13 @@ migrateExtensionStorage();
  * and `useExtensions` already read, so nothing here is a second source of truth.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useDebounce } from '@/hooks/ui/useDebounce';
+import { useContentSafetySettings } from '@/hooks/user/useContentSafetySettings';
+import { isExplicitExtensionContent } from '@/lib/contentSafety';
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { downloadExtensionKai } from "@/core/extensions/marketplace-client";
-import { isCapacitor } from "@/lib/platform/platform";
+import { isCapacitor, isNative } from "@/lib/platform/platform";
 import {
   extensionAliases,
   fetchStoreExtension,
@@ -258,7 +262,7 @@ export interface StoreCatalogueOptions {
   /** Free text; routed to `/extension/search/:search` when non-empty. */
   search?: string;
   type?: StoreExtensionType | "all";
-  limit?: number; ecosystem?: string; compatibility?: string;
+  limit?: number; ecosystem?: string; compatibility?: string; language?: string;
 }
 
 export interface StoreCatalogue {
@@ -285,18 +289,19 @@ export interface StoreCatalogue {
 export function useStoreCatalogue({
   search = "",
   type = "all",
-  limit = 100, ecosystem = "all", compatibility = "all",
+  limit = 100, ecosystem = "all", compatibility = "all", language = "all",
 }: StoreCatalogueOptions = {}): StoreCatalogue {
   useUiTranslation();
-  const needle = search.trim();
+  const needle = useDebounce(search.trim(), 250);
+  const { settings: safety } = useContentSafetySettings();
   const localRevision = useLocalCatalogueRevision();
 
   const query = useQuery({
-    queryKey: ["extension-store", "catalogue", needle, type, limit, ecosystem, compatibility],
+    queryKey: ["extension-store", "catalogue", needle, type, limit, ecosystem, compatibility, language],
     queryFn: async ({ signal }) => {
-      const first = await fetchStoreExtensions({ type, limit, ecosystem, compatibility, search: needle }, signal);
+      const first = await fetchStoreExtensions({ type, limit, ecosystem, compatibility, language, search: needle }, signal);
       for (let offset = first.items.length; offset < first.count; offset = first.items.length) {
-        const page = await fetchStoreExtensions({ type, limit, offset, ecosystem, compatibility, search: needle }, signal);
+        const page = await fetchStoreExtensions({ type, limit, offset, ecosystem, compatibility, language, search: needle }, signal);
         if (!page.items.length) break;
         first.items.push(...page.items);
       }
@@ -316,6 +321,8 @@ export function useStoreCatalogue({
 
     let list = Array.from(merged.values());
 
+    if (!safety.showAdultEverywhere) list = list.filter(item => !isExplicitExtensionContent(item));
+    if (language !== "all") list = list.filter(item => item.languages?.includes(language));
     if (type !== "all") list = list.filter((item) => item.type === type);
     if (needle) {
       const lowered = needle.toLowerCase();
@@ -335,7 +342,7 @@ export function useStoreCatalogue({
         right.installs + right.downloads - (left.installs + left.downloads)
       );
     });
-  }, [query.data, needle, type, localRevision]);
+  }, [query.data, needle, type, localRevision, safety.showAdultEverywhere, language]);
 
   const featured = useMemo(
     () =>
@@ -373,14 +380,17 @@ export function useStoreTags() {
  */
 export function useStoreExtensionDetail(idOrSlug?: string) {
   useUiTranslation();
+  const client = useQueryClient();
   const localRevision = useLocalCatalogueRevision();
-  const query = useQuery({
+  const query = useQuery<StoreExtension | null>({
     queryKey: ["extension-store", "detail", idOrSlug],
     queryFn: ({ signal }) => fetchStoreExtension(idOrSlug!, signal),
     enabled: Boolean(idOrSlug) && isExtensionStoreConfigured,
     staleTime: 10 * 60 * 1000,
     retry: false,
     refetchOnWindowFocus: false,
+    placeholderData: () => client.getQueriesData<{ items: StoreExtension[] }>({ queryKey: ['extension-store', 'catalogue'] })
+      .flatMap(([, data]) => data?.items ?? []).find(item => extensionAliases(item).includes((idOrSlug || '').toLowerCase())),
   });
 
   /** A sideloaded bundle is not in the service at all. */
@@ -418,6 +428,7 @@ export type InstallState = "idle" | "installing" | "installed" | "not_loaded";
  * ends in a distinct state rather than in a failure.
  */
 export function useExtensionInstaller() {
+  const navigate=useNavigate();
   useUiTranslation();
   const queryClient = useQueryClient();
   const [installedIds, setInstalledIds] = useState<string[]>(() =>
@@ -544,6 +555,18 @@ export function useExtensionInstaller() {
       version?: StoreVersion;
     }) => {
       const targetId = extension.slug || extension.id;
+      if(extension.capabilities?.includes('extension-server')) {
+        const url=new URL(extension.sourceUrl||'');
+        if(url.protocol!=='https:'||url.username||url.password||url.search||url.hash||url.pathname!=='/')throw Error('Invalid community server address');
+        const path='/extensionserver/'+encodeURIComponent(url.origin);
+        if(isNative())navigate(path);else window.location.href='tatakai://extensionserver/'+encodeURIComponent(url.origin);
+        return {targetId,loaded:false,openedInApp:true};
+      }
+
+      if (!isNative()) {
+        window.location.href = `tatakai://extensions/${encodeURIComponent(extension.id)}?install=1`;
+        return {targetId,loaded:false,openedInApp:true};
+      }
       setPendingId(targetId);
       const known = aliasesOf(extension);
       setNotLoadedIds((prev) =>
@@ -632,7 +655,9 @@ export function useExtensionInstaller() {
         (await waitForRuntime(aliases.length > 0 ? aliases : [canonicalId]));
       return { targetId: canonicalId, loaded };
     },
-    onSuccess: ({ targetId, loaded }) => {
+    onSuccess: (result) => {
+      if ("openedInApp" in result && result.openedInApp) return;
+      const {targetId,loaded}=result;
       if (!loaded)
         setNotLoadedIds((prev) => Array.from(new Set([...prev, targetId])));
       window.dispatchEvent(
@@ -719,6 +744,7 @@ export function useExtensionInstaller() {
 
   const toggle = useCallback(
     (extension: StoreExtension, version?: StoreVersion) => {
+      if(extension.capabilities?.includes('extension-server')){install.mutate({extension});return;}
       if (['external', 'unavailable'].includes(extension.compatibility || '') || (extension.ecosystem && !['tatakai','stremio','seanime'].includes(extension.ecosystem))) {
         window.open(extension.latestVersion?.downloadUrl || extension.manifestUrl || extension.githubRepoUrl, '_blank', 'noopener,noreferrer'); return;
       }

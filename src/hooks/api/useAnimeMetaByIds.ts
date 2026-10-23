@@ -16,8 +16,10 @@ import { ANILIST_GRAPHQL_ENDPOINT as ANILIST_ENDPOINT } from '@/lib/api/backendO
 const QUERY = `
 query ($ids: [Int]) {
   Page(perPage: 50) {
-    media(id_in: $ids) {
+    media(id_in: $ids, type: ANIME) {
       id
+      format
+      isAdult
       title { romaji english }
       coverImage { large medium }
     }
@@ -28,6 +30,8 @@ export interface AnimeMeta {
   id: number;
   title: string;
   coverImage: string | null;
+  format?: string;
+  isAdult?: boolean;
 }
 
 async function fetchMeta(ids: number[]): Promise<Record<number, AnimeMeta>> {
@@ -47,6 +51,8 @@ async function fetchMeta(ids: number[]): Promise<Record<number, AnimeMeta>> {
       if (!Number.isFinite(id)) continue;
       out[id] = {
         id,
+        format: m.format,
+        isAdult: m.isAdult === true,
         title: m?.title?.english || m?.title?.romaji || 'Unknown',
         coverImage: m?.coverImage?.large || m?.coverImage?.medium || null,
       };
@@ -74,7 +80,7 @@ export function useAnimeMetaByIds(animeIds: (string | number | null | undefined)
   ).sort((a, b) => a - b);
 
   return useQuery({
-    queryKey: ['anime-meta-by-ids', ids],
+    queryKey: ['anime-meta-by-ids-v2', ids],
     queryFn: () => fetchMeta(ids),
     enabled: ids.length > 0,
     staleTime: 60 * 60 * 1000,

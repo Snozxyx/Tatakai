@@ -8,6 +8,7 @@
  * Extensions expose optional bundle methods: getNovelChapters, getNovelContent.
  */
 import type { NovelContentResponse } from '@/types/novel';
+import { serverNovelChapters, serverNovelContent } from '@/core/extensions/server/client';
 import {
   resolveExtensionApiBase,
   MOBILE_EXT_BASE,
@@ -144,7 +145,7 @@ function hasExtensionRuntime(): boolean {
   );
 }
 
-export async function fetchExtensionNovelChapters(params: {
+async function fetchLocalNovelChapters(params: {
   fullScan?: boolean;
   anilistId?: number;
   malId?: number;
@@ -258,12 +259,25 @@ export interface NovelContentAttempt {
   providerChapterId?: string;
 }
 
+export async function fetchExtensionNovelChapters(params: Parameters<typeof fetchLocalNovelChapters>[0]): Promise<NovelChaptersPayload> {
+  const [local, remote] = await Promise.all([
+    fetchLocalNovelChapters(params).catch(() => ({ chapters: [], providersAvailable: [], failedProviders: ['local-runtime'], pending: false })),
+    serverNovelChapters(params),
+  ]);
+  const byNumber = new Map<number, NovelChapterAggregate>();
+  mergeRows(byNumber, local.chapters, 'local');
+  mergeRows(byNumber, remote.chapters, 'server');
+  return { chapters: [...byNumber.values()].sort((a, b) => a.number - b.number), pending: !!local.pending,
+    providersAvailable: [...local.providersAvailable, ...remote.providersAvailable], failedProviders: [...local.failedProviders, ...remote.failedProviders] };
+}
+
 async function fetchOneSourceContent(params: {
   extensionId: string;
   chapterKey: string;
   providerChapterId?: string;
   anilistId?: number;
 }): Promise<NovelContentResponse> {
+  if (params.extensionId.startsWith('server-')) return serverNovelContent(params);
   const env = await resolveNovelHttpEnv();
   const fail = (message: string): NovelContentResponse => ({
     success: false,
@@ -339,10 +353,10 @@ async function fetchOneSourceContent(params: {
   if (!hasExtensionRuntime()) {
     return {
       success: false,
-      message: 'Novel reading requires the Tatakai app extension runtime.',
+      message: 'Connect an extension server or install a local novel extension to read this chapter.',
       guidance: {
         code: 'EXTENSION_RUNTIME_REQUIRED',
-        message: 'Open this chapter in the Tatakai desktop or mobile app with a novel extension installed.',
+        message: 'Connect an extension server with a novel extension in Settings → Extension Hub.',
         retryable: false,
       },
     };
@@ -441,7 +455,8 @@ export async function fetchExtensionNovelContent(params: {
       chapterKey: attempt.chapterKey,
       providerChapterId: attempt.providerChapterId,
       anilistId: params.anilistId,
-    });
+    }).catch((error): NovelContentResponse => ({ success: false, message: error instanceof Error ? error.message : 'This novel source could not be reached.',
+      guidance: { code: 'SOURCE_UNAVAILABLE', message: error instanceof Error ? error.message : 'This novel source could not be reached.', retryable: true } }));
     if (res.success && (res.data?.paragraphs?.length ?? 0) > 0) {
       if (attempted.length > 1 && res.data?.readMeta) res.data.readMeta.fallbackUsed = true;
       return res;

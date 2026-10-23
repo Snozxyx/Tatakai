@@ -317,6 +317,7 @@ function createMainWindow(deps) {
     }
 
     mainWindow.once('ready-to-show', () => {
+        logger.info('[Startup] Renderer ready to show', { elapsedMs: Math.round(process.uptime() * 1000) });
         if (winState.splash && !winState.splash.isDestroyed()) {
             winState.splash.close();
             winState.splash = null;

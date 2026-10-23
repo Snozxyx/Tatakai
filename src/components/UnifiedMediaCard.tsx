@@ -1,3 +1,4 @@
+import { TatakaiReadingViews } from '@/components/media/TatakaiReadingViews';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
@@ -170,6 +171,7 @@ export const UnifiedMediaCard = memo(function UnifiedMediaCard({ item, variant, 
       {score && <ScoreBadge score={score} />}{label && <MetaBadge className="text-white/85">{label}</MetaBadge>}
       {isAnime && !!item.episodes?.sub && <MetaBadge className="text-white/85">{item.episodes.sub} {uiI18n.t('app.sub_5d85613a')} {item.episodes.dub ? uiI18n.t('app.i18n_value_0_dub_f85b5df5', { value0: item.episodes.dub }) : ''}</MetaBadge>}
       {(isManga || isNovel) && !!item.chapters && <MetaBadge className="text-white/85">{item.chapters} {uiI18n.t('app.ch_482bd64c')}</MetaBadge>}
+      {(isManga||isNovel)&&<TatakaiReadingViews kind={isNovel?"novel":"manga"} id={item.id} anilistId={item.anilistId}/>}
       {animeViewId && <TatakaiAnimeViews animeId={animeViewId} className="text-white/85" />}
     </div> : <div className="flex flex-wrap items-center gap-x-1.5">
       <span className="capitalize">{isAnime ? item.type || uiI18n.t('app.anime_f1b32a19') : mediaBadgeLabel}</span>
@@ -179,6 +181,7 @@ export const UnifiedMediaCard = memo(function UnifiedMediaCard({ item, variant, 
       {isAnime && !!item.episodes?.dub && <span>· {item.episodes.dub} {uiI18n.t('app.dub_1ca4b285')}</span>}
       {label && <span>· {label}</span>}
       {item.status && !isCharacter && <span>· {item.status}</span>}
+      {(isManga||isNovel)&&<TatakaiReadingViews kind={isNovel?"novel":"manga"} id={item.id} anilistId={item.anilistId}/>}
       {animeViewId && <TatakaiAnimeViews animeId={animeViewId} />}
     </div>} />;
 });

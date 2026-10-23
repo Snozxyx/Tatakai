@@ -13,6 +13,7 @@ import {
   CalendarDays,
   MoreHorizontal,
   Plus,
+  Languages,
 } from "lucide-react";
 import { NavIcon } from "@/components/ui/NavIcon";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -32,8 +33,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useCustomSources } from "@/hooks/api/useCustomSource";
-import type { CustomSourceEntry } from "@/core/content/custom-source-runtime";
 import { cn } from "@/lib/utils";
 
 const OVERFLOW_ITEMS = [
@@ -54,12 +53,6 @@ export function Sidebar() {
   const isPhoneWidth = useIsPhone();
   const domain = import.meta.env.VITE_PUBLIC_DOMAIN || "https://tatakai.me";
 
-  const { data: customSources } = useCustomSources();
-  const customByNamespace = (customSources ?? []).reduce<Record<string, CustomSourceEntry[]>>((acc, src) => {
-    (acc[src.namespace] ||= []).push(src);
-    return acc;
-  }, {});
-  const hasCustomSources = (customSources?.length ?? 0) > 0;
 
   // Logo click-streak easter egg: 7 rapid clicks → a spin + a petal pop from the
   // logo + a playful toast. The streak resets after 1.2s of no clicks. Normal
@@ -103,7 +96,7 @@ export function Sidebar() {
   const isActive = (path: string) => location.pathname === path;
   const isMangaActive = location.pathname === "/manga" || location.pathname.startsWith("/manga/");
   const isNovelActive = location.pathname === "/novel" || location.pathname.startsWith("/novel/");
-  const overflowActive = OVERFLOW_ITEMS.some((i) => isActive(i.path));
+  const overflowActive = OVERFLOW_ITEMS.some((i) => isActive(i.path)) || (isDesktopApp && isActive('/translate'));
 
   return (
     <nav
@@ -151,60 +144,7 @@ export function Sidebar() {
         {/* 3. Secondary/Social Group */}
         <NavIcon icon={Users} active={isActive("/community")} onClick={() => navigate("/community")} label={t("nav.community")} />
 
-        {/* Custom sources ("+") — extension-provided verticals; hidden when none installed. */}
-        {hasCustomSources && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                aria-label={t("nav.customSources")}
-                title={t("nav.customSources")}
-                className={cn(
-                  "group relative flex h-10 w-10 items-center justify-center rounded-xl outline-none transition-[color,background-color,opacity,transform] duration-200",
-                  "hover:bg-accent/80 hover:text-accent-foreground",
-                  location.pathname.startsWith("/x/") ? "bg-primary/10 text-primary" : "text-muted-foreground",
-                )}
-              >
-                <Plus className="h-5 w-5 shrink-0" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              side="right"
-              align="center"
-              sideOffset={20}
-              className="w-56 rounded-xl border-border/40 bg-background/80 p-1.5 shadow-xl backdrop-blur-xl"
-            >
-              {Object.entries(customByNamespace).map(([namespace, sources], groupIdx) => (
-                <div key={namespace}>
-                  {groupIdx > 0 && <DropdownMenuSeparator />}
-                  <DropdownMenuLabel className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                    {namespace}
-                  </DropdownMenuLabel>
-                  {sources.map((src) => {
-                    const path = `/x/${src.namespace}/${src.id}`;
-                    const active = location.pathname === path || location.pathname.startsWith(`${path}/`);
-                    return (
-                      <DropdownMenuItem
-                        key={`${src.namespace}:${src.id}`}
-                        onClick={() => navigate(path)}
-                        className={cn(
-                          "cursor-pointer gap-3 rounded-lg px-3 py-2.5 font-medium transition-colors duration-200",
-                          active ? "bg-primary/10 text-primary" : "hover:bg-accent focus:bg-accent",
-                        )}
-                      >
-                        {src.kind === "read" ? (
-                          <BookOpen className={cn("h-4 w-4", active ? "text-primary" : "text-muted-foreground")} />
-                        ) : (
-                          <LayoutGrid className={cn("h-4 w-4", active ? "text-primary" : "text-muted-foreground")} />
-                        )}
-                        <span className="min-w-0 flex-1 truncate">{src.name}</span>
-                      </DropdownMenuItem>
-                    );
-                  })}
-                </div>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
+        <button type="button" aria-label={t("nav.customSources")} title={t("nav.customSources")} onClick={() => navigate('/custom-providers')} className={cn("flex h-10 w-10 items-center justify-center rounded-xl transition-colors hover:bg-accent", location.pathname.startsWith('/x/') || location.pathname === '/custom-providers' ? 'bg-primary/10 text-primary' : 'text-muted-foreground')}><Plus className="size-5" /></button>
 
         {/* Overflow Menu */}
         <DropdownMenu>
@@ -246,6 +186,12 @@ export function Sidebar() {
                 </DropdownMenuItem>
               );
             })}
+            {isDesktopApp && <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => navigate('/translate')} className={cn('gap-3 rounded-lg px-3 py-2.5 font-medium cursor-pointer', isActive('/translate') && 'bg-primary/10 text-primary')}>
+                <Languages className="size-4" />Yomi
+              </DropdownMenuItem>
+            </>}
           </DropdownMenuContent>
         </DropdownMenu>
 

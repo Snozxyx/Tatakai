@@ -1,3 +1,4 @@
+import { playNotificationSound } from '@/lib/notificationSound';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
@@ -710,7 +711,10 @@ export function useWatchRoomController() {
         }
 
         const channel = supabase.channel(`room-${roomId}`)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'watch_room_messages', filter: `room_id=eq.${roomId}` }, () => refetchMessages())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'watch_room_messages', filter: `room_id=eq.${roomId}` }, (payload) => {
+                if (payload.eventType === 'INSERT' && payload.new.user_id !== user?.id && payload.new.message_type === 'chat') playNotificationSound();
+                void refetchMessages();
+            })
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'watch_rooms', filter: `id=eq.${roomId}` }, () => {
                 queryClient.invalidateQueries({ queryKey: ['watch-room', roomId] });
             })
@@ -742,7 +746,7 @@ export function useWatchRoomController() {
                 }
             });
         return () => { supabase.removeChannel(channel); };
-    }, [roomId, refetchMessages, queryClient]);
+    }, [roomId, refetchMessages, queryClient, user?.id]);
 
     // Auto-scroll chat
     useEffect(() => {

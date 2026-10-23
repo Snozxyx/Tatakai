@@ -121,6 +121,7 @@ export function LastReadNovelSection() {
                     <span className="tabular-nums text-white/60">{totalParas} {uiI18n.t('app.paragraphs_c9355d01')}</span>
                   ) : undefined
                 }
+                overlayIcon={BookOpen}
                 fallbackIcon={BookMarked}
               />
               </Peekable>

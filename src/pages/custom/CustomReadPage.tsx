@@ -1,28 +1,42 @@
-import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
-import uiI18n from '@/lib/uiI18n';
-import { SourceDebug } from '@/components/extensions/SourceDebug';
+import { useReaderResume } from "@/pages/manga/hooks/useReaderResume";
+import { useUiTranslation } from "@/hooks/ui/useUiTranslation";
 /**
  * Custom-source read page (`kind: 'read'`).
  *
- * Fully isolated from the manga readlist: it never reads or writes reading
- * progress / continue-reading. It fetches `CustomReadPage[]` from the extension's
+ * Source identity and local progress stay separate from verified catalogue lists. It fetches `CustomReadPage[]` from the extension's
  * custom source and renders them through the shared `ReaderImage` strip (the same
  * blob/proxy component the manga reader uses), reusing `useReaderSettings` for
  * width/gap/mode so a user's reader prefs carry over. Prev/next chapter navigation
  * is derived from the source's own info entries.
  */
 
-import { useEffect, useMemo, useState } from "react";
-import type { CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
-import { ReaderImage } from "@/components/reader/ReaderImage";
-import { GlassPanel } from "@/components/ui/GlassPanel";
 import { useReaderSettings } from "@/hooks/media/useReaderSettings";
-import { getProfileKnobs } from "@/lib/memoryProfile";
-import { readerPageRenderKey } from "@/lib/reader/imageLifecycle";
-import { useCustomRead, useCustomInfo, useCustomSource } from "@/hooks/api/useCustomSource";
+import {
+  useCustomRead,
+  useCustomInfo,
+  useCustomSource,
+} from "@/hooks/api/useCustomSource";
+import { useExtensionTitleProgress } from "@/hooks/media/useExtensionLibrary";
+import {
+  extensionChapterKey,
+  extensionDownloadIdentity,
+} from "@/core/extensions/compatibility/downloads";
+import { updateExtensionLibrary } from "@/core/extensions/compatibility/library";
+import { useMangaDownload } from "@/hooks/media/useMangaDownload";
+import { TranslateChapterButton } from "@/components/translate/TranslateChapterButton";
+import { useCustomCatalog } from "@/hooks/media/useCustomCatalog";
+import { useCustomTracker } from "@/hooks/media/useCustomTracker";
+import { isCompatibilityNamespace } from "@/core/extensions/compatibility/client";
+import {
+  customSourceBase,
+  orderedCustomEntries,
+} from "@/core/content/custom-source-model";
+import { CustomReaderView } from "@/components/reader/CustomReaderView";
+import { CustomCatalogComments } from "@/components/extensions/CustomCatalogPanel";
+import { catalogCommentTarget } from "@/core/content/custom-catalog";
 
 export default function CustomReadPage() {
   useUiTranslation();
@@ -36,152 +50,254 @@ export default function CustomReadPage() {
   }>();
   const { source } = useCustomSource(namespace, sourceId);
   const { data: info } = useCustomInfo(namespace, sourceId, id);
-  const { data, isLoading, isError } = useCustomRead(namespace, sourceId, id, chapterId);
+  const { data, isLoading, isError, error, refetch, isFetching } =
+    useCustomRead(namespace, sourceId, id, chapterId);
   const { settings } = useReaderSettings();
 
   const pages = data?.pages ?? [];
   const total = pages.length;
   const [pageIndex, setPageIndex] = useState(0);
+  const pageContainer = useRef<HTMLDivElement>(null);
+  const scrollContainer = useRef<HTMLDivElement>(null);
+  const restored = useRef("");
+  const restoredPage = useRef<number | null>(null);
+  const chapterIdentity = JSON.stringify([namespace, sourceId, id, chapterId]);
+  const [downloadError, setDownloadError] = useState("");
+  const [downloading, setDownloading] = useState(false);
+  const [translationChapter, setTranslationChapter] = useState<{
+    anilistId: number;
+    chapterKey: string;
+  } | null>(null);
+  const { enqueueChapter, isEnabled: downloadsEnabled } = useMangaDownload();
 
   // Reset to first page whenever the chapter changes.
-  useEffect(() => setPageIndex(0), [chapterId]);
+  useEffect(() => setPageIndex(0), [chapterIdentity]);
 
-  const entries = info?.entries ?? [];
+  const entries = useMemo(
+    () => orderedCustomEntries(info?.entries ?? []),
+    [info?.entries]
+  );
   const currentIdx = entries.findIndex((e) => e.id === chapterId);
   const prev = currentIdx > 0 ? entries[currentIdx - 1] : null;
-  const next = currentIdx >= 0 && currentIdx < entries.length - 1 ? entries[currentIdx + 1] : null;
+  const next =
+    currentIdx >= 0 && currentIdx < entries.length - 1
+      ? entries[currentIdx + 1]
+      : null;
   const currentLabel = currentIdx >= 0 ? entries[currentIdx].label : chapterId;
-
-  const base = `/x/${namespace}/${sourceId}`;
-  const goEntry = (entryId: string) => navigate(`${base}/read/${id}/${encodeURIComponent(entryId)}`);
-
-  const widthStyle: CSSProperties = useMemo(
-    () =>
-      settings.sizing === "natural"
-        ? { width: "auto", maxWidth: "100%" }
-        : { width: `${settings.widthPercent}%`, maxWidth: "100%" },
-    [settings.sizing, settings.widthPercent],
+  const libraryTitle =
+    info && namespace && sourceId && id
+      ? {
+          namespace,
+          sourceId,
+          id,
+          kind: "read" as const,
+          title: info.title,
+          image: info.image,
+          sourceName: source?.name,
+          catalog: entries,
+        }
+      : undefined;
+  useEffect(() => {
+    setTranslationChapter(null);
+    if (
+      !window.electron?.translate ||
+      namespace !== "compat-mihon" ||
+      !libraryTitle ||
+      !sourceId ||
+      !chapterId
+    )
+      return;
+    let disposed = false;
+    Promise.all([
+      extensionDownloadIdentity(libraryTitle),
+      extensionChapterKey(sourceId, chapterId),
+    ])
+      .then(([anilistId, chapterKey]) => {
+        if (!disposed) setTranslationChapter({ anilistId, chapterKey });
+      })
+      .catch((error) => {
+        if (!disposed)
+          setDownloadError(
+            error instanceof Error
+              ? error.message
+              : "Could not identify this chapter"
+          );
+      });
+    return () => {
+      disposed = true;
+    };
+  }, [namespace, sourceId, id, chapterId, info?.title]);
+  const progress = useExtensionTitleProgress(
+    libraryTitle,
+    chapterId,
+    currentLabel
   );
+  const catalog = useCustomCatalog(source, id, info);
+  const tracker = useCustomTracker(catalog, entries, progress.row);
+  const lastPage = useRef(
+    new Map<string, { position: number; total: number }>()
+  );
+  if (chapterId && total && restored.current === chapterIdentity)
+    lastPage.current.set(chapterIdentity, { position: pageIndex, total });
+  useEffect(
+    () => () => {
+      const page = chapterId
+        ? lastPage.current.get(chapterIdentity)
+        : undefined;
+      if (page)
+        progress.save(
+          page.position,
+          page.total,
+          page.position === page.total - 1,
+          true
+        );
+    },
+    [chapterIdentity, progress.save]
+  );
+  const restorePage = useCallback(
+    (index: number) => {
+      restored.current = chapterIdentity;
+      restoredPage.current = index;
+      setPageIndex(index);
+    },
+    [chapterIdentity]
+  );
+  const restoring = useReaderResume({
+    rootRef: scrollContainer,
+    identity: chapterIdentity,
+    page: progress.initialPosition,
+    currentPage: pageIndex,
+    total: progress.ready ? total : 0,
+    vertical: settings.readingMode === "vertical",
+    onPage: restorePage,
+    pageSelector: "[data-extension-page]",
+  });
+  useEffect(() => {
+    if (settings.readingMode !== "vertical" || !total) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (restoring.current) return;
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        const index = Number(
+          (visible[0]?.target as HTMLElement | undefined)?.dataset.extensionPage
+        );
+        if (Number.isFinite(index)) setPageIndex(index);
+      },
+      {
+        root: scrollContainer.current,
+        rootMargin: "-10% 0px -55% 0px",
+        threshold: 0,
+      }
+    );
+    pageContainer.current
+      ?.querySelectorAll("[data-extension-page]")
+      .forEach((node) => observer.observe(node));
+    return () => observer.disconnect();
+  }, [chapterIdentity, total, settings.readingMode, restoring]);
+  useEffect(() => {
+    if (restoredPage.current !== null) {
+      if (pageIndex !== restoredPage.current) return;
+      restoredPage.current = null;
+    }
+    if (total && restored.current === chapterIdentity)
+      progress.save(pageIndex, total, pageIndex === total - 1);
+  }, [pageIndex, total, chapterIdentity, progress.save]);
+  async function downloadChapter() {
+    if (!libraryTitle || !chapterId || !sourceId) return;
+    setDownloading(true);
+    setDownloadError("");
+    try {
+      const anilistId = await extensionDownloadIdentity(libraryTitle);
+      await updateExtensionLibrary(progress.profile, libraryTitle, {
+        saved: true,
+      });
+      const result = await enqueueChapter(
+        { anilistId, title: libraryTitle.title, posterUrl: libraryTitle.image },
+        {
+          chapterKey: await extensionChapterKey(sourceId, chapterId),
+          provider: sourceId,
+          providerChapterId: chapterId,
+          chapterNumber: entries[currentIdx]?.number,
+        }
+      );
+      if (!result.ok)
+        setDownloadError(
+          "reason" in result
+            ? String(result.reason)
+            : "Could not start chapter download"
+        );
+    } catch (error) {
+      setDownloadError(
+        error instanceof Error ? error.message : "Could not download chapter"
+      );
+    } finally {
+      setDownloading(false);
+    }
+  }
 
-  const eagerFor = (idx: number) => {
-    // 'partial' is the reader default; when untouched, the active memory profile
-    // picks the preload window (none on Low, full on Unlimited).
-    const effectivePreloading =
-      settings.preloading === "partial" ? getProfileKnobs().readerPreload : settings.preloading;
-    if (settings.loadingStrategy === "eager" || effectivePreloading === "full") return true;
-    const win = effectivePreloading === "none" ? 1 : 3;
-    return Math.abs(idx - pageIndex) <= win;
-  };
-
-  const goNextPage = () => setPageIndex((i) => Math.min(total - 1, i + 1));
-  const goPrevPage = () => setPageIndex((i) => Math.max(0, i - 1));
-  const progressPct = total ? ((pageIndex + 1) / total) * 100 : 0;
-  const progressLabel = uiI18n.t('app.i18n_value_0_i18n_value_1_68ff458e', { value0: Math.min(pageIndex + 1, total || 1), value1: total || "…" });
+  const base = customSourceBase({
+    namespace: namespace || "",
+    id: sourceId || "",
+  });
+  const goEntry = (entryId: string) =>
+    navigate(
+      `${base}/read/${encodeURIComponent(id || "")}/${encodeURIComponent(
+        entryId
+      )}`
+    );
 
   return (
-    <div className="relative min-h-screen text-foreground" style={{ backgroundColor: settings.backgroundColor }}>
-      <div className="sticky top-0 z-30 flex items-center gap-2 border-b border-white/10 bg-black/50 px-3 py-2 backdrop-blur">
-        <button
-          onClick={() => navigate(`${base}/info/${encodeURIComponent(id || "")}`)}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 px-2.5 py-1.5 text-sm font-semibold hover:bg-white/10"
-          title={t('animeDetail.backToInfo')}
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </button>
-        <button
-          disabled={!prev}
-          onClick={() => prev && goEntry(prev.id)}
-          className="inline-flex items-center gap-1 rounded-lg border border-white/15 px-2.5 py-1.5 text-sm font-semibold hover:bg-white/10 disabled:opacity-40"
-        >
-          <ChevronLeft className="h-4 w-4" /> {t('common.previous')}
-        </button>
-        <div className="flex min-w-0 flex-1 flex-col items-center px-2 text-center">
-          <span className="w-full truncate text-sm font-bold">{info?.title || source?.name || t('animeDetail.read')}</span>
-          <span className="w-full truncate text-xs text-muted-foreground">{currentLabel}</span>
-        </div>
-        <button
-          disabled={!next}
-          onClick={() => next && goEntry(next.id)}
-          className="inline-flex items-center gap-1 rounded-lg border border-white/15 px-2.5 py-1.5 text-sm font-semibold hover:bg-white/10 disabled:opacity-40"
-        >
-          {t('common.next')} <ChevronRight className="h-4 w-4" />
-        </button>
-      </div>
-
-      <div className="mx-auto w-full max-w-5xl px-3 py-4">
-        <SourceDebug kind="custom" unit="pages" sources={pages.map(() => ({ providerKey: namespace, providerName: source?.name }))} />
-        {isLoading ? (
-          <div className="flex items-center justify-center gap-2 py-24 text-muted-foreground">
-            <Loader2 className="h-5 w-5 animate-spin" /> {t('discover.loadingPages')}
-          </div>
-        ) : total === 0 || isError ? (
-          <GlassPanel className="mx-auto max-w-xl border border-white/10 p-6">
-            <h2 className="text-xl font-bold">{t('discover.unableToLoadChapter')}</h2>
-            <p className="mt-2 text-muted-foreground">
-              {t('discover.unableToLoadChapterDesc')}
-            </p>
-          </GlassPanel>
-        ) : settings.readingMode === "vertical" ? (
-          <div className="flex flex-col items-center" style={{ gap: `${settings.gap}px` }}>
-            {pages.map((page, idx) => (
-              <ReaderImage
-                key={readerPageRenderKey(chapterId || "", page)}
-                page={page}
-                mode={settings.loadingMethod}
-                style={widthStyle}
-                eager={eagerFor(idx)}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="relative flex min-h-full items-center justify-center">
-            {pages[pageIndex] ? (
-              <ReaderImage key={readerPageRenderKey(chapterId || "", pages[pageIndex])} page={pages[pageIndex]} mode={settings.loadingMethod} style={widthStyle} eager />
-            ) : null}
-            {settings.clickToTurn ? (
-              <>
-                <button
-                  type="button"
-                  tabIndex={-1}
-                  aria-label={t('manga.previousPage')}
-                  onClick={(e) => {
-                    goPrevPage();
-                    // Keep the invisible tap zone from holding focus and
-                    // painting a focus ring over the page on keyboard use.
-                    e.currentTarget.blur();
-                  }}
-                  className="absolute left-0 top-0 h-full w-1/3 cursor-w-resize bg-transparent outline-none focus:outline-none focus-visible:outline-none"
-                />
-                <button
-                  type="button"
-                  tabIndex={-1}
-                  aria-label={t('manga.nextPage')}
-                  onClick={(e) => {
-                    goNextPage();
-                    e.currentTarget.blur();
-                  }}
-                  className="absolute right-0 top-0 h-full w-1/3 cursor-e-resize bg-transparent outline-none focus:outline-none focus-visible:outline-none"
-                />
-              </>
-            ) : null}
-          </div>
-        )}
-      </div>
-
-      {total > 0 ? (
-        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30">
-          {settings.showProgressBar ? (
-            <div className="h-1 w-full bg-white/10">
-              <div className="h-full bg-primary transition-all" style={{ width: `${progressPct}%` }} />
-            </div>
-          ) : null}
-          <div className="flex justify-center py-2">
-            <span className="pointer-events-auto rounded-full bg-black/60 px-3 py-1 text-xs font-semibold text-white backdrop-blur">
-              {progressLabel}
-            </span>
-          </div>
-        </div>
-      ) : null}
-    </div>
+    <CustomReaderView
+      title={info?.title || source?.name || t("animeDetail.read")}
+      chapterLabel={currentLabel || ""}
+      sourceName={source?.name || ""}
+      namespace={namespace || ""}
+      pages={pages}
+      pageIndex={pageIndex}
+      onPage={setPageIndex}
+      pageContainer={pageContainer}
+      scrollContainer={scrollContainer}
+      entries={entries}
+      chapterId={chapterId || ""}
+      onChapter={goEntry}
+      prev={prev?.id}
+      next={next?.id}
+      onBack={() => navigate(`${base}/info/${encodeURIComponent(id || "")}`)}
+      onHome={() => navigate(base)}
+      loading={isLoading}
+      fetching={isFetching}
+      failed={isError}
+      error={error?.message}
+      onReload={() => void refetch()}
+      actionError={tracker.error || downloadError}
+      onRetrySync={tracker.error ? tracker.retry : undefined}
+      download={
+        downloadsEnabled && namespace && isCompatibilityNamespace(namespace)
+          ? () => {
+              if (!downloading) void downloadChapter();
+            }
+          : undefined
+      }
+      downloading={downloading}
+      translation={
+        translationChapter && (
+          <TranslateChapterButton
+            {...translationChapter}
+            title={info?.title || "Manga"}
+            chapterLabel={currentLabel}
+            provider={sourceId}
+            providerChapterId={chapterId}
+            chapterNumber={entries[currentIdx]?.number}
+          />
+        )
+      }
+      comments={
+        catalogCommentTarget(source, catalog.identity, catalog.link) ? (
+          <CustomCatalogComments catalog={catalog} source={source} />
+        ) : undefined
+      }
+    />
   );
 }

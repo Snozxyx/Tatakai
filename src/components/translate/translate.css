@@ -1,0 +1,65 @@
+.translate-workspace {
+  --editor-panel: var(--card);
+  font-variant-numeric: tabular-nums;
+}
+
+.translate-workspace .editor-input {
+  min-height: 2rem;
+  height: 2rem;
+  border-radius: 0.5rem;
+  font-size: 0.8125rem;
+}
+
+.translate-workspace .editor-select {
+  height: 2rem;
+  border-radius: 0.5rem;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  padding: 0 0.625rem;
+  font-size: 0.8125rem;
+}
+
+.translate-workspace details > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  list-style: none;
+  padding: 0.625rem 0;
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.translate-workspace details > summary::-webkit-details-marker {
+  display: none;
+}
+.translate-workspace details > summary::after {
+  content: "";
+  width: 0.375rem;
+  height: 0.375rem;
+  margin-right: 0.25rem;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+}
+.translate-workspace details[open] > summary::after {
+  transform: rotate(45deg);
+}
+.translate-workspace summary:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+.translate-workspace input[type="checkbox"] {
+  accent-color: hsl(var(--primary));
+}
+.translate-workspace textarea {
+  scrollbar-gutter: stable;
+}
+.translate-workspace ::selection {
+  background: hsl(var(--primary) / 0.2);
+  color: hsl(var(--foreground));
+}
+.translate-workspace :is(input, textarea) {
+  caret-color: hsl(var(--primary));
+}

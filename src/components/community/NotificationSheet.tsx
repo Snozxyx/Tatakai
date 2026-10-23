@@ -1,13 +1,16 @@
+import { NotificationSoundToggle } from '@/components/community/NotificationSoundToggle';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
+  SheetDescription,
 } from '@/components/ui/sheet';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useNotifications, type Notification } from '@/hooks/community/useNotifications';
@@ -56,6 +59,7 @@ interface FeedItem {
   link?: string;
   fromUsername?: string;
   fromAvatar?: string;
+  fromUserId?: string;
   rawId: string;
 }
 
@@ -66,22 +70,22 @@ function categorize(type: string | undefined): Category {
   return 'system';
 }
 
-/** Per-type icon + tint for the row's leading chip. */
-function iconFor(type: string): { icon: React.ElementType; tint: string } {
+/** A quiet, consistent icon for each activity type. */
+function iconFor(type: string): { icon: React.ElementType } {
   switch (type) {
     case 'mention':
-      return { icon: AtSign, tint: 'text-sky-400 bg-sky-500/15 border-sky-500/25' };
+      return { icon: AtSign };
     case 'airing':
-      return { icon: CalendarClock, tint: 'text-violet-400 bg-violet-500/15 border-violet-500/25' };
+      return { icon: CalendarClock };
     case 'broadcast':
     case 'announcement':
-      return { icon: Megaphone, tint: 'text-amber-400 bg-amber-500/15 border-amber-500/25' };
+      return { icon: Megaphone };
     case 'like_milestone':
-      return { icon: Heart, tint: 'text-rose-400 bg-rose-500/15 border-rose-500/25' };
+      return { icon: Heart };
     case 'reply':
-      return { icon: Reply, tint: 'text-emerald-400 bg-emerald-500/15 border-emerald-500/25' };
+      return { icon: Reply };
     default:
-      return { icon: Info, tint: 'text-muted-foreground bg-white/[0.06] border-white/10' };
+      return { icon: Info };
   }
 }
 
@@ -123,7 +127,7 @@ const BUCKET_ORDER: Array<'Today' | 'Yesterday' | 'Earlier'> = ['Today', 'Yester
 function SectionLabel({ children }: { children: React.ReactNode }) {
   useUiTranslation();
   return (
-    <div className="mb-2 mt-1 px-1 text-[10px] font-black uppercase tracking-wider text-muted-foreground/60">
+    <div className="mb-2 mt-1 px-3 text-xs font-medium text-muted-foreground">
       {children}
     </div>
   );
@@ -132,54 +136,53 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 function EmptyState({ icon: Icon, message }: { icon: React.ElementType; message: string }) {
   useUiTranslation();
   return (
-    <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-      <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/[0.06] bg-white/[0.02] text-muted-foreground/50">
+    <div className="flex min-h-64 flex-col items-center justify-center gap-4 px-6 py-16 text-center">
+      <div className="flex h-12 w-12 items-center justify-center text-muted-foreground">
         <Icon className="h-6 w-6" />
       </div>
-      <p className="max-w-[220px] text-xs font-medium text-muted-foreground/70">{message}</p>
+      <p className="max-w-[260px] text-sm leading-relaxed text-muted-foreground">{message}</p>
     </div>
   );
 }
 
 function NotificationRow({ item, onClick }: { item: FeedItem; onClick: (item: FeedItem) => void }) {
   useUiTranslation();
-  const { icon: Icon, tint } = iconFor(item.iconType);
-  const hasAvatar = !!item.fromAvatar || !!item.fromUsername;
+  const { icon: Icon } = iconFor(item.iconType);
+  const hasAvatar = !!item.fromUserId || !!item.fromAvatar || !!item.fromUsername;
   return (
-    <motion.button
+    <button
       type="button"
-      layout
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
       onClick={() => onClick(item)}
       className={cn(
-        'group flex w-full items-start gap-3 rounded-2xl border p-3 text-left transition-all duration-200',
+        'group flex w-full items-start gap-3 rounded-lg px-3 py-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
         item.read
-          ? 'border-white/[0.05] bg-white/[0.01] hover:bg-white/[0.03]'
-          : 'border-primary/20 bg-primary/[0.06] hover:bg-primary/[0.09]',
+          ? 'hover:bg-muted/40'
+          : 'bg-muted/30 hover:bg-muted/50',
       )}
     >
       {hasAvatar ? (
-        <Avatar className="h-9 w-9 shrink-0 border border-white/10">
-          <AvatarImage src={item.fromAvatar} />
+        <Avatar className="h-10 w-10 shrink-0">
+          <AvatarImage src={item.fromAvatar} alt={item.fromUsername || 'Notification sender'} />
           <AvatarFallback className="bg-white/[0.06] text-[11px] font-bold text-muted-foreground">
             {(item.fromUsername ?? '?').slice(0, 2).toUpperCase()}
           </AvatarFallback>
         </Avatar>
       ) : (
-        <div className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border', tint)}>
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted/60 text-muted-foreground">
           <Icon className="h-4 w-4" />
         </div>
       )}
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[13px] font-bold text-white">{item.title}</p>
+        <div className="flex items-baseline justify-between gap-3">
+          <p className={cn('min-w-0 break-words text-sm leading-snug text-foreground', item.read ? 'font-medium' : 'font-semibold')}>{item.title}</p>
+          <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{relTime(item.createdAt)}</span>
+        </div>
         {item.body && (
-          <p className="mt-0.5 line-clamp-2 text-xs leading-snug text-muted-foreground/80">{item.body}</p>
+          <p className="mt-1 line-clamp-2 break-words text-[13px] leading-relaxed text-muted-foreground">{item.body}</p>
         )}
-        <span className="mt-1 block text-[10px] font-medium text-muted-foreground/50">{relTime(item.createdAt)}</span>
       </div>
-      {!item.read && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary shadow-[0_0_8px_rgba(var(--primary),0.6)]" />}
-    </motion.button>
+      {!item.read && <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />}
+    </button>
   );
 }
 
@@ -212,22 +215,22 @@ function UpcomingCalendar({ onNavigate }: { onNavigate: (link: string) => void }
                 key={m.mediaId}
                 type="button"
                 onClick={() => onNavigate(`/anime/anilist-${m.mediaId}`)}
-                className="flex w-full items-center gap-3 rounded-2xl border border-violet-500/15 bg-violet-500/[0.04] p-2.5 text-left transition-all duration-200 hover:bg-violet-500/[0.08]"
+                className="flex w-full items-center gap-3 rounded-lg p-3 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 {m.coverImage ? (
                   <img src={m.coverImage} alt="" className="h-12 w-9 shrink-0 rounded-lg object-cover" />
                 ) : (
-                  <div className="flex h-12 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-500/15 text-violet-400">
+                  <div className="flex h-12 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
                     <CalendarClock className="h-4 w-4" />
                   </div>
                 )}
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[13px] font-bold text-white">{m.title}</p>
+                  <p className="truncate text-sm font-semibold text-foreground">{m.title}</p>
                   <p className="mt-0.5 text-xs text-muted-foreground/80">
                     {m.episode != null ? uiI18n.t('app.ep_i18n_value_0_1a0eea94', { value0: m.episode }) : uiI18n.t('app.next_episode_882f1a46')}
                   </p>
                 </div>
-                <div className="shrink-0 rounded-lg bg-violet-500/15 px-2 py-1 text-[11px] font-bold tabular-nums text-violet-300">
+                <div className="shrink-0 text-xs font-medium tabular-nums text-muted-foreground">
                   {m.airingAt != null ? countdown(m.airingAt) : ''}
                 </div>
               </button>
@@ -262,14 +265,11 @@ function SentMentionsList({ onNavigate }: { onNavigate: (link: string) => void }
           .map((u) => `@${u.display_name || u.username || 'someone'}`)
           .join(', ');
         return (
-          <motion.button
+          <button
             key={m.id}
             type="button"
-            layout
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
             onClick={() => onNavigate(m.link)}
-            className="flex w-full items-start gap-3 rounded-2xl border border-white/[0.05] bg-white/[0.01] p-3 text-left transition-all duration-200 hover:bg-white/[0.03]"
+            className="flex w-full items-start gap-3 rounded-lg p-3 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <div className="flex -space-x-2">
               {m.mentioned.slice(0, 3).map((u) => (
@@ -282,13 +282,13 @@ function SentMentionsList({ onNavigate }: { onNavigate: (link: string) => void }
               ))}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-[13px] font-bold text-white">
-                {uiI18n.t('app.you_mentioned_97bb3b2b')} <span className="text-sky-400">{names}</span>
+              <p className="truncate text-sm font-semibold text-foreground">
+                {uiI18n.t('app.you_mentioned_97bb3b2b')} <span className="text-foreground">{names}</span>
               </p>
-              <p className="mt-0.5 line-clamp-2 text-xs leading-snug text-muted-foreground/80">{m.preview}</p>
-              <span className="mt-1 block text-[10px] font-medium text-muted-foreground/50">{relTime(m.created_at)}</span>
+              <p className="mt-1 line-clamp-2 break-words text-[13px] leading-relaxed text-muted-foreground">{m.preview}</p>
+              <span className="mt-1 block text-[11px] font-medium text-muted-foreground">{relTime(m.created_at)}</span>
             </div>
-          </motion.button>
+          </button>
         );
       })}
     </div>
@@ -314,7 +314,24 @@ export function NotificationSheet({ open, onOpenChange }: NotificationSheetProps
     unreadCount: adminUnread,
   } = useAdminMessages();
 
+  const senderIds = [...new Set([
+    ...notifications.map((n) => n.data?.from_user ?? n.data?.actor_id),
+    ...(messages ?? []).map((m) => m.sender_id),
+  ].filter((id): id is string => typeof id === 'string' && !!id))].sort();
+  const { data: senders = [] } = useQuery({
+    queryKey: ['notification-senders', senderIds],
+    enabled: open && senderIds.length > 0,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase.from('profiles')
+        .select('user_id, username, display_name, avatar_url').in('user_id', senderIds);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
   const items = useMemo<FeedItem[]>(() => {
+    const senderById = new Map(senders.map((sender) => [sender.user_id, sender]));
     const notifItems = (notifications as Notification[]).map<FeedItem>((n) => ({
       key: `n-${n.id}`,
       source: 'notification',
@@ -325,8 +342,10 @@ export function NotificationSheet({ open, onOpenChange }: NotificationSheetProps
       createdAt: n.created_at,
       read: n.read,
       link: n.data?.link,
-      fromUsername: n.data?.from_username,
-      fromAvatar: n.data?.from_avatar,
+      fromUserId: n.data?.from_user ?? n.data?.actor_id,
+      fromUsername: senderById.get(n.data?.from_user ?? n.data?.actor_id)?.display_name
+        || senderById.get(n.data?.from_user ?? n.data?.actor_id)?.username || n.data?.from_username,
+      fromAvatar: senderById.get(n.data?.from_user ?? n.data?.actor_id)?.avatar_url || n.data?.from_avatar,
       rawId: n.id,
     }));
     const adminItems = (messages ?? []).map<FeedItem>((m) => ({
@@ -338,12 +357,15 @@ export function NotificationSheet({ open, onOpenChange }: NotificationSheetProps
       body: m.content,
       createdAt: m.created_at,
       read: m.is_read,
+      fromUserId: m.sender_id,
+      fromUsername: senderById.get(m.sender_id)?.display_name || senderById.get(m.sender_id)?.username,
+      fromAvatar: senderById.get(m.sender_id)?.avatar_url,
       rawId: m.id,
     }));
     return [...notifItems, ...adminItems].sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     );
-  }, [notifications, messages]);
+  }, [notifications, messages, senders]);
 
   const totalUnread = notifUnread + adminUnread;
 
@@ -380,11 +402,11 @@ export function NotificationSheet({ open, onOpenChange }: NotificationSheetProps
   };
 
   const groupedList = (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {BUCKET_ORDER.filter((b) => grouped[b].length > 0).map((bucket) => (
         <div key={bucket}>
           <SectionLabel>{bucket}</SectionLabel>
-          <div className="space-y-2">
+          <div className="space-y-1">
             {grouped[bucket].map((item) => (
               <NotificationRow key={item.key} item={item} onClick={handleItemClick} />
             ))}
@@ -398,76 +420,52 @@ export function NotificationSheet({ open, onOpenChange }: NotificationSheetProps
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="flex w-full flex-col gap-0 overflow-hidden border-l border-white/[0.08] bg-background/60 p-0 backdrop-blur-[40px] sm:max-w-md md:max-w-lg shadow-[-20px_0_40px_rgba(0,0,0,0.5)] z-50"
+        className="z-50 flex w-full flex-col gap-0 overflow-hidden border-l border-border bg-background p-0 shadow-[-16px_0_64px_-24px_rgba(0,0,0,0.45)] sm:max-w-[440px] md:max-w-[480px]"
       >
-        {/* Ambient glow */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none -z-10">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-primary/15 blur-[120px] rounded-full" />
-          <div className="absolute bottom-20 left-0 w-72 h-72 bg-sky-500/10 blur-[100px] rounded-full" />
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/80 to-background/95" />
-        </div>
-
-        {/* Header */}
-        <SheetHeader className="relative shrink-0 border-b border-white/[0.05] bg-white/[0.01] p-6 pb-5 text-left z-10">
-          <div className="flex items-center justify-between gap-3">
-            <SheetTitle className="flex items-center gap-3 text-2xl font-black tracking-tight text-white drop-shadow-md">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/30 to-primary/5 border border-primary/20 text-primary shadow-[0_0_20px_rgba(var(--primary),0.2)]">
-                <Bell className="h-5 w-5" />
-              </div>
-              {uiI18n.t('app.notifications_753a22b2')}
-            </SheetTitle>
+        <SheetHeader className="shrink-0 px-6 pb-5 pt-8 text-left">
+          <SheetTitle className="pr-8 font-display text-2xl font-semibold tracking-tight text-foreground">
+            {uiI18n.t('app.notifications_753a22b2')}
+          </SheetTitle>
+          <div className="flex min-h-8 items-center justify-between gap-3">
+            <SheetDescription className="text-xs text-muted-foreground">
+              {totalUnread > 0 ? uiI18n.t('app.i18n_value_0_unread_notificationi18n_value_1_c7314901', { value0: totalUnread, value1: totalUnread === 1 ? '' : 's' }) : uiI18n.t('app.you_are_all_caught_up_c0b73100')}
+            </SheetDescription>
             {totalUnread > 0 && (
-              <button
-                type="button"
-                onClick={handleMarkAll}
-                className="flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-[11px] font-bold text-muted-foreground transition-all hover:bg-white/[0.06] hover:text-white"
-              >
+              <button type="button" onClick={handleMarkAll}
+                className="flex min-h-9 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                 <CheckCheck className="h-3.5 w-3.5" />
                 {uiI18n.t('app.mark_all_26cd1bb1')}
               </button>
             )}
           </div>
-          <p className="mt-1 text-xs font-medium text-muted-foreground/80">
-            {totalUnread > 0 ? uiI18n.t('app.i18n_value_0_unread_notificationi18n_value_1_c7314901', { value0: totalUnread, value1: totalUnread === 1 ? '' : 's' }) : uiI18n.t('app.you_are_all_caught_up_c0b73100')}
-          </p>
         </SheetHeader>
 
-        {/* Scrollable body */}
-        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-6 custom-scrollbar relative z-10">
-          {/* Filter tabs */}
-          <div className="grid grid-cols-5 gap-1.5 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-1.5 shadow-xl backdrop-blur-md">
-            {TABS.map(({ value, label, icon: Icon }) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => setTab(value)}
-                className={cn(
-                  'flex flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 text-[10px] font-bold tracking-tight transition-all duration-200',
-                  tab === value
-                    ? 'bg-primary text-primary-foreground shadow-[0_0_20px_rgba(var(--primary),0.35)]'
-                    : 'text-muted-foreground hover:text-white hover:bg-white/[0.03]',
-                )}
-              >
-                <Icon className="h-4 w-4 shrink-0" />
-                <span className="truncate">{label}</span>
-              </button>
-            ))}
-          </div>
+        <div className="grid shrink-0 grid-cols-5 border-b border-border px-4" role="group" aria-label={uiI18n.t('app.notifications_753a22b2')}>
+          {TABS.map(({ value, label }) => (
+            <button key={value} type="button" aria-pressed={tab === value} onClick={() => setTab(value)}
+              className={cn('relative min-h-11 min-w-0 px-1 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
+                tab === value ? 'font-semibold text-foreground' : 'font-medium text-muted-foreground hover:text-foreground')}>
+              <span className="block truncate">{label}</span>
+              {tab === value && <span className="absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-foreground" />}
+            </button>
+          ))}
+        </div>
 
+        <div className="custom-scrollbar min-h-0 flex-1 space-y-5 overflow-y-auto px-3 py-5 sm:px-4">
           {tab === 'mention' ? (
             <div className="space-y-4">
               {/* Received / Sent toggle */}
-              <div className="grid grid-cols-2 gap-1.5 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-1.5">
+              <div className="mx-3 grid grid-cols-2 gap-1 rounded-lg bg-muted/40 p-1">
                 {(['received', 'sent'] as const).map((v) => (
                   <button
                     key={v}
                     type="button"
                     onClick={() => setMentionView(v)}
                     className={cn(
-                      'rounded-xl px-3 py-1.5 text-xs font-bold capitalize transition-all duration-200',
+                      'min-h-9 rounded-md px-3 text-xs font-medium capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                       mentionView === v
-                        ? 'bg-primary text-primary-foreground shadow-[0_0_16px_rgba(var(--primary),0.3)]'
-                        : 'text-muted-foreground hover:text-white',
+                        ? 'bg-background text-foreground'
+                        : 'text-muted-foreground hover:text-foreground',
                     )}
                   >
                     {uiI18n.t(({"received":"app.received_38428a69","sent":"app.sent_27e7700f"})[v])}
@@ -510,6 +508,9 @@ export function NotificationSheet({ open, onOpenChange }: NotificationSheetProps
               }
             />
           )}
+        </div>
+        <div className="shrink-0 border-t border-border px-6 py-2 text-muted-foreground">
+          <NotificationSoundToggle />
         </div>
       </SheetContent>
     </Sheet>

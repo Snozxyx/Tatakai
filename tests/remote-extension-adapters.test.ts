@@ -98,6 +98,11 @@ describe('source display metadata and provider cache', () => {
     expect(getSimpleServerDisplayName('stremio-1a1a519c-5644#1', 'Anime Source')).toBe('Anime Source');
     const keys = ['seanime-uuid#1', 'seanime-uuid#2'];
     expect(buildUniqueSimpleNameMap(keys, Object.fromEntries(keys.map(k => [k, 'Source'])))).toEqual({ 'seanime-uuid#1': 'Source 1', 'seanime-uuid#2': 'Source 2' });
+    const qualified = 'd72ece56-84cc-4dbc-81e7-b81c6af7b67f/041cc064-2e65-46b6-84eb-5de2e7dec187';
+    expect(getSimpleServerDisplayName(qualified, 'QA Server')).toBe('QA Server');
+    expect(buildUniqueSimpleNameMap([`${qualified}#1`, `${qualified}#2`], {
+      [`${qualified}#1`]: 'QA Server', [`${qualified}#2`]: 'QA Server',
+    })).toEqual({ [`${qualified}#1`]: 'QA Server 1', [`${qualified}#2`]: 'QA Server 2' });
   });
   it('normalizes languages and quality without treating unknown audio as sub', () => {
     expect(languageLabel('eng')).toBe('English'); expect(languageLabel('pt-BR')).toContain('Portuguese');

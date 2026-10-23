@@ -660,6 +660,11 @@ function createHomeServer({ store, adapters, logger }) {
   }
 
   async function handle(req, res) {
+    const requestPath = (req.url || '/').split('?')[0];
+    if (adapters.handleExtensionServer && (requestPath === '/' || requestPath.startsWith('/assets/') || requestPath.startsWith('/api/server/'))) {
+      try { return await adapters.handleExtensionServer(req, res); }
+      catch { return sendJson(res, 503, { success: false, error: 'extension_server_unavailable' }); }
+    }
     const config = store.read();
     const origin = req.headers.origin;
     const headers = corsHeaders(origin, config);
@@ -681,6 +686,7 @@ function createHomeServer({ store, adapters, logger }) {
     }
 
     const pathname = url.pathname.replace(/\/+$/, '') || '/';
+    if (pathname === '/home') return serveRemoteUi(req, res, '/', headers);
 
     // Remote web UI (Tatakai-branded SPA for TV / phone / tablet)
     if (!pathname.startsWith('/api/')) {

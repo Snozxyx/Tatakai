@@ -1,3 +1,4 @@
+import { ThemedSelect } from '@/components/ui/themed-select';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { memo, useEffect, useMemo, useRef, useState } from "react";
@@ -329,7 +330,7 @@ export const MangaSmartDiscover = memo(function MangaSmartDiscover() {
           ))}
         </div>
 
-        <select
+        <ThemedSelect
           aria-label={uiI18n.t('app.publication_status_084ea620')}
           value={status}
           onChange={(e) => setStatus(e.target.value as StatusFilter)}
@@ -338,7 +339,7 @@ export const MangaSmartDiscover = memo(function MangaSmartDiscover() {
           <option value="all">{uiI18n.t('app.any_status_55201ac9')}</option>
           <option value="ongoing">{uiI18n.t('app.ongoing_2e0254c2')}</option>
           <option value="completed">{uiI18n.t('app.completed_1798b3ba')}</option>
-        </select>
+        </ThemedSelect>
 
         <div className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto py-0.5" style={{ scrollbarWidth: "none" }}>
           <button

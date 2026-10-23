@@ -4,18 +4,19 @@ import { normalizeStremioStream, stremioResourceUrl, supportsResource } from './
 import { proxyRemoteSources, proxyRemoteUrl } from './media';
 import { matchRemoteTitle } from './resolve';
 import { recordSourceReport } from './diagnostics';
+import { isExplicitExtensionContent } from '@/lib/contentSafety';
 import type { CustomSourceEntry, CustomHomeData, CustomSearchData, CustomInfoData, CustomWatchData } from '@/core/content/custom-source-runtime';
 
 export function customDescriptors(row: RemoteExtension): CustomSourceEntry[] {
   if (row.enabled && row.ecosystem === 'seanime' && row.manifest.type === 'custom-source') {
-    return (['anime', 'manga'] as const).filter(type => row.manifest.customSettings?.[type === 'anime' ? 'supportsAnime' : 'supportsManga']).map(type => ({ namespace: row.id, extensionId: row.id, id: type, kind: type === 'anime' ? 'watch' : 'read', name: `${row.manifest.name} · ${type}`, icon: row.manifest.icon, description: row.manifest.description }));
+    return (['anime', 'manga'] as const).filter(type => row.manifest.customSettings?.[type === 'anime' ? 'supportsAnime' : 'supportsManga']).map(type => ({ namespace: row.id, extensionId: row.id, id: type, kind: type === 'anime' ? 'watch' : 'read', catalogMediaType: type, nsfw: isExplicitExtensionContent(row.manifest), name: `${row.manifest.name} · ${type}`, icon: row.manifest.icon, description: row.manifest.description }));
   }
   if (!row.enabled || row.ecosystem !== 'stremio' || !Array.isArray(row.manifest.catalogs)) return [];
   const resources = (row.manifest.resources || []).map((r: any) => typeof r === 'string' ? r : r.name);
   if (!resources.includes('meta') || !resources.includes('stream')) return [];
   return [...new Set<string>(row.manifest.catalogs.map((c: any) => c.type).filter(Boolean))].map(type => ({
     namespace: row.id, extensionId: row.id, id: type, kind: 'watch', name: `${row.manifest.name} · ${type}`,
-    icon: row.manifest.logo, description: row.manifest.description,
+    icon: row.manifest.logo, description: row.manifest.description, nsfw: isExplicitExtensionContent(row.manifest),
   }));
 }
 export async function listRemoteCustomSources() {
@@ -25,7 +26,7 @@ export async function remoteCustomRow(namespace: string): Promise<RemoteExtensio
   if (!/^(stremio|seanime)-/.test(namespace)) return null;
   return (await listRemoteExtensions()).find(r => r.id === namespace && r.enabled && customDescriptors(r).length) || null;
 }
-const card = (meta: any) => ({ id: String(meta.id), title: String(meta.name || meta.id), image: meta.poster, subtitle: meta.releaseInfo, badge: meta.type });
+const card = (meta: any) => ({ id: String(meta.id), title: String(meta.name || meta.id), image: meta.poster, subtitle: meta.releaseInfo, badge: meta.type, nsfw: isExplicitExtensionContent(meta), genres: meta.genres });
 async function catalog(row: RemoteExtension, type: string, entry: any, query?: string, page = 1) {
   const extras = [];
   if (query) extras.push(`search=${encodeURIComponent(query)}`);
@@ -85,7 +86,7 @@ export async function remoteCustomWatch(row: RemoteExtension, type: string, epis
   }
 }
 
-const seanimeCard = (media: any) => ({ id: String(media.id), title: media.title?.userPreferred || media.title?.english || media.title?.romaji || media.title?.native || String(media.id), image: media.coverImage?.large || media.coverImage?.medium, subtitle: media.format });
+const seanimeCard = (media: any) => ({ id: String(media.id), title: media.title?.userPreferred || media.title?.english || media.title?.romaji || media.title?.native || String(media.id), image: media.coverImage?.large || media.coverImage?.medium, subtitle: media.format, nsfw: isExplicitExtensionContent(media), genres: media.genres });
 function decodeEntry(value: string): any { try { const entry = JSON.parse(value); if (!entry.provider || !entry.titleId) throw Error(); return entry; } catch { throw Error('Invalid custom-source entry'); } }
 async function entryProvider(entry: any, type: string) { const row = (await listRemoteExtensions()).find(r => r.enabled && r.id === entry.provider && r.manifest.type === type); if (!row) throw Error('Selected content provider is disabled or removed'); return row; }
 async function seanimeCustomInfo(row: RemoteExtension, type: string, id: string): Promise<CustomInfoData | null> {

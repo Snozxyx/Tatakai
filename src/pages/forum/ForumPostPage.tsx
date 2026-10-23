@@ -1,3 +1,4 @@
+import { FollowButton } from '@/components/community/FollowButton';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -99,7 +100,8 @@ export default function ForumPostPage() {
               <ArrowLeft className="h-4 w-4" /> {uiI18n.t('app.community_bfd58ee3')}
             </Button>
             {post && (
-              <div className="flex items-center gap-1">
+              <div className="flex flex-wrap items-center gap-1">
+                {!post.is_deleted && <FollowButton kind="thread" id={postId} />}
                 {isAdmin && (
                   <Button
                     variant="ghost"

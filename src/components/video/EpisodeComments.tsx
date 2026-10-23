@@ -31,7 +31,8 @@ import { UserBadges } from '@/components/ui/UserBadges';
 import { useBatchUserBadges } from '@/hooks/community/useUserBadges';
 import { ProfileWidgetCard } from '@/components/profile/ProfileWidgetCard';
 import { RichCommentComposer } from '@/components/comments/RichCommentComposer';
-import { CommentContent, type TimestampTarget } from '@/components/comments/CommentContent';
+import { TranslatedCommentContent } from '@/components/comments/TranslatedCommentContent';
+import { type TimestampTarget } from '@/components/comments/CommentContent';
 import { CommentAttachments } from '@/components/comments/CommentAttachments';
 import { CommentEmbeds } from '@/components/comments/CommentEmbeds';
 import { CommentReplies } from './CommentReplies';
@@ -42,6 +43,7 @@ import type { CommentPollDraft } from '@/hooks/community/useComments';
 type CommentFilter = 'new' | 'global' | 'episodes';
 
 export interface CommentsProps {
+  generalCommunity?: boolean;
   quoteDraft?: import('@/lib/commentQuotes').CommentQuoteDraft;
   /** Which surface these comments belong to. */
   entityType: CommentEntityType;
@@ -92,7 +94,7 @@ function embedLabel(e: CommentEmbed): string {
  * when entityType === 'anime'; every other surface gets the same GIF / poll /
  * mention / embed feature set without them.
  */
-export function Comments({ entityType, entityId, episodeId, entityName, fallbackEpisodeId, quoteDraft }: CommentsProps) {
+export function Comments({ entityType, entityId, episodeId, entityName, fallbackEpisodeId, quoteDraft, generalCommunity = false }: CommentsProps) {
   useUiTranslation();
   const { user, profile, isAdmin, isModerator } = useAuth();
   const confirm = useConfirm();
@@ -397,6 +399,7 @@ export function Comments({ entityType, entityId, episodeId, entityName, fallback
                   </Avatar>
                   <div className="flex-1 min-w-0">
                     <RichCommentComposer
+                      generalCommunity={generalCommunity}
                       quoteDraft={quoteDraft}
                       key={`${user.id}:${entityType}:${entityId}:${epId ?? "all"}`}
                       draftKey={`${entityType}:${entityId}:${epId ?? "all"}`}
@@ -501,6 +504,7 @@ export function Comments({ entityType, entityId, episodeId, entityName, fallback
                         <GlassPanel className="p-4">
                           <p className="text-sm italic text-muted-foreground">{tombstoneLabel((comment as any).deleted_by_role)}</p>
                           <CommentReplies
+                            generalCommunity={generalCommunity}
                             parentId={comment.id}
                             entityType={entityType}
                             entityId={entityId}
@@ -725,7 +729,7 @@ export function Comments({ entityType, entityId, episodeId, entityName, fallback
                               </button>
                             ) : (
                               <div className="mt-1">
-                                <CommentContent content={comment.content} className="leading-relaxed" timestampTarget={timestampTarget} clamp />
+                                <TranslatedCommentContent content={comment.content} className="leading-relaxed" timestampTarget={timestampTarget} clamp />
                                 <CommentAttachments attachments={comment.attachments} />
                                 <CommentEmbeds embeds={comment.embeds} poll={comment.poll} />
                               </div>
@@ -802,6 +806,7 @@ export function Comments({ entityType, entityId, episodeId, entityName, fallback
                         {replyingId === comment.id && (
                           <div className="mt-3 ml-11">
                             <RichCommentComposer
+                              generalCommunity={generalCommunity}
                               draftKey={`reply:${comment.id}`}
                               compact
                               autoFocus
@@ -818,6 +823,7 @@ export function Comments({ entityType, entityId, episodeId, entityName, fallback
 
                         {/* Replies */}
                         <CommentReplies
+                          generalCommunity={generalCommunity}
                           parentId={comment.id}
                           entityType={entityType}
                           entityId={entityId}

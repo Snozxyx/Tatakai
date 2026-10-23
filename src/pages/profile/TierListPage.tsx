@@ -1,3 +1,4 @@
+import { ThemedSelect } from '@/components/ui/themed-select';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState } from 'react';
@@ -604,7 +605,7 @@ export function TierListViewPage() {
 
                         {canManageCollaborators ? (
                           <div className="flex items-center gap-2">
-                            <select
+                            <ThemedSelect
                               value={collaborator.role}
                               onChange={(event) => handleUpdateCollaboratorRole(collaborator.id, event.target.value as TierCollaboratorRole)}
                               className="h-8 rounded-full border border-border/60 bg-background/80 px-3 text-xs font-medium focus:ring-1 focus:ring-primary"
@@ -612,7 +613,7 @@ export function TierListViewPage() {
                               <option value="viewer">{uiI18n.t('app.viewer_40b4f25b')}</option>
                               <option value="editor">{uiI18n.t('app.editor_ab419498')}</option>
                               <option value="owner">{uiI18n.t('app.owner_579233b2')}</option>
-                            </select>
+                            </ThemedSelect>
                             <Button
                               variant="ghost"
                               size="icon"
@@ -648,7 +649,7 @@ export function TierListViewPage() {
                       placeholder={uiI18n.t('app.search_username_or_display_name_6e1ccde6')}
                       className="rounded-full bg-background/50 border-border/50"
                     />
-                    <select
+                    <ThemedSelect
                       value={newCollaboratorRole}
                       onChange={(event) => setNewCollaboratorRole(event.target.value as TierCollaboratorRole)}
                       className="h-10 rounded-full border border-border/50 bg-background/50 px-3 text-sm font-medium focus:ring-1 focus:ring-primary"
@@ -656,7 +657,7 @@ export function TierListViewPage() {
                       <option value="viewer">{uiI18n.t('app.viewer_40b4f25b')}</option>
                       <option value="editor">{uiI18n.t('app.editor_ab419498')}</option>
                       <option value="owner">{uiI18n.t('app.owner_579233b2')}</option>
-                    </select>
+                    </ThemedSelect>
                   </div>
 
                   {collaboratorSearch.trim().length >= 2 && (

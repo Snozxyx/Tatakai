@@ -1,3 +1,4 @@
+import { ThemedSelect } from '@/components/ui/themed-select';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState } from 'react';
@@ -197,7 +198,7 @@ export function BanAuditLogPanel() {
             className="w-full bg-white/5 border border-white/10 rounded pl-9 pr-3 py-1.5 text-sm text-white placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </div>
-        <select
+        <ThemedSelect
           value={actionFilter}
           onChange={(e) => handleActionFilterChange(e.target.value as any)}
           className="bg-white/5 border border-white/10 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary"
@@ -205,7 +206,7 @@ export function BanAuditLogPanel() {
           <option value="all">{uiI18n.t('app.all_actions_902f1999')}</option>
           <option value="banned">{uiI18n.t('app.banned_c8cd83f6')}</option>
           <option value="unbanned">{uiI18n.t('app.unbanned_6d81a499')}</option>
-        </select>
+        </ThemedSelect>
       </div>
 
       {/* Content */}

@@ -1,3 +1,4 @@
+import { notificationSoundEnabled, playNotificationSound } from '@/lib/notificationSound';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -28,6 +29,13 @@ async function showNativeNotification(notification: Notification) {
             await LocalNotifications.requestPermissions();
         }
         
+        const soundEnabled = notificationSoundEnabled();
+        const channelId = soundEnabled ? 'tatakai-activity-sound' : 'tatakai-activity-silent';
+        if (Capacitor.getPlatform() === 'android') {
+            await LocalNotifications.createChannel({ id: channelId,
+                name: soundEnabled ? 'Activity with sound' : 'Silent activity', importance: soundEnabled ? 4 : 2,
+                vibration: false }).catch(() => {});
+        }
         await LocalNotifications.schedule({
             notifications: [{
                 title: notification.title,
@@ -35,7 +43,8 @@ async function showNativeNotification(notification: Notification) {
                 id: Math.abs(notification.id.hashCode?.() || Date.now()) % 2147483647,
                 smallIcon: 'ic_notification',
                 largeIcon: 'ic_notification_large',
-                sound: 'default',
+                sound: soundEnabled ? 'default' : undefined,
+                channelId,
             }]
         });
     } catch (error) {
@@ -73,6 +82,8 @@ String.prototype.hashCode = function() {
     return hash;
 };
 
+const presentedNotifications = new Set<string>();
+
 export function useNotifications() {
   useUiTranslation();
     const { user } = useAuth();
@@ -100,7 +111,10 @@ export function useNotifications() {
                 queryClient.invalidateQueries({ queryKey: ['notifications', user.id] });
                 
                 // Show native notification on mobile (Capacitor) and desktop (Electron)
-                if (payload.new) {
+                if (payload.new && !presentedNotifications.has(payload.new.id)) {
+                    presentedNotifications.add(payload.new.id);
+                    if (presentedNotifications.size > 500) presentedNotifications.delete(presentedNotifications.values().next().value!);
+                    if (!Capacitor.isNativePlatform()) playNotificationSound();
                     showNativeNotification(payload.new as Notification);
                     showDesktopNotification(payload.new as Notification);
                 }

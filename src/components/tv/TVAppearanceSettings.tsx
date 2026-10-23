@@ -1,3 +1,4 @@
+import { ThemedCheckbox } from '@/components/ui/themed-checkbox';
 import { useState } from "react";
 import { saveTVAppearance, useTVAppearance } from "@/core/tv/appearance";
 import { TV_WALLPAPERS, validTVWallpaper } from "@/core/tv/wallpapers";
@@ -13,8 +14,8 @@ export function TVAppearanceSettings() {
         saveTVAppearance({ ...appearance, wallpaper: preset.src }); setMessage(`${preset.name} selected.`);
       }}><img src={preset.poster} alt="" loading="lazy" /><span>{preset.name}{appearance.wallpaper === preset.src && <small>Active</small>}</span></button>)}
     </div>
-    <label className="tv-setting-row"><span><strong>Animated wallpaper</strong><small>Lightweight offline scenes. Animation pauses during playback and reading.</small></span><input type="checkbox" checked={appearance.videoWallpaper} onChange={event => saveTVAppearance({ ...appearance, videoWallpaper: event.target.checked })} /></label>
-    <label className="tv-setting-row"><span><strong>Title previews</strong><small>Play muted previews after focusing a title. Availability depends on the title.</small></span><input type="checkbox" checked={appearance.previews} onChange={event => saveTVAppearance({ ...appearance, previews: event.target.checked })} /></label>
+    <label className="tv-setting-row"><span><strong>Animated wallpaper</strong><small>Lightweight offline scenes. Animation pauses during playback and reading.</small></span><ThemedCheckbox type="checkbox" checked={appearance.videoWallpaper} onChange={event => saveTVAppearance({ ...appearance, videoWallpaper: event.target.checked })} /></label>
+    <label className="tv-setting-row"><span><strong>Title previews</strong><small>Play muted previews after focusing a title. Availability depends on the title.</small></span><ThemedCheckbox type="checkbox" checked={appearance.previews} onChange={event => saveTVAppearance({ ...appearance, previews: event.target.checked })} /></label>
     <details className="tv-custom-wallpaper"><summary>Use your own video</summary><label>HTTPS video URL<input type="url" value={url} onChange={event => setUrl(event.target.value)} placeholder="https://example.com/wallpaper.mp4" /></label><button onClick={() => {
       if (!url.startsWith('https:') || !validTVWallpaper(url)) { setMessage('Enter an HTTPS video URL without credentials.'); return; }
       saveTVAppearance({ ...appearance, wallpaper: url }); setMessage('Custom wallpaper selected. A still image is shown if the video cannot play.');

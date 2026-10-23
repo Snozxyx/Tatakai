@@ -1,3 +1,5 @@
+import { ThemedCheckbox } from '@/components/ui/themed-checkbox';
+import { ThemedSelect } from '@/components/ui/themed-select';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMemo, useState } from 'react';
@@ -47,41 +49,41 @@ export function NovelSearchFilters({ value, onChange, genres }: {
       </div>
       <div className="space-y-1.5">
         <label htmlFor="filter-novel-origin" className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.origin_44ab85a2')}</label>
-        <select id="filter-novel-origin" className={selectClass} value={value.origin || ''} onChange={event => update({ origin: event.target.value || undefined })}>
+        <ThemedSelect id="filter-novel-origin" className={selectClass} value={value.origin || ''} onChange={event => update({ origin: event.target.value || undefined })}>
           <option value="">{uiI18n.t('app.all_origins_8b645e03')}</option>
           <option value="JP">{uiI18n.t('app.japan_fcf29f6c')}</option><option value="KR">{uiI18n.t('app.south_korea_04653e65')}</option><option value="CN">{uiI18n.t('app.china_d2eaf2aa')}</option>
-        </select>
+        </ThemedSelect>
       </div>
       <div className="space-y-1.5">
         <label htmlFor="filter-novel-status" className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.status_bae7d5be')}</label>
-        <select id="filter-novel-status" className={selectClass} value={value.statuses?.[0] || ''} onChange={event => update({ statuses: event.target.value ? [event.target.value] : undefined })}>
+        <ThemedSelect id="filter-novel-status" className={selectClass} value={value.statuses?.[0] || ''} onChange={event => update({ statuses: event.target.value ? [event.target.value] : undefined })}>
           <option value="">{uiI18n.t('app.any_status_55201ac9')}</option><option value="ongoing">{uiI18n.t('app.ongoing_2e0254c2')}</option><option value="completed">{uiI18n.t('app.completed_1798b3ba')}</option>
           <option value="hiatus">{uiI18n.t('app.hiatus_f6eb2b71')}</option><option value="cancelled">{uiI18n.t('app.cancelled_a1bf92ef')}</option><option value="unreleased">{uiI18n.t('app.unreleased_81dd1756')}</option>
-        </select>
+        </ThemedSelect>
       </div>
       <div className="space-y-1.5">
         <label htmlFor="filter-novel-genre" className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.genre_2aa31fca')}</label>
-        <select id="filter-novel-genre" className={selectClass} value={value.genre || ''} onChange={event => update({ genre: event.target.value || undefined })}>
+        <ThemedSelect id="filter-novel-genre" className={selectClass} value={value.genre || ''} onChange={event => update({ genre: event.target.value || undefined })}>
           <option value="">{uiI18n.t('app.any_genre_a2ae9cce')}</option>
           {value.genre && !genres.includes(value.genre) && <option value={value.genre}>{value.genre}</option>}
           {genres.map(genre => <option key={genre} value={genre}>{genre}</option>)}
-        </select>
+        </ThemedSelect>
       </div>
       <div className="space-y-1.5">
         <label htmlFor="filter-novel-sort" className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.sort_method_7ae019e9')}</label>
-        <select id="filter-novel-sort" className={selectClass} value={value.sort || ''} onChange={event => update({ sort: event.target.value || undefined })}>
+        <ThemedSelect id="filter-novel-sort" className={selectClass} value={value.sort || ''} onChange={event => update({ sort: event.target.value || undefined })}>
           <option value="">{uiI18n.t('app.best_match_86f686f8')}</option><option value="POPULARITY_DESC">{uiI18n.t('app.popular_9bc2c5b3')}</option><option value="SCORE_DESC">{uiI18n.t('app.top_rated_fa405956')}</option>
           <option value="START_DATE_DESC">{uiI18n.t('app.newest_d0442824')}</option><option value="TITLE_ROMAJI">{uiI18n.t('app.name_a_z_5d3eb278')}</option>
-        </select>
+        </ThemedSelect>
       </div>
       <div className="space-y-2">
         <label htmlFor="filter-novel-tag-source" className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.tag_catalog_be9c0f1e')}</label>
-        <select id="filter-novel-tag-source" className={selectClass} value={source} onChange={event => update({ tagSource: event.target.value as 'anilist' | 'mangabaka', tags: [] })}>
+        <ThemedSelect id="filter-novel-tag-source" className={selectClass} value={source} onChange={event => update({ tagSource: event.target.value as 'anilist' | 'mangabaka', tags: [] })}>
           <option value="anilist">{uiI18n.t('app.anilist_c03a6787')}</option><option value="mangabaka">{uiI18n.t('app.mangabaka_c4dfa49b')}</option>
-        </select>
+        </ThemedSelect>
         <Input aria-label={uiI18n.t('app.search_novel_tags_4d3b76c1')} value={tagSearch} onChange={event => setTagSearch(event.target.value)} placeholder={uiI18n.t('app.search_novel_tags_07f81dee')} className="h-9 rounded-xl bg-background/80 border-white/10 text-xs" />
         <label className="flex items-center gap-2 text-xs text-muted-foreground">
-          <input type="checkbox" checked={showSpoilers} onChange={event => setShowSpoilers(event.target.checked)} className="accent-primary" />{uiI18n.t('app.show_spoiler_tags_de6453df')}
+          <ThemedCheckbox type="checkbox" checked={showSpoilers} onChange={event => setShowSpoilers(event.target.checked)} className="accent-primary" />{uiI18n.t('app.show_spoiler_tags_de6453df')}
         </label>
         <div className="flex flex-wrap gap-1.5">
           {value.tags?.map(tag => <button key={tag} type="button" aria-label={uiI18n.t('app.remove_novel_tag_i18n_value_0_94338df9', { value0: tag })} onClick={() => update({ tags: value.tags!.filter(name => name !== tag) })} className="rounded-md bg-primary/15 px-2 py-1 text-xs text-primary">{tag} ×</button>)}
@@ -91,7 +93,7 @@ export function NovelSearchFilters({ value, onChange, genres }: {
           : <TagGroupCloud groups={groups} selected={value.tags || []} onToggle={name => update({ tags: value.tags?.includes(name) ? value.tags.filter(tag => tag !== name) : [...(value.tags || []), name] })} maxHeightClass="max-h-40" emptyText={uiI18n.t('app.no_tags_match_that_search_b5b4f8be')} />}
       </div>
       <label className="flex items-center gap-2 p-3 rounded-xl bg-background/70 border border-white/10 text-xs font-semibold">
-        <input type="checkbox" checked={Boolean(value.adult)} onChange={event => update({ adult: event.target.checked })} className="w-4 h-4 accent-primary" />{uiI18n.t('app.18_adult_content_9017958f')}
+        <ThemedCheckbox type="checkbox" checked={Boolean(value.adult)} onChange={event => update({ adult: event.target.checked })} className="w-4 h-4 accent-primary" />{uiI18n.t('app.18_adult_content_9017958f')}
       </label>
     </div>
   );

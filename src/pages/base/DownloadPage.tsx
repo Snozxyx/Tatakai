@@ -4,7 +4,8 @@ import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 
 import { useEffect, useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Monitor, Apple, Download, X, Smartphone, Tv, DownloadCloud, CheckCircle, Shield, Sparkles, RefreshCw } from "lucide-react";
+import { ArrowRight, Monitor, Apple, Download, X, Smartphone, Tv, DownloadCloud, CheckCircle, Shield, Sparkles, RefreshCw, Server, ExternalLink } from "lucide-react";
+import { Card, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Navigation } from "@/components/ui/navbar";
 import { FooterSection } from "@/components/ui/footer";
@@ -358,6 +359,16 @@ export function DownloadSection() {
             );
           })}
         </div>
+
+        <Card className="mb-12" aria-labelledby="tatakai-server-download-title">
+          <CardHeader>
+            <CardTitle id="tatakai-server-download-title" className="flex items-center gap-2"><Server className="size-5" />Tatakai Server</CardTitle>
+            <CardDescription>Host your own extension server and connect it to Tatakai. Get the server and setup instructions on GitHub.</CardDescription>
+          </CardHeader>
+          <CardFooter>
+            <Button asChild variant="outline"><a href="https://github.com/snozxyx/tatakaiserver" target="_blank" rel="noopener noreferrer">Get Tatakai Server<ExternalLink data-icon="inline-end" /></a></Button>
+          </CardFooter>
+        </Card>
 
         {/* Alternative install channels — sideload stores & open-source clients */}
         <div className="mb-20">

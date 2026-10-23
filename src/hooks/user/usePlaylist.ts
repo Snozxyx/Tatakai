@@ -106,16 +106,15 @@ export function useUserPlaylistsStaff(userId: string | undefined) {
 // Get a single playlist by ID
 export function usePlaylist(playlistId: string | undefined) {
   useUiTranslation();
+  const {user}=useAuth();
   return useQuery({
-    queryKey: ['playlist', playlistId],
+    queryKey: ['playlist', playlistId, user?.id ?? 'guest'],
     queryFn: async () => {
       if (!playlistId) return null;
 
-      const { data, error } = await supabase
-        .from('playlists')
-        .select('*')
-        .eq('id', playlistId)
-        .single();
+      let query=supabase.from('playlists').select('*').eq('id',playlistId);
+      if(!user)query=query.eq('is_public',true);
+      const {data,error}=await query.single();
 
       if (error) throw error;
       return data as Playlist;
@@ -127,8 +126,9 @@ export function usePlaylist(playlistId: string | undefined) {
 // Get items in a playlist
 export function usePlaylistItems(playlistId: string | undefined) {
   useUiTranslation();
+  const {user}=useAuth();
   return useQuery({
-    queryKey: ['playlist_items', playlistId],
+    queryKey: ['playlist_items', playlistId, user?.id ?? 'guest'],
     queryFn: async () => {
       if (!playlistId) return [];
 

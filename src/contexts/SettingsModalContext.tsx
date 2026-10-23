@@ -18,6 +18,7 @@ export type SettingsCategoryId =
   | 'integrations'
   | 'appearance'
   | 'display'
+  | 'translation'
   | 'player'
   | 'reader'
   | 'novel-reader'
@@ -45,6 +46,8 @@ const TAB_ALIASES: Record<string, SettingsCategoryId> = {
   novel: 'novel-reader',
   novelreader: 'novel-reader',
   novels: 'novel-reader',
+  translate: 'translation',
+  translations: 'translation',
 };
 
 export function normalizeSettingsCategory(value?: string | null): SettingsCategoryId {
@@ -53,7 +56,7 @@ export function normalizeSettingsCategory(value?: string | null): SettingsCatego
   if (key in TAB_ALIASES) return TAB_ALIASES[key];
   const known: SettingsCategoryId[] = [
     'account', 'saved', 'privacy', 'integrations', 'appearance',
-    'display', 'player', 'reader', 'novel-reader', 'app', 'mobile', 'extensions', 'about', 'changelog',
+    'display', 'translation', 'player', 'reader', 'novel-reader', 'app', 'mobile', 'extensions', 'about', 'changelog',
   ];
   return (known as string[]).includes(key) ? (key as SettingsCategoryId) : DEFAULT_CATEGORY;
 }

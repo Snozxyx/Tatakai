@@ -14,7 +14,7 @@ export function readTVAppearance(): TVAppearance {
     const saved = JSON.parse(localStorage.getItem(KEY) || "{}");
     return {
       videoWallpaper: true,
-      previews: true,
+      previews: false,
       reducedMotion: false,
       ...saved,
       wallpaper: resolveTVWallpaper(saved.wallpaper),
@@ -23,7 +23,7 @@ export function readTVAppearance(): TVAppearance {
     return {
       wallpaper: DEFAULT_TV_WALLPAPER,
       videoWallpaper: true,
-      previews: true,
+      previews: false,
       reducedMotion: false,
     };
   }

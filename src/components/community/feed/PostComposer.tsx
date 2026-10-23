@@ -1,3 +1,7 @@
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { PostDrafts } from '@/components/community/PostDrafts';
+import { PostPreview } from '@/components/community/PostPreview';
+import { GeneralCommunityLanguageWarning } from '@/components/community/GeneralCommunityLanguageWarning';
 import uiI18n from '@/lib/uiI18n';
 import { isTV } from '@/core/tv/device';
 import { requestTVWriting } from '@/core/tv/writingHandoff';
@@ -122,6 +126,9 @@ export function PostComposer({ onPosted, defaultCommunityId, defaultMedia }: { o
   const createPoll = useCreatePostPoll();
 
   const [content, setContent] = useState('');
+  const [preview, setPreview] = useState(false);
+  const [draftId, setDraftId] = useState('');
+  const draftPublishRef = useRef<(() => void) | null>(null);
   const [title, setTitle] = useState('');
   const [poll, setPoll] = useState<PollState>(null);
   const [gifUrl, setGifUrl] = useState<string | null>(null);
@@ -147,6 +154,7 @@ export function PostComposer({ onPosted, defaultCommunityId, defaultMedia }: { o
   if (!user) return null;
 
   const reset = () => {
+    setPreview(false);
     setContent('');
     setTitle('');
     editorRef.current?.clear();
@@ -213,7 +221,7 @@ export function PostComposer({ onPosted, defaultCommunityId, defaultMedia }: { o
   const pollValid = !poll || pollOptions.length >= 2;
   const hasContent = content.replace(/<[^>]*>/g, '').replace(/&nbsp;/gi, ' ').trim().length > 0;
   const hasAttachment = !!(poll || gifUrl || imageUrls.length || playlistId || tierlistId || watchRoomId || media);
-  const canPost = (hasContent || hasAttachment) && pollValid && !submitting;
+  const canPost = (hasContent || hasAttachment) && pollValid && !submitting && !intakeBusy;
 
   const handleSubmit = async () => {
     if (!canPost) return;
@@ -260,6 +268,7 @@ export function PostComposer({ onPosted, defaultCommunityId, defaultMedia }: { o
         description: imageUrls.length ? 'Posts with images require admin approval before they appear.' : undefined,
       });
       void triggerHaptic('post');
+      draftPublishRef.current?.();
       reset();
       onPosted?.();
     } catch (err) {
@@ -341,14 +350,16 @@ export function PostComposer({ onPosted, defaultCommunityId, defaultMedia }: { o
 
           <RichEditor
             ref={editorRef}
+            content={content}
             placeholder={uiI18n.t('app.what_s_happening_617696c8')}
             minHeight="52px"
             className="text-[15px] leading-relaxed"
             onChange={setContent}
-            onSubmit={handleSubmit}
+            onSubmit={() => setPreview(true)}
             onPasteFiles={(files) => intakeImageFile(files[0])}
           />
 
+          <GeneralCommunityLanguageWarning content={`${title}\n${content}`} enabled={!communityId} />
           {/* Formatting hint */}
           <p className="mt-1 text-[11px] text-muted-foreground/50">
             {uiI18n.t('app.add_an_optional_title_then_a_description_select__ca9ee523')} <span className="font-semibold text-primary/70">@</span> {uiI18n.t('app.to_mention_09e97c3d')} <span className="font-semibold text-primary/70">#</span> {uiI18n.t('app.to_tag_58eb9458')}
@@ -468,7 +479,7 @@ export function PostComposer({ onPosted, defaultCommunityId, defaultMedia }: { o
               <ToolbarIcon icon={AlertTriangle} label={uiI18n.t('app.mark_spoiler_f0b4b53f')} active={isSpoiler} onClick={() => setIsSpoiler((v) => !v)} />
             </div>
 
-            <Button onClick={handleSubmit} disabled={!canPost} className="mt-2.5 h-10 w-full rounded-2xl px-5 text-sm font-bold shadow-lg shadow-primary/20 sm:mt-0 sm:h-9 sm:w-auto sm:rounded-full sm:ml-auto">
+            <Button onClick={() => setPreview(true)} disabled={submitting || intakeBusy} className="mt-2.5 h-10 w-full rounded-2xl px-5 text-sm font-bold shadow-lg shadow-primary/20 sm:mt-0 sm:h-9 sm:w-auto sm:rounded-full sm:ml-auto">
               {submitting ? uiI18n.t('app.posting_20c00d70') : uiI18n.t('app.post_7858ac3f')}
             </Button>
           </div>
@@ -476,6 +487,33 @@ export function PostComposer({ onPosted, defaultCommunityId, defaultMedia }: { o
           <input ref={pollImgRef} type="file" accept="image/*" className="hidden" onChange={handlePollImageSelect} />
         </div>
       </div>
+      <Dialog open={preview} onOpenChange={setPreview}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Review your post</DialogTitle><DialogDescription>Preview your post, save a draft, or publish when ready.</DialogDescription></DialogHeader>
+          <PostDrafts userId={user.id} scope={`feed:${defaultCommunityId ?? 'main'}`} title={title || content.replace(/<[^>]*>/g, ' ').slice(0, 60)}
+            disabled={submitting || intakeBusy} publishRef={draftPublishRef} selectedId={draftId} onSelectedIdChange={setDraftId}
+            value={{ content, title, poll, gifUrl, imageUrls, playlistId, tierlistId, watchRoomId, communityId, media, isSpoiler }}
+            onRestore={(draft) => {
+              setContent(draft.content); setTitle(draft.title); setPoll(draft.poll); setGifUrl(draft.gifUrl);
+              setImageUrls(draft.imageUrls); setPlaylistId(draft.playlistId); setTierlistId(draft.tierlistId);
+              setWatchRoomId(draft.watchRoomId); setCommunityId(draft.communityId); setMedia(draft.media); setIsSpoiler(draft.isSpoiler);
+              setPreview(false);
+            }} />
+          <PostPreview title={title} content={content} spoiler={isSpoiler} images={gifUrl ? [gifUrl] : imageUrls} poll={poll}
+            attachments={[
+              ...(communityId ? [`Community: ${communities.find((c) => c.id === communityId)?.name || 'Selected community'}`] : []),
+              ...(media ? [`${media.type}: ${media.name}`] : []),
+              ...(playlistId ? [`Playlist: ${playlists.find((p) => p.id === playlistId)?.name || 'Selected playlist'}`] : []),
+              ...(tierlistId ? [`Tier list: ${tierlists.find((t) => t.id === tierlistId)?.title || 'Selected tier list'}`] : []),
+              ...(watchRoomId ? ['Watch Together lobby'] : []),
+            ]} />
+
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button type="button" variant="ghost" onClick={() => setPreview(false)}>Keep editing</Button>
+            <Button type="button" disabled={!canPost} onClick={handleSubmit}>{submitting ? 'Posting...' : 'Publish post'}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </GlassPanel>
   );
 }

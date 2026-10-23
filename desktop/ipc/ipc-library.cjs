@@ -179,6 +179,30 @@ async function downloadFile(url, outputPath, options = {}) {
 }
 
 module.exports = function registerLibraryHandlers(ipcMain, app, dialog, shell, fs, path, logger, getMainWindow) {
+    ipcMain.handle('extension:pick-package', async () => {
+        const result = await dialog.showOpenDialog(getMainWindow(), {
+            title: 'Install extension from file', properties: ['openFile'],
+            filters: [{ name: 'Tatakai packages and manifests', extensions: ['kai', 'json'] }],
+        });
+        if (result.canceled || !result.filePaths.length) return null;
+        const selected = result.filePaths[0];
+        if (!/\.(kai|json)$/i.test(selected)) throw new Error('Choose a .kai package or .json manifest');
+        const handle = await fs.promises.open(selected, 'r');
+        try {
+            const stat = await handle.stat();
+            if (!stat.isFile() || stat.size > 30 * 1024 * 1024) throw new Error('Extension must be a file under 30 MB');
+            // Bound allocation even if another process grows the selected file.
+            const bytes = Buffer.alloc(stat.size + 1);
+            let bytesRead = 0;
+            while (bytesRead < bytes.length) {
+                const chunk = await handle.read(bytes, bytesRead, bytes.length - bytesRead, bytesRead);
+                if (!chunk.bytesRead) break;
+                bytesRead += chunk.bytesRead;
+            }
+            if (bytesRead > stat.size) throw new Error('Extension changed while reading; select it again');
+            return { name: path.basename(selected), bytes: new Uint8Array(bytes.subarray(0, bytesRead)) };
+        } finally { await handle.close(); }
+    });
     ipcMain.handle('select-directory', async () => {
         const { canceled, filePaths } = await dialog.showOpenDialog(getMainWindow(), { properties: ['openDirectory'] });
         return canceled ? null : filePaths[0];

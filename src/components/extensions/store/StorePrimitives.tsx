@@ -27,7 +27,8 @@ import {
 import { cn } from '@/lib/utils';
 import type { StoreExtension } from '@/core/extensions/store-api';
 import type { InstallState } from '@/hooks/api/useExtensionStore';
-import { formatCompact, formatHealth, lettermark, typeVisual } from './extensionVisuals';
+import { formatCompact, formatHealth, typeVisual } from './extensionVisuals';
+import { ExtensionLogo } from '../ExtensionLogo';
 
 type IconExtension = Pick<StoreExtension, 'name' | 'icon' | 'type'>;
 
@@ -69,27 +70,14 @@ export function ExtensionIcon({
   const visual = typeVisual(extension.type);
 
   return (
-    <div
+    <ExtensionLogo name={extension.name} src={extension.icon}
       className={cn(
         'relative flex shrink-0 items-center justify-center overflow-hidden border border-border bg-gradient-to-br font-black text-foreground',
         visual.tileClass,
         ICON_SIZES[size],
         className,
       )}
-    >
-      <span aria-hidden>{lettermark(extension.name)}</span>
-      {extension.icon ? (
-        <img
-          src={extension.icon}
-          alt=""
-          loading="lazy"
-          className="absolute inset-0 h-full w-full object-cover"
-          onError={(event) => {
-            (event.currentTarget as HTMLImageElement).style.display = 'none';
-          }}
-        />
-      ) : null}
-    </div>
+    />
   );
 }
 
@@ -165,7 +153,7 @@ export function ExtensionChips({
   className,
   showHealth = true,
 }: {
-  extension: Pick<StoreExtension, 'type' | 'isFeatured' | 'healthScore' | 'ecosystem' | 'compatibility'>;
+  extension: Pick<StoreExtension, 'type' | 'isFeatured' | 'healthScore' | 'ecosystem' | 'compatibility' | 'languages'>;
   className?: string;
   showHealth?: boolean;
 }) {
@@ -192,6 +180,7 @@ export function ExtensionChips({
           {uiI18n.t('app.featured_ae31ad5d')}
         </span>
       ) : null}
+      {extension.languages?.slice(0,3).map(language=><span key={language} className="rounded-full border border-border px-2 py-0.5 text-[11px] uppercase">{language}</span>)}
       {health ? (
         <span className="inline-flex items-center rounded-full border border-border bg-muted/50 px-2 py-0.5 text-[11px] font-bold text-muted-foreground">
           {health} {uiI18n.t('app.healthy_de18ccfa')}
@@ -257,7 +246,7 @@ export function ExtensionHeroCard({
           {extension.description || uiI18n.t('app.no_description_provided_fe3f10ae')}
         </p>
         <div className="flex flex-wrap items-center gap-3">
-          <InstallButton state={state} label={extension.compatibility === "external" ? uiI18n.t('app.open_externally_d666a3ea') : extension.compatibility === "unavailable" ? uiI18n.t('app.unavailable_2c9c1f79') : undefined} onClick={onInstall} size="lg" />
+          <InstallButton state={state} label={extension.capabilities?.includes('extension-server')?'Connect':extension.compatibility === "external" ? uiI18n.t('app.open_externally_d666a3ea') : extension.compatibility === "unavailable" ? uiI18n.t('app.unavailable_2c9c1f79') : undefined} onClick={onInstall} size="lg" />
           <span className="text-xs font-semibold text-muted-foreground">
             {formatCompact(extension.installs || extension.downloads)} {uiI18n.t('app.installs_v_45093ddd')}{extension.version}
           </span>
@@ -299,7 +288,7 @@ export function ExtensionPromoTile({
           {visual.label} · {formatCompact(extension.installs || extension.downloads)} {uiI18n.t('app.installs_b7a92138')}
         </p>
       </div>
-      <InstallButton state={state} label={extension.compatibility === "external" ? uiI18n.t('app.open_externally_d666a3ea') : extension.compatibility === "unavailable" ? uiI18n.t('app.unavailable_2c9c1f79') : undefined} onClick={onInstall} size="sm" className="relative" />
+      <InstallButton state={state} label={extension.capabilities?.includes('extension-server')?'Connect':extension.compatibility === "external" ? uiI18n.t('app.open_externally_d666a3ea') : extension.compatibility === "unavailable" ? uiI18n.t('app.unavailable_2c9c1f79') : undefined} onClick={onInstall} size="sm" className="relative" />
     </Link>
   );
 }
@@ -346,7 +335,7 @@ export function ExtensionRow({
           {formatCompact(extension.installs || extension.downloads)}
         </p>
       </div>
-      <InstallButton state={state} label={extension.compatibility === "external" ? uiI18n.t('app.open_externally_d666a3ea') : extension.compatibility === "unavailable" ? uiI18n.t('app.unavailable_2c9c1f79') : undefined} onClick={onInstall} size="sm" />
+      <InstallButton state={state} label={extension.capabilities?.includes('extension-server')?'Connect':extension.compatibility === "external" ? uiI18n.t('app.open_externally_d666a3ea') : extension.compatibility === "unavailable" ? uiI18n.t('app.unavailable_2c9c1f79') : undefined} onClick={onInstall} size="sm" />
     </Link>
   );
 }
@@ -396,7 +385,7 @@ export function ExtensionTile({
         <span className="text-[11px] font-semibold text-muted-foreground">
           v{extension.version} · {formatCompact(extension.installs || extension.downloads)} {uiI18n.t('app.installs_b7a92138')}
         </span>
-        <InstallButton state={state} label={extension.compatibility === "external" ? uiI18n.t('app.open_externally_d666a3ea') : extension.compatibility === "unavailable" ? uiI18n.t('app.unavailable_2c9c1f79') : undefined} onClick={onInstall} size="sm" />
+        <InstallButton state={state} label={extension.capabilities?.includes('extension-server')?'Connect':extension.compatibility === "external" ? uiI18n.t('app.open_externally_d666a3ea') : extension.compatibility === "unavailable" ? uiI18n.t('app.unavailable_2c9c1f79') : undefined} onClick={onInstall} size="sm" />
       </div>
     </Link>
   );

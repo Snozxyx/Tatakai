@@ -284,6 +284,9 @@ export function useUpdateWatchHistory() {
       queryClient.invalidateQueries({ queryKey: ['watch_history'] });
       queryClient.invalidateQueries({ queryKey: ['profile-watch-time'] });
       queryClient.invalidateQueries({ queryKey: ['continue_watching'] });
+      if (variables.completed || (variables.progressSeconds || 0) < 10) {
+        void queryClient.invalidateQueries({ queryKey: ['badge-progress', user?.id] });
+      }
 
       // Auto-sync to MAL if linked
       if (profile?.mal_access_token) {

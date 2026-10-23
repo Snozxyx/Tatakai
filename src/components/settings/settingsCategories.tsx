@@ -14,6 +14,7 @@ import {
   Puzzle,
   Info,
   ScrollText,
+  Languages,
 } from 'lucide-react';
 import type { SettingsCategoryId } from '@/contexts/SettingsModalContext';
 import { AccountPanel } from './panels/AccountPanel';
@@ -22,6 +23,7 @@ import { PrivacyPanel } from './panels/PrivacyPanel';
 import { IntegrationsPanel } from './panels/IntegrationsPanel';
 import { AppearancePanel } from './panels/AppearancePanel';
 import { DisplayPanel } from './panels/DisplayPanel';
+import { TranslationPanel } from './panels/TranslationPanel';
 import { VideoPlayerPanel } from './panels/VideoPlayerPanel';
 import { ReaderPanel } from './panels/ReaderPanel';
 import { NovelReaderPanel } from './panels/NovelReaderPanel';
@@ -56,6 +58,7 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
   { id: 'integrations', get label() { return uiI18n.t('app.integrations_a7881cac'); }, get description() { return uiI18n.t('app.myanimelist_and_anilist_sync_f7eb7895'); }, icon: Plug, group: 'User', keywords: ['myanimelist', 'mal', 'anilist', 'sync', 'tracking', 'tracker', 'import list', 'export list', 'connect account'], Component: IntegrationsPanel },
   { id: 'appearance', get label() { return uiI18n.t('app.appearance_41def7a0'); }, get description() { return uiI18n.t('app.theme_and_visual_style_15db4cd5'); }, icon: Palette, group: 'App', keywords: ['theme', 'dark mode', 'light mode', 'colors', 'accent color', 'visual style', 'cards', 'poster', 'overlay', 'mobile appearance', 'wallpaper', 'background', 'window'], Component: AppearancePanel },
   { id: 'display', get label() { return uiI18n.t('app.display_574ff9b0'); }, get description() { return uiI18n.t('app.languages_motion_and_contrast_421de9db'); }, icon: Monitor, group: 'App', keywords: ['language', 'app language', 'interface language', 'idioma', 'subtitle language', 'audio language', 'reduce motion', 'high contrast', 'accessibility', 'ultra-lite', 'ultra lite', 'performance', 'feature flags', 'admin'], Component: DisplayPanel },
+  { id: 'translation', get label() { return uiI18n.t('translation.settingsTitle'); }, get description() { return uiI18n.t('translation.settingsDescription'); }, icon: Languages, group: 'App', keywords: ['translation', 'translate', 'translator', 'google translate', 'deepl', 'deeplx', 'azure', 'openai', 'llm', 'provider', 'engine', 'subtitle translation', 'subtitles translate', 'comment translation', 'translated comments', 'novel translation', 'community translation', 'mobile translation', 'traducir', 'traducción', 'idioma'], Component: TranslationPanel },
   { id: 'player', get label() { return uiI18n.t('app.video_player_9def7c8c'); }, get description() { return uiI18n.t('app.playback_and_player_behavior_8db84524'); }, icon: PlayCircle, group: 'App', keywords: ['playback', 'autoplay', 'auto play', 'skip intro', 'skip outro', 'quality', 'subtitles', 'captions', 'external player', 'mpv', 'vlc', 'volume', 'speed'], Component: VideoPlayerPanel },
   { id: 'reader', get label() { return uiI18n.t('app.reader_ac5bbe82'); }, get description() { return uiI18n.t('app.manga_reading_layout_and_keybinds_ab64df2a'); }, icon: BookOpen, group: 'App', keywords: ['manga', 'reader', 'reading', 'reading direction', 'webtoon', 'vertical', 'paged', 'page fit', 'width', 'gap', 'background', 'preload', 'preloading', 'infinite scroll', 'auto scroll', 'keybinds', 'keyboard shortcuts', 'comments', 'zoom'], Component: ReaderPanel },
   { id: 'novel-reader', get label() { return uiI18n.t('app.novel_reader_ee9d95ed'); }, get description() { return uiI18n.t('app.light_novel_typography_narration_and_flow_09d7809e'); }, icon: ScrollText, group: 'App', keywords: ['novel', 'light novel', 'webnovel', 'typography', 'font', 'dyslexic', 'lora', 'georgia', 'text size', 'line spacing', 'paragraph spacing', 'text width', 'background', 'text colour', 'text to speech', 'tts', 'narrator', 'kitten', 'read aloud', 'continuous scroll', 'progress bar', 'percent read', 'chapter number', 'fullscreen', 'paragraph comments'], Component: NovelReaderPanel },

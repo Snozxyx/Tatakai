@@ -18,14 +18,19 @@ import {
   Timer,
   Repeat,
   MonitorPlay,
+  Languages,
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useIsMobile } from '@/hooks/ui/use-mobile';
 import { useVideoSettings, VideoSettings } from '@/hooks/media/useVideoSettings';
 import { isMobileNative } from '@/lib/platform/platform';
 import { useKeybinds } from '@/hooks/media/useKeybinds';
+import { setTranslationConfig } from '@/lib/translation/config';
+import { TRANSLATION_LANGUAGES } from '@/lib/translation/languages';
+import { useTranslationConfig } from '@/hooks/translation/useTranslationConfig';
 import {
   KEYBIND_ACTIONS,
   formatKeyToken,
@@ -141,7 +146,9 @@ const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: 'shortcuts', get label() { return uiI18n.t('app.keys_e5651c68'); }, icon: Keyboard },
 ];
 
-/** Reusable label + optional caption + Switch row. */
+/**
+ * Reusable label + optional caption + Switch row.
+ */
 function ToggleRow({
   label,
   caption,
@@ -162,6 +169,66 @@ function ToggleRow({
       </div>
       <Switch checked={checked} onCheckedChange={onCheckedChange} />
     </div>
+  );
+}
+
+/**
+ * Live subtitle translation controls — shared by the player sheet and the
+ * settings modal, so the feature is reachable on web, desktop, mobile and TV.
+ * Both controls write the same app-wide translation config the player's
+ * `useSubtitleTranslation` hook reads.
+ */
+function SubtitleTranslationSection() {
+  const translationConfig = useTranslationConfig();
+  const enabled = translationConfig.enabled && translationConfig.subtitleTranslate;
+  const target = translationConfig.subtitleTargetLanguage || '';
+  return (
+    <section className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <Languages className="w-4 h-4 text-primary" />
+        <h3 className="text-sm font-medium">{uiI18n.t('translation.subtitlesTitle')}</h3>
+      </div>
+      <ToggleRow
+        label={uiI18n.t('translation.subtitlesToggle')}
+        caption={uiI18n.t('translation.subtitlesToggleDescription')}
+        checked={translationConfig.subtitleTranslate}
+        onCheckedChange={(checked) => setTranslationConfig({ subtitleTranslate: checked })}
+      />
+      <ToggleRow
+        label={uiI18n.t('translation.pretranslate')}
+        caption={uiI18n.t('translation.pretranslateDescription')}
+        checked={translationConfig.subtitlePretranslate}
+        onCheckedChange={(checked) => setTranslationConfig({ subtitlePretranslate: checked })}
+      />
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs text-muted-foreground w-28 shrink-0">
+          {uiI18n.t('translation.subtitlesLanguage')}
+        </span>
+        <Select
+          value={target || 'auto'}
+          onValueChange={(value) =>
+            setTranslationConfig({ subtitleTargetLanguage: value === 'auto' ? '' : value })
+          }
+        >
+          <SelectTrigger className="h-9 min-w-40 flex-1 rounded-lg text-sm" aria-label={uiI18n.t('translation.subtitlesLanguage')}>
+            <SelectValue placeholder={uiI18n.t('translation.auto')} />
+          </SelectTrigger>
+          <SelectContent className="max-h-72 z-[215]">
+            <SelectItem value="auto">{uiI18n.t('translation.followTarget')}</SelectItem>
+            {TRANSLATION_LANGUAGES.map((language) => (
+              <SelectItem key={language.code} value={language.code}>
+                {language.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        {enabled
+          ? uiI18n.t('translation.subtitlesActiveHint')
+          : uiI18n.t('translation.masterOffHint')}
+      </p>
+    </section>
   );
 }
 
@@ -542,6 +609,9 @@ function SettingsPanelBody({
               </div>
             </section>
 
+            {/* Subtitle translation — live cue translation via the app-wide engine */}
+            <SubtitleTranslationSection />
+
             {onSubtitleUpload && <button type="button" onClick={onSubtitleUpload} className={`${pill(false)} w-full text-left`}>{uiI18n.t('app.add_subtitle_file_srt_ass_ssa_vtt_fd0ff143')}</button>}
             {onSubtitleChange && <button type="button" onClick={() => onSubtitleChange('off')} className={`${pill(currentSubtitle === 'off')} w-full text-left`}>{uiI18n.t('app.subtitles_off_c6906246')}</button>}
             {(availableSubtitles || []).length > 0 && <section className="space-y-3">
@@ -808,6 +878,14 @@ function SettingsPanelBody({
         {/* ── Audio Tab ────────────────────────────── */}
         {activeTab === 'audio' && (
           <>
+            <section className="flex flex-col gap-2">
+              <label htmlFor="preferred-audio-language" className="text-sm font-medium">Preferred audio language</label>
+              <Select value={settings.audioLanguage} onValueChange={value => updateSetting('audioLanguage', value)}>
+                <SelectTrigger id="preferred-audio-language"><SelectValue /></SelectTrigger>
+                <SelectContent><SelectGroup>{[['auto', 'Automatic'], ['ja', 'Japanese'], ['en', 'English'], ['hi', 'Hindi'], ['fr', 'French'], ['es', 'Spanish'], ['de', 'German'], ['pt', 'Portuguese'], ['ar', 'Arabic'], ['ko', 'Korean'], ['zh', 'Chinese']].map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectGroup></SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">Applied when a stream provides matching audio tracks. Subtitle language is set in the Subtitles tab.</p>
+            </section>
             {audioTracks.length >= 1 && (
               <section className="space-y-3">
                 <div className="flex flex-wrap items-center gap-2">

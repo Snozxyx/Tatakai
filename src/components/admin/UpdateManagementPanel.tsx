@@ -1,3 +1,4 @@
+import { ThemedSelect } from '@/components/ui/themed-select';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState } from 'react';
@@ -203,7 +204,7 @@ export function UpdateManagementPanel() {
           {/* Channel */}
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground font-medium uppercase tracking-wide">{uiI18n.t('app.channel_879f0b1b')}</label>
-            <select
+            <ThemedSelect
               value={form.channel}
               onChange={e => handleFormChange('channel', e.target.value)}
               className="w-full bg-white/5 border border-white/10 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary"
@@ -211,13 +212,13 @@ export function UpdateManagementPanel() {
               <option value="stable">{uiI18n.t('app.stable_4fbacc2f')}</option>
               <option value="beta">{uiI18n.t('app.beta_a295e0bd')}</option>
               <option value="experimental">{uiI18n.t('app.experimental_2216470a')}</option>
-            </select>
+            </ThemedSelect>
           </div>
 
           {/* Type */}
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground font-medium uppercase tracking-wide">{uiI18n.t('app.type_3deb7456')}</label>
-            <select
+            <ThemedSelect
               value={form.type}
               onChange={e => handleFormChange('type', e.target.value)}
               className="w-full bg-white/5 border border-white/10 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary"
@@ -226,7 +227,7 @@ export function UpdateManagementPanel() {
               <option value="recommended">{uiI18n.t('app.recommended_13941e19')}</option>
               <option value="experimental">{uiI18n.t('app.experimental_2216470a')}</option>
               <option value="rollback">{uiI18n.t('app.rollback_ff3a6f3b')}</option>
-            </select>
+            </ThemedSelect>
           </div>
 
           {/* Target version */}

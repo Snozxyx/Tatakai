@@ -1,3 +1,4 @@
+import { ThemedSelect } from '@/components/ui/themed-select';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { debridOrchestrator, extractMagnetHash } from '@/core/providers/debrid-orchestrator';
@@ -251,7 +252,7 @@ export function TorrentSourcePanel({
         </button>
 
         {qualityTiers.length > 1 && (
-          <select
+          <ThemedSelect
             value={minQuality}
             onChange={(event) => setMinQuality(Number(event.target.value))}
             className="h-7 rounded-lg border border-white/10 bg-black/20 px-2 text-[11px] text-foreground outline-none"
@@ -263,7 +264,7 @@ export function TorrentSourcePanel({
                 {tier >= 2160 ? "4K" : uiI18n.t('app.i18n_value_0p_f996f669', { value0: tier })}+
               </option>
             ))}
-          </select>
+          </ThemedSelect>
         )}
 
         {filtersActive && (

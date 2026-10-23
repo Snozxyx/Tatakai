@@ -1,3 +1,4 @@
+import { ThemedCheckbox } from '@/components/ui/themed-checkbox';
 import { useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -74,7 +75,7 @@ export default function TVLinkPage() {
                 Confirm the TV displays <strong>{lookup.phrase}</strong>.
               </p>
               <label>
-                <input
+                <ThemedCheckbox
                   type="checkbox"
                   checked={confirmed}
                   onChange={(e) => setConfirmed(e.target.checked)}
@@ -86,7 +87,7 @@ export default function TVLinkPage() {
                 additional data to copy:
               </p>
               <label>
-                <input
+                <ThemedCheckbox
                   type="checkbox"
                   checked={providers}
                   onChange={(e) => setProviders(e.target.checked)}
@@ -94,7 +95,7 @@ export default function TVLinkPage() {
                 Stored provider credentials
               </label>
               <label>
-                <input
+                <ThemedCheckbox
                   type="checkbox"
                   checked={playlists}
                   onChange={(e) => setPlaylists(e.target.checked)}
@@ -102,7 +103,7 @@ export default function TVLinkPage() {
                 IPTV playlists
               </label>
               <label>
-                <input
+                <ThemedCheckbox
                   type="checkbox"
                   checked={extensions}
                   onChange={(e) => setExtensions(e.target.checked)}

@@ -1,0 +1,14 @@
+# Original APK bytecode links these public host APIs by their exact names.
+-keep class eu.kanade.tachiyomi.** { *; }
+-keep class okhttp3.** { *; }
+-keep class okio.** { *; }
+-keep class rx.** { *; }
+-keep class org.jsoup.** { *; }
+-keep class kotlin.** { *; }
+-keep class kotlinx.** { *; }
+-keep class uy.kohesive.injekt.** { *; }
+-keep class androidx.preference.** { *; }
+-keep class androidx.compose.runtime.** { *; }
+-keep class com.fasterxml.jackson.** { *; }
+-keep class com.squareup.zstd.** { *; }
+-keepattributes Signature,*Annotation*,InnerClasses,EnclosingMethod

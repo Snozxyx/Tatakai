@@ -1,4 +1,5 @@
 import uiI18n from '@/lib/uiI18n';
+import { ExtensionServersSettings } from '../ExtensionServersSettings';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { RemoteExtensionsPanel } from "@/components/extensions/RemoteExtensionsPanel";
 import { migrateExtensionStorage } from "@/core/extensions/ecosystems";
@@ -105,6 +106,7 @@ export function ExtensionsPanel() {
           <span>{uiI18n.t('app.choose_source_extensions_from_the_marketplace_or_e18d995d')}</span>
         </div>
       </SettingsSection>
+ <ExtensionServersSettings />
  <RemoteExtensionsPanel />
       <SettingsSection
         icon={PackageOpen}

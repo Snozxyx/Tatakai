@@ -24,6 +24,8 @@
         android:supportsRtl="true"
         android:largeHeap="true"
         android:theme="@style/AppTheme">
+        <service android:name=".compatibility.CompatibilityService" android:process=":compatibility" android:exported="false" />
+        <activity android:name=".compatibility.CompatibilityActivity" android:process=":compatibility" android:exported="false" android:theme="@style/AppTheme.NoActionBar" />
         <!-- NOTE: must stay an AppCompat theme: PlayerActivity extends
             AppCompatActivity, and the SplashScreen-based NoActionBarLaunch
             theme crashes it on launch ("You need to use a Theme.AppCompat

@@ -9,7 +9,7 @@ export function OfflineGate({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   
   // In native app, allow offline library access and offline watch even when offline
-  const offlinePaths = ['/offline-library', '/offline', '/downloads', '/watch'];
+  const offlinePaths = ['/offline-library', '/offline', '/downloads', '/watch', '/translate'];
   const isOfflineWatch = location.pathname.startsWith('/watch') && location.search.includes('offline=true');
   // Reading a downloaded chapter serves its pages from the local device
   // (getMangaReadByKey's offline-first branch). Mirror ProtectedRoute's

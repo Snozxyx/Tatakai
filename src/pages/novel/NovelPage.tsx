@@ -1,3 +1,10 @@
+import { TatakaiReadingViews } from '@/components/media/TatakaiReadingViews';
+import { useReadingViewTracker } from '@/hooks/user/useReadingViews';
+import { readingViewId } from '@/lib/readingViewId';
+import { MobileDetailQuickActions } from '@/components/anime/MobileDetailQuickActions';
+import '@/components/anime/mobile-detail.css';
+import type { CatalogDetailProps } from "@/components/extensions/CatalogSourceContext";
+import { ThemedSelect } from '@/components/ui/themed-select';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { SourceDebug } from '@/components/extensions/SourceDebug';
@@ -190,9 +197,10 @@ const toRecommendationCard = (item: NovelSearchItem): UnifiedMediaCardProps["ite
 type ChapterSortMode = "newest" | "oldest";
 const CHAPTERS_PER_GROUP = 25;
 
-export default function NovelPage() {
+export default function NovelPage({ catalogId, sourceContext }: CatalogDetailProps = {}) {
   useUiTranslation();
-  const { novelId } = useParams<{ novelId: string }>();
+  const { novelId: routeId } = useParams<{ novelId: string }>();
+  const novelId = catalogId || routeId;
   const navigate = useNavigate();
   const isNative = useIsNativeApp();
   const isDesktopApp = useIsDesktopApp();
@@ -205,9 +213,10 @@ export default function NovelPage() {
   const [showNovelDownload, setShowNovelDownload] = useState(false);
 
   const { data: novelData, isLoading: loadingInfo, error } = useNovelDetail(novelId);
+  useEffect(() => { if (sourceContext && !loadingInfo && (!novelData || error)) sourceContext.onUnavailable(); }, [sourceContext, loadingInfo, novelData, error]);
   const novelSearchTitle = novelData?.detail?.title?.english || novelData?.detail?.title?.romaji || novelData?.detail?.canonicalTitle;
   const [fullScanForNovel, setFullScanForNovel] = useState<string | null>(null);
-  const { data: chapterData, isLoading: loadingChapters, isFetching: checkingChapters, refetch: recheckChapters } = useNovelChapters(novelId, novelSearchTitle, fullScanForNovel === novelId);
+  const { data: chapterData, isLoading: loadingChapters, isFetching: checkingChapters, refetch: recheckChapters } = useNovelChapters(sourceContext ? undefined : novelId, novelSearchTitle, fullScanForNovel === novelId);
   const { data: mangaBakaData } = useMangaBakaSeries((novelData as any)?.detail?.anilistId);
   const { data: anilistNovelMeta } = useQuery({
     queryKey: ['novel-anilist-tags', (novelData as any)?.detail?.anilistId],
@@ -651,6 +660,7 @@ export default function NovelPage() {
   }, [selectedVolumeFilter, volumeSections]);
 
   const info = (novelData as any)?.detail;
+  useReadingViewTracker('novel',readingViewId(novelId,(info as any)?.anilistId),!!info&&!loadingInfo);
 
   const displayTitle =
     info?.canonicalTitle ||
@@ -882,6 +892,7 @@ export default function NovelPage() {
   const isInReadlist = Boolean(readlistEntry && readlistEntry.status !== "reading");
 
   const handleReadNow = () => {
+    if (sourceContext) { sourceContext.open(); return; }
     if (!novelId) return;
 
     if (hasSavedProgress && readlistEntry?.last_chapter_key) {
@@ -1026,18 +1037,19 @@ export default function NovelPage() {
             </div>
           )}
 
-          {/* Back Button */}
+          {sourceContext?.header}
+            {/* Back Button */}
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6 group w-fit"
+            className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors min-h-11 md:min-h-0 mb-4 md:mb-6 group w-fit"
           >
             <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
             <span className="font-medium text-sm">{uiI18n.t('app.back_b52b36b7')}</span>
           </button>
 
           {/* Hero Section — AnimePage-aligned GlassPanel layout */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-16 pt-4 md:pt-8">
-            <GlassPanel className="overflow-hidden mx-auto lg:mx-0 w-full max-w-[320px] lg:max-w-none">
+          <div className="mobile-detail-hero grid grid-cols-1 lg:grid-cols-3 gap-8 mb-16 pt-4 md:pt-8">
+            <GlassPanel className="mobile-detail-poster overflow-hidden mx-auto lg:mx-0 w-full max-w-[320px] lg:max-w-none">
               <img
                 src={coverImageSrc}
                 alt={displayTitle}
@@ -1057,7 +1069,18 @@ export default function NovelPage() {
 
             <div className="lg:col-span-2 space-y-6">
               <div>
-                <h1 className="font-display text-4xl md:text-5xl font-bold mb-4">{displayTitle}</h1>
+                <h1 className="mobile-detail-title font-display text-4xl md:text-5xl font-bold mb-4">{displayTitle}</h1>
+                <TatakaiReadingViews kind="novel" id={novelId} anilistId={(info as any)?.anilistId} detail/>
+                <MobileDetailQuickActions target="novel-chapters-section" label={uiI18n.t('app.chapters_034e2733')}>
+                  <button
+                    onClick={handleReadNow}
+                    disabled={sourceContext ? !sourceContext.canOpen : sortedChapters.length === 0}
+                    className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 font-bold text-primary-foreground disabled:opacity-50"
+                  >
+                    <BookOpen className="h-5 w-5 shrink-0" />
+                    {sourceContext ? (sourceContext.resume ? 'Continue reading' : 'Read now') : hasSavedProgress ? uiI18n.t('app.continue_reading_54800d4f') : uiI18n.t('app.read_from_chapter_1_8933469a')}
+                  </button>
+                </MobileDetailQuickActions>
 
                 {/* Provenance badge (all visitors) + admin edit button */}
                 <div className="flex flex-wrap items-center gap-2 mb-4">
@@ -1222,13 +1245,14 @@ export default function NovelPage() {
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
+                {sourceContext?.actions}
                 <button
                   onClick={handleReadNow}
-                  disabled={sortedChapters.length === 0}
-                  className="flex items-center justify-center gap-2 bg-primary text-primary-foreground px-8 py-3.5 rounded-xl font-bold hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-primary/25 disabled:opacity-50 disabled:cursor-not-allowed group"
+                  disabled={sourceContext ? !sourceContext.canOpen : sortedChapters.length === 0}
+                  className="hidden md:flex items-center justify-center gap-2 bg-primary text-primary-foreground px-8 py-3.5 rounded-xl font-bold hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-primary/25 disabled:opacity-50 disabled:cursor-not-allowed group"
                 >
                   <BookOpen className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                  {hasSavedProgress ? uiI18n.t('app.continue_reading_54800d4f') : uiI18n.t('app.read_from_chapter_1_8933469a')}
+                  {sourceContext ? (sourceContext.resume ? 'Continue reading' : 'Read now') : hasSavedProgress ? uiI18n.t('app.continue_reading_54800d4f') : uiI18n.t('app.read_from_chapter_1_8933469a')}
                 </button>
                 <AddToPlaylistButton
                   animeId={`novel:${String(info.anilistId || info.malId || novelId || "")}`}
@@ -1391,24 +1415,25 @@ export default function NovelPage() {
               )}
 
               {/* Chapters List */}
-              <section id="novel-chapters-section">
+              <div id="novel-chapters-section" className="detail-entry-section">
+              {sourceContext ? sourceContext.entries : (<section>
                 <div className="mb-4 space-y-3">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <h3 className="font-display text-xl md:text-2xl font-bold flex items-center gap-2">
                       <Layers className="w-5 h-5 text-primary" />
                       {uiI18n.t('app.chapters_034e2733')}
                     </h3>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <Button size="sm" variant="outline" disabled={checkingChapters}
                         onClick={() => fullScanForNovel === novelId ? void recheckChapters() : setFullScanForNovel(novelId || null)}
-                        className="h-8 text-xs">
+                        className="min-h-11 md:min-h-0 h-8 text-xs">
                         {checkingChapters ? uiI18n.t('app.checking_sources_17451181') : uiI18n.t('app.check_all_sources_7b5bc3b0')}
                       </Button>
                       <Button
                         size="sm"
                         onClick={() => setShowNovelDownload(true)}
                         disabled={chapters.length === 0}
-                        className="h-8 gap-1.5 rounded-lg glow-primary text-xs font-bold"
+                        className="min-h-11 md:min-h-0 h-8 gap-1.5 rounded-lg glow-primary text-xs font-bold"
                       >
                         <Download className="w-3.5 h-3.5" />
                         {uiI18n.t('app.download_all_d69edf7c')}
@@ -1416,14 +1441,15 @@ export default function NovelPage() {
                       <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                         {uiI18n.t('app.sort_by_a2a5bdec')}
                       </label>
-                      <select
+                      <ThemedSelect
+                        aria-label={uiI18n.t('app.sort_by_a2a5bdec')}
                         value={chapterSortMode}
                         onChange={(event) => setChapterSortMode(event.target.value as ChapterSortMode)}
-                        className="rounded-lg border border-white/10 bg-background/70 px-2.5 py-1.5 text-xs font-semibold"
+                        className="min-h-11 md:min-h-0 rounded-lg border border-white/10 bg-background/70 px-2.5 py-1.5 text-sm md:text-xs font-semibold"
                       >
                         <option value="oldest">{uiI18n.t('app.oldest_first_6a99c65c')}</option>
                         <option value="newest">{uiI18n.t('app.newest_first_f5ec7772')}</option>
-                      </select>
+                      </ThemedSelect>
                       <span className="text-sm font-bold text-muted-foreground bg-muted px-3 py-1 rounded-full">
                         {isChapterListLoading
                           ? "Loading..."
@@ -1435,13 +1461,15 @@ export default function NovelPage() {
                   </div>
 
                   <div className="flex flex-col gap-2 md:flex-row md:items-center">
-                    <div className="relative flex-1 min-w-[220px]">
+                    <div className="relative flex-1 min-w-0">
                       <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                       <input
+                        type="search"
+                        aria-label={uiI18n.t('app.search_chapter_number_title_translator_f6dd9d48')}
                         value={chapterSearchTerm}
                         onChange={(event) => setChapterSearchTerm(event.target.value)}
                         placeholder={uiI18n.t('app.search_chapter_number_title_translator_f6dd9d48')}
-                        className="w-full rounded-xl border border-white/10 bg-background/70 pl-9 pr-3 py-2 text-sm font-medium text-foreground focus:border-primary/50 focus:outline-none"
+                        className="w-full rounded-xl border border-white/10 bg-background/70 pl-9 pr-3 py-2 min-h-11 text-base md:text-sm font-medium text-foreground focus:border-primary/50 focus:outline-none"
                       />
                     </div>
 
@@ -1450,7 +1478,8 @@ export default function NovelPage() {
                         <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                           {uiI18n.t('app.book_volume')}
                         </label>
-                        <select
+                        <ThemedSelect
+                          aria-label={uiI18n.t('app.book_volume')}
                           value={selectedVolumeFilter == null ? "all" : String(selectedVolumeFilter)}
                           onChange={(event) => {
                             const nextValue = event.target.value;
@@ -1462,7 +1491,7 @@ export default function NovelPage() {
                             setSelectedVolumeFilter(Number(nextValue));
                             setChapterSearchTerm("");
                           }}
-                          className="rounded-lg border border-white/10 bg-background/70 px-2.5 py-1.5 text-xs font-semibold"
+                          className="min-h-11 md:min-h-0 rounded-lg border border-white/10 bg-background/70 px-2.5 py-1.5 text-sm md:text-xs font-semibold"
                         >
                           <option value="all">{uiI18n.t('app.all_volumes_d12fdd83')}</option>
                           {volumeSections.map((volumeItem) => (
@@ -1470,7 +1499,7 @@ export default function NovelPage() {
                               {uiI18n.t('app.book_volume')} {volumeItem.volume}
                             </option>
                           ))}
-                        </select>
+                        </ThemedSelect>
                       </div>
                     )}
 
@@ -1480,15 +1509,34 @@ export default function NovelPage() {
                           setChapterSearchTerm("");
                           setSelectedVolumeFilter(null);
                         }}
-                        className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider hover:bg-white/10 transition-colors"
+                        className="min-h-11 md:min-h-0 rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider hover:bg-white/10 transition-colors"
                       >
                         {uiI18n.t('app.clear_719ea396')}
                       </button>
                     )}
                   </div>
 
+                <div className="space-y-1 md:hidden">
+                  <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                    {uiI18n.t('app.preferred_translator_1225eea2')}
+                  </label>
+                  <ThemedSelect
+                    aria-label={uiI18n.t('app.preferred_translator_1225eea2')}
+                    value={preferredProvider}
+                    onChange={(event) => setPreferredProvider(event.target.value)}
+                    className="w-full rounded-xl border border-white/10 bg-background/70 px-3 py-2 min-h-11 text-base font-medium text-foreground focus:border-primary/50 focus:outline-none"
+                  >
+                    <option value="auto">{uiI18n.t('app.auto_best_source_per_chapter_922dc680')}</option>
+                    {providerOptions.map((provider) => (
+                      <option key={provider} value={provider}>
+                        {chapters.flatMap(ch => ch.sources || []).find(s => s.provider === provider)?.providerName || provider}
+                      </option>
+                    ))}
+                  </ThemedSelect>
+                </div>
+
                   {hasChapterGroups && (
-                    <div className="flex flex-wrap gap-2">
+                    <div className="detail-entry-groups flex flex-wrap gap-2">
                       {chapterGroups.map((group, index) => {
                         const range = chapterGroupRanges[index] || { start: 1, end: group.length };
                         const isActiveGroup = index === activeChapterGroup;
@@ -1497,6 +1545,7 @@ export default function NovelPage() {
                           <button
                             key={`chapter-group-${range.start}-${range.end}-${index}`}
                             onClick={() => setSelectedChapterGroup(index)}
+                            aria-pressed={isActiveGroup}
                             className={cn(
                               "px-3 py-1.5 rounded-full text-xs font-bold border transition-colors",
                               isActiveGroup
@@ -1581,7 +1630,8 @@ export default function NovelPage() {
                     )}
                   </GlassPanel>
                 )}
-              </section>
+              </section>)}
+              </div>
 
               {volumeSections.length > 0 && (
                 <section>
@@ -1706,11 +1756,11 @@ export default function NovelPage() {
             <div className="space-y-4">
               <GlassPanel className="p-5">
                 <h4 className="font-display font-bold mb-3">{uiI18n.t('app.metadata_251edc0e')}</h4>
-                <div className="mb-4">
+                <div className="mb-4 hidden md:block">
                   <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                     {uiI18n.t('app.preferred_translator_1225eea2')}
                   </label>
-                  <select
+                  <ThemedSelect
                     value={preferredProvider}
                     onChange={(event) => setPreferredProvider(event.target.value)}
                     className="w-full rounded-xl border border-white/10 bg-background/70 px-3 py-2 text-sm font-medium text-foreground focus:border-primary/50 focus:outline-none"
@@ -1721,7 +1771,7 @@ export default function NovelPage() {
                         {chapters.flatMap(ch => ch.sources || []).find(s => s.provider === provider)?.providerName || provider}
                       </option>
                     ))}
-                  </select>
+                  </ThemedSelect>
                 </div>
                 <SourceDebug kind="manga" sources={chapters.flatMap(ch => ch.sources || [])} />
                 <div className="space-y-2 text-sm text-muted-foreground">

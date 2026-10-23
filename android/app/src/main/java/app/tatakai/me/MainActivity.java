@@ -35,6 +35,7 @@ public class MainActivity extends BridgeActivity {
         // ffmpeg `-c copy` path).
         registerPlugin(TatakaiMuxPlugin.class);
         registerPlugin(app.tatakai.me.media.TatakaiMediaPlugin.class);
+        registerPlugin(app.tatakai.me.compatibility.TatakaiCompatibilityPlugin.class);
         super.onCreate(savedInstanceState);
 
         // Install the native anti-click-hijack clients, the mobile equivalent of

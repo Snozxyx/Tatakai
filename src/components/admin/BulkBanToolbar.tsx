@@ -1,3 +1,4 @@
+import { ThemedSelect } from '@/components/ui/themed-select';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 // BulkBanToolbar — Requirements 11.1–11.6
@@ -125,13 +126,13 @@ export function BulkBanToolbar({ selectedUsers, onComplete }: BulkBanToolbarProp
                 </div>
                 <div className="space-y-1">
                   <label className="text-xs text-muted-foreground font-medium uppercase tracking-wide">{uiI18n.t('app.duration_1370004d')}</label>
-                  <select value={durationPreset} onChange={(e) => setDurationPreset(e.target.value as any)}
+                  <ThemedSelect value={durationPreset} onChange={(e) => setDurationPreset(e.target.value as any)}
                     className="w-full bg-white/5 border border-white/10 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary">
                     <option value="permanent">{uiI18n.t('app.permanent_af0fa7cd')}</option>
                     <option value="7d">{uiI18n.t('app.7_days_0a8dd6ad')}</option>
                     <option value="30d">{uiI18n.t('app.30_days_7d4278a8')}</option>
                     <option value="custom">{uiI18n.t('app.custom_1_365_days_f0c1147c')}</option>
-                  </select>
+                  </ThemedSelect>
                   {durationPreset === 'custom' && (
                     <input type="number" value={customDays} onChange={(e) => setCustomDays(e.target.value)} min={1} max={365}
                       placeholder={uiI18n.t('app.days_1_365_6cbc317d')} className="w-full mt-2 bg-white/5 border border-white/10 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary" />

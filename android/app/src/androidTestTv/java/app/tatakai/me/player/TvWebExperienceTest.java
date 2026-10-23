@@ -43,6 +43,13 @@ public class TvWebExperienceTest {
             instrumentation.runOnMainSync(() -> web = activity.getBridge().getWebView());
             String cards = "return {count:document.querySelectorAll('.tv-discovery-grid .tv-content-card').length};";
             JSONObject first = waitFor(cards, "count", 24);
+            evaluate("const rail=[...document.querySelectorAll('.tv-rail-items')].find(row=>row.querySelectorAll('.tv-content-card').length>=9); window.__tvNavRail=rail; window.__tvExpectedHref=rail?.querySelectorAll('.tv-content-card')[8]?.getAttribute('href'); rail?.querySelector('.tv-content-card')?.focus(); return {found:!!rail};");
+            for (int step = 0; step < 8; step++) {
+                instrumentation.sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_RIGHT);
+                instrumentation.waitForIdleSync();
+            }
+            JSONObject navigation = waitFor("return {correct:document.activeElement?.closest('.tv-rail-items')===window.__tvNavRail&&document.activeElement?.getAttribute('href')===window.__tvExpectedHref?1:0};", "correct", 1);
+            assertEquals("Remote focus must stay in its rail during hero and metadata updates", 1, navigation.getInt("correct"));
             evaluate("const button=document.querySelector('.tv-load-more button'); if(button){button.focus();button.scrollIntoView({block:'nearest'});} return {found:!!button};");
             JSONObject next = waitFor(cards, "count", first.getInt("count") + 1);
             assertTrue("Android focus must append another catalogue page", next.getInt("count") > first.getInt("count"));

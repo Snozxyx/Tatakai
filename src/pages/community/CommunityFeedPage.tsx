@@ -167,7 +167,7 @@ export default function CommunityFeedPage() {
             {!searchActive && (
               <>
                 {/* Communities Carousel */}
-                <CommunitiesShowcase />
+                <div id="communities" className="scroll-mt-24"><CommunitiesShowcase /></div>
 
                 {/* Mobile Quick-Access Bar */}
                 <div className="flex gap-2.5 overflow-x-auto pb-2 xl:hidden no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 scroll-smooth">

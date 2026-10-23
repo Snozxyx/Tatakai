@@ -1,4 +1,6 @@
 /** Text-only translation slots; markup and social identifiers never go to an engine. */
+import { decodeHtmlEntities } from '@/lib/commentMarkup';
+
 export function preparePostTranslation(title: string, content: string) {
   const parser = new DOMParser();
   const doc = parser.parseFromString('', 'text/html');
@@ -7,7 +9,8 @@ export function preparePostTranslation(title: string, content: string) {
   const body = doc.createElement('div');
   const isHtml = /<[a-z][\s\S]*>/i.test(content);
   if (isHtml) body.innerHTML = content;
-  else body.textContent = content;
+  // Plain posts: entity-encoded legacy rows must reach the engine as prose.
+  else body.textContent = decodeHtmlEntities(content);
   doc.body.append(titleElement, body);
 
   const slots: Text[] = [];

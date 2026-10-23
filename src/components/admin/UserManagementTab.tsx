@@ -1,3 +1,4 @@
+import { ThemedCheckbox } from '@/components/ui/themed-checkbox';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useEffect } from 'react';
@@ -247,7 +248,7 @@ export function UserManagementTab({
                 <thead>
                   <tr className="border-b border-border/50">
                     <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground w-10">
-                      <input type="checkbox" className="rounded border-white/20"
+                      <ThemedCheckbox type="checkbox" className="rounded border-white/20"
                         checked={selectedUsers.length > 0 && selectedUsers.length === filteredUsers?.length}
                         onChange={(e) => {
                           if (e.target.checked) {
@@ -268,7 +269,7 @@ export function UserManagementTab({
                   {filteredUsers?.map((user: any) => (
                     <tr key={user.id} className={`border-b border-border/30 hover:bg-muted/30 transition-colors ${user.is_banned ? 'opacity-60' : ''}`}>
                       <td className="py-3 px-4">
-                        <input type="checkbox" className="rounded border-white/20"
+                        <ThemedCheckbox type="checkbox" className="rounded border-white/20"
                           checked={selectedUsers.some(s => s.id === user.user_id)}
                           onChange={(e) => {
                             if (e.target.checked) {

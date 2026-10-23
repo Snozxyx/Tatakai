@@ -1,4 +1,8 @@
+import { ThemedCheckbox } from '@/components/ui/themed-checkbox';
+import { ThemedSelect } from '@/components/ui/themed-select';
 import uiI18n from '@/lib/uiI18n';
+import { searchCompatibility } from '@/core/extensions/compatibility/content';
+import { EXTENSION_INSTALLED_EVENT } from '@/core/extensions/ecosystems';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useSearchParams, useNavigate, useParams } from "react-router-dom";
 import { Background } from "@/components/layout/Background";
@@ -32,6 +36,7 @@ import { type MangaSearchOptions } from "@/core/content/manga-client";
 import { getProxiedImageUrl } from "@/lib/api";
 import { UnifiedMediaCard } from "@/components/UnifiedMediaCard";
 import { useContentSafetySettings } from "@/hooks/user/useContentSafetySettings";
+import { isExplicitExtensionContent } from '@/lib/contentSafety';
 import { isExplicitMangaSearchQuery, inferMangaAdultFlag, inferAnimeAdultFlag } from "@/lib/contentSafety";
 import { extensionRegistry } from "@/core/extensions/ExtensionRegistry";
 import { DiscoverHero } from '@/components/anime/discover/DiscoverHero';
@@ -49,12 +54,15 @@ import { discoverYears, DISCOVER_SORTS, type DiscoverSort, useDiscoverMedia } fr
 import { controlItemClass, controlMenuClass, controlTriggerClass } from '@/components/anime/discover/types';
 import { celebrate, type CelebrateVariant } from '@/components/effects/Celebrate';
 
-function useExtensionSearch(query: string, enabled: boolean) {
+function useExtensionSearch(query: string, enabled: boolean, kind?: 'watch' | 'read') {
   useUiTranslation();
+  const [revision, setRevision] = useState(0);
+  useEffect(() => { const changed = () => setRevision(v => v + 1); window.addEventListener(EXTENSION_INSTALLED_EVENT, changed); return () => window.removeEventListener(EXTENSION_INSTALLED_EVENT, changed); }, []);
   return useQuery({
-    queryKey: ['extension-search', query],
-    queryFn: async () => {
-      const providers = extensionRegistry.getSearchProviders();
+    queryKey: ['extension-search', query, kind, revision],
+    queryFn: async ({ signal }) => {
+      const providers = kind === 'read' ? [] : extensionRegistry.getSearchProviders();
+      const compatibility = searchCompatibility(query, kind, signal).catch(() => []);
       const results = await Promise.all(
         providers.map(async (provider) => {
           try {
@@ -66,7 +74,9 @@ function useExtensionSearch(query: string, enabled: boolean) {
           }
         })
       );
-      return results.flat();
+      const nativeResults = await compatibility;
+      signal.throwIfAborted();
+      return [...results.flat(), ...nativeResults];
     },
     enabled: enabled && query.length > 2,
     staleTime: 5 * 60 * 1000,
@@ -655,7 +665,11 @@ export default function SearchPage() {
     refetch: retryNovelSearch,
   } = useInfiniteNovelSearch(query, 20, shouldEnableNovelSearch, novelSearchOptions);
 
-  const { data: extensionResults, isLoading: isLoadingExtensions } = useExtensionSearch(query, resultType === 'all' || resultType === 'anime');
+  const { data: extensionResults, isLoading: isLoadingExtensions } = useExtensionSearch(query, ['all', 'anime', 'manga'].includes(resultType), resultType === 'anime' ? 'watch' : resultType === 'manga' ? 'read' : undefined);
+  const [extensionFilter, setExtensionFilter] = useState('all');
+  useEffect(() => setExtensionFilter('all'), [query, resultType]);
+  const extensionOptions = new Map<string, string>((extensionResults || []).map(item => [String(item.sourceId || item.providerName), String(item.providerName)]));
+  const filteredExtensionResults = (extensionResults || []).filter(item => (contentSafetySettings.showAdultEverywhere || !isExplicitExtensionContent(item)) && (extensionFilter === 'all' || String(item.sourceId || item.providerName) === extensionFilter));
 
 
   const observer = useRef<IntersectionObserver>();
@@ -1631,7 +1645,7 @@ export default function SearchPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <label htmlFor="filter-localAnimeType" className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.type_3deb7456')}</label>
-                      <select
+                      <ThemedSelect
                         id="filter-localAnimeType"
                         value={localAnimeType}
                         onChange={(e) => setLocalAnimeType(e.target.value)}
@@ -1643,12 +1657,12 @@ export default function SearchPage() {
                         <option value="ova">{uiI18n.t('app.ova_256d1ad0')}</option>
                         <option value="ona">{uiI18n.t('app.ona_2e6b1c12')}</option>
                         <option value="special">{uiI18n.t('app.special_942078ca')}</option>
-                      </select>
+                      </ThemedSelect>
                     </div>
 
                     <div className="space-y-1.5">
                       <label htmlFor="filter-localAnimeStatus" className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.status_bae7d5be')}</label>
-                      <select
+                      <ThemedSelect
                         id="filter-localAnimeStatus"
                         value={localAnimeStatus}
                         onChange={(e) => setLocalAnimeStatus(e.target.value)}
@@ -1658,13 +1672,13 @@ export default function SearchPage() {
                         <option value="currently-airing">{uiI18n.t('app.currently_airing_024e7049')}</option>
                         <option value="finished-airing">{uiI18n.t('app.finished_airing_44bcad79')}</option>
                         <option value="not-yet-aired">{uiI18n.t('app.not_yet_aired_ca93adcf')}</option>
-                      </select>
+                      </ThemedSelect>
                     </div>
                   </div>
 
                   <div className="space-y-1.5">
                     <label htmlFor="filter-localAnimeGenre" className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.genre_2aa31fca')}</label>
-                    <select
+                    <ThemedSelect
                       id="filter-localAnimeGenre"
                       value={localAnimeGenre}
                       onChange={(e) => setLocalAnimeGenre(e.target.value)}
@@ -1676,7 +1690,7 @@ export default function SearchPage() {
                           {genre.label}
                         </option>
                       ))}
-                    </select>
+                    </ThemedSelect>
                   </div>
 
                   <div className="space-y-2">
@@ -1729,7 +1743,7 @@ export default function SearchPage() {
 
                   <div className="space-y-1.5">
                     <label htmlFor="filter-localAnimeSort" className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.sort_method_7ae019e9')}</label>
-                    <select
+                    <ThemedSelect
                       id="filter-localAnimeSort"
                       value={localAnimeSort}
                       onChange={(e) => setLocalAnimeSort(e.target.value)}
@@ -1741,7 +1755,7 @@ export default function SearchPage() {
                       <option value="score">{uiI18n.t('app.score_489f4877')}</option>
                       <option value="name-a-z">{uiI18n.t('app.name_a_z_257c1c4b')}</option>
                       <option value="released-date">{uiI18n.t('app.released_date_6ccfd4a6')}</option>
-                    </select>
+                    </ThemedSelect>
                   </div>
                 </div>
 
@@ -1754,7 +1768,7 @@ export default function SearchPage() {
 
                   <div className="space-y-1.5">
                     <label htmlFor="filter-localMangaOrigin" className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.origin_44ab85a2')}</label>
-                    <select
+                    <ThemedSelect
                       id="filter-localMangaOrigin"
                       value={localMangaOrigin}
                       onChange={(e) => setLocalMangaOrigin(e.target.value)}
@@ -1764,7 +1778,7 @@ export default function SearchPage() {
                       <option value="JP">{uiI18n.t('app.japan_manga_e84da95f')}</option>
                       <option value="KR">{uiI18n.t('app.south_korea_manhwa_webtoon_e69ff1fb')}</option>
                       <option value="CN">{uiI18n.t('app.china_manhua_3ff6ad6f')}</option>
-                    </select>
+                    </ThemedSelect>
                   </div>
 
                   <div className="space-y-2 rounded-xl border border-white/10 bg-background/50 p-3">
@@ -1805,7 +1819,7 @@ export default function SearchPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <label htmlFor="filter-localMangaType" className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.format_041a5dec')}</label>
-                      <select
+                      <ThemedSelect
                         id="filter-localMangaType"
                         value={localMangaType}
                         onChange={(e) => setLocalMangaType(e.target.value)}
@@ -1816,12 +1830,12 @@ export default function SearchPage() {
                         <option value="manhwa">{uiI18n.t('app.manhwa_8251bcf8')}</option>
                         <option value="manhua">{uiI18n.t('app.manhua_b6ddb037')}</option>
                         <option value="comics">{uiI18n.t('app.comics_0fd813b3')}</option>
-                      </select>
+                      </ThemedSelect>
                     </div>
 
                     <div className="space-y-1.5">
                       <label htmlFor="filter-localMangaStatus" className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.status_bae7d5be')}</label>
-                      <select
+                      <ThemedSelect
                         id="filter-localMangaStatus"
                         value={localMangaStatus}
                         onChange={(e) => setLocalMangaStatus(e.target.value)}
@@ -1833,13 +1847,13 @@ export default function SearchPage() {
                         <option value="hiatus">{uiI18n.t('app.hiatus_f6eb2b71')}</option>
                         <option value="cancelled">{uiI18n.t('app.cancelled_a1bf92ef')}</option>
                         <option value="unreleased">{uiI18n.t('app.unreleased_81dd1756')}</option>
-                      </select>
+                      </ThemedSelect>
                     </div>
                   </div>
 
                   <div className="space-y-1.5">
                     <label htmlFor="filter-localMangaGenre" className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.genre_2aa31fca')}</label>
-                    <select
+                    <ThemedSelect
                       id="filter-localMangaGenre"
                       value={localMangaGenre}
                       onChange={(e) => setLocalMangaGenre(e.target.value)}
@@ -1857,18 +1871,18 @@ export default function SearchPage() {
                           {genre.label}
                         </option>
                       ))}
-                    </select>
+                    </ThemedSelect>
                   </div>
 
                   <div className="space-y-2 rounded-xl border border-primary/10 bg-primary/5 p-3">
                     <div className="flex items-center gap-2">
                       <Tags className="w-3.5 h-3.5 text-primary" />
-                      <select aria-label={uiI18n.t('app.manga_tag_catalog_3c6109dc')} value={mangaTagSource || 'anilist'}
+                      <ThemedSelect aria-label={uiI18n.t('app.manga_tag_catalog_3c6109dc')} value={mangaTagSource || 'anilist'}
                         onChange={(event) => { setMangaTagSource(event.target.value as 'anilist' | 'mangabaka'); setSelectedMangaTags([]); }}
                         className="min-h-11 rounded-lg border border-border bg-background px-3 text-sm">
                         <option value="anilist">{uiI18n.t('app.anilist_tags_57a023ee')}</option>
                         <option value="mangabaka">{uiI18n.t('app.mangabaka_tags_982685a1')}</option>
-                      </select>
+                      </ThemedSelect>
                     </div>
                     <Input
                       value={mangaTagSearch}
@@ -1912,7 +1926,7 @@ export default function SearchPage() {
                   </div>
 
                   <div className="flex items-center gap-2 p-3 rounded-xl bg-background/70 border border-white/10 hover:border-primary/30 transition-[color,background-color,border-color,opacity,transform] cursor-pointer group" onClick={() => setLocalMangaAdult(!localMangaAdult)}>
-                    <input
+                    <ThemedCheckbox
                       type="checkbox"
                       checked={localMangaAdult}
                       onChange={(e) => setLocalMangaAdult(e.target.checked)}
@@ -1937,7 +1951,7 @@ export default function SearchPage() {
 
                   <div className="space-y-1.5">
                     <label htmlFor="filter-localSortMode" className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.global_sort_method_e38cf87c')}</label>
-                    <select
+                    <ThemedSelect
                       id="filter-localSortMode"
                       value={localSortMode}
                       onChange={(e) => setLocalSortMode(e.target.value as any)}
@@ -1947,7 +1961,7 @@ export default function SearchPage() {
                       <option value="rating">{uiI18n.t('app.highest_rating_2b1db9e1')}</option>
                       <option value="popularity">{uiI18n.t('app.popularity_be6c200f')}</option>
                       <option value="title">{uiI18n.t('app.title_a_z_ed803fe1')}</option>
-                    </select>
+                    </ThemedSelect>
                   </div>
 
                   <div className="space-y-1.5">
@@ -2030,7 +2044,7 @@ export default function SearchPage() {
 
                   <div className="space-y-1.5">
                     <p className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.season_62255f56')} <span className="text-muted-foreground/60 normal-case">{uiI18n.t('app.anime_1483ec5d')}</span></p>
-                    <select aria-label={uiI18n.t('app.season_62255f56')}
+                    <ThemedSelect aria-label={uiI18n.t('app.season_62255f56')}
                         value={localSeason}
                       onChange={(e) => setLocalSeason(e.target.value)}
                       className="w-full h-11 rounded-xl bg-background/80 border border-white/10 px-3 text-sm outline-none transition-[color,background-color,border-color,opacity,transform] cursor-pointer hover:border-white/25 hover:bg-background focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
@@ -2040,7 +2054,7 @@ export default function SearchPage() {
                       <option value="SPRING">{uiI18n.t('app.spring_89677615')}</option>
                       <option value="SUMMER">{uiI18n.t('app.summer_7c92fc5c')}</option>
                       <option value="FALL">{uiI18n.t('app.fall_5c1ae82c')}</option>
-                    </select>
+                    </ThemedSelect>
                   </div>
 
                   <div className="space-y-1.5">
@@ -2226,13 +2240,13 @@ export default function SearchPage() {
 
         {query && extensionResults && extensionResults.length > 0 && (
           <div className="mb-12 animate-in fade-in slide-in-from-top-4 duration-500">
-            <h2 className="text-xl font-bold mb-6 flex items-center gap-3">
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-3"><h2 className="text-xl font-bold flex items-center gap-3">
               <Puzzle className="w-5 h-5 text-primary" />
-              {uiI18n.t('app.community_modules_aa40ab23')}{extensionResults.length})
-            </h2>
+              {uiI18n.t('extensions.searchResults', { defaultValue: 'Extension results' })} ({filteredExtensionResults.length})
+            </h2><label className="flex items-center gap-2 text-sm">Source<ThemedSelect aria-label="Filter extension results by source" className={controlTriggerClass} value={extensionFilter} onChange={event => setExtensionFilter(event.target.value)}><option value="all">All enabled sources</option>{[...extensionOptions].map(([id, name]) => <option key={id} value={id}>{name}</option>)}</ThemedSelect></label></div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {extensionResults.map((result, idx) => (
-                <GlassPanel key={idx} className="p-4 flex gap-4 items-center group hover:border-primary/50 transition-[color,background-color,border-color,opacity,transform] cursor-pointer" onClick={() => result.url && window.open(result.url, '_blank')}>
+              {filteredExtensionResults.map((result, idx) => (
+                <GlassPanel key={result.route || idx} role="button" tabIndex={0} className="p-4 flex gap-4 items-center group hover:border-primary/50 transition-[color,background-color,border-color,opacity,transform] cursor-pointer" onClick={() => result.route ? navigate(result.route) : result.url && window.open(result.url, '_blank', 'noopener,noreferrer')} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); result.route ? navigate(result.route) : result.url && window.open(result.url, '_blank', 'noopener,noreferrer'); } }}>
                   <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary flex-shrink-0">
                     {result.image ? (
                       <img src={result.image} alt="" className="w-full h-full object-cover rounded-xl" />

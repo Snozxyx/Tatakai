@@ -26,6 +26,14 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
+      - name: Check public build configuration rules
+        run: node --test tests/client-build-env.test.mjs
+      - name: Prepare complete public website configuration
+        run: node scripts/write-client-env.mjs web
+        env:
+          CLIENT_DOTENV: ${{ secrets.WEB_DOTENV || secrets.DESKTOP_DOTENV }}
+          VITE_EXTENSION_API_URL: ${{ secrets.VITE_EXTENSION_API_URL }}
+          VITE_EXTENSION_PORTAL_URL: ${{ secrets.VITE_EXTENSION_PORTAL_URL }}
       - name: Build production website
         run: npm run build -- --mode web
         env:

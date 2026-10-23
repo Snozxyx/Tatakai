@@ -1,3 +1,4 @@
+import { ThemedSelect } from '@/components/ui/themed-select';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { OfflineMediaCard } from '@/components/library/OfflineMediaCard';
@@ -102,27 +103,27 @@ function AutoDownloadSettings() {
           <label htmlFor="download-audio-language" className="flex items-center gap-2 text-sm font-medium">
             <Languages className="w-3.5 h-3.5" /> {uiI18n.t('app.preferred_audio_language_8df2d769')}
           </label>
-          <select id="download-audio-language" value={language} onChange={(e) => onLanguage(e.target.value)} className={selectClass}>
+          <ThemedSelect id="download-audio-language" value={language} onChange={(e) => onLanguage(e.target.value)} className={selectClass}>
             {AUTO_DL_LANGUAGES.map((code) => (
               <option key={code} value={code} className="bg-background">
                 {getLanguageLabel(code)}
               </option>
             ))}
-          </select>
+          </ThemedSelect>
           <p className="text-[11px] text-muted-foreground">{uiI18n.t('app.used_for_auto_downloads_and_as_the_default_in_th_c67f229a')}</p>
         </div>
         <div className="space-y-1.5">
           <label htmlFor="download-default-server" className="flex items-center gap-2 text-sm font-medium">
             <Server className="w-3.5 h-3.5" /> {uiI18n.t('app.default_server_b44e4263')}
           </label>
-          <select id="download-default-server" value={server} onChange={(e) => onServer(e.target.value)} className={selectClass}>
+          <ThemedSelect id="download-default-server" value={server} onChange={(e) => onServer(e.target.value)} className={selectClass}>
             <option value="" className="bg-background">{uiI18n.t('app.auto_recommended_3c14e964')}</option>
             {serverOptions.map((s) => (
               <option key={s.key} value={s.key} className="bg-background">
                 {s.name}
               </option>
             ))}
-          </select>
+          </ThemedSelect>
           <p className="text-[11px] text-muted-foreground">{uiI18n.t('app.preferred_first_the_app_falls_back_to_others_whe_df5e0771')}</p>
         </div>
       </div>
@@ -408,7 +409,12 @@ export default function OfflineLibraryPage() {
     catch (err) { console.error('Failed to open manga folder:', err); }
   };
 
-  const handleReadManga = (series: OfflineMangaSeries) => {
+  const handleReadManga = async (series: OfflineMangaSeries) => {
+    if (series.anilistId < 0) {
+      const { db } = await import('@/core/db/tatakai-db');
+      const record = await db.kv.get(`extension-download:${series.anilistId}`);
+      if (record) { const { extensionTitleRoute } = await import('@/core/extensions/compatibility/library'); navigate(extensionTitleRoute(JSON.parse(record.value), false)); return; }
+    }
     const first = series.chapters?.[0];
     if (!first) { toast.error(uiI18n.t('app.no_chapters_downloaded_b72dc2b8')); return; }
     const params = new URLSearchParams({ chapterKey: first.chapterKey });

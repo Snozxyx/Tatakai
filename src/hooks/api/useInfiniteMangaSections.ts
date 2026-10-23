@@ -109,6 +109,7 @@ export function useInfiniteMangaSections({ showAdult }: { showAdult: boolean }) 
     staleTime: 30 * 60 * 1000,
     gcTime: 60 * 60 * 1000,
     refetchOnWindowFocus: false,
+    retry: (attempt, error) => !/HTTP 503|temporarily disabled/i.test(String(error)) && attempt < 1,
   });
 }
 

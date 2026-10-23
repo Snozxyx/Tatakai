@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
+import { searchCompatibility } from '@/core/extensions/compatibility/content';
 import { Mic, Search } from "lucide-react";
 import { TVLoadMore } from "@/components/tv/TVLoadMore";
 import { TVContentCard } from "@/components/tv/TVContentCard";
@@ -26,6 +27,8 @@ export default function TVSearchPage({ format }: { format?: "tv" | "movie" }) {
   const { settings } = useContentSafetySettings();
   const result = useTVCatalogue(debounced, format, settings.showAdultEverywhere);
   const animeItems = result.data?.pages.flatMap((page) => page.animes) || [];
+  const extensionSearch = useQuery({ queryKey: ['compatibility', 'tv-search', debounced], enabled: debounced.trim().length > 1,
+    queryFn: ({ signal }) => searchCompatibility(debounced, undefined, signal), retry: false });
 
   const extra = useQuery({
     queryKey: ["tv-search-everywhere", debounced, settings.showAdultEverywhere],
@@ -136,6 +139,7 @@ export default function TVSearchPage({ format }: { format?: "tv" | "movie" }) {
       <TVRail title="Manga" items={extra.data?.manga || []} />
       <TVRail title="Novels" items={extra.data?.novels || []} />
       <TVRail title="IPTV channels" items={extra.data?.channels || []} />
+      {!!extensionSearch.data?.length && <section><h2>Extension sources</h2><div className="tv-search-results">{extensionSearch.data.map(item => <Link key={item.route} to={item.route} data-tv-key={`compat-result-${item.sourceId}-${item.id}`}><strong>{item.title}</strong><p>{item.providerName}</p></Link>)}</div></section>}
       <TVLoadMore
         hasMore={result.hasNextPage && !result.error}
         busy={result.isFetchingNextPage}
@@ -145,7 +149,7 @@ export default function TVSearchPage({ format }: { format?: "tv" | "movie" }) {
         !animeItems.length &&
         !extra.data?.manga.length &&
         !extra.data?.novels.length &&
-        !extra.data?.channels.length && (
+        !extra.data?.channels.length && !extensionSearch.data?.length && !extensionSearch.isFetching && (
           <p>No titles found. Try another search.</p>
         )}
     </div>

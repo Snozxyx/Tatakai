@@ -111,6 +111,11 @@ export async function bootstrapExtensions(navigate: (path: string) => void): Pro
   booted = true;
   const { migrateExtensionStorage } = await import("./ecosystems");
   migrateExtensionStorage();
+  // Warm only an already-installed compatibility host, without delaying the
+  // native Tatakai extension bootstrap or initiating a runtime download.
+  void import('./compatibility/client').then(({ compatibilitySources }) => compatibilitySources()).then(sources => {
+    if (sources.some(source => source.enabled)) window.dispatchEvent(new CustomEvent('tatakai-extensions-changed'));
+  }).catch(() => {});
   const { hydrateRemoteExtensions } = await import("./remote/installed");
   await hydrateRemoteExtensions().catch(() => undefined);
 

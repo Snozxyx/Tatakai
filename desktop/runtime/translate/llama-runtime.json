@@ -1,0 +1,12 @@
+{
+  "version": "b11669",
+  "source": "https://github.com/ggml-org/llama.cpp/releases/tag/b11669",
+  "assets": {
+    "win32-x64": { "file": "llama-b11669-bin-win-cpu-x64.zip", "sha256": "37b3efcf962847ca869745fd4ccf7f5e7e8dacfeff9fa3523b4ca8cdc66d632b" },
+    "win32-arm64": { "file": "llama-b11669-bin-win-cpu-arm64.zip", "sha256": "9cff39ffed17edcd03a7d876073f74d7b48cd43a1e5eafdd59ee094185ad871b" },
+    "darwin-x64": { "file": "llama-b11669-bin-macos-x64.tar.gz", "sha256": "cab28238d78158109b48deb27b05d50e0dcef56275d2e76da9ca8281526c7532" },
+    "darwin-arm64": { "file": "llama-b11669-bin-macos-arm64.tar.gz", "sha256": "dbed55493d72bc1ba2babc8770d669c2289b5bc4ee9fb2a4dfc158d45b7d13fd" },
+    "linux-x64": { "file": "llama-b11669-bin-ubuntu-x64.tar.gz", "sha256": "cf07c1c112d709bd67e522017471de57ed0ec8bea031d732c5422351c07f65ac" },
+    "linux-arm64": { "file": "llama-b11669-bin-ubuntu-arm64.tar.gz", "sha256": "9ac6fda2058d35677608a06f751a50122ddfa4ce0ddb7f084466b8e79b6d4a99" }
+  }
+}

@@ -261,7 +261,61 @@ export function useSubtitleManager({
         return;
       }
 
+      // Idempotency: when the selected track is already the only enabled one,
+      // skip the destructive "disable all -> re-enable one" pass. Several
+      // effects re-run this handler (blob loads, canplay/seeked re-asserts,
+      // signature re-checks) and each full pass flips track modes, briefly
+      // dropping cues — visible as subtitle flicker during playback.
+      const enabledTrackIndices: number[] = [];
+      for (let i = 0; i < tracks.length; i++) {
+        if (tracks[i].mode !== "disabled") enabledTrackIndices.push(i);
+      }
+      if (enabledTrackIndices.length === 1 && tracks[enabledTrackIndices[0]].mode === "hidden") {
+        const only = enabledTrackIndices[0];
+        const domTracks = video.querySelectorAll("track");
+        const domTrack = domTracks[only] as HTMLTrackElement | undefined;
+        const trackSrc = domTrack?.getAttribute("src") || "";
+        const trackResolvedSrc = domTrack?.src || "";
+        const bySrcIndex = orderedSubtitles.findIndex((s, idx) => {
+          const subUrl = String(s.url || "").trim();
+          if (!subUrl) return false;
+          const blobUrl = subtitleBlobs[subUrl];
+          return (
+            trackSrc === subUrl ||
+            trackResolvedSrc === subUrl ||
+            (!!blobUrl && (trackSrc === blobUrl || trackResolvedSrc === blobUrl))
+          );
+        });
+        const resolvedIndex = bySrcIndex >= 0 ? bySrcIndex : only;
+        const candidate = orderedSubtitles[resolvedIndex];
+        if (
+          candidate &&
+          getSubtitleSelectionKey(candidate, resolvedIndex).toLowerCase() === selectedKeyLower
+        ) {
+          subtitleApplyStateRef.current = { lang, selectedIndex: only, trackCount: tracks.length };
+          return;
+        }
+      }
+
+      // A language preference ("auto", "english", "spanish", …) resolves to one
+      // concrete track. Record that track's *selection key* (e.g. "sub:<url>")
+      // so the quick selector and the settings panel highlight the option that
+      // is actually playing — preference names never match a listed key and
+      // used to make every menu show "nothing selected".
+      const findResolvableSubIndex = (preference?: string | null, startIndex = 0): number => {
+        for (let i = Math.max(0, startIndex); i < orderedSubtitles.length; i++) {
+          const sub = orderedSubtitles[i];
+          if (!String(sub.url || "").trim()) continue;
+          if (preference && !doesSubtitleTrackMatchPreference({ language: sub.lang, label: sub.label }, preference)) {
+            continue;
+          }
+          return i;
+        }
+        return -1;
+      };
+
       let selectedIndex = -1;
+      let resolvedKey: string | null = null;
       const trackElements = video.querySelectorAll("track");
 
       // 2. Try to match tracks by their DOM element src attribute
@@ -302,6 +356,7 @@ export function useSubtitleManager({
               // the Anime4K canvas. Only ever enable ONE track.
               track.mode = "hidden";
               selectedIndex = subIndex;
+              resolvedKey = getSubtitleSelectionKey(sub, subIndex);
               break;
             }
           }
@@ -320,12 +375,16 @@ export function useSubtitleManager({
 
         if (lang === "auto") {
           selectedIndex = englishIndex >= 0 ? englishIndex : tracks.length > 0 ? 0 : -1;
+          const englishSubIndex = findResolvableSubIndex("english");
+          const fallbackSubIndex = englishSubIndex >= 0 ? englishSubIndex : findResolvableSubIndex();
+          resolvedKey = fallbackSubIndex >= 0 ? getSubtitleSelectionKey(orderedSubtitles[fallbackSubIndex], fallbackSubIndex) : null;
         } else {
           for (let i = 0; i < tracks.length; i++) {
             const mappedSubtitle = orderedSubtitles[i];
             const mappedKey = mappedSubtitle ? getSubtitleSelectionKey(mappedSubtitle, i).toLowerCase() : "";
             if (mappedKey === selectedKeyLower) {
               selectedIndex = i;
+              resolvedKey = getSubtitleSelectionKey(mappedSubtitle, i);
               break;
             }
           }
@@ -337,6 +396,13 @@ export function useSubtitleManager({
                 selectedIndex = i;
                 break;
               }
+            }
+            if (selectedIndex >= 0) {
+              const preferenceSubIndex = findResolvableSubIndex(selectedKey);
+              resolvedKey =
+                preferenceSubIndex >= 0
+                  ? getSubtitleSelectionKey(orderedSubtitles[preferenceSubIndex], preferenceSubIndex)
+                  : null;
             }
           }
         }
@@ -352,7 +418,7 @@ export function useSubtitleManager({
         trackCount: tracks.length,
       };
 
-      setCurrentSubtitle(lang);
+      setCurrentSubtitle(resolvedKey || lang);
     },
     [allRenderedSubtitles, subtitleBlobs, videoRef, setCurrentSubtitle],
   );
@@ -590,11 +656,24 @@ export function useSubtitleManager({
     video.addEventListener("canplay", reapply);
     video.addEventListener("play", reapply);
     video.addEventListener("seeked", reapply);
+    // Track-set churn from MSE/hls.js resets also arrives as textTracks
+    // addtrack/removetrack/change events, often without the media events
+    // above; watch those too so the active track is restored even if the
+    // element never reloads. reapply() no-ops via the anyEnabled guard, so
+    // our own mode assignments can't loop this.
+    const tracks = video.textTracks;
+    const onTrackSetChange = () => reapply();
+    tracks.addEventListener?.("change", onTrackSetChange);
+    tracks.addEventListener?.("addtrack", onTrackSetChange);
+    tracks.addEventListener?.("removetrack", onTrackSetChange);
     return () => {
       video.removeEventListener("loadeddata", reapply);
       video.removeEventListener("canplay", reapply);
       video.removeEventListener("play", reapply);
       video.removeEventListener("seeked", reapply);
+      tracks.removeEventListener?.("change", onTrackSetChange);
+      tracks.removeEventListener?.("addtrack", onTrackSetChange);
+      tracks.removeEventListener?.("removetrack", onTrackSetChange);
     };
   }, [currentSubtitle, videoRef, handleSubtitleChange]);
 

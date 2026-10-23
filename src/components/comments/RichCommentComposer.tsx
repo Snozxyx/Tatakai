@@ -1,4 +1,5 @@
 import uiI18n from '@/lib/uiI18n';
+import { GeneralCommunityLanguageWarning } from '@/components/community/GeneralCommunityLanguageWarning';
 import { isTV } from '@/core/tv/device';
 import { requestTVWriting } from '@/core/tv/writingHandoff';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
@@ -65,6 +66,7 @@ const POLL_DURATION = {
 };
 
 interface RichCommentComposerProps {
+  generalCommunity?: boolean;
   onSubmit: (payload: ComposerPayload) => Promise<unknown> | unknown;
   submitting?: boolean;
   placeholder?: string;
@@ -123,6 +125,7 @@ export function RichCommentComposer({
   allowTimestamp = false,
   allowEmbeds = false,
   initialEmbeds,
+  generalCommunity = false,
 }: RichCommentComposerProps) {
   useUiTranslation();
   const { t } = useTranslation();
@@ -540,6 +543,7 @@ export function RichCommentComposer({
         )}
       </div>
 
+      <GeneralCommunityLanguageWarning content={content} enabled={generalCommunity} />
       {/* Textarea + mention dropdown */}
       <div className="relative">
         <Textarea

@@ -24,6 +24,25 @@ export function BadgeReward() {
   const { t } = useTranslation();
   const reduced = useMotionPreference();
   const client = useQueryClient();
+  useQuery({
+    queryKey: ['badge-progress', user?.id],
+    enabled: !!user,
+    staleTime: 30_000,
+    queryFn: async () => {
+      const { error } = await supabase.rpc('recompute_user_badges' as any, {
+        p_user_id: user!.id,
+      });
+      if (error) throw error;
+      await Promise.all([
+        refreshProfile(),
+        client.invalidateQueries({ queryKey: ['user_badges'] }),
+        client.invalidateQueries({ queryKey: ['user_badges_batch'] }),
+        client.invalidateQueries({ queryKey: ['badge-rewards'] }),
+        client.invalidateQueries({ queryKey: ['feed'] }),
+      ]);
+      return true;
+    },
+  });
   const [equipped, setEquipped] = useState<string | null>(null);
   const [available, setAvailable] = useState(false);
   useEffect(() => {

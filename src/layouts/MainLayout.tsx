@@ -146,7 +146,7 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
   }, [deferredStartupReady, isDesktopApp]);
 
   const online = useOnline();
-  const hideSidebarPages = ['/', '/welcome', '/download', '/downloads', '/auth', '/onboarding', '/setup', '/maintenance', '/banned', '/error', '/smarttv', '/manga/read', '/novel/read'];
+  const hideSidebarPages = ['/', '/welcome', '/download', '/downloads', '/auth', '/onboarding', '/setup', '/maintenance', '/banned', '/error', '/smarttv', '/manga/read', '/novel/read', '/translate'];
   const isHiddenPage = hideSidebarPages.some(page => page === '/' ? location.pathname === '/' : location.pathname.startsWith(page));
   // The community feed ships its own X-style CommunitySidebar, so suppress the
   // global Sidebar there. The single-post /community/forum/:id view and the
@@ -234,6 +234,7 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
     <IdleReclaimProvider />
     <div
       data-main-layout
+      style={{ '--desktop-content-height': isDesktopApp && !titlebarHidden && !isMac ? 'calc(100dvh - 2rem)' : '100dvh' } as React.CSSProperties}
       className={cn(
         "min-h-screen relative flex flex-col transition-[padding] duration-300",
         isDesktopApp && showSidebar && online && "lg:pl-[var(--sidebar-width)]",
@@ -304,7 +305,7 @@ function ConditionalFooter() {
   const isNative = useIsNativeApp();
   if (isNative) return null;
   const hideFooter = ['/welcome', '/download', '/watch/', '/novel/comingsoon', '/dmca', '/suggestions','/privacy', '/terms', '/community-guidelines', '/community-rules', '/char/', '/genre/', '/manga/', '/manga', '/isshoni/', '/search', '/image-search', '/status', '/banned', '/maintenance', '/service-unavailable', '/503', '/error', '/auth', '/reset-password', '/update-password', '/onboarding', '/setup', '/mal-redirect', '/anilist-redirect', '/favorites', '/', '/trending', '/settings' , '/recommendations' , '/admin', '/mobile-app'].some(path => location.pathname === '/' ? path === '/' : location.pathname.startsWith(path));
-  if (hideFooter || location.pathname.startsWith('/novel/read')) return null;
+  if (hideFooter || location.pathname.startsWith('/novel/read') || location.pathname.startsWith('/translate')) return null;
   return <Footer />;
 }
 

@@ -1,4 +1,7 @@
 import { proxyCustomSources } from '@/core/extensions/remote/media';
+import { serverCustomSources, serverCustomHome, serverCustomSearch, serverCustomInfo, serverCustomWatch, serverCustomRead } from '@/core/extensions/server/client';
+import { isCompatibilityNamespace } from '@/core/extensions/compatibility/client';
+import { compatibilityCustomSources, compatibilityHome, compatibilitySearch, compatibilityInfo, compatibilityWatch, compatibilityRead } from '@/core/extensions/compatibility/content';
 import { isCapacitor } from '@/lib/platform/platform';
 import { listRemoteCustomSources, remoteCustomRow, remoteCustomHome, remoteCustomSearch, remoteCustomInfo, remoteCustomWatch, remoteCustomRead } from '@/core/extensions/remote/custom';
 /**
@@ -129,6 +132,8 @@ function isMobileEnv(env: { baseUrl: string } | null): boolean {
 export interface CustomSourceEntry extends CustomSourceDescriptor {
   namespace: string;
   extensionId?: string;
+  /** Inventory only; omitted for enabled native Tatakai sources. */
+  enabled?: boolean;
 }
 
 /** Namespaces whose manifest advertises custom sources (capability or descriptor). */
@@ -147,9 +152,10 @@ function customNamespaces(namespaces: NamespaceInfo[]): NamespaceInfo[] {
  * namespace); IPC `listInstalledExtensions` as the fallback. Powers the sidebar
  * "+" menu and the custom-source routes.
  */
-export async function listAllCustomSources(): Promise<CustomSourceEntry[]> {
-  const out: CustomSourceEntry[] = await listRemoteCustomSources();
-  const seen = new Set<string>();
+export async function listAllCustomSources(includeDisabled = false): Promise<CustomSourceEntry[]> {
+  const [remoteSources, compatibility, servers] = await Promise.all([listRemoteCustomSources(), compatibilityCustomSources(includeDisabled), serverCustomSources()]);
+  const out: CustomSourceEntry[] = [...remoteSources, ...compatibility, ...servers];
+  const seen = new Set<string>(out.map(source => `${source.namespace}::${source.id}`));
 
   // Deep links can reach a custom route before the app-shell bootstrap has
   // hydrated cached mobile bundles. Await the deduped initializer here so the
@@ -251,6 +257,7 @@ function customUrl(baseUrl: string, namespace: string, route: string, params: Re
 export interface CustomHomeData {
   sections: CustomHomeSection[];
   filters?: CustomFilterSchema;
+  hasNextPage?: boolean;
 }
 export interface CustomSearchData {
   results: CustomMediaCard[];
@@ -273,7 +280,9 @@ export interface CustomReadData {
 
 // ── fetchers (HTTP primary, IPC fallback) ────────────────────────────────────
 
-export async function fetchCustomHome(namespace: string, sourceId: string): Promise<CustomHomeData> {
+export async function fetchCustomHome(namespace: string, sourceId: string, page = 1, signal?: AbortSignal): Promise<CustomHomeData> {
+  if (namespace.startsWith('server-')) return serverCustomHome(namespace, sourceId, page, signal);
+  if (isCompatibilityNamespace(namespace)) return compatibilityHome(namespace, sourceId, page, signal);
   const remote = await remoteCustomRow(namespace); if (remote) return remoteCustomHome(remote, sourceId);
   const env = await resolveCustomHttpEnv();
   if (isMobileEnv(env)) {
@@ -307,7 +316,10 @@ export async function fetchCustomSearch(
   query: string,
   page = 1,
   filters?: CustomSearchFilters,
+  signal?: AbortSignal,
 ): Promise<CustomSearchData> {
+  if (namespace.startsWith('server-')) return serverCustomSearch(namespace, sourceId, query, page, signal);
+  if (isCompatibilityNamespace(namespace)) return compatibilitySearch(namespace, sourceId, query, page, signal);
   const remote = await remoteCustomRow(namespace); if (remote) return remoteCustomSearch(remote, sourceId, query, page);
   const filtersParam =
     filters && Object.keys(filters).length ? JSON.stringify(filters) : undefined;
@@ -335,7 +347,9 @@ export async function fetchCustomSearch(
   return { results: [], hasNextPage: false };
 }
 
-export async function fetchCustomInfo(namespace: string, sourceId: string, id: string): Promise<CustomInfoData | null> {
+export async function fetchCustomInfo(namespace: string, sourceId: string, id: string, signal?: AbortSignal): Promise<CustomInfoData | null> {
+  if (namespace.startsWith('server-')) return serverCustomInfo(namespace, sourceId, id, signal);
+  if (isCompatibilityNamespace(namespace)) return compatibilityInfo(namespace, sourceId, id, signal);
   const remote = await remoteCustomRow(namespace); if (remote) return remoteCustomInfo(remote, sourceId, id);
   const env = await resolveCustomHttpEnv();
   if (isMobileEnv(env)) {
@@ -349,6 +363,8 @@ export async function fetchCustomInfo(namespace: string, sourceId: string, id: s
         title: body.title || "",
         image: body.image ?? undefined,
         description: body.description ?? undefined,
+        catalogIds: body.catalogIds,
+        banner: body.banner,
         meta: body.meta || {},
         entries: body.entries,
       };
@@ -370,6 +386,8 @@ export async function fetchCustomWatch(
   id: string,
   episodeId: string,
 ): Promise<CustomWatchData> {
+  if (namespace.startsWith('server-')) return serverCustomWatch(namespace, sourceId, id, episodeId);
+  if (isCompatibilityNamespace(namespace)) return compatibilityWatch(namespace, sourceId, id, episodeId);
   const remote = await remoteCustomRow(namespace); if (remote) return remoteCustomWatch(remote, sourceId, episodeId);
   const env = await resolveCustomHttpEnv();
   if (isMobileEnv(env)) {
@@ -399,6 +417,8 @@ export async function fetchCustomRead(
   id: string,
   chapterId: string,
 ): Promise<CustomReadData> {
+  if (namespace.startsWith('server-')) return serverCustomRead(namespace, sourceId, chapterId);
+  if (isCompatibilityNamespace(namespace)) return compatibilityRead(namespace, sourceId, chapterId);
   const remote = await remoteCustomRow(namespace); if (remote) return remoteCustomRead(remote, chapterId);
   const env = await resolveCustomHttpEnv();
   if (isMobileEnv(env)) {

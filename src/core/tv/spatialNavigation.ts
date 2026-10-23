@@ -12,8 +12,9 @@ export function nextCandidate<T extends { rect: Rect }>(
   const sign = direction === "left" || direction === "up" ? -1 : 1;
   const cx = (origin.left + origin.right) / 2,
     cy = (origin.top + origin.bottom) / 2;
-  return candidates
-    .map((candidate) => {
+  let best: T | undefined;
+  let bestScore = Infinity;
+  for (const candidate of candidates) {
       const r = candidate.rect,
         x = (r.left + r.right) / 2,
         y = (r.top + r.bottom) / 2;
@@ -22,16 +23,11 @@ export function nextCandidate<T extends { rect: Rect }>(
         ? Math.min(origin.bottom, r.bottom) - Math.max(origin.top, r.top)
         : Math.min(origin.right, r.right) - Math.max(origin.left, r.left);
       const perpendicular = Math.abs(horizontal ? y - cy : x - cx);
-      return {
-        candidate,
-        primary,
-        inDirection: overlap > -0.5 || primary >= perpendicular * 0.5,
-        // Prefer alignment without skipping a nearer hero action for a distant rail.
-        score: primary + perpendicular * 0.5 + Math.max(0, -overlap) * 0.75,
-      };
-    })
-    .filter((c) => c.primary > 0.5 && c.inDirection)
-    .sort((a, b) => a.score - b.score)[0]?.candidate;
+      const inDirection = overlap > -0.5 || primary >= perpendicular * 0.5;
+      const score = primary + perpendicular * 0.5 + Math.max(0, -overlap) * 0.75;
+      if (primary > 0.5 && inDirection && score < bestScore) { best = candidate; bestScore = score; }
+  }
+  return best;
 }
 const selector =
   'a[href],summary,button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[role="button"],[role="link"],[role="tab"],[role="slider"],[role="checkbox"],[role="switch"],[role="radio"],[role="menuitem"],[role="option"],[role="menuitemcheckbox"],[role="menuitemradio"],[data-tv-focus]';
@@ -57,19 +53,26 @@ export function installSpatialNavigation(
       el.getClientRects().length > 0
     );
   }
-  const candidates = () =>
-    [...getScope().querySelectorAll<HTMLElement>(selector)].filter(visible);
+  let dirty = true;
+  let cachedScope: HTMLElement | undefined;
+  let cachedElements: HTMLElement[] = [];
+  const candidates = () => {
+    const scope = getScope();
+    if (dirty || cachedScope !== scope) {
+      cachedElements = [...scope.querySelectorAll<HTMLElement>(selector)];
+      cachedScope = scope; dirty = false;
+    }
+    return cachedElements.filter(visible);
+  };
   function focus(el: HTMLElement) {
-    candidates().forEach((c) => {
-      c.tabIndex = c === el ? 0 : -1;
-    });
+    const previous = document.activeElement as HTMLElement | null;
+    if (previous && previous !== el && previous.matches(selector)) previous.tabIndex = -1;
+    el.tabIndex = 0;
     el.focus({ preventScroll: true });
     el.scrollIntoView({
       block: "nearest",
       inline: "nearest",
-      behavior: matchMedia("(prefers-reduced-motion: reduce)").matches
-        ? "auto"
-        : "smooth",
+      behavior: "auto",
     });
   }
   const key = (event: KeyboardEvent) => {
@@ -142,6 +145,17 @@ export function installSpatialNavigation(
       return;
     }
     if (!event.key.startsWith("Arrow")) return;
+    // Rails already encode horizontal order. Avoid laying out the entire page
+    // for each repeat from a remote, including cards hundreds of rows away.
+    const rail = active?.closest('.tv-rail-items');
+    if (rail && getScope() === root && ["ArrowLeft", "ArrowRight"].includes(event.key)) {
+      const row = [...rail.querySelectorAll<HTMLElement>(selector)];
+      const step = event.key === 'ArrowRight' ? 1 : -1;
+      for (let index = row.indexOf(active) + step; index >= 0 && index < row.length; index += step) {
+        if (!visible(row[index])) continue;
+        event.preventDefault(); focus(row[index]); return;
+      }
+    }
     // Analytics can have long stretches of reading content between actions.
     const profile = active?.closest('[data-tv-profile]');
     const list = candidates();
@@ -172,11 +186,21 @@ export function installSpatialNavigation(
     if (target) focus(target);
   };
   document.addEventListener("keydown", key);
-  const initial =
-    candidates().find((el) => el.dataset.tvKey === "nav-Home") ||
-    candidates()[0];
+  const initialCandidates = candidates();
+  initialCandidates.forEach(el => { el.tabIndex = el === document.activeElement ? 0 : -1; });
+  const initial = initialCandidates.find((el) => el.dataset.tvKey === "nav-Home") || initialCandidates[0];
   if (initial && !root.contains(document.activeElement)) focus(initial);
-  const observer = new MutationObserver(() => {
+  const observer = new MutationObserver(records => {
+    dirty = true;
+    for (const record of records) for (const node of record.addedNodes) {
+      if (node.nodeType !== 1) continue;
+      const element = node as HTMLElement;
+      const additions = [...element.querySelectorAll<HTMLElement>(selector)];
+      if (element.matches(selector)) additions.push(element);
+      for (const el of additions) if (el !== document.activeElement && el.tabIndex !== -1) el.tabIndex = -1;
+    }
+    const active = document.activeElement as HTMLElement | null;
+    if (active?.isConnected && getScope().contains(active) && visible(active)) return;
     const list = candidates();
     if (
       !list.includes(document.activeElement as HTMLElement) &&
@@ -186,7 +210,7 @@ export function installSpatialNavigation(
     )
       list[0] && focus(list[0]);
   });
-  observer.observe(root, { subtree: true, childList: true });
+  observer.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['disabled', 'hidden', 'inert', 'aria-hidden', 'aria-disabled', 'role'] });
   return () => {
     observer.disconnect();
     document.removeEventListener("keydown", key);

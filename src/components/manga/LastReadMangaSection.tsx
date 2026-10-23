@@ -118,6 +118,7 @@ export function LastReadMangaSection() {
                     <span className="tabular-nums text-white/60">{totalPages} {uiI18n.t('app.pages_eec6542d')}</span>
                   ) : undefined
                 }
+                overlayIcon={BookOpen}
                 fallbackIcon={BookMarked}
               />
               </Peekable>

@@ -1436,6 +1436,7 @@ export type Database = {
           updated_at: string;
           chapters: number | null;
           volumes: number | null;
+          is_hidden: boolean;
         };
         Insert: {
           tatakai_id?: string;
@@ -1486,6 +1487,7 @@ export type Database = {
           updated_at?: string;
           chapters?: number | null;
           volumes?: number | null;
+          is_hidden?: boolean;
         };
         Update: {
           tatakai_id?: string;
@@ -1536,6 +1538,7 @@ export type Database = {
           updated_at?: string;
           chapters?: number | null;
           volumes?: number | null;
+          is_hidden?: boolean;
         };
         Relationships: [];
       };

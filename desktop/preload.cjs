@@ -1,6 +1,27 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electron', {
+    translate: {
+        request: (command, args) => ipcRenderer.invoke('translate:request', { command, args }),
+        importPages: (args) => ipcRenderer.invoke('translate:import', args),
+        exportPages: (args) => ipcRenderer.invoke('translate:export', args),
+        backup: () => ipcRenderer.invoke('translate:backup'),
+        restore: () => ipcRenderer.invoke('translate:restore'),
+        importFont: (args) => ipcRenderer.invoke('translate:font', args),
+        offlineStatus: () => ipcRenderer.invoke('translate:offline-status'),
+        setupOffline: (args) => ipcRenderer.invoke('translate:offline-setup', args),
+        cancelOfflineSetup: () => ipcRenderer.invoke('translate:offline-cancel'),
+        modelStatus: () => ipcRenderer.invoke('translate:model-status'),
+        startModel: (args) => ipcRenderer.invoke('translate:model-start', args),
+        stopModel: () => ipcRenderer.invoke('translate:model-stop'),
+        importChapter: (args) => ipcRenderer.invoke('translate:chapter', args),
+        onEvent: (callback) => {
+            const handler = (_event, message) => callback(message);
+            ipcRenderer.on('translate:event', handler);
+            return () => ipcRenderer.removeListener('translate:event', handler);
+        },
+    },
+    compatibilityRequest: (payload) => ipcRenderer.invoke('compatibility:request', payload),
     configureExtension: (url) => ipcRenderer.invoke('extension:configure', url),
     onConfiguredExtension: (callback) => {
         const handler = (_event, url) => callback(url);
@@ -53,6 +74,7 @@ contextBridge.exposeInMainWorld('electron', {
     repairAnime: (params) => ipcRenderer.invoke('repair-anime', params),
     selectDirectory: () => ipcRenderer.invoke('select-directory'),
     selectFile: (options) => ipcRenderer.invoke('select-file', options),
+    pickExtensionPackage: () => ipcRenderer.invoke('extension:pick-package'),
     openPath: (path) => ipcRenderer.invoke('open-path', path),
     streamLocalFile: (filePath) => ipcRenderer.invoke('media:stream-local-file', filePath),
     debridRequest: (payload) => ipcRenderer.invoke('debrid:request', payload),

@@ -1,3 +1,5 @@
+import { canonicalTrendingAniListId, resolvedTrendingEntries } from '@/lib/trendingCatalog';
+import { useAnimeMetaByIds } from '@/hooks/api/useAnimeMetaByIds';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
@@ -68,6 +70,7 @@ type TimeFrame = 'today' | 'week' | 'month' | 'all';
  * into the chart.
  */
 interface TrendingRow extends TrendingAnime {
+  views_month?: number;
   anime_name?: string;
   poster?: string;
   sparkline?: { date: string; count: number }[];
@@ -131,11 +134,13 @@ const normalizeAnimeName = (value?: string | null) =>
 function viewsForFrame(row: TrendingRow, frame: TimeFrame): number | undefined {
   if (frame === 'today') return row.views_today ?? row.views_week ?? row.total_views;
   if (frame === 'week') return row.views_week ?? row.total_views;
+  if (frame === 'month') return row.views_month ?? row.total_views;
   return row.total_views ?? row.views_week;
 }
 
 /** Converts an API trending row to the card shape, preserving the resolved id. */
-function trendingToCard(trending: ApiTrendingAnime, routeIdOverride?: string): AnimeCard {
+type TrendingCandidate=Pick<AnimeCard,'id'|'name'|'poster'>;
+function trendingToCard(trending: TrendingCandidate, routeIdOverride?: string): AnimeCard {
   const malId = toPositiveInt(
     (trending as any)?.malId ?? (trending as any)?.malID ?? (trending as any)?.mal_id,
   );
@@ -177,7 +182,8 @@ export default function TrendingPage() {
 
   const frame = TIME_FRAMES.find((entry) => entry.id === timeFrame) ?? TIME_FRAMES[1];
 
-  const { data: internalTrending, isLoading: loadingInternal } = useTrendingAnime(50, timeFrame);
+  const { data: internalTrending, isLoading: loadingInternal } = useTrendingAnime(100, timeFrame);
+  const {data:resolvedMetadata={},isLoading:loadingMetadata}=useAnimeMetaByIds((internalTrending??[]).map(row=>canonicalTrendingAniListId(row.anime_id)).filter(Boolean));
 
   // Hide mature (18+) titles from the board unless the user opts in globally.
   const { settings: contentSafetySettings } = useContentSafetySettings();
@@ -219,7 +225,7 @@ export default function TrendingPage() {
     return () => window.clearTimeout(timer);
   }, [loadingInternal, loadingHomepage, timeFrame]);
 
-  const isLoading = loadingInternal || loadingHomepage;
+  const isLoading = loadingInternal || loadingHomepage || loadingMetadata;
   // Memoized so the empty-array fallbacks keep a stable identity: everything
   // below derives from them through useMemo, which would otherwise recompute on
   // every render while either query is still pending.
@@ -231,7 +237,7 @@ export default function TrendingPage() {
     () => filterAdultAnime(homepageData?.trendingAnimes ?? [], showAdult),
     [homepageData, showAdult],
   );
-  const hasInternalData = internalRows.length > 0;
+
 
   const homeIdMappingIndex = useMemo(() => {
     const index = createAnimeIdMappingIndex();
@@ -239,10 +245,33 @@ export default function TrendingPage() {
     return index;
   }, [homepageData]);
 
-  const apiTrendingById = useMemo(() => {
-    const map = new Map<string, ApiTrendingAnime>();
+  // Build a comprehensive map of all anime from the homepage data for better matching
+  const allHomepageAnime = useMemo(() => {
+    if (!homepageData) return [];
+    const allAnime: TrendingCandidate[] = [];
+    // Collect from all homepage sections to maximize matching chances
+    const sections = [
+      homepageData.spotlightAnimes,
+      homepageData.trendingAnimes,
+      homepageData.topAiringAnimes,
+      homepageData.topUpcomingAnimes,
+      homepageData.mostPopularAnimes,
+      homepageData.mostFavoriteAnimes,
+      homepageData.latestCompletedAnimes,
+      homepageData.latestEpisodeAnimes,
+    ];
+    for (const section of sections) {
+      if (Array.isArray(section)) {
+        allAnime.push(...section);
+      }
+    }
+    return filterAdultAnime(allAnime, showAdult);
+  }, [homepageData, showAdult]);
 
-    apiTrending.forEach((item) => {
+  const apiTrendingById = useMemo(() => {
+    const map = new Map<string, TrendingCandidate>();
+
+    allHomepageAnime.forEach((item) => {
       const routeKeys = new Set<string>();
       const preferredId = buildPreferredAnimeRouteId(item as any, homeIdMappingIndex);
       const fallbackExternalId = buildExternalAnimeRouteId(
@@ -260,16 +289,16 @@ export default function TrendingPage() {
     });
 
     return map;
-  }, [apiTrending, homeIdMappingIndex]);
+  }, [allHomepageAnime, homeIdMappingIndex]);
 
   const apiTrendingByName = useMemo(() => {
-    const map = new Map<string, ApiTrendingAnime>();
-    apiTrending.forEach((item) => {
+    const map = new Map<string, TrendingCandidate>();
+    allHomepageAnime.forEach((item) => {
       const key = normalizeAnimeName(item?.name);
       if (key) map.set(key, item);
     });
     return map;
-  }, [apiTrending]);
+  }, [allHomepageAnime]);
 
   /**
    * An RPC row only reliably has `anime_id` and `anime_name`, and `anime_id` is
@@ -280,7 +309,12 @@ export default function TrendingPage() {
   const resolveInternalTrendingCard = useCallback(
     (entry: TrendingRow): AnimeCard => {
       const rawEntryId = String(entry?.anime_id || '').trim();
-      const safeRawEntryId = /^(mal|anilist)[:-]/i.test(rawEntryId) ? '' : rawEntryId;
+      const canonical=canonicalTrendingAniListId(rawEntryId);
+      const metadata=canonical?resolvedMetadata[Number(canonical)]:undefined;
+      if(metadata?.title&&metadata.coverImage&&(!metadata.isAdult||showAdult))return {
+        id:`anilist:${metadata.id}`,name:metadata.title,poster:metadata.coverImage,type:metadata.format||'TV',
+        episodes:{sub:0,dub:0},anilistId:metadata.id,
+      };
 
       const preferredRouteId = buildPreferredAnimeRouteId(
         {
@@ -306,16 +340,12 @@ export default function TrendingPage() {
         return trendingToCard(directResolved, resolvedRouteId);
       }
 
-      return {
-        id: preferredRouteId || safeRawEntryId || '',
-        name: entry?.anime_name || safeRawEntryId || 'Unknown Anime',
-        poster: entry?.poster || '',
-        type: 'TV',
-        episodes: { sub: 0, dub: 0 },
-        rating: undefined,
-      };
+      // Historical provider slugs without a current metadata mapping are retired.
+      // Never manufacture titles or image URLs from obsolete identifiers.
+      return null;
+
     },
-    [homeIdMappingIndex, apiTrendingById, apiTrendingByName],
+    [homeIdMappingIndex, apiTrendingById, apiTrendingByName, resolvedMetadata, showAdult],
   );
 
   const aniListToCard = useCallback(
@@ -344,12 +374,15 @@ export default function TrendingPage() {
     [homeIdMappingIndex],
   );
 
+  const resolvedInternalRows=useMemo(()=>resolvedTrendingEntries(internalRows,resolveInternalTrendingCard),[internalRows,resolveInternalTrendingCard]);
+  const hasInternalData=resolvedInternalRows.length>0;
+
   // ─── The board ──────────────────────────────────────────────────────────────
 
   const board = useMemo<BoardEntry[]>(() => {
     if (hasInternalData) {
-      return internalRows.map((row, index) => ({
-        item: animeCardToPosterItem(resolveInternalTrendingCard(row), index),
+      return resolvedInternalRows.slice(0,50).map(({row,card}, index) => ({
+        item: animeCardToPosterItem(card, index),
         rank: index + 1,
         views: viewsForFrame(row, timeFrame),
         sparkline: row.sparkline,
@@ -362,20 +395,20 @@ export default function TrendingPage() {
       ),
       rank: index + 1,
     }));
-  }, [hasInternalData, internalRows, apiTrending, resolveInternalTrendingCard, homeIdMappingIndex, timeFrame]);
+  }, [hasInternalData, resolvedInternalRows, apiTrending, homeIdMappingIndex, timeFrame]);
 
   const podium = board.slice(0, RAIL_LENGTH);
   const rest = board.slice(RAIL_LENGTH);
 
   /** Resolved separately from `board` because the banner query needs the ids. */
   const leaderCard = useMemo<AnimeCard | null>(() => {
-    if (hasInternalData) return resolveInternalTrendingCard(internalRows[0]);
+    if (hasInternalData) return resolvedInternalRows[0].card;
     if (!apiTrending[0]) return null;
     return trendingToCard(
       apiTrending[0],
       buildPreferredAnimeRouteId(apiTrending[0] as any, homeIdMappingIndex) || apiTrending[0].id,
     );
-  }, [hasInternalData, internalRows, apiTrending, resolveInternalTrendingCard, homeIdMappingIndex]);
+  }, [hasInternalData, resolvedInternalRows, apiTrending, homeIdMappingIndex]);
 
   const heroExternalIds = useMemo(() => {
     if (!leaderCard) return { anilistId: null as number | null, malId: null as number | null };

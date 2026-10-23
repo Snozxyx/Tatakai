@@ -61,6 +61,10 @@ export const CSP_POLICY = {
   ],
   'frame-src': [
     "'self'",
+    'https://www.youtube-nocookie.com',
+    'https://www.redditmedia.com',
+    'https://player.vimeo.com',
+    'https://open.spotify.com',
     'https://*.supabase.co',
     'https://challenges.cloudflare.com', // Cloudflare Turnstile challenge iframe
   ],

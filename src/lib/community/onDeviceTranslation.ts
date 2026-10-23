@@ -216,6 +216,7 @@ function getWorker() {
     type: 'module',
   });
   worker.onmessage = ({ data }) => {
+    lastWorkerActivity = Date.now();
     if (data.type === 'progress') {
       const p = data.progress;
       if (
@@ -267,6 +268,11 @@ function getWorker() {
   return worker;
 }
 
+const REQUEST_WATCHDOG_MS = 150_000;
+// The watchdog only fires after a quiet stretch: a healthy model download
+// streams progress messages that keep pushing this timestamp forward.
+let lastWorkerActivity = Date.now();
+
 async function translateOffline(
   texts: string[],
   source: string,
@@ -276,12 +282,33 @@ async function translateOffline(
   if (signal?.aborted) throw new DOMException('Cancelled', 'AbortError');
   const engine = getWorker();
   const id = ++nextId;
-  return new Promise((resolve, reject) => {
+  let watchdog: number | undefined;
+  return new Promise<string[]>((resolve, reject) => {
     const abort = () => {
       pending.delete(id);
       engine.postMessage({ type: 'cancel', id });
       reject(new DOMException('Cancelled', 'AbortError'));
     };
+    const armWatchdog = () => {
+      watchdog = window.setTimeout(() => {
+        if (Date.now() - lastWorkerActivity < REQUEST_WATCHDOG_MS) {
+          // Still streaming model chunks — re-arm and wait for the worker.
+          armWatchdog();
+          return;
+        }
+        // The worker went quiet mid-request — usually a stalled 650 MB model
+        // download that blocks the serialized queue behind it. Terminate and
+        // start fresh so pending posts fail over instead of spinning forever.
+        worker?.terminate();
+        worker = null;
+        pending.forEach((entry) =>
+          entry.reject(new Error('translation-timeout'))
+        );
+        pending.clear();
+        update({ status: 'error' });
+      }, REQUEST_WATCHDOG_MS);
+    };
+    armWatchdog();
     pending.set(id, {
       resolve: (value) => {
         signal?.removeEventListener('abort', abort);
@@ -294,6 +321,8 @@ async function translateOffline(
     });
     signal?.addEventListener('abort', abort, { once: true });
     engine.postMessage({ type: 'translate', id, texts, source, target });
+  }).finally(() => {
+    if (watchdog !== undefined) window.clearTimeout(watchdog);
   });
 }
 

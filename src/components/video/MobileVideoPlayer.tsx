@@ -46,8 +46,11 @@ import { UpNextOverlay } from "./overlays/UpNextOverlay";
 import { VideoSettingsPanel } from "./VideoSettingsPanel";
 import { buildSubtitleCueStyle } from "@/lib/video/subtitleStyle";
 import { ensureCustomSubtitleFontLoaded } from "@/lib/video/customSubtitleFont";
+import { selectPreferredSource } from "@/lib/video/preferredSource";
 import { triggerHaptic } from "@/lib/haptics";
 import { useActiveCues } from "./hooks/useActiveCues";
+import { useSubtitleTranslation } from "./hooks/useSubtitleTranslation";
+import { useSubtitlePretranslation } from "./hooks/useSubtitlePretranslation";
 import { useAmbientMode } from "./hooks/usePlayerEnhancements";
 import "./mobile-player.css";
 import {
@@ -98,40 +101,7 @@ interface MobileVideoPlayerProps {
 }
 
 // formatTime + subtitle helper functions moved to @/core/player/*
-
-function parseQualityScore(quality?: string): number | null {
-  const normalized = String(quality || '').toLowerCase();
-  const match = normalized.match(/(\d{3,4})\s*p?/);
-  if (!match) return null;
-  const value = Number(match[1]);
-  return Number.isFinite(value) ? value : null;
-}
-
-function selectPreferredSource(
-  sources: Array<{ url: string; isM3U8: boolean; quality?: string }>,
-  preferredQuality: 'auto' | '1080p' | '720p' | '480p' | '360p',
-) {
-  if (!sources.length) return undefined;
-  if (preferredQuality === 'auto') return sources[0];
-
-  const preferredScore = parseQualityScore(preferredQuality);
-  if (!preferredScore) {
-    return sources.find((source) => String(source.quality || '').toLowerCase() === preferredQuality) || sources[0];
-  }
-
-  const candidates = sources
-    .map((source) => ({ source, score: parseQualityScore(source.quality) }))
-    .filter((entry): entry is { source: { url: string; isM3U8: boolean; quality?: string }; score: number } => entry.score != null)
-    .sort((left, right) => {
-      const distanceDiff = Math.abs(left.score - preferredScore) - Math.abs(right.score - preferredScore);
-      if (distanceDiff !== 0) return distanceDiff;
-      return right.score - left.score;
-    });
-
-  if (candidates.length > 0) return candidates[0].source;
-
-  return sources.find((source) => String(source.quality || '').toLowerCase() === preferredQuality) || sources[0];
-}
+// Quality selection helper lives in @/lib/video/preferredSource.
 
 function normalizeSubtitleLanguage(value?: string): string {
   const normalized = String(value || '').trim().toLowerCase();
@@ -362,6 +332,8 @@ export function MobileVideoPlayer({
   // like desktop's Audio tab. Native torrent audio stays in the native UI.
   const [hlsAudioTracks, setHlsAudioTracks] = useState<Array<{ id: number; label: string; lang: string }>>([]);
   const [currentHlsAudioTrack, setCurrentHlsAudioTrack] = useState<number>(-1);
+  const preferredAudioRef = useRef(settings.audioLanguage);
+  preferredAudioRef.current = settings.audioLanguage;
 
   // Full settings sheet options — same source as desktop (parity).
   const settingsSubtitleOptions = useMemo(
@@ -410,7 +382,8 @@ export function MobileVideoPlayer({
   const subtitleRequestKey = JSON.stringify(subtitles);
   const subtitlesRef = useRef(subtitles);
   subtitlesRef.current = subtitles;
-  const sourceTypeKey = currentSource?.isM3U8 || (currentSource as any)?.sourceType === 'hls' || /\.m3u8(?:$|[?#/])/i.test(currentSource?.url || '') ? 'm3u8' : 'file';
+  const sourceTypeKey = (currentSource as any)?.sourceType === 'dash' || /\.mpd(?:$|[?#])/i.test((currentSource as any)?.originalUrl || currentSource?.url || '') ? 'dash'
+    : currentSource?.isM3U8 || (currentSource as any)?.sourceType === 'hls' || /\.m3u8(?:$|[?#/])/i.test(currentSource?.url || '') ? 'm3u8' : 'file';
   const sourceHeaders = (currentSource as any)?.headers as Record<string, string> | undefined;
   const playbackReferer = sourceHeaders?.Referer || sourceHeaders?.referer || headers?.Referer || '';
   const playbackUserAgent = sourceHeaders?.["User-Agent"] || sourceHeaders?.['user-agent'] || headers?.["User-Agent"] || '';
@@ -521,6 +494,12 @@ export function MobileVideoPlayer({
   // Custom subtitle overlay (desktop parity): tracks run in "hidden" mode and
   // we paint active cues ourselves so size/font/color/BG/position/offset apply.
   const activeCueLines = useActiveCues(videoRef, `${sourceUrlKey}|${currentSubtitle}`, settings.subtitleOffset);
+  useSubtitlePretranslation(videoRef, `${sourceUrlKey}|${currentSubtitle}`);
+  const translatedCues = useSubtitleTranslation(activeCueLines);
+  const displayCueLines =
+    translatedCues.lines && translatedCues.lines.length === activeCueLines.length
+      ? translatedCues.lines
+      : activeCueLines;
   const customCueStyle = useMemo(() => buildSubtitleCueStyle(settings), [settings]);
   useEffect(() => {
     void ensureCustomSubtitleFontLoaded();
@@ -778,6 +757,8 @@ export function MobileVideoPlayer({
     let mounted = false;
     let disposed = false;
     let terminalFailure = false;
+    let dashPlayer: import('dashjs').MediaPlayerClass | null = null;
+    let dashAttempt: AbortController | undefined;
 
     // Shared recovery ladder, reachable from both the hls.js error handler and
     // the media-element stall watchdog (the "server works but the video froze"
@@ -799,6 +780,7 @@ export function MobileVideoPlayer({
         if (retryCountRef.current < MAX_SAME_URL_RETRIES) {
           retryCountRef.current += 1;
           setRetryCount(retryCountRef.current);
+          if (sourceTypeKey === 'dash') { mountAt(candidateIndexRef.current); return; }
           if (hlsRef.current) {
             try { hlsRef.current.startLoad(); return; } catch { /* fall through */ }
           }
@@ -825,6 +807,7 @@ export function MobileVideoPlayer({
       if (disposed) return;
       mounted = true;
       const finalUrlResolved = candidates[Math.min(Math.max(index, 0), candidates.length - 1)];
+      dashAttempt?.abort(); dashPlayer?.reset(); dashPlayer = null;
 
       // Cleanup previous HLS instance
       if (hlsRef.current) {
@@ -850,7 +833,16 @@ export function MobileVideoPlayer({
         }
       };
 
-      if (isHls && Hls.isSupported()) {
+      if (sourceTypeKey === 'dash') {
+        const controller = new AbortController(); dashAttempt = controller;
+        void import('@/core/player/DashAdapter').then(({ attachDashTransport }) => attachDashTransport({
+          videoElement: video, signal: controller.signal, autoPlay: shouldAutoplayVideo(settings.autoplay), startTime: initialSeekSeconds || 0,
+          source: { id: 'mobile-dash', mode: 'dash', url: finalUrlResolved, originalUrl: (source as any).originalUrl || source.url,
+            headers: { ...replayHeaders, ...(playbackReferer ? { Referer: playbackReferer } : {}), ...(playbackUserAgent ? { 'User-Agent': playbackUserAgent } : {}) } },
+        }, () => { if (!disposed && !controller.signal.aborted) recover(); })).then(player => {
+          if (disposed || controller.signal.aborted) player.reset(); else dashPlayer = player;
+        }).catch(error => { if (!disposed && !controller.signal.aborted) giveUp(undefined, error instanceof Error ? error.message : 'dash_error'); });
+      } else if (isHls && Hls.isSupported()) {
         // Buffer sizes follow the effective profile (data-saver forces `low`).
         const { backBufferLength, maxBufferLength, maxMaxBufferLength } =
           getProfileKnobs(getEffectiveMemoryProfile()).hls;
@@ -926,6 +918,10 @@ export function MobileVideoPlayer({
         };
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
           syncAudioTracks();
+          if (preferredAudioRef.current !== 'auto') {
+            const preferred = hls.audioTracks.findIndex(track => String(track.lang || '').toLowerCase().split('-')[0] === preferredAudioRef.current);
+            if (preferred >= 0) { hls.audioTrack = preferred; setCurrentHlsAudioTrack(preferred); }
+          }
           if (initialSeekSeconds && initialSeekSeconds > 0) {
             video.currentTime = initialSeekSeconds;
           }
@@ -1066,6 +1062,7 @@ export function MobileVideoPlayer({
 
     return () => {
       disposed = true;
+      dashAttempt?.abort(); dashPlayer?.reset(); dashPlayer = null;
       if (metadataAutoplayCleanup.current) {
         metadataAutoplayCleanup.current();
         metadataAutoplayCleanup.current = null;

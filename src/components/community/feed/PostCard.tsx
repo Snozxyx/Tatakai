@@ -222,6 +222,8 @@ export function PostCard({ post, defaultShowComments = false, contextCommunityId
   const author = post.profiles;
   const authorName = author?.display_name || author?.username || 'Anonymous';
 
+  if (post.is_deleted && !defaultShowComments) return null;
+
   if (post.is_deleted) {
     return (
       <div data-mobile-community-post>
@@ -477,7 +479,7 @@ export function PostCard({ post, defaultShowComments = false, contextCommunityId
               onClick={(e) => e.stopPropagation()}
             >
               <div className="border-t border-white/[0.08] pt-4 mt-2">
-                <Comments entityType="forum_post" entityId={post.id} entityName={post.title} />
+                <Comments entityType="forum_post" entityId={post.id} entityName={post.title} generalCommunity={!post.community_id} />
               </div>
             </motion.div>
           )}

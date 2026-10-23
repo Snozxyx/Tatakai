@@ -1,0 +1,86 @@
+name: Translate engine verification
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'translate-engine/**'
+      - 'desktop/runtime/translate/**'
+      - 'desktop/ipc/ipc-translate.cjs'
+      - 'scripts/*translate*'
+      - 'tests/translate-*.test.cjs'
+      - 'tests/fixtures/translate/**'
+      - '.github/workflows/translate-engine.yml'
+      - 'package.json'
+      - 'package-lock.json'
+  pull_request:
+    paths:
+      - 'translate-engine/**'
+      - 'desktop/runtime/translate/**'
+      - 'desktop/ipc/ipc-translate.cjs'
+      - 'scripts/build-translate-engine.mjs'
+      - 'scripts/verify-translate-package.cjs'
+      - 'scripts/check-translate-inference.cjs'
+      - 'scripts/check-translate-offline-inference.cjs'
+      - 'tests/translate-*.test.cjs'
+      - 'tests/fixtures/translate/**'
+      - '.github/workflows/translate-engine.yml'
+      - 'package.json'
+      - 'package-lock.json'
+
+permissions:
+  contents: read
+
+jobs:
+  native-engine:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+          - runner: windows-11-arm
+            target: aarch64-pc-windows-msvc
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+          - runner: macos-15
+            target: aarch64-apple-darwin
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Linux credential store build dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev pkg-config
+      - name: Engine tests
+        run: cargo test --locked --manifest-path translate-engine/Cargo.toml --target ${{ matrix.target }}
+      - name: Build native engine
+        env:
+          TATAKAI_TRANSLATE_TARGET: ${{ matrix.target }}
+        run: node scripts/build-translate-engine.mjs
+      - name: Native process and reader tests
+        run: npm ci --ignore-scripts
+      - name: Verify native project and export flows
+        run: node --test tests/translate-reader.test.cjs tests/translate-engine.test.cjs tests/translate-packaging.test.cjs tests/translate-offline.test.cjs tests/translate-offline-ipc.test.cjs
+      - name: Real CPU inference on the native desktop architecture
+        run: node scripts/check-translate-inference.cjs
+      - name: Cached CPU inference with downloads forbidden
+        run: node scripts/check-translate-offline-inference.cjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: translate-engine-${{ matrix.target }}
+          path: resources/bin/translate-engine/*
+
+# This workflow verifies the native process. It does not certify installed
+# Electron applications, inference hardware, model parity or release readiness.

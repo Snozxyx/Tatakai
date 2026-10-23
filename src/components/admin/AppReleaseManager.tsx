@@ -1,3 +1,5 @@
+import { ThemedCheckbox } from '@/components/ui/themed-checkbox';
+import { ThemedSelect } from '@/components/ui/themed-select';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState } from 'react';
@@ -196,7 +198,7 @@ export function AppReleaseManager() {
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="platform">{uiI18n.t('app.platform_123a7f2f')}</Label>
-                                <select
+                                <ThemedSelect
                                     id="platform"
                                     value={platform}
                                     onChange={(e) => setPlatform(e.target.value as any)}
@@ -207,7 +209,7 @@ export function AppReleaseManager() {
                                     <option value="linux">{uiI18n.t('app.linux_83ad8510')}</option>
                                     <option value="android">Android</option>
                                     <option value="android-tv">Android TV</option>
-                                </select>
+                                </ThemedSelect>
                             </div>
                         </div>
 
@@ -234,7 +236,7 @@ export function AppReleaseManager() {
                         </div>
 
                         <div className="flex items-center gap-2">
-                            <input
+                            <ThemedCheckbox
                                 type="checkbox"
                                 id="isLatest"
                                 checked={isLatest}

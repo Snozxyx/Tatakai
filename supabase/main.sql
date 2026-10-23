@@ -561,6 +561,7 @@ CREATE TABLE public.content_items (
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
   chapters integer,
   volumes integer,
+  is_hidden boolean NOT NULL DEFAULT false,
   CONSTRAINT content_items_pkey PRIMARY KEY (tatakai_id)
 );
 CREATE TABLE public.content_moderation_flags (

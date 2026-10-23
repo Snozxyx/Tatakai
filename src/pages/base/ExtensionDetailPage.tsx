@@ -16,7 +16,7 @@ import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
  * state in a browser — the bundle downloads, but there is no sandbox to load it.
  */
 import { useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeft,
@@ -259,6 +259,8 @@ export default function ExtensionDetailPage() {
 
   const visual = typeVisual(extension?.type);
   const state = extension ? installer.stateFor(extension) : 'idle';
+  const [requestParams]=useSearchParams();
+  const installRequested=requestParams.get('install')==='1';
 
   const versions = useMemo<StoreVersion[]>(() => {
     if (!extension) return [];
@@ -382,10 +384,10 @@ export default function ExtensionDetailPage() {
             <div className="flex flex-col items-start gap-2 md:items-end">
               <InstallButton
                 state={state}
-                onClick={() => installer.toggle(extension)}
+                onClick={() => { if(installRequested && installer.isInstalled(extension))return; installer.toggle(extension); }}
                 size="lg"
                 label={
-                  state === 'installed'
+                  extension.capabilities?.includes('extension-server')?'Connect to server':state === 'installed'
                     ? uiI18n.t('app.remove_e963907d')
                     : state === 'installing'
                       ? uiI18n.t('app.working_13b7bfca')

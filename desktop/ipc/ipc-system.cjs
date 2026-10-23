@@ -63,7 +63,21 @@ module.exports = function registerSystemHandlers(ipcMain, app, dialog, autoUpdat
         try {
             const win = getMainWindow();
             if (!win) return { success: false, error: 'no-window' };
+            const settle = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+            if (enabled && win.isMaximized()) {
+                // Windows frameless windows fail to leave a maximized state into
+                // fullscreen cleanly; unmaximize first so the transition settles.
+                win.unmaximize();
+                await settle(80);
+            }
             win.setFullScreen(Boolean(enabled));
+            // The unmaximize → fullscreen transition can briefly report
+            // isFullScreen() false. Verify once and retry a missed enter so the
+            // reported state is the real end state, not a transitional snapshot.
+            if (enabled && !win.isFullScreen()) {
+                await settle(300);
+                if (!win.isDestroyed() && !win.isFullScreen()) win.setFullScreen(true);
+            }
             return { success: true, fullscreen: win.isFullScreen() };
         } catch (err) {
             return { success: false, error: err?.message || String(err) };

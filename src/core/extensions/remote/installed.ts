@@ -1,4 +1,5 @@
 import Dexie, { type Table } from 'dexie';
+import { extensionDeadline } from './deadline';
 import { detectEcosystem, normalizeManifestUrl, EXTENSION_INSTALLED_EVENT } from '../ecosystems';
 import { fetchExtensionJson, extensionFetch } from './transport';
 import { buildSeanimeBundle, wrapSeanimeCode } from './seanime';
@@ -84,7 +85,7 @@ export async function invokeRemote(row: RemoteExtension, method: string, args: a
   if (!row.enabled) throw new Error('Extension is disabled');
   const runtime = (window as any).tatakaiRuntime;
   if (runtime?.invokeExtension && (window as any).electron) {
-    const result = await runtime.invokeExtension(row.id, method, { ...args, preferences: row.preferences });
+    const result = await extensionDeadline<{ success?: boolean; error?: string; result?: unknown }>(() => runtime.invokeExtension(row.id, method, { ...args, preferences: row.preferences }), 30000);
     if (!result?.success) throw new Error(result?.error || 'Seanime provider call failed');
     return result.result;
   }
