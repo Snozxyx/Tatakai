@@ -73,7 +73,7 @@ jobs:
             sudo sysctl -q -w net.ipv4.tcp_congestion_control=bbr
           fi
       - name: Deliver verified build archive to Server B
-        if: github.event_name == 'push' && steps.release_artifact.outcome == 'success'
+        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && steps.release_artifact.outcome == 'success'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
