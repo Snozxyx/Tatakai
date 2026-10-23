@@ -119,6 +119,8 @@ jobs:
         shell: bash
         env:
           DESKTOP_DOTENV: ${{ secrets.DESKTOP_DOTENV }}
+          VITE_EXTENSION_API_URL: ${{ secrets.VITE_EXTENSION_API_URL }}
+          VITE_EXTENSION_PORTAL_URL: ${{ secrets.VITE_EXTENSION_PORTAL_URL }}
           CLIENT_DOTENV: ${{ secrets.WEB_DOTENV || secrets.DESKTOP_DOTENV }}
         run: node scripts/write-client-env.mjs desktop
 
@@ -330,6 +332,8 @@ jobs:
         shell: bash
         env:
           DESKTOP_DOTENV: ${{ secrets.DESKTOP_DOTENV }}
+          VITE_EXTENSION_API_URL: ${{ secrets.VITE_EXTENSION_API_URL }}
+          VITE_EXTENSION_PORTAL_URL: ${{ secrets.VITE_EXTENSION_PORTAL_URL }}
           CLIENT_DOTENV: ${{ secrets.WEB_DOTENV || secrets.DESKTOP_DOTENV }}
         run: node scripts/write-client-env.mjs mobile
 
@@ -401,6 +405,8 @@ jobs:
         shell: bash
         env:
           DESKTOP_DOTENV: ${{ secrets.DESKTOP_DOTENV }}
+          VITE_EXTENSION_API_URL: ${{ secrets.VITE_EXTENSION_API_URL }}
+          VITE_EXTENSION_PORTAL_URL: ${{ secrets.VITE_EXTENSION_PORTAL_URL }}
           CLIENT_DOTENV: ${{ secrets.WEB_DOTENV || secrets.DESKTOP_DOTENV }}
         run: node scripts/write-client-env.mjs mobile
 

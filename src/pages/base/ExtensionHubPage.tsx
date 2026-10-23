@@ -29,8 +29,9 @@ import { InstalledCompatibilityExtensions } from '@/components/extensions/Instal
  * gone rather than reimplemented, because inventing activity in a store that
  * tracks real install counts is worse than an emptier page.
  */
-import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { toast } from 'sonner';
 import {
   ArrowLeft,
   ExternalLink,
@@ -58,7 +59,7 @@ import {
   StoreShelf,
 } from '@/components/extensions/store/StorePrimitives';
 import { formatCompact } from '@/components/extensions/store/extensionVisuals';
-import { useExtensionInstaller, useStoreCatalogue } from '@/hooks/api/useExtensionStore';
+import { useExtensionInstaller, useStoreCatalogue, useStoreExtensionDetail } from '@/hooks/api/useExtensionStore';
 import {
   EXTENSION_PORTAL_URL,
   type StoreExtension,
@@ -188,9 +189,43 @@ export default function ExtensionHubPage() {
   const [sideloadOpen, setSideloadOpen] = useState(false);
   const [visibleCount, setVisibleCount] = useState(48);
   useEffect(() => setVisibleCount(48), [search, type, ecosystem, compatibility, language]);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const installId = searchParams.get('install')?.trim() || undefined;
+  const requestedExtension = useStoreExtensionDetail(installId);
+  const handledInstallId = useRef<string | null>(null);
 
   const catalogue = useStoreCatalogue({ search, type: type === 'manga' ? 'all' : type, ecosystem, compatibility, language });
   const installer = useExtensionInstaller();
+
+  // Links from extensions.tatakai.me use `tatakai://extensions?install=<id>`.
+  // Resolve the public catalog record inside the app and pass it through the
+  // same validated installer used by the in-app store. This keeps package
+  // downloads and remote Stremio/Seanime manifests on their normal code paths.
+  useEffect(() => {
+    if (!installId) {
+      handledInstallId.current = null;
+      return;
+    }
+    if (handledInstallId.current === installId || requestedExtension.isLoading) return;
+    handledInstallId.current = installId;
+
+    void (async () => {
+      try {
+        if (!requestedExtension.extension) {
+          toast.error(requestedExtension.error?.message || 'This extension is not available in the Tatakai catalog.');
+          return;
+        }
+        await installer.install.mutateAsync({ extension: requestedExtension.extension });
+      } catch {
+        // The installer mutation reports its own error to the user.
+      } finally {
+        const next = new URLSearchParams(searchParams);
+        next.delete('install');
+        setSearchParams(next, { replace: true });
+      }
+    })();
+  }, [installId, requestedExtension.isLoading, requestedExtension.extension, requestedExtension.error, installer.install, searchParams, setSearchParams]);
+
   const typeFilters = isIos ? TYPE_FILTERS.filter((option) => option.id !== 'torrent') : TYPE_FILTERS;
   const visibleItems = useMemo(
     () => (isIos ? catalogue.items.filter((item) => item.type !== 'torrent') : catalogue.items).filter(item => (type !== 'manga' || isMangaExtension(item)) && (ecosystem === 'all' || (item.ecosystem || 'tatakai') === ecosystem) && (compatibility === 'all' || (item.compatibility || 'supported') === compatibility)),
