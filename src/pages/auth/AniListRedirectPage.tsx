@@ -3,7 +3,7 @@ import { useEffect, useState, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useSettingsModal } from '@/contexts/SettingsModalContext';
-import { exchangeAniListCode } from '@/lib/externalIntegrations';
+import { exchangeAniListCode, readAniListOAuthState } from '@/lib/externalIntegrations';
 import { buildDesktopDeepLink, isNativeOAuthApp, isDesktopOAuthState } from '@/lib/desktopOAuth';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -75,6 +75,15 @@ export default function AniListRedirectPage() {
         const completeAuth = async () => {
             hasRun.current = true;
             try {
+                // SECURITY (audit finding AUTH-1): verify the CSRF `state` before
+                // spending the authorization code. Without this the callback
+                // happily linked whatever AniList account the code belonged to,
+                // so a link crafted by someone else could attach THEIR account to
+                // the signed-in user's profile (login CSRF). Mirrors MalRedirectPage.
+                const expectedState = readAniListOAuthState();
+                if (!stateParam) throw new Error(t('auth.stateMissing'));
+                if (!expectedState) throw new Error(t('auth.stateMissing'));
+                if (stateParam !== expectedState) throw new Error(t('auth.stateMismatch'));
                 await exchangeAniListCode(code, user.id);
                 await refreshProfile();
                 setStatus('success');

@@ -471,8 +471,29 @@ module.exports = function registerRuntimeHandlers(ipcMain, app, fs, path, logger
     });
 
     // ── cache:read / cache:write ──────────────────────────────────────────────
+    // SEC audit finding DESK-3: `key` used to be interpolated straight into
+    // path.join(), so `{ key: '../../../evil' }` wrote attacker-controlled JSON
+    // anywhere the app process could write (and read arbitrary *.json files back
+    // out). Keys are now restricted to a flat, separator-free charset and the
+    // resolved path is re-checked against the cache directory.
+    const CACHE_KEY_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+    const isValidCacheKey = (key) =>
+        typeof key === 'string' && CACHE_KEY_RE.test(key) && !key.includes('..');
+
+    const resolveCachePath = (key) => {
+        if (!isValidCacheKey(key)) return null;
+        const cacheDir = path.resolve(app.getPath('userData'), 'runtime_cache');
+        const cachePath = path.resolve(cacheDir, `${key}.json`);
+        if (!cachePath.startsWith(cacheDir + path.sep)) return null;
+        return cachePath;
+    };
+
     ipcMain.handle('cache:read', async (_event, key) => {
-        const cachePath = path.join(app.getPath('userData'), 'runtime_cache', `${key}.json`);
+        const cachePath = resolveCachePath(key);
+        if (!cachePath) {
+            logger.warn('[Cache] Rejected invalid cache key on read');
+            return null;
+        }
         try {
             if (fs.existsSync(cachePath)) return JSON.parse(fs.readFileSync(cachePath, 'utf8'));
         } catch (e) {
@@ -481,10 +502,15 @@ module.exports = function registerRuntimeHandlers(ipcMain, app, fs, path, logger
         return null;
     });
 
-    ipcMain.handle('cache:write', async (_event, { key, value }) => {
-        const cacheDir = path.join(app.getPath('userData'), 'runtime_cache');
+    ipcMain.handle('cache:write', async (_event, { key, value } = {}) => {
+        const cachePath = resolveCachePath(key);
+        if (!cachePath) {
+            logger.warn('[Cache] Rejected invalid cache key on write');
+            return false;
+        }
+        const cacheDir = path.dirname(cachePath);
         if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
-        fs.writeFileSync(path.join(cacheDir, `${key}.json`), JSON.stringify(value), 'utf8');
+        fs.writeFileSync(cachePath, JSON.stringify(value), 'utf8');
         return true;
     });
 

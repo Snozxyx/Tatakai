@@ -201,7 +201,12 @@ contextBridge.exposeInMainWorld('electron', {
     listInstalledExtensions: () => ipcRenderer.invoke('electron.listInstalledExtensions'),
 
     // Home Server — must live on window.electron (settings UI)
-    invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args),
+    // NOTE: there is deliberately NO generic `invoke(channel, ...)` passthrough
+    // here (see docs/security/SECURITY_AUDIT.md, finding DESK-1). Mirroring the
+    // whole ipcMain surface into the renderer turns any renderer-side code
+    // execution into arbitrary main-process IPC — file reads/writes, downloads,
+    // torrent control, home-server admin. Every capability must be a named,
+    // reviewable entry in this bridge.
     homeServerGetStatus: () => ipcRenderer.invoke('home-server:get-status'),
     homeServerGetConfig: () => ipcRenderer.invoke('home-server:get-config'),
     homeServerSetConfig: (patch) => ipcRenderer.invoke('home-server:set-config', patch),
@@ -401,9 +406,6 @@ contextBridge.exposeInMainWorld('tatakaiRuntime', {
     extractAudioTrack: (url, trackIndex) => ipcRenderer.invoke('media:extract-audio-track', url, trackIndex),
     readLocalFile: (filePath) => ipcRenderer.invoke('media:read-local-file', filePath),
 
-    // Generic invoke (fallback for newer channels if preload is stale)
-    invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args),
-
     // FlareSolverr — configure and query the external bypass service
     flareSolverrConfig: (config) => ipcRenderer.invoke('runtime:flaresolverr-config', config),
     flareSolverrStatus: () => ipcRenderer.invoke('runtime:flaresolverr-status'),
@@ -474,7 +476,6 @@ contextBridge.exposeInMainWorld('tatakaiRuntime', {
         listConsent: () => ipcRenderer.invoke('home-server:list-consent'),
         decideConsent: (payload) => ipcRenderer.invoke('home-server:decide-consent', payload),
     },
-    invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args),
 
     // Cleanup
     removeTorrentProgressListeners: () => ipcRenderer.removeAllListeners('torrent:progress'),

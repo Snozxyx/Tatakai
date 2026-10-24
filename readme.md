@@ -54,6 +54,7 @@
 - [API](#api)
 - [Community and support](#community-and-support)
 - [Legal and licensing](#legal-and-licensing)
+- [Security](#security)
 - [AI disclosure](#ai-disclosure)
 - [Star history](#star-history)
 
@@ -101,7 +102,7 @@ For a new Tatakai checkout, use `git clone --recurse-submodules`.
 
 Discord is currently Tatakai's only official social channel. Please report accounts on other social platforms that claim to represent Tatakai.
 
-For security concerns, contact the maintainers privately rather than sharing sensitive details in a public issue.
+For security concerns, use [GitHub private vulnerability reporting](https://github.com/Snozxyx/Tatakai/security) rather than sharing sensitive details in a public issue — see [SECURITY.md](SECURITY.md) for scope, response times and safe-harbour terms. The published self-assessment (what was reviewed, what is fixed, and what is still open) is in [docs/security/SECURITY_AUDIT.md](docs/security/SECURITY_AUDIT.md).
 
 ## Legal and licensing
 
@@ -115,6 +116,20 @@ Tatakai is developed as a non-commercial, educational frontend project and is li
 **Licensing note:** The MPL-2.0 does not itself prohibit commercial use or require an entire combined project to be open source. Any additional restrictions would need separate, legally reviewed terms; they are not imposed by the MPL-2.0 alone.
 
 For legal or content-related concerns, contact [snozxyx@gmail.com](mailto:snozxyx@gmail.com).
+
+## Security
+
+Security reports go through [GitHub private vulnerability reporting](https://github.com/Snozxyx/Tatakai/security) — please do not open a public issue with details. [SECURITY.md](SECURITY.md) covers scope, what to include, response targets and safe harbour.
+
+The repository also carries its own executable security baseline, so the trust-boundary decisions below cannot silently regress:
+
+```bash
+node scripts/check-security-baseline.mjs   # 20 repository invariants
+node scripts/check-audit-gate.mjs          # production dependency advisories
+node scripts/check-migrations.mjs          # schema lint, incl. RLS coverage
+```
+
+What was reviewed, what was fixed, and — importantly — [what is still open](docs/security/SECURITY_AUDIT.md#e-open-findings-and-residual-risk) is documented in [`docs/security/SECURITY_AUDIT.md`](docs/security/SECURITY_AUDIT.md).
 
 ## AI disclosure
 

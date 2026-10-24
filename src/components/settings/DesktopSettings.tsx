@@ -364,9 +364,7 @@ export function DesktopSettings() {
                 );
 
                 setTimeout(async () => {
-                    await (window as any).electron.invoke(
-                        'app-relaunch'
-                    );
+                    await (window as any).electron.appRelaunch();
                 }, 1500);
             } else {
                 toast.error(

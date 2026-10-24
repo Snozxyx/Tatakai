@@ -1,6 +1,7 @@
 'use strict';
 
 const pathModule = require('path');
+const { fileURLToPath } = require('url');
 const { Menu, shell } = require('electron');
 const { attachStreamingCors } = require('./cors-bridge.cjs');
 const { registerShortcuts } = require('./shortcuts.cjs');
@@ -28,15 +29,37 @@ function createMainWindow(deps) {
 
     const getMainWindow = () => winState.mainWindow;
     const shouldOpenDevTools = isDev && process.env.ELECTRON_DEVTOOLS === '1';
-    const isAllowedAppUrl = (url) => {
-        if (!url || typeof url !== 'string') return false;
-        return (
-            url.startsWith(`${APP_SCHEME}://${APP_HOST}`) ||
-            url.startsWith('https://api.tatakai.me') ||
-            url.startsWith('http://localhost:8090') ||
-            url.startsWith('http://127.0.0.1:8090') ||
-            url.startsWith('file://')
-        );
+    // SEC audit finding DESK-4: this used to be a set of `startsWith` checks, so
+    // `https://api.tatakai.me.evil.example/` and any `file://` path passed as an
+    // in-app URL. Compare parsed components instead: an exact origin, an exact
+    // app:// host, and file: URLs that stay inside the packaged renderer dir.
+    const distDir = pathModule.resolve(desktopDir, '..', 'dist');
+    const isAllowedAppUrl = (rawUrl) => {
+        if (!rawUrl || typeof rawUrl !== 'string') return false;
+        let url;
+        try {
+            url = new URL(rawUrl);
+        } catch (_) {
+            return false;
+        }
+        if (url.protocol === 'app:') return url.hostname === APP_HOST;
+        if (url.protocol === 'https:') return url.origin === 'https://api.tatakai.me';
+        if (url.protocol === 'http:') {
+            return (
+                (url.hostname === 'localhost' || url.hostname === '127.0.0.1') &&
+                url.port === '8090'
+            );
+        }
+        if (url.protocol === 'file:') {
+            let filePath;
+            try {
+                filePath = pathModule.resolve(fileURLToPath(url));
+            } catch (_) {
+                return false;
+            }
+            return filePath === distDir || filePath.startsWith(distDir + pathModule.sep);
+        }
+        return false;
     };
 
     const isMac = process.platform === 'darwin';

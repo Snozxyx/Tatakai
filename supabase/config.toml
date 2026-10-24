@@ -9,6 +9,13 @@ verify_jwt = false
 [functions.embed-proxy]
 verify_jwt = false
 
+# Admin-only push dispatch. The function re-checks the caller's staff role
+# server-side (audit finding SRV-1); `verify_jwt = true` keeps unauthenticated
+# traffic out before it even runs, and is spelled out here so a deploy cannot
+# silently inherit a different default.
+[functions.send-notification]
+verify_jwt = true
+
 # Auth email templates — 6-digit codes ({{ .Token }}), typed in-app (no links).
 # NOTE: local/CLI templates document intent. The hosted project ALSO needs these
 # pasted in Dashboard → Authentication → Email Templates (must contain {{ .Token }}),

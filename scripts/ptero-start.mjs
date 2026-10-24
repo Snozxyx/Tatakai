@@ -1,6 +1,6 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { dirname, join, extname, normalize } from 'node:path';
+import { dirname, join, extname, normalize, resolve, sep } from 'node:path';
 import { existsSync, createReadStream, readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { matchEntityRoute } from './seo/routes.mjs';
@@ -37,6 +37,44 @@ const MIME_TYPES = {
   '.woff': 'font/woff',
   '.woff2': 'font/woff2',
 };
+
+// ── Security headers ─────────────────────────────────────────────────────────
+// SEC audit finding WEB-1: this server (the documented self-hosted production
+// web entrypoint, `npm run start:web` / Pterodactyl) sent no security headers at
+// all — no CSP, no HSTS, no nosniff — unlike the Vercel deployment, which gets
+// them from vercel.json. Keep the two in sync when either changes.
+const SITE_CSP = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.google-analytics.com https://challenges.cloudflare.com",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: https:",
+  "font-src 'self' data:",
+  "connect-src 'self' blob: https: http: http://localhost:* http://127.0.0.1:* http://[::1]:* https://*.supabase.co https://*.tatakai.me https://api.tatakai.me https://api.jikan.moe https://api.trace.moe https://graphql.anilist.co https://api.myanimelist.net https://api.mangabaka.org https://www.google-analytics.com https://*.datadoghq.com https://challenges.cloudflare.com https://huggingface.co https://*.huggingface.co https://*.hf.co",
+  "media-src 'self' blob: https:",
+  "worker-src 'self' blob:",
+  "frame-src 'self' https: https://challenges.cloudflare.com",
+  "frame-ancestors 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  'upgrade-insecure-requests',
+].join('; ');
+
+/**
+ * Apply the baseline security header set to a response.
+ * @param {import('node:http').ServerResponse} res
+ * @param {{html?: boolean}} [opts]
+ */
+function applySecurityHeaders(res, opts = {}) {
+  if (!res.headersSent) {
+    if (opts.html !== false) res.setHeader('Content-Security-Policy', SITE_CSP);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+  }
+}
 
 function runOrExit(command, args, stepName) {
   const result = spawnSync(command, args, {
@@ -127,6 +165,7 @@ function startStaticServer() {
         res.setHeader('Content-Type', expectedType);
         res.setHeader('Cache-Control', 'no-store');
         res.setHeader('Retry-After', '300');
+        applySecurityHeaders(res, { html: false });
         res.end(degradedBody);
       }
       return;
@@ -134,10 +173,23 @@ function startStaticServer() {
 
     const filePath = cleanPath === '/' ? distIndex : join(distDir, cleanPath.replace(/^[/\\]/, ''));
 
+    // SEC audit finding WEB-2: containment check. normalize()+join() already
+    // collapses `..`, but an encoded or unicode separator could otherwise escape
+    // dist/ and serve an arbitrary file. Everything outside dist/ is a 404.
+    const resolvedFile = resolve(filePath);
+    if (resolvedFile !== distIndex && !resolvedFile.startsWith(distDir + sep)) {
+      res.statusCode = 404;
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      applySecurityHeaders(res, { html: false });
+      res.end('Not found');
+      return;
+    }
+
     // Real file on disk (assets, /index.html, favicon, …): stream it untouched.
     if (existsSync(filePath)) {
       const contentType = MIME_TYPES[extname(filePath).toLowerCase()] || 'application/octet-stream';
       res.setHeader('Content-Type', contentType);
+      applySecurityHeaders(res);
       createReadStream(filePath)
         .on('error', () => {
           res.statusCode = 500;
@@ -160,6 +212,7 @@ function startStaticServer() {
 
 async function serveSpaFallback(reqPath, res, baseIndexHtml) {
   res.setHeader('Content-Type', MIME_TYPES['.html']);
+  applySecurityHeaders(res);
 
   // No cached HTML (unreadable at startup): stream the file as a last resort.
   if (baseIndexHtml == null) {

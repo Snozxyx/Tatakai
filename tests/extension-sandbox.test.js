@@ -15,7 +15,7 @@ import { describe, it, expect } from 'bun:test';
 import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
-const { wrapExtensionCode, extractAllowedDomains } = require('../desktop/runtime/extension-sandbox.cjs');
+const { wrapExtensionCode, extractAllowedDomains } = require('../desktop/runtime/extension/extension-sandbox.cjs');
 
 // ---------------------------------------------------------------------------
 // Helpers

@@ -28,8 +28,16 @@ function defaultConfig() {
       },
     ],
     tokens: {},
-    corsOrigins: ['*'],
+    // SEC audit finding HOME-1: an empty list means "same-origin only" (the
+    // bundled web UI needs nothing more). Add explicit origins here — or '*',
+    // which re-opens the server to every site — only when a different client
+    // genuinely has to call the API from another origin.
+    corsOrigins: [],
     rateLimitPerMinute: 120,
+    // Extra `Host:` values to accept, for reverse-proxy / custom-domain setups.
+    // Loopback names, IP literals, mDNS `.local` names and the OS hostname are
+    // always accepted (DNS-rebinding defence, HOME-1).
+    allowedHosts: [],
   };
 }
 

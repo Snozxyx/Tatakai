@@ -119,6 +119,8 @@
     "checkSpam": "¿No recibiste el correo? Revisa tu carpeta de spam.",
     "chooseNewPasswordFor": "Elige una nueva contraseña para",
     "codeExpired": "Ese código ha caducado. Solicita uno nuevo.",
+    "stateMissing": "El proveedor no devolvió el estado de inicio de sesión. Vuelve a iniciar sesión con AniList desde Ajustes.",
+    "stateMismatch": "Este inicio de sesión con AniList no coincide con el que se inició en este navegador. Vuelve a iniciarlo desde Ajustes.",
     "codeSent": "Casi listo: enviamos un código de 6 dígitos a {{email}}",
     "codeSentHint": "Enviamos un código de 6 dígitos a",
     "communityGuidelines": "Normas de la comunidad",

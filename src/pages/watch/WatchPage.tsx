@@ -1137,9 +1137,10 @@ export default function WatchPage() {
                 // For Electron: read subtitle file as data: URL via IPC
                 // data: URLs work reliably with <track> elements (no CORS issues)
                 const electronBridge = (window as any).electron;
-                if (electronBridge?.invoke) {
+                const readLocalFile = (window as any).tatakaiRuntime?.readLocalFile;
+                if (typeof readLocalFile === 'function') {
                   try {
-                    const result = await electronBridge.invoke('media:read-local-file', localSubPath);
+                    const result = await readLocalFile(localSubPath);
                     if (result?.success && result.url) {
                       subUrl = result.url;
                     }

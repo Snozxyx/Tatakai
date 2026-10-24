@@ -96,3 +96,112 @@ ${extensionCode}
 }
 
 module.exports = { wrapExtensionCode, extractAllowedDomains };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Hardening layer 2 — OS/process-level isolation for extension workers
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// The shadowed globals above are cosmetic: extension code runs through
+// `new Function`, which does not even see those `const` bindings (it is created
+// in the worker's *global* scope, not the module scope). What it does see is the
+// real `process` global, and `process` is enough to leave the worker entirely:
+//
+//     process.getBuiltinModule('child_process').execSync('id')
+//     process.binding('fs').open(...)
+//
+// That was verified against this runtime (Node 22) and reproduced from inside an
+// extension worker, so a malicious `.kai` bundle had full arbitrary code
+// execution with the user's privileges — no sandbox at all.
+//
+// Layer 2 therefore puts the worker under Node's permission model, which is
+// enforced in C++ below the JS layer, so `process.binding`, `getBuiltinModule`,
+// `require` tricks and `import()` all hit ERR_ACCESS_DENIED. The worker gets:
+//   read  → the app directory (JS modules only: cheerio / anitomyscript)
+//   write → nothing
+//   child processes / worker threads / WASI / native addons → denied
+//
+// Network access is deliberately NOT denied: extensions exist to fetch remote
+// pages, and every sanctioned request already goes through the domain-gated
+// `__tatakai_fetch__` helper. Node's permission model has no network scope, so
+// raw network egress by a hostile extension remains possible and is documented
+// in docs/security/SECURITY_AUDIT.md (finding EXT-2).
+
+/** Name of the permission-model flag this Node build understands, if any. */
+function permissionModelFlag() {
+  try {
+    const flags = process.allowedNodeEnvironmentFlags;
+    if (flags.has('--permission')) return '--permission';
+    if (flags.has('--experimental-permission')) return '--experimental-permission';
+  } catch (_) {
+    /* not a Node with the permission model */
+  }
+  return null;
+}
+
+/** True when extension workers can be run under the Node permission model. */
+function isProcessIsolationAvailable() {
+  return permissionModelFlag() !== null;
+}
+
+/**
+ * Build the `execArgv` that sandboxes an extension worker.
+ *
+ * Returns `null` when the runtime has no permission model (older Node/Electron),
+ * in which case the caller must treat isolation as degraded — never as granted.
+ *
+ * @param {object}   options
+ * @param {string[]} [options.readPaths]  directories the worker may read
+ * @param {string[]} [options.writePaths] directories the worker may write
+ * @returns {string[]|null}
+ */
+function buildPermissionExecArgv({ readPaths = [], writePaths = [] } = {}) {
+  const flag = permissionModelFlag();
+  if (!flag) return null;
+
+  const normalize = (paths) =>
+    Array.from(
+      new Set(
+        (Array.isArray(paths) ? paths : [])
+          .filter((p) => typeof p === 'string' && p.trim() !== '')
+          .map((p) => p.trim())
+      )
+    );
+
+  const args = [flag];
+  for (const p of normalize(readPaths)) args.push(`--allow-fs-read=${p}`);
+  for (const p of normalize(writePaths)) args.push(`--allow-fs-write=${p}`);
+  // Deliberately absent: --allow-child-process, --allow-worker, --allow-wasi,
+  // --allow-addons. All four stay denied.
+  return args;
+}
+
+/**
+ * Source injected into the worker bootstrap *before* any extension code runs.
+ *
+ * This is defence in depth for the case where the permission model is missing
+ * (unsupported runtime): it removes the documented handles a `new Function`
+ * body can reach from the `process` global.
+ */
+const WORKER_GLOBAL_HARDENING_SOURCE = `
+// ── Remove Node builtin escape hatches ───────────────────────────────────────
+// new Function bodies see the real global scope, so process is reachable.
+// These members are the documented way out of a worker-thread "sandbox".
+try { delete process.getBuiltinModule; } catch (_) {}
+try { Object.defineProperty(process, 'getBuiltinModule', { value: undefined, writable: false, configurable: false }); } catch (_) {}
+try { delete process.binding; } catch (_) {}
+try { delete process._linkedBinding; } catch (_) {}
+try { delete process.dlopen; } catch (_) {}
+try { delete process.mainModule; } catch (_) {}
+try { delete process.embedderHostFunctions; } catch (_) {}
+// Environment variables are readable (extensions need TATAKAI_PROXY_URL) but must
+// not carry the parent's secrets forward into a hostile script's reach.
+try { delete process.env.NODE_OPTIONS; } catch (_) {}
+try { delete process.env.ELECTRON_RUN_AS_NODE; } catch (_) {}
+`;
+
+module.exports = Object.assign(module.exports, {
+  buildPermissionExecArgv,
+  isProcessIsolationAvailable,
+  permissionModelFlag,
+  WORKER_GLOBAL_HARDENING_SOURCE,
+});

@@ -27,3 +27,7 @@ enabled = true
 ALLOWED_UPSTREAM_HOSTS = ""
 # Comma-separated hostnames to always block, in addition to the private-range guard.
 BLOCKED_UPSTREAM_HOSTS = ""
+# Requests allowed per client IP per 10 s (per Worker isolate). 0 disables the
+# limiter. Keep it generous: a single HLS playback legitimately fetches hundreds
+# of segments, and hls.js retries.
+RATE_LIMIT_PER_10S = "600"

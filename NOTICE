@@ -27,3 +27,53 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
+
+────────────────────────────────────────────────────────────────────────────
+Bundled / downloaded third-party binaries
+────────────────────────────────────────────────────────────────────────────
+
+The desktop build ships or downloads the following executables. They are
+invoked as separate processes (the app talks to them over pipes and the
+filesystem); they are not linked into Tatakai's own code.
+
+1. FFmpeg / ffprobe
+   Delivered through `@ffmpeg-installer/ffmpeg` and
+   `@ffprobe-installer/ffprobe`. The licence of the shipped binary depends on
+   the platform build published by those packages, and it is *not* uniform:
+
+     linux-x64   ffmpeg GPLv3        ffprobe GPL-3.0
+     win32-x64   ffmpeg GPLv3        ffprobe GPL-3.0
+     darwin-x64  ffmpeg LGPL-2.1     ffprobe GPL-3.0
+
+   Project: https://ffmpeg.org — source: https://ffmpeg.org/download.html
+   Copying / redistribution of a GPL build carries the obligations of that
+   licence (including the licence text and the source-availability terms). If
+   you redistribute a Tatakai build, check which platform packages it contains
+   and satisfy those obligations for the exact binaries you ship — being
+   separate executables changes what *you* must do, not whether the licence
+   applies. This note is descriptive, not legal advice.
+
+2. libvips (through `sharp`)
+   `sharp` links libvips, which is licensed LGPL-3.0-or-later, and the
+   prebuilt `@img/sharp-*` packages bundle it. Project:
+   https://www.libvips.org — licence: https://www.gnu.org/licenses/lgpl-3.0.html
+
+3. UnRAR
+   If an UnRAR binary is present on a user's system, Tatakai only calls it to
+   list/extract archives the user selected. UnRAR's own licence forbids using
+   it to re-create the RAR compression algorithm; Tatakai does not do that and
+   does not bundle UnRAR.
+
+4. Rust dependencies (`translate-engine/`)
+   See `translate-engine/Cargo.lock` and `cargo license` for the full crate
+   graph. Crates are statically linked into the translate engine, so their
+   notices apply to that binary.
+
+5. Localisation model weights (Qwen3-VL and friends)
+   Downloaded at the user's request into the app data directory, not shipped
+   in the installer. Each model carries its own licence (Apache-2.0 for the
+   Qwen3-VL family at the time of writing) — the model card is authoritative
+   for the version you download.
+
+Tatakai itself is licensed MPL-2.0 (see LICENSE). The MPL applies to Tatakai's
+own source files; it does not relicense any of the components above.
