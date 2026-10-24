@@ -11,6 +11,6 @@
     "secret": "wrangler secret put PROXY_PASSWORD"
   },
   "devDependencies": {
-    "wrangler": "^3.90.0"
+    "wrangler": "^4.152.0"
   }
 }
