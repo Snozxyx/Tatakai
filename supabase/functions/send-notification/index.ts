@@ -118,14 +118,15 @@ serve(async (req) => {
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
     const { data: profile, error: profileError } = await adminClient
       .from("profiles")
-      .select("is_admin, role")
+      .select("is_admin, is_moderator, role")
       .eq("user_id", callerId)
       .maybeSingle();
     if (profileError) {
       console.error("send-notification: profile lookup failed", profileError.message);
       return json({ error: "unavailable" }, 503, cors);
     }
-    const isStaff = Boolean(profile?.is_admin) || ["admin", "moderator"].includes(profile?.role ?? "");
+    const isStaff = profile?.is_admin === true || profile?.is_moderator === true ||
+      ["admin", "moderator"].includes(profile?.role ?? "");
     if (!isStaff) {
       console.warn(`send-notification: caller ${callerId} is not staff — denied`);
       return json({ error: "forbidden" }, 403, cors);
@@ -163,23 +164,26 @@ serve(async (req) => {
       console.error("send-notification: token query failed", tokenError.message);
       return json({ error: "unavailable" }, 503, cors);
     }
-    if (!tokens || tokens.length === 0) {
-      return json({ success: true, message: "No devices found to notify" }, 200, cors);
-    }
-
-    const fcmTokens = [...new Set(tokens.map((t: { token: string }) => t.token).filter(Boolean))];
+    const fcmTokens = [...new Set((tokens ?? []).map((t: { token: string }) => t.token).filter(Boolean))];
 
     // NOTE: delivery is not implemented here (no FCM service account is
     // configured). The audit trail below is intentional: broadcast actions must
     // be attributable to the staff member who triggered them.
-    await adminClient.from("staff_audit_log").insert({
-      actor_id: callerId,
+    const { error: auditError } = await adminClient.from("admin_logs").insert({
+      user_id: callerId,
       action: "send_notification",
-      target,
-      detail: { title, recipientCount: fcmTokens.length, userId: userId ?? null },
-    }).then(() => undefined).catch((err: Error) => {
-      console.error("send-notification: audit write failed", err.message);
+      entity_type: "notification",
+      entity_id: userId ?? null,
+      details: { title, target, recipientCount: fcmTokens.length, userId: userId ?? null },
     });
+    if (auditError) {
+      console.error("send-notification: audit write failed", auditError.message);
+      return json({ error: "unavailable" }, 503, cors);
+    }
+
+    if (fcmTokens.length === 0) {
+      return json({ success: true, message: "No devices found to notify" }, 200, cors);
+    }
 
     return json({ success: true, count: fcmTokens.length }, 200, cors);
   } catch (error) {

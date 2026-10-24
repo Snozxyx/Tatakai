@@ -28,7 +28,11 @@ concurrency:
 jobs:
   baseline:
     name: Security baseline & regression tests
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -49,7 +53,7 @@ jobs:
         run: bun install --frozen-lockfile || npm ci --ignore-scripts
 
       - name: Security regression tests
-        run: bun test tests/extension-worker-isolation.test.mjs tests/desktop-ipc-hardening.test.js tests/desktop-media-guard.test.js tests/desktop-open-path-guard.test.js tests/extension-api-host-origin-guard.test.js tests/anilist-oauth-state.test.ts tests/home-server-origin-guard.test.js tests/streaming-proxy-worker.test.js tests/rich-text-sanitizer.test.ts
+        run: bun test tests/extension-worker-isolation.test.mjs tests/desktop-ipc-hardening.test.js tests/desktop-media-guard.test.js tests/desktop-open-path-guard.test.js tests/extension-api-host-origin-guard.test.js tests/anilist-oauth-state.test.ts tests/home-server-origin-guard.test.js tests/home-server-store.test.js tests/send-notification-security.test.ts tests/streaming-proxy-worker.test.js tests/rich-text-sanitizer.test.ts
 
       - name: Migration lint
         run: node scripts/check-migrations.mjs

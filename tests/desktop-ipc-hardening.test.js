@@ -10,7 +10,8 @@
 import { describe, it, expect } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const require = createRequire(import.meta.url);
 const { installIpcSenderGuard, isTrustedFrameUrl } = require('../desktop/security/ipc-guard.cjs');
@@ -43,8 +44,8 @@ describe('preload IPC surface (DESK-1)', () => {
 describe('IPC sender guard (DESK-2)', () => {
     const opts = {
         isDev: false,
-        distDir: '/opt/Tatakai/resources/app/dist',
-        desktopDir: '/opt/Tatakai/resources/app/desktop',
+        distDir: resolve(ROOT, 'dist'),
+        desktopDir: resolve(ROOT, 'desktop'),
     };
 
     it('trusts the packaged app:// renderer only', () => {
@@ -55,10 +56,11 @@ describe('IPC sender guard (DESK-2)', () => {
     });
 
     it('trusts local files inside the app directories only', () => {
-        expect(isTrustedFrameUrl('file:///opt/Tatakai/resources/app/dist/index.html', opts)).toBe(true);
-        expect(isTrustedFrameUrl('file:///opt/Tatakai/resources/app/desktop/offline.html', opts)).toBe(true);
-        expect(isTrustedFrameUrl('file:///etc/passwd', opts)).toBe(false);
-        expect(isTrustedFrameUrl('file:///opt/Tatakai/resources/app/dist/../../secrets.txt', opts)).toBe(false);
+        expect(isTrustedFrameUrl(pathToFileURL(join(opts.distDir, 'index.html')).href, opts)).toBe(true);
+        expect(isTrustedFrameUrl(pathToFileURL(join(opts.desktopDir, 'offline.html')).href, opts)).toBe(true);
+        expect(isTrustedFrameUrl(pathToFileURL(join(ROOT, 'secrets.txt')).href, opts)).toBe(false);
+        expect(isTrustedFrameUrl(pathToFileURL(join(opts.distDir, '../../secrets.txt')).href, opts)).toBe(false);
+        expect(isTrustedFrameUrl(pathToFileURL(`${opts.distDir}-other/index.html`).href, opts)).toBe(false);
     });
 
     it('trusts the dev server only in development', () => {

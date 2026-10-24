@@ -244,7 +244,13 @@ bucket.
 **Fix:** no CORS headers unless the operator lists explicit origins, `Host`
 validation (`isAllowedHostHeader`), `Origin` validation (`isAllowedOrigin`), and a
 dedicated tight rate-limit bucket for login.
-**Test:** `tests/home-server-origin-guard.test.js`. **Guard:** `HOME-1` invariant.
+Previously saved wildcard origins are removed on read and write, with the
+upgrade persisted when possible. Explicit origin allowlists, credentials and
+other configuration are retained. Wildcards are no longer supported, including
+when supplied directly to the request handler.
+**Tests:** `tests/home-server-origin-guard.test.js` (upgraded existing config),
+`tests/home-server-store.test.js` (persistence and read-only disk).
+**Guard:** `HOME-1` invariant.
 
 ### D13. PW-1..PW-3 — streaming proxy worker
 PW-2 is the important one: `redirect: 'follow'` let an allowed upstream bounce the
@@ -261,6 +267,13 @@ could `POST {target:'all', title, body}` and push arbitrary text to the entire
 user base. It also answered `ACAO: *` and returned raw Postgres/Deno errors.
 **Fix:** caller JWT required, profile resolved server-side, staff-only broadcast,
 per-caller rate limit, origin allowlist, and no internal error detail.
+Staff checks include `is_admin`, `is_moderator`, and the textual role. Attempts
+are recorded in the existing `admin_logs` schema, including zero-recipient
+attempts. A returned database error from the audit insert returns HTTP 503
+instead of silently reporting success. Push delivery itself still requires an
+FCM implementation; this fix does not add one.
+**Test:** `tests/send-notification-security.test.ts` executes the actual handler
+with injected authentication/database dependencies.
 
 ### D15. DB-1 — eleven `public` tables without RLS, including the updater's download URL
 Supabase grants `anon` and `authenticated` `ALL` on new tables by default, so an

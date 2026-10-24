@@ -14,6 +14,7 @@ import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 const { createHomeServer } = require('../desktop/runtime/home-server/server.cjs');
+const { createHomeServerStore } = require('../desktop/runtime/home-server/store.cjs');
 
 const PORT = 18787;
 
@@ -26,18 +27,23 @@ function fakeStore() {
         passwordSalt: 'salt',
         users: [{ id: 'admin', name: 'Admin', role: 'admin', permissions: ['*'] }],
         tokens: {},
-        corsOrigins: [],
+        // Simulate the wildcard saved by the previous release, rather than
+        // testing only a clean install with the new safe defaults.
+        corsOrigins: ['*'],
         rateLimitPerMinute: 500,
         requireConsent: false,
         consentRequests: [],
     };
-    return {
-        read: () => ({ ...config }),
-        write: () => true,
-        resolveToken: () => ({ user: config.users[0] }),
-        verifyPassword: () => false,
-        issueToken: () => 'token',
-    };
+    let saved = JSON.stringify(config);
+    return createHomeServerStore({
+        app: { getPath: () => import.meta.dir },
+        fs: {
+            existsSync: () => true,
+            readFileSync: () => saved,
+            writeFileSync: (_path, value) => { saved = value; },
+        },
+        logger: { warn() {} },
+    });
 }
 
 const adapters = new Proxy(

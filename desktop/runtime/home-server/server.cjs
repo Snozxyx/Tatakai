@@ -270,7 +270,7 @@ function createHomeServer({ store, adapters, logger }) {
       };
     }
     const allow =
-      allowed.includes('*') ? origin || '*' : origin && allowed.includes(origin) ? origin : 'null';
+      origin && origin !== '*' && allowed.includes(origin) ? origin : 'null';
     return {
       'Access-Control-Allow-Origin': allow,
       'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Tatakai-Token',
@@ -321,8 +321,7 @@ function createHomeServer({ store, adapters, logger }) {
   function isAllowedOrigin(origin, hostHeader, config) {
     if (!origin) return true; // same-origin subresource / non-browser client
     const allowed = Array.isArray(config.corsOrigins) ? config.corsOrigins : [];
-    if (allowed.includes('*')) return true;
-    if (allowed.includes(origin)) return true;
+    if (origin !== '*' && allowed.includes(origin)) return true;
     try {
       const parsed = new URL(origin);
       const host = String(hostHeader || '').toLowerCase();
