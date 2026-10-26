@@ -39,20 +39,32 @@ interface RuntimeHealth {
   loadedExtensions: string[];
 }
 
-class ExtensionDebugger {
-  private async invoke(channel: string, ...args: any[]): Promise<any> {
-    if (typeof window === 'undefined' || !(window as any).electron) {
-      throw new Error('Must run in Electron renderer process');
-    }
-    return (window as any).electron.invoke(channel, ...args);
-  }
+type RuntimeBridge = {
+  health: () => Promise<RuntimeHealth>;
+  resolveEpisodeSources: (options: any) => Promise<any>;
+  invokeExtension: (extensionId: string, method: string, args: unknown[]) => Promise<any>;
+};
 
+/**
+ * The runtime bridge exposes named operations only — there is intentionally no
+ * generic `invoke(channel, ...)` on the preload bridge (SEC audit finding
+ * DESK-1), so this debugger goes through the same typed entry points the app
+ * itself uses.
+ */
+function runtimeBridge(): RuntimeBridge {
+  if (typeof window === 'undefined' || !(window as any).tatakaiRuntime) {
+    throw new Error('Must run in Electron renderer process');
+  }
+  return (window as any).tatakaiRuntime as RuntimeBridge;
+}
+
+class ExtensionDebugger {
   async checkStatus(): Promise<void> {
     console.log('=== Extension Status Check ===\n');
 
     try {
       // Check runtime health
-      const health = await this.invoke('runtime:health') as RuntimeHealth;
+      const health = await runtimeBridge().health();
       console.log('✅ Runtime Status:', health.status);
       console.log('   App Version:', health.version);
       console.log('   Loaded Extensions:', health.loadedExtensions.length);
@@ -104,7 +116,7 @@ class ExtensionDebugger {
 
     try {
       const startTime = Date.now();
-      const result = await this.invoke('runtime:resolve-sources', testQuery);
+      const result = await runtimeBridge().resolveEpisodeSources(testQuery);
       const elapsed = Date.now() - startTime;
 
       console.log(`\n⏱️  Elapsed: ${elapsed}ms`);
@@ -143,16 +155,16 @@ class ExtensionDebugger {
 
     try {
       // Direct invoke to extension
-      const invokeResult = await this.invoke('extension:invoke', {
-        extensionId: 'tatakai.extension.toko',
-        method: 'single',
-        args: [{
+      const invokeResult = await runtimeBridge().invokeExtension(
+        'tatakai.extension.toko',
+        'single',
+        [{
           anilistId: 21,
           titles: ['One Piece'],
           episode: 1,
           resolution: '1080p',
         }],
-      });
+      );
 
       console.log('Direct invoke result:', invokeResult);
 
@@ -228,7 +240,7 @@ class ExtensionDebugger {
 
       console.log('✅ Toko loaded');
 
-      const result = await this.invoke('runtime:resolve-sources', {
+      const result = await runtimeBridge().resolveEpisodeSources({
         anilistId: 21,
         titles: ['One Piece'],
         episode: 1,

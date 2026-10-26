@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Data extraction rules (Android 12+).
+
+  Tatakai stores the user's Supabase session (JWT + refresh token) in the
+  WebView's storage and keeps library/torrent indexes in app-private files.
+  Neither belongs in a cloud backup or a device-to-device transfer: a restored
+  backup on another account/device would silently grant that account the
+  session. Everything is therefore excluded — the app re-authenticates and
+  re-syncs from the server instead.
+
+  Mirrored by android:allowBackup="false" for pre-API-31 devices.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </device-transfer>
+</data-extraction-rules>

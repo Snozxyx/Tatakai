@@ -14,6 +14,7 @@ Welcome to the official documentation for **Tatakai** — an all-in-one platform
 | **Build an extension** | [Extension System](extensions/overview.md) |
 | **See all features** | [Features Reference](reference/features.md) |
 | **Contribute to the codebase** | [Contributing](contributing.md) |
+| **Report a vulnerability / read the audit** | [Security](../SECURITY.md) · [Audit](security/SECURITY_AUDIT.md) |
 
 ---
 
@@ -45,6 +46,8 @@ docs/
 │   ├── security.md              # Trust model & permissions
 │   ├── migration.md             # Migration from old format
 │   └── build-first.md           # Step-by-step extension guide
+├── security/
+│   └── SECURITY_AUDIT.md        # Self-assessment: scope, findings (fixed & open), verification
 ├── features/
 │   ├── playback.md              # Video player & streaming
 │   ├── manga.md                 # Manga/manhwa reader

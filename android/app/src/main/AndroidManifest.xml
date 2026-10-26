@@ -15,8 +15,14 @@
         <intent><action android:name="android.intent.action.VIEW" /><data android:mimeType="video/*" /></intent>
     </queries>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- SEC audit finding MOB-1: app data holds the Supabase session token and
+         the offline library index. Backing it up copies those secrets into
+         Google Drive / `adb backup`, so backup is refused explicitly here and in
+         @xml/data_extraction_rules (API 31+). -->
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:networkSecurityConfig="@xml/network_security_config"

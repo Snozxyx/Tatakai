@@ -142,13 +142,9 @@ async function runTokoTest(method: 'debugSingle' | 'debugBatch' | 'debugMangaCha
     console.log(`[DebugWindow] invokeExtension result for ${method}:`, res);
     return res;
   }
-  if (runtime?.invoke) {
-    const res = await runtime.invoke('extension:invoke', {
-      extensionId: 'tatakai.extension.toko',
-      method,
-      args: [payload],
-    });
-    console.log(`[DebugWindow] runtime.invoke result for ${method}:`, res);
+  if (runtime?.invokeExtension) {
+    const res = await runtime.invokeExtension('tatakai.extension.toko', method, [payload]);
+    console.log(`[DebugWindow] runtime.invokeExtension result for ${method}:`, res);
     return res;
   }
   throw new Error(uiI18n.t('app.no_extension_runtime_available_4a369628'));

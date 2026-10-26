@@ -125,6 +125,8 @@
     "checkSpam": "Didn't receive the email? Check your spam folder.",
     "chooseNewPasswordFor": "Choose a new password for",
     "codeExpired": "That code expired — request a new one.",
+    "stateMissing": "The provider did not return a login state. Please start the AniList login again from Settings.",
+    "stateMismatch": "This AniList login does not match the one started in this browser. Start the login again from Settings.",
     "codeSent": "Almost there — we sent a 6-digit code to {{email}}",
     "codeSentHint": "We sent a 6-digit code to",
     "communityGuidelines": "Community Guidelines",

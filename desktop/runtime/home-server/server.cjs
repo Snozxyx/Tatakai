@@ -252,15 +252,83 @@ function createHomeServer({ store, adapters, logger }) {
   const subtitleSources = new Map();
   const playbackTickets = new Map();
 
+  // SEC audit finding HOME-1. This used to default to `Access-Control-Allow-Origin: *`,
+  // and `authenticate()` treats *every* loopback request as admin. The combination
+  // meant any page in the user's browser (or a DNS-rebinding domain resolving to
+  // 127.0.0.1) could read the library, delete files and start torrents on a
+  // LAN-bound home server without ever presenting a token.
+  //
+  // Now: no CORS headers at all unless the operator lists explicit origins in
+  // config.corsOrigins (the bundled web UI is same-origin and needs none).
   function corsHeaders(origin, config) {
-    const allowed = config.corsOrigins || ['*'];
+    const allowed = Array.isArray(config.corsOrigins) ? config.corsOrigins : [];
+    if (allowed.length === 0) {
+      return {
+        'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Tatakai-Token',
+        'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS',
+        Vary: 'Origin',
+      };
+    }
     const allow =
-      allowed.includes('*') || (origin && allowed.includes(origin)) ? origin || '*' : allowed[0] || '*';
+      origin && origin !== '*' && allowed.includes(origin) ? origin : 'null';
     return {
       'Access-Control-Allow-Origin': allow,
       'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Tatakai-Token',
       'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS',
+      Vary: 'Origin',
     };
+  }
+
+  // ── Request-origin defences (HOME-1) ───────────────────────────────────────
+  const IPV4_RE = /^\d{1,3}(\.\d{1,3}){3}$/;
+
+  /**
+   * DNS-rebinding defence: the browser sends the *hostname it typed* in `Host`,
+   * so an attacker's domain resolving to this machine still announces itself.
+   * We accept loopback names, IP literals, mDNS `.local` names and the OS
+   * hostname; anything else (i.e. a random public domain) is refused.
+   */
+  function isAllowedHostHeader(hostHeader, config) {
+    const raw = String(hostHeader || '').trim().toLowerCase();
+    if (!raw) return false;
+    const extra = Array.isArray(config.allowedHosts) ? config.allowedHosts.map((h) => String(h).toLowerCase()) : [];
+    // Strip the port; IPv6 literals keep their brackets.
+    let hostname = raw;
+    if (raw.startsWith('[')) {
+      const close = raw.indexOf(']');
+      hostname = close > 0 ? raw.slice(1, close) : raw;
+    } else if (raw.includes(':')) {
+      hostname = raw.slice(0, raw.lastIndexOf(':'));
+    }
+    if (extra.includes(raw) || extra.includes(hostname)) return true;
+    if (hostname === 'localhost' || hostname === '' ) return true;
+    if (IPV4_RE.test(hostname)) return true;
+    if (hostname === '::1' || hostname === '::ffff:127.0.0.1') return true;
+    if (hostname.endsWith('.local')) return true;
+    try {
+      if (hostname === String(os.hostname() || '').toLowerCase()) return true;
+    } catch (_) {
+      /* hostname unavailable */
+    }
+    return false;
+  }
+
+  /**
+   * Cross-site defence: a browser always attaches `Origin` to a cross-origin
+   * request. Anything that is not same-origin with the Host header and not in
+   * the operator's CORS allowlist is refused before routing.
+   */
+  function isAllowedOrigin(origin, hostHeader, config) {
+    if (!origin) return true; // same-origin subresource / non-browser client
+    const allowed = Array.isArray(config.corsOrigins) ? config.corsOrigins : [];
+    if (origin !== '*' && allowed.includes(origin)) return true;
+    try {
+      const parsed = new URL(origin);
+      const host = String(hostHeader || '').toLowerCase();
+      return parsed.host.toLowerCase() === host;
+    } catch (_) {
+      return false;
+    }
   }
 
   function clientKey(req) {
@@ -279,6 +347,26 @@ function createHomeServer({ store, adapters, logger }) {
     }
     bucket.count += 1;
     return bucket.count <= limit;
+  }
+
+  // Per-IP login attempt budget: 10 attempts / 5 minutes (§ HOME-2).
+  const loginAttempts = new Map();
+  function loginRateLimit(req) {
+    const key = clientKey(req);
+    const now = Date.now();
+    const windowMs = 5 * 60_000;
+    let bucket = loginAttempts.get(key);
+    if (!bucket || now - bucket.startedAt > windowMs) {
+      bucket = { startedAt: now, count: 0 };
+      loginAttempts.set(key, bucket);
+    }
+    bucket.count += 1;
+    if (loginAttempts.size > 2048) {
+      for (const [k, v] of loginAttempts) {
+        if (now - v.startedAt > windowMs) loginAttempts.delete(k);
+      }
+    }
+    return bucket.count <= 10;
   }
 
   function isLocalRequest(req) {
@@ -669,6 +757,15 @@ function createHomeServer({ store, adapters, logger }) {
     const origin = req.headers.origin;
     const headers = corsHeaders(origin, config);
 
+    // SEC audit finding HOME-1: reject rebinding hostnames and cross-origin
+    // callers before any routing, auth or file access happens.
+    if (!isAllowedHostHeader(req.headers.host, config)) {
+      return sendJson(res, 403, { success: false, error: 'host_not_allowed' }, headers);
+    }
+    if (!isAllowedOrigin(origin, req.headers.host, config)) {
+      return sendJson(res, 403, { success: false, error: 'origin_not_allowed' }, headers);
+    }
+
     if (req.method === 'OPTIONS') {
       res.writeHead(204, headers);
       return res.end();
@@ -713,6 +810,11 @@ function createHomeServer({ store, adapters, logger }) {
 
     // Login (password to token)
     if (pathname === '/api/home/auth/login' && req.method === 'POST') {
+      // SEC audit finding HOME-2: the global 120/min bucket is far too generous
+      // for a password endpoint; cap login attempts per client IP separately.
+      if (!loginRateLimit(req)) {
+        return sendJson(res, 429, { success: false, error: 'rate_limited' }, headers);
+      }
       try {
         const body = await readBody(req);
         const password = String(body.password || '');
@@ -743,7 +845,8 @@ function createHomeServer({ store, adapters, logger }) {
           { ...headers, 'Set-Cookie': cookie },
         );
       } catch (err) {
-        return sendJson(res, 400, { success: false, error: err.message || 'bad_body' }, headers);
+        // Never echo internal errors (JSON parse text, stack context) to clients.
+        return sendJson(res, 400, { success: false, error: 'bad_body' }, headers);
       }
     }
 

@@ -14,7 +14,7 @@ import { describe, it, expect, beforeEach } from 'bun:test';
 import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
-const { ExtensionRegistry } = require('../desktop/runtime/extension-registry.cjs');
+const { ExtensionRegistry } = require('../desktop/runtime/extension/extension-registry.cjs');
 
 // ---------------------------------------------------------------------------
 // Helpers

@@ -213,15 +213,109 @@ function subtitleContentType(upstreamType, targetUrl) {
   return 'text/plain; charset=utf-8';
 }
 
+// ── Abuse controls ───────────────────────────────────────────────────────────
+
+/** Constant-time-ish string compare for the shared proxy password. */
+function timingSafeEqual(a, b) {
+  const left = String(a ?? '');
+  const right = String(b ?? '');
+  // Length is not secret (the password length is fixed by configuration), but
+  // compare over the longest string so the loop count does not vary per guess.
+  const len = Math.max(left.length, right.length);
+  let diff = left.length ^ right.length;
+  for (let i = 0; i < len; i += 1) {
+    diff |= (left.charCodeAt(i) || 0) ^ (right.charCodeAt(i) || 0);
+  }
+  return diff === 0;
+}
+
+/** Very small fixed-window limiter: per isolate, per client IP. */
+const RATE_WINDOW_MS = 10_000;
+const rateBuckets = new Map();
+
+function takeRateLimitToken(clientKey, env) {
+  const limit = Number(env?.RATE_LIMIT_PER_10S || 240);
+  if (!Number.isFinite(limit) || limit <= 0) return true;
+  const now = Date.now();
+  let bucket = rateBuckets.get(clientKey);
+  if (!bucket || now - bucket.startedAt > RATE_WINDOW_MS) {
+    bucket = { startedAt: now, count: 0 };
+    rateBuckets.set(clientKey, bucket);
+    // Opportunistic eviction so a long-lived isolate cannot grow without bound.
+    if (rateBuckets.size > 4096) {
+      for (const [key, value] of rateBuckets) {
+        if (now - value.startedAt > RATE_WINDOW_MS) rateBuckets.delete(key);
+      }
+    }
+  }
+  bucket.count += 1;
+  return bucket.count <= limit;
+}
+
+/**
+ * fetch() that follows redirects itself, re-validating each hop.
+ * Returns the final Response, or null when a hop is not allowed.
+ */
+async function fetchWithValidatedRedirects(startUrl, { method, headers, signal, env }) {
+  const MAX_HOPS = 3;
+  let current = new URL(startUrl);
+
+  for (let hop = 0; hop <= MAX_HOPS; hop += 1) {
+    if (current.protocol !== 'http:' && current.protocol !== 'https:') return null;
+    if (isBlockedHost(current.hostname) || !passesHostPolicy(current.hostname, env)) return null;
+
+    const response = await fetch(current.href, {
+      method,
+      headers,
+      redirect: 'manual',
+      signal,
+    });
+
+    const isRedirect = response.status >= 300 && response.status <= 399;
+    const location = response.headers.get('location');
+    if (!isRedirect || !location) return response;
+
+    // Drain the redirect body so the connection can be reused.
+    try {
+      await response.body?.cancel();
+    } catch (_) {
+      /* already consumed */
+    }
+
+    let next;
+    try {
+      next = new URL(location, current);
+    } catch (_) {
+      return null;
+    }
+    current = next;
+  }
+
+  // Too many hops (or a redirect loop): refuse rather than following further.
+  return null;
+}
+
 async function handleProxy(request, env, requestUrl) {
   const targetUrl = String(requestUrl.searchParams.get('url') || '').trim();
   if (!targetUrl) return textResponse(400, 'missing target url');
 
   // Password gate (only enforced when a secret is configured).
+  //
+  // NOTE (SEC audit PW-1): the password is also shipped to browsers as
+  // VITE_STREAM_PROXY_PASSWORD, so it is a *public* gate that raises the cost of
+  // casual abuse — not a secret. It is compared in constant time, and the real
+  // protections are the host policy, the SSRF blocklist and the rate limit below.
   const expected = String(env?.PROXY_PASSWORD || '').trim();
   if (expected) {
     const provided = String(requestUrl.searchParams.get('password') || '').trim();
-    if (provided !== expected) return textResponse(403, 'forbidden');
+    if (!timingSafeEqual(provided, expected)) return textResponse(403, 'forbidden');
+  }
+
+  // Per-IP request budget (best effort — each Worker isolate keeps its own
+  // counter, which is enough to stop a single client looping an open proxy).
+  const clientKey = request.headers.get('cf-connecting-ip') || 'unknown';
+  if (!takeRateLimitToken(clientKey, env)) {
+    return textResponse(429, 'too many requests', { 'retry-after': '10' });
   }
 
   let target;
@@ -249,18 +343,26 @@ async function handleProxy(request, env, requestUrl) {
   const timeout = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
   let upstream;
   try {
-    upstream = await fetch(target.href, {
+    // SEC audit PW-2: `redirect: 'follow'` let an attacker-controlled origin
+    // answer 302 → http://169.254.169.254/… (or any private host) and the
+    // isBlockedHost() check above was bypassed entirely, because only the first
+    // URL was validated. Redirects are now followed manually, one hop at a time,
+    // with the same protocol + host policy re-applied to every hop.
+    upstream = await fetchWithValidatedRedirects(target.href, {
       method,
       headers: outboundHeaders,
-      redirect: 'follow',
       signal: controller.signal,
+      env,
     });
   } catch (err) {
     clearTimeout(timeout);
     const aborted = /abort/i.test(String(err?.name || err?.message || ''));
-    return textResponse(aborted ? 504 : 502, `proxy error: ${err?.message || err}`);
+    // SEC audit PW-3: never echo upstream error text back to the caller — it
+    // leaks internal hostnames and resolver behaviour.
+    return textResponse(aborted ? 504 : 502, aborted ? 'upstream timeout' : 'upstream request failed');
   }
   clearTimeout(timeout);
+  if (upstream === null) return textResponse(403, 'redirect target not allowed');
 
   const upstreamType = String(upstream.headers.get('content-type') || '').toLowerCase();
   const isPlaylist =

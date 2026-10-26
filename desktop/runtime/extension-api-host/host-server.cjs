@@ -424,13 +424,83 @@ function flattenMangaChapters(entries) {
 
 // ── SSE helpers (ported from server.js) ────────────────────────────────────────
 
+// ── Request-origin defences (SEC audit finding EXT-3) ─────────────────────────
+//
+// This server binds 127.0.0.1 on a *stable preferred port* (8099), and it used to
+// answer every request with `Access-Control-Allow-Origin: *` and no authentication.
+// Any page the user had open could therefore `fetch('http://127.0.0.1:8099/api/v3/<ns>/sources')`
+// and read the results — search history, provider lists, proxied media URLs — or
+// use it as a same-origin-free request relay. A DNS-rebinding domain works the
+// same way because the port is predictable.
+//
+// The fix mirrors the home server (finding HOME-1): validate the `Host` header
+// and the `Origin` header before routing, and echo only the caller's own origin
+// back instead of a wildcard.
+
+const LOOPBACK_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1', '[::1]', '::ffff:127.0.0.1']);
+const IPV4_RE = /^\d{1,3}(\.\d{1,3}){3}$/;
+/** Origins the Tatakai renderer itself can have (dev server, app://, file:// fallback, Capacitor). */
+const TRUSTED_ORIGIN_PROTOCOLS = new Set(['app:', 'file:', 'capacitor:', 'ionic:', 'chrome-extension:']);
+
+/** DNS-rebinding defence: the browser sends the hostname the user navigated to. */
+function isAllowedHostHeader(hostHeader) {
+    const raw = String(hostHeader || '').trim().toLowerCase();
+    if (!raw) return false; // HTTP/1.0 request with no Host — browsers always send one
+    let hostname = raw;
+    if (raw.startsWith('[')) {
+        const close = raw.indexOf(']');
+        hostname = close > 0 ? raw.slice(0, close + 1) : raw;
+    } else if (raw.includes(':')) {
+        hostname = raw.slice(0, raw.lastIndexOf(':'));
+    }
+    if (LOOPBACK_HOSTNAMES.has(hostname)) return true;
+    if (IPV4_RE.test(hostname)) return true;
+    try {
+        if (hostname === String(os.hostname() || '').toLowerCase()) return true;
+    } catch (_) {
+        /* hostname unavailable — fall through to deny */
+    }
+    return false;
+}
+
+/**
+ * @returns {{ok: boolean, allowOrigin: string}} `allowOrigin` is what to send in
+ *   `Access-Control-Allow-Origin`; empty string means "no CORS header at all".
+ */
+function evaluateRequestOrigin(headers = {}) {
+    if (!isAllowedHostHeader(headers.host)) return { ok: false, allowOrigin: '' };
+    const origin = String(headers.origin || '').trim();
+    if (!origin) return { ok: true, allowOrigin: '*' }; // <video>/<img> and non-browser clients
+    if (origin === 'null') {
+        // Sandboxed iframes and `file://` pages both serialize to `null`. A real
+        // browser that initiated this fetch announces itself with Sec-Fetch-*;
+        // refuse that combination so an attacker's sandboxed iframe cannot read us.
+        if (headers['sec-fetch-mode'] || headers['sec-fetch-site']) return { ok: false, allowOrigin: '' };
+        return { ok: true, allowOrigin: 'null' };
+    }
+    let parsed;
+    try {
+        parsed = new URL(origin);
+    } catch (_) {
+        return { ok: false, allowOrigin: '' };
+    }
+    if (TRUSTED_ORIGIN_PROTOCOLS.has(parsed.protocol)) return { ok: true, allowOrigin: origin };
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+        const host = parsed.hostname.toLowerCase();
+        if (host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '[::1]') {
+            return { ok: true, allowOrigin: origin };
+        }
+    }
+    return { ok: false, allowOrigin: '' };
+}
+
 function startSSE(res) {
+    // CORS is decided per request in `handler()` and set with res.setHeader().
     res.writeHead(200, {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
         'X-Accel-Buffering': 'no',
-        'Access-Control-Allow-Origin': '*',
     });
     res.flushHeaders?.();
 }
@@ -439,7 +509,8 @@ function sseEvent(res, event, data) {
     res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
 }
 
-const JSON_HEADERS = { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' };
+// CORS header is added per request by `handler()`; see evaluateRequestOrigin().
+const JSON_HEADERS = { 'Content-Type': 'application/json' };
 
 /**
  * Probe settings. The UA is a real browser one because embed hosts routinely
@@ -1601,6 +1672,13 @@ function createHostApp({ registry, localProxy, logger }) {
     }
 
     async function handler(req, res) {
+        const access = evaluateRequestOrigin(req.headers);
+        if (!access.ok) {
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            return res.end(JSON.stringify({ error: 'Forbidden' }));
+        }
+        if (access.allowOrigin) res.setHeader('Access-Control-Allow-Origin', access.allowOrigin);
+
         let parsed;
         try {
             parsed = new URL(req.url, 'http://127.0.0.1');
@@ -1614,7 +1692,6 @@ function createHostApp({ registry, localProxy, logger }) {
         // Preflight (renderer EventSource / fetch from localhost origin)
         if (req.method === 'OPTIONS') {
             res.writeHead(204, {
-                'Access-Control-Allow-Origin': '*',
                 'Access-Control-Allow-Methods': 'GET, OPTIONS',
                 'Access-Control-Allow-Headers': '*',
             });
@@ -1801,6 +1878,9 @@ function createHostApp({ registry, localProxy, logger }) {
 
 module.exports = {
     createHostApp,
+    // Exported for the regression test (tests/extension-api-host-origin-guard.test.js)
+    evaluateRequestOrigin,
+    isAllowedHostHeader,
     // Exported for unit testing / reuse
     normalizeSource,
     applyProxy,

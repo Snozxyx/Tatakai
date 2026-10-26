@@ -501,8 +501,49 @@ module.exports = function registerLibraryHandlers(ipcMain, app, dialog, shell, f
         }
     });
 
+    // SEC audit finding DESK-9.
+    //
+    // `open-path` handed whatever the renderer passed straight to
+    // `shell.openPath()`, which in Electron means "open with the OS default
+    // handler". For a `.exe`/`.bat`/`.lnk`/`.desktop` that is code execution, so
+    // a script-injection bug in the renderer escalated to running a local binary
+    // without any further user consent. The app only ever opens a folder or a
+    // media file it downloaded, so the bridge now allows exactly that.
+    const OPENABLE_EXTENSIONS = new Set([
+        '.mp4', '.mkv', '.avi', '.webm', '.mov', '.m4v', '.ts', '.m2ts',
+        '.mp3', '.m4a', '.flac', '.wav', '.ogg', '.opus', '.aac',
+        '.vtt', '.srt', '.ass', '.ssa', '.sub',
+        '.jpg', '.jpeg', '.png', '.webp', '.gif', '.avif',
+        '.pdf', '.epub', '.cbz', '.cbr', '.zip', '.json', '.log', '.nfo',
+    ]);
+
     ipcMain.handle('open-path', async (_event, filePath) => {
-        await shell.openPath(filePath);
+        try {
+            if (typeof filePath !== 'string' || !filePath.trim()) {
+                return { success: false, error: 'invalid-path' };
+            }
+            const resolved = path.resolve(filePath);
+            let stat;
+            try {
+                stat = await fs.promises.stat(resolved);
+            } catch {
+                return { success: false, error: 'not-found' };
+            }
+            if (stat.isDirectory()) {
+                const error = await shell.openPath(resolved);
+                return { success: !error, error: error || undefined };
+            }
+            if (!stat.isFile()) return { success: false, error: 'unsupported-target' };
+            const ext = path.extname(resolved).toLowerCase();
+            if (!OPENABLE_EXTENSIONS.has(ext)) {
+                logger.warn(`[open-path] Refused to open an unexpected file type: ${ext || '(none)'}`);
+                return { success: false, error: 'unsupported-target' };
+            }
+            const error = await shell.openPath(resolved);
+            return { success: !error, error: error || undefined };
+        } catch (err) {
+            return { success: false, error: err.message };
+        }
     });
 
     ipcMain.handle('select-import-files', async () => {

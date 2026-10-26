@@ -28,8 +28,15 @@ function defaultConfig() {
       },
     ],
     tokens: {},
-    corsOrigins: ['*'],
+    // SEC audit finding HOME-1: an empty list means "same-origin only" (the
+    // bundled web UI needs nothing more). Only explicit origins are supported;
+    // older versions persisted a wildcard, which is removed on read and write.
+    corsOrigins: [],
     rateLimitPerMinute: 120,
+    // Extra `Host:` values to accept, for reverse-proxy / custom-domain setups.
+    // Loopback names, IP literals, mDNS `.local` names and the OS hostname are
+    // always accepted (DNS-rebinding defence, HOME-1).
+    allowedHosts: [],
   };
 }
 
@@ -38,11 +45,26 @@ function createHomeServerStore({ app, fs: fsMod, path: pathMod, logger }) {
   const pathApi = pathMod || path;
   const configPath = pathApi.join(app.getPath('userData'), 'home-server.json');
 
+  function normalizeConfig(raw) {
+    const defaults = defaultConfig();
+    const corsOrigins = Array.isArray(raw.corsOrigins)
+      ? [...new Set(raw.corsOrigins.filter((origin) => typeof origin === 'string')
+        .map((origin) => origin.trim()).filter((origin) => origin && origin !== '*'))]
+      : [];
+    return { ...defaults, ...raw, corsOrigins, users: raw.users || defaults.users };
+  }
+
   function read() {
     try {
       if (!fsApi.existsSync(configPath)) return defaultConfig();
       const raw = JSON.parse(fsApi.readFileSync(configPath, 'utf8'));
-      return { ...defaultConfig(), ...raw, users: raw.users || defaultConfig().users };
+      const config = normalizeConfig(raw);
+      if (JSON.stringify(raw.corsOrigins) !== JSON.stringify(config.corsOrigins)) {
+        // Persist the upgrade, but use the safe config even if the disk is
+        // read-only. The old default must never restore cross-origin admin access.
+        write(config);
+      }
+      return config;
     } catch (err) {
       logger?.warn?.('home-server store read failed', err);
       return defaultConfig();
@@ -51,7 +73,7 @@ function createHomeServerStore({ app, fs: fsMod, path: pathMod, logger }) {
 
   function write(config) {
     try {
-      fsApi.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
+      fsApi.writeFileSync(configPath, JSON.stringify(normalizeConfig(config), null, 2), 'utf8');
       return true;
     } catch (err) {
       logger?.warn?.('home-server store write failed', err);

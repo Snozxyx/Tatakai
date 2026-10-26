@@ -1,0 +1,47 @@
+{
+  "$comment": "Tracked production-dependency advisories. scripts/check-audit-gate.mjs fails the build when a high/critical advisory appears that is NOT listed here, when a listed entry passes its `expires` date, or when a listed package picks up a NEW advisory id. Adding an entry is a review decision, not a mute button: every entry needs an owner-visible reason and an expiry date. See docs/security/SECURITY_AUDIT.md § F.",
+  "policy": {
+    "blockSeverities": ["high", "critical"],
+    "scope": "npm audit --omit=dev"
+  },
+  "entries": [
+    {
+      "package": "ip",
+      "advisories": ["GHSA-2p57-rm9w-gvfp"],
+      "reason": "Transitive: webtorrent -> torrent-discovery -> bittorrent-tracker -> ip@2. `ip` is unmaintained upstream and has no patched 2.x. bittorrent-tracker uses ip.isPublic() only to classify peer addresses in tracker responses; Tatakai never relies on it as a trust boundary (the app's own SSRF guard is urlHost.ts / the streaming-proxy isBlockedHost check). Fix path: webtorrent 3 (major, needs a torrent-stack regression pass).",
+      "expires": "2027-01-31",
+      "tracking": "upgrade webtorrent to 3.x and re-run tests/torrent-*.test.*"
+    },
+    {
+      "package": "bittorrent-tracker",
+      "advisories": [],
+      "reason": "Flagged only because it depends on `ip` (see the ip entry).",
+      "expires": "2027-01-31"
+    },
+    {
+      "package": "torrent-discovery",
+      "advisories": [],
+      "reason": "Flagged only because it depends on bittorrent-tracker -> ip (see the ip entry).",
+      "expires": "2027-01-31"
+    },
+    {
+      "package": "webtorrent",
+      "advisories": [],
+      "reason": "Flagged only because it depends on torrent-discovery -> ip (see the ip entry).",
+      "expires": "2027-01-31"
+    },
+    {
+      "package": "zod",
+      "advisories": ["GHSA-mrhx-c7xc-m3w5"],
+      "reason": "Memory exhaustion while validating oversized constrained collections. Tatakai's own schemas (src/pages/auth/*) validate scalars (email, password length), which is not the affected shape. The direct dependency is held at v3 because @discord/embedded-app-sdk pins zod ^3.9.8; moving to zod 4 needs the Discord activity path re-tested.",
+      "expires": "2027-01-31",
+      "tracking": "bump zod to >=4.6.6 once @discord/embedded-app-sdk allows it"
+    },
+    {
+      "package": "@discord/embedded-app-sdk",
+      "advisories": [],
+      "reason": "Flagged only because it bundles its own zod@3 (see the zod entry).",
+      "expires": "2027-01-31"
+    }
+  ]
+}

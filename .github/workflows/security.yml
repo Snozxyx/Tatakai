@@ -1,0 +1,100 @@
+name: Security
+
+# Lightweight, blocking security gate for an open-source project:
+#   1. dependency audit        — high/critical in production dependencies
+#   2. secret scanning         — gitleaks over the full history
+#   3. repo security baseline  — this project's own trust-boundary invariants
+#   4. security regression tests — the tests under tests/*-isolation|hardening|guard
+#
+# Deliberately NO pull_request_target and no write-scoped token on PR runs.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Weekly, so a newly disclosed advisory fails the default branch even when
+    # nothing in the repo changed.
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  baseline:
+    name: Security baseline & regression tests
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Repository security invariants
+        run: node scripts/check-security-baseline.mjs
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile || npm ci --ignore-scripts
+
+      - name: Security regression tests
+        run: bun test tests/extension-worker-isolation.test.mjs tests/desktop-ipc-hardening.test.js tests/desktop-media-guard.test.js tests/desktop-open-path-guard.test.js tests/extension-api-host-origin-guard.test.js tests/anilist-oauth-state.test.ts tests/home-server-origin-guard.test.js tests/home-server-store.test.js tests/send-notification-security.test.ts tests/streaming-proxy-worker.test.js tests/rich-text-sanitizer.test.ts
+
+      - name: Migration lint
+        run: node scripts/check-migrations.mjs
+
+  dependencies:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install from lockfile (no scripts)
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      # Production dependencies only. The gate is scripts/check-audit-gate.mjs
+      # rather than raw `npm audit`: a new high/critical advisory fails the
+      # build, while the handful of advisories that are already reviewed and
+      # tracked (with an owner, a reason and an expiry date) are printed instead
+      # of being re-litigated on every PR. Dev-only toolchain findings are
+      # reported (non-blocking) by the next step and tracked in
+      # docs/security/SECURITY_AUDIT.md § F.
+      - name: Audit production dependencies (blocking on unaccepted high/critical)
+        run: node scripts/check-audit-gate.mjs
+
+      - name: Audit full tree (informational)
+        continue-on-error: true
+        run: npm audit --audit-level=moderate
+
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_COMMENTS: 'false'

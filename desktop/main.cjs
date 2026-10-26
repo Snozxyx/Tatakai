@@ -113,6 +113,18 @@ errorTracker.init({
 // This is the instance used everywhere from this point forward.
 const logger = createLogService({ app, maxFileSizeMB: 10, maxFiles: 5, ipcMain, errorTracker });
 
+// ── IPC sender guard ──────────────────────────────────────────────────────────
+// Installed BEFORE any ipcMain.handle() registration so every privileged channel
+// is sender-checked (SEC audit finding DESK-2). Handlers below see only requests
+// whose frame is the packaged app:// renderer (or the dev server in development).
+const { installIpcSenderGuard } = require('./security/ipc-guard.cjs');
+installIpcSenderGuard(ipcMain, {
+    logger,
+    isDev,
+    distDir: path.join(DESKTOP_DIR, '..', 'dist'),
+    desktopDir: DESKTOP_DIR,
+});
+
 const { getOrCreateCID } = require('./services/cid.cjs');
 const appCID = getOrCreateCID(app, fs, path, crypto, logger);
 logger.info(`[CID] Device ID: ${appCID}`);
@@ -279,13 +291,25 @@ require('./ipc/ipc-home-server.cjs')(ipcMain, app, fs, path, logger, getMainWind
 app.on('ready', () => {
     logger.info('[Startup] Electron ready', { elapsedMs: Math.round(process.uptime() * 1000) });
     if (!isDev) {
+        // SEC audit finding DESK-5: this handler used to serve ANY path the URL
+        // named, effectively handing every frame an unvalidated local-file read.
+        // It only exists so the packaged `file://` fallback renderer
+        // (window-factory.cjs prodFileUrl) can load — so it is confined to dist/.
+        const distRoot = path.resolve(DESKTOP_DIR, '..', 'dist');
         protocol.registerFileProtocol('file', (request, callback) => {
-            const url = request.url.substr(7);
+            let filePath;
             try {
-                callback({ path: path.normalize(decodeURIComponent(url)) });
+                filePath = decodeURIComponent(request.url.substr(7));
             } catch {
-                callback({ path: path.normalize(decodeURI(url)) });
+                filePath = decodeURI(request.url.substr(7));
             }
+            const resolved = path.resolve(path.normalize(filePath));
+            if (resolved !== distRoot && !resolved.startsWith(distRoot + path.sep)) {
+                logger.warn(`[Security] Blocked file:// read outside dist: ${request.url}`);
+                callback({ error: -6 }); // NET::ERR_FILE_NOT_FOUND
+                return;
+            }
+            callback({ path: resolved });
         });
 
         // Serve the built renderer over app://tatakai.me (prod only; dev uses
@@ -296,7 +320,43 @@ app.on('ready', () => {
     // Register tatakai-media:// protocol for serving local video/media files.
     // This is always registered (dev + prod) to allow offline library playback.
     // tatakai-media:///C:/path/to/file.mkv → serves the file with streaming support.
+    // SEC audit finding DESK-6: this scheme is registered with `bypassCSP` and
+    // `corsEnabled`, so a third-party embed iframe could otherwise read any local
+    // file by requesting `tatakai-media:///…/secret`. Requests are now refused
+    // when the initiating document is a remote http(s) origin; only our own
+    // renderer (app://, dev server, file:// dist) may ask for media.
+    const isOwnRendererRequest = (request) => {
+        const candidates = [
+            request && request.referrer,
+            request && request.headers && (request.headers.Origin || request.headers.origin),
+            request && request.headers && (request.headers.Referer || request.headers.referer),
+        ].filter((v) => typeof v === 'string' && v !== '');
+        if (candidates.length === 0) return true; // no initiator info: own renderer / media element
+        return candidates.some((raw) => {
+            let parsed;
+            try {
+                parsed = new URL(raw);
+            } catch (_) {
+                return false;
+            }
+            if (parsed.protocol === 'app:') return parsed.hostname === 'tatakai.me';
+            if (parsed.protocol === 'file:') return true;
+            if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+                return (
+                    (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') &&
+                    parsed.port === '8090'
+                );
+            }
+            return false;
+        });
+    };
+
     protocol.registerFileProtocol('tatakai-media', (request, callback) => {
+        if (!isOwnRendererRequest(request)) {
+            logger.warn('[Security] Blocked cross-origin tatakai-media:// read');
+            callback({ error: -10 }); // NET::ERR_ACCESS_DENIED
+            return;
+        }
         try {
             // Standard-scheme URL canonicalization collapses a Windows drive letter
             // into the URL authority: Chromium rewrites `tatakai-media:///C:/dir/file`

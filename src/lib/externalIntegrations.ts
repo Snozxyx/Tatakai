@@ -92,9 +92,38 @@ const ANILIST_AUTH_URL = 'https://anilist.co/api/v2/oauth/authorize';
 const ANILIST_REDIRECT_STORAGE_KEY = 'anilist_redirect_uri';
 const ANILIST_STATE_STORAGE_KEY = 'anilist_oauth_state';
 
+/**
+ * Random OAuth `state` for flows that do not carry the desktop marker.
+ *
+ * SECURITY (audit finding AUTH-1): the web AniList flow used to send no `state`
+ * at all, and the callback exchanged any `code` it was handed. That is a login
+ * CSRF: an attacker who has an AniList authorization code for THEIR account can
+ * send the victim to
+ *   https://tatakai.me/integration/anilist/redirect?code=<attacker code>
+ * and the victim's Tatakai account silently links the attacker's AniList
+ * profile. Every flow now mints a state, stores it, and the redirect page
+ * verifies it before exchanging the code.
+ */
+function mintOAuthState(): string {
+  try {
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  } catch {
+    return `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
+  }
+}
+
+/** The `state` this browser stored when the AniList flow started (AUTH-1). */
+export function readAniListOAuthState(): string | null {
+  try { return localStorage.getItem(ANILIST_STATE_STORAGE_KEY); } catch { return null; }
+}
+
 // Generate AniList OAuth URL. Pass an explicit `redirectUri` to override the
 // default web redirect, and `state` to tag the flow (desktop passes
 // `buildDesktopOAuthState()` so the https bridge page can route back to the app).
+// When no state is passed, a random one is minted and stored — the callback
+// page verifies it (AUTH-1).
 export function getAniListAuthUrl(redirectUri?: string, state?: string): string {
   if (!ANILIST_CLIENT_ID) {
     throw new Error('Missing VITE_ANILIST_CLIENT_ID');
@@ -107,18 +136,18 @@ export function getAniListAuthUrl(redirectUri?: string, state?: string): string 
       'Register exactly one URL — a pair triggers a login prompt that loops.',
     );
   }
+  const effectiveState = state || mintOAuthState();
   try {
     localStorage.setItem(ANILIST_REDIRECT_STORAGE_KEY, effectiveRedirect);
-    if (state) localStorage.setItem(ANILIST_STATE_STORAGE_KEY, state);
-    else localStorage.removeItem(ANILIST_STATE_STORAGE_KEY);
+    localStorage.setItem(ANILIST_STATE_STORAGE_KEY, effectiveState);
   } catch { /* localStorage unavailable — exchange falls back to default */ }
 
   const params = new URLSearchParams({
     client_id: ANILIST_CLIENT_ID,
     redirect_uri: effectiveRedirect,
     response_type: 'code',
+    state: effectiveState,
   });
-  if (state) params.set('state', state);
 
   return `${ANILIST_AUTH_URL}?${params.toString()}`;
 }
