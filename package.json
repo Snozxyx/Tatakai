@@ -309,8 +309,7 @@
       "include": "build/installer.nsh"
     },
     "portable": {
-      "artifactName": "${productName}-${version}-${os}-${arch}-portable.${ext}",
-      "useZip": true
+      "artifactName": "${productName}-${version}-${os}-${arch}-portable.${ext}"
     },
     "mac": {
       "target": [

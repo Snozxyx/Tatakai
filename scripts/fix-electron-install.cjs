@@ -48,6 +48,24 @@ function isHealthy() {
   return !!rel && fs.existsSync(path.join(distDir, rel));
 }
 
+function patchBuilderUtilTimeout() {
+  const p = path.join(__dirname, '..', 'node_modules', 'builder-util', 'out', 'util.js');
+  if (fs.existsSync(p)) {
+    try {
+      let c = fs.readFileSync(p, 'utf8');
+      if (c.includes('4 * 60 * 1000')) {
+        c = c.replace(/4 \* 60 \* 1000/g, '15 * 60 * 1000');
+        fs.writeFileSync(p, c);
+        log('Patched builder-util makensis timeout to 15 minutes');
+      }
+    } catch (e) {
+      log('Failed to patch builder-util timeout: ' + e.message);
+    }
+  }
+}
+
+patchBuilderUtilTimeout();
+
 if (isHealthy()) process.exit(0);
 
 log(`Electron ${version} install looks broken (missing dist binary / path.txt). Repairing from cache…`);

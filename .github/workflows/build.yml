@@ -194,7 +194,20 @@ jobs:
       # workflow_dispatch with publish → also publish
       # Otherwise → local build only
       - name: Build Electron
-        run: npx electron-builder --publish never
+        shell: bash
+        run: |
+          node -e "
+            const fs = require('fs');
+            const p = 'node_modules/builder-util/out/util.js';
+            if (fs.existsSync(p)) {
+              let c = fs.readFileSync(p, 'utf8');
+              if (c.includes('4 * 60 * 1000')) {
+                fs.writeFileSync(p, c.replace(/4 \* 60 \* 1000/g, '15 * 60 * 1000'));
+                console.log('Patched builder-util makensis timeout to 15 minutes');
+              }
+            }
+          " || true
+          npx electron-builder --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # No paid certificate: never auto-discover a macOS signing identity.
