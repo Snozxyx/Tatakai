@@ -34,9 +34,10 @@ export function sortMangaChapterSources(
 export function pickMangaChapterSource(
   sources: MangaChapterSource[] | null | undefined,
   preferProvider?: string | null,
+  lockProvider = false,
 ): MangaChapterSource | null {
   const ordered = sortMangaChapterSources(sources);
-  return ordered.find((source) => source.provider === preferProvider) || ordered[0] || null;
+  return ordered.find((source) => source.provider === preferProvider) || (lockProvider ? null : ordered[0]) || null;
 }
 
 export function nextMangaChapterSource(

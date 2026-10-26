@@ -1,8 +1,9 @@
 /* eslint-disable no-restricted-globals */
 // Service Worker for PWA offline support
 
-const CACHE_NAME = 'tatakai-v1';
-const RUNTIME_CACHE = 'tatakai-runtime-v1';
+const CACHE_NAME = 'tatakai-v2';
+const RUNTIME_CACHE = 'tatakai-runtime-v2';
+const MAX_RUNTIME_ENTRIES = 120;
 
 // Assets to cache on install
 const PRECACHE_ASSETS = [
@@ -51,6 +52,12 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Let HTTP/CDN caching handle seekable media and wsrv images. Never put
+  // partial responses or authenticated API responses into the offline cache.
+  if (request.headers.has('range') || request.destination === 'video' ||
+      request.destination === 'audio' || url.pathname.startsWith('/api/') ||
+      url.pathname.startsWith('/storage/')) return;
+
   // Cache strategy: Network first, fallback to cache
   event.respondWith(
     fetch(request)
@@ -59,10 +66,13 @@ self.addEventListener('fetch', (event) => {
         const responseToCache = response.clone();
 
         // Cache successful responses
-        if (response.status === 200) {
-          caches.open(RUNTIME_CACHE).then((cache) => {
-            cache.put(request, responseToCache);
-          });
+        if (response.status === 200 && !/private|no-store/i.test(response.headers.get('cache-control') || '')) {
+          event.waitUntil((async () => { try {
+            const cache = await caches.open(RUNTIME_CACHE);
+            await cache.put(request, responseToCache);
+            const keys = await cache.keys();
+            await Promise.all(keys.slice(0, Math.max(0, keys.length - MAX_RUNTIME_ENTRIES)).map(key => cache.delete(key)));
+          } catch { /* Storage pressure must not break a successful network load. */ } })());
         }
 
         return response;

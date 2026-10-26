@@ -1,0 +1,34 @@
+{
+  "source": "gothic-empress-red-eye-live-wallpaper-wallsflow-com.mp4",
+  "sourceBytes": 88535159,
+  "sourceSha256": "edd186e75661f898b2a75f762ee26eaf6b5a3ec00db20d1d22f448b36eadc719",
+  "sourceResolution": "3840x2160",
+  "durationSeconds": 17.516,
+  "artwork": "User-provided original, preserved. No generated character frames.",
+  "presentation": "CSS contrast 1.12, brightness 0.84, saturation 0.82; vignette and letterbox overlay. Three.js silver thorn halo and crimson embers.",
+  "outputs": {
+    "empress-poster.jpg": {
+      "bytes": 292948,
+      "sha256": "0f7fdbfc73769ba38b7c2e48815200c5eec8005bb5da9e9803cd4867714f5154"
+    },
+    "empress-mobile.mp4": {
+      "bytes": 3694449,
+      "sha256": "80c9a5ab192e319bffd2c9c24ddf7e2b43c908ea77eb31202d827f291f8ba99c"
+    },
+    "thorn-wire.svg": {
+      "bytes": 686,
+      "sha256": "c97e88469b6d867a666264b582230de0b90e31e1cb2255b71e0908cbd8009ddb"
+    },
+    "empress-scene.mp4": {
+      "bytes": 7967966,
+      "sha256": "28294d74939ca6adb52336b9cdad63698b35ca51f0ecbc24d7a0a49ecc84f923",
+      "encoding": "H.264 1920x1080 24 fps; CRF 26, 3500k maxrate, 7000k buffer; no audio; faststart"
+    }
+  },
+  "font": {
+    "licenseFile": "rajdhani-OFL.txt",
+    "name": "Rajdhani SemiBold",
+    "license": "SIL Open Font License 1.1",
+    "source": "https://github.com/google/fonts/tree/main/ofl/rajdhani"
+  }
+}

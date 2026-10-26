@@ -3,6 +3,7 @@ import * as SelectPrimitive from "@radix-ui/react-select";
 import { Check, ChevronDown, ChevronUp } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { getFullscreenPortalContainer } from '@/lib/video/fullscreenPortal';
 
 const Select = SelectPrimitive.Root;
 
@@ -62,7 +63,7 @@ const SelectContent = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
 >(({ className, children, position = "popper", ...props }, ref) => (
-  <SelectPrimitive.Portal container={typeof document !== 'undefined' ? document.fullscreenElement as HTMLElement | null : undefined}>
+  <SelectPrimitive.Portal container={getFullscreenPortalContainer()}>
     <SelectPrimitive.Content
       ref={ref}
       className={cn(

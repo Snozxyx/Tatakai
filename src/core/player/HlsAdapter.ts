@@ -9,10 +9,13 @@ import {
   probePlaybackCandidate,
 } from './stream-resolver';
 import { getProfileKnobs } from '@/lib/memoryProfile';
+import { findWatchPartyMedia } from '../watch-party/media';
+import { createWatchPartyHlsLoader } from '../watch-party/media-hls';
 
 export class HlsAdapter extends AbstractSourceAdapter {
   readonly mode: PlaybackMode = 'hls';
   private hls: Hls | null = null;
+  private peerBridge: { close(): Promise<void> } | null = null;
 
   /**
    * Every URL we can try for the current source, best first. hls.js only ever
@@ -41,6 +44,7 @@ export class HlsAdapter extends AbstractSourceAdapter {
     await super.load(options);
     const { source, videoElement, startTime } = options;
     if (options.signal?.aborted) return;
+    const partyTransport = findWatchPartyMedia(source.url) || (source.originalUrl ? findWatchPartyMedia(source.originalUrl) : undefined);
 
     const referer = (source as any).headers?.Referer;
     const userAgent = (source as any).headers?.['User-Agent'];
@@ -51,7 +55,7 @@ export class HlsAdapter extends AbstractSourceAdapter {
     // A loopback URL is already the in-app proxy (the extension host registered
     // the source's headers with it), so there is nothing to wrap it in — going
     // through the remote proxy would just strip the headers that make it work.
-    this.candidates =
+    this.candidates = partyTransport ? [partyTransport.rootUrl] :
       source.url.startsWith('http') && !source.debridResolved && !isLoopbackProxyUrl(source.url)
         ? buildProxyCandidateUrls(source.url, referer, userAgent, undefined, undefined, refererCandidates)
         : [source.url];
@@ -85,7 +89,12 @@ export class HlsAdapter extends AbstractSourceAdapter {
 
     if (!Hls.isSupported()) {
       if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
-        videoElement.src = finalUrl;
+        if (partyTransport) {
+          const { registerNativeWatchPartyMedia } = await import('../watch-party/media-native');
+          const bridge = await registerNativeWatchPartyMedia(partyTransport);
+          if (options.signal?.aborted) { await bridge.close(); return; }
+          this.peerBridge = bridge; videoElement.src = bridge.url;
+        } else videoElement.src = finalUrl;
         if (startTime) videoElement.currentTime = startTime;
       } else {
         throw new Error('HLS is not supported in this browser');
@@ -102,6 +111,7 @@ export class HlsAdapter extends AbstractSourceAdapter {
     if (options.signal?.aborted) return;
 
     this.hls = new Hls({
+      ...(partyTransport ? { loader: createWatchPartyHlsLoader(partyTransport) } : {}),
       enableWorker: true,
       // VOD is not low-latency live: lowLatencyMode adds part-request overhead
       // and hurts time-to-first-frame on proxied segments. Off = faster start.
@@ -315,6 +325,7 @@ export class HlsAdapter extends AbstractSourceAdapter {
   }
 
   async unload(): Promise<void> {
+    await this.peerBridge?.close(); this.peerBridge = null;
     if (this.hls) {
       this.hls.destroy();
       this.hls = null;

@@ -7,13 +7,11 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Play, Download, Sparkles } from "lucide-react";
 import { Navigation } from "@/components/ui/navbar";
-import { useAuth } from "@/contexts/AuthContext";
+import { useMotionPreference } from "@/hooks/ui/useMotionPreference";
 import { useGitHubRepo, useLatestRelease, useAllReleases, platformForAsset, formatCompact, GITHUB_REPO_URL } from "@/lib/github";
 import { supabase } from "@/integrations/supabase/client";
 import { FeatureShowcase } from "@/components/landing/FeatureShowcase";
 import { FooterSection } from "@/components/ui/footer";
-
-const words = ["explore", "discover", "immerse", "love"];
 
 function BlurWord({ word, trigger }: { word: string; trigger: number }) {
   useUiTranslation();
@@ -116,7 +114,19 @@ export default function LandingPage() {
   const [isVisible, setIsVisible] = useState(false);
   const [wordIndex, setWordIndex] = useState(0);
   const [mounted, setMounted] = useState(false);
-  const { user } = useAuth();
+  const reducedMotion = useMotionPreference();
+  const motionStopped = reducedMotion;
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const words = ['explore', 'discover', 'immerse', 'love'].map((word) =>
+    uiI18n.t(`landingHero.${word}`)
+  );
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (motionStopped) video.pause();
+    else void video.play().catch(() => { /* The static backdrop remains visible. */ });
+  }, [motionStopped]);
   const navigate = useNavigate();
 
   const repo = useGitHubRepo();
@@ -186,16 +196,17 @@ export default function LandingPage() {
   }, []);
 
   useEffect(() => {
+    if (motionStopped) return;
     const interval = setInterval(() => {
       setWordIndex((prev) => (prev + 1) % words.length);
     }, 2500);
     return () => clearInterval(interval);
-  }, []);
+  }, [motionStopped, words.length]);
 
   return (
     <div className="relative min-h-screen w-full overflow-hidden bg-black text-white">
       {/* ===================== HERO ===================== */}
-      <section className="relative min-h-screen w-full overflow-hidden">
+      <section data-motion-stopped={motionStopped} className="landing-hero relative min-h-screen w-full overflow-hidden">
       {/* Animated gradient orb background */}
       <div className="pointer-events-none absolute inset-0 z-0">
         <div className="absolute -top-32 -left-32 h-[500px] w-[500px] rounded-full bg-violet-600/20 blur-[120px] animate-pulse" />
@@ -205,8 +216,10 @@ export default function LandingPage() {
 
       {/* Background Video */}
       <div className="absolute inset-0 z-0">
-        <video
-          autoPlay
+        <img src="/assets/brand/Landing.png" alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover opacity-50" />
+        {!reducedMotion && <video
+          ref={videoRef}
+          autoPlay={!motionStopped}
           muted
           loop
           playsInline
@@ -214,7 +227,7 @@ export default function LandingPage() {
           className="h-full w-full object-cover object-center opacity-50"
         >
           <source src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/bg-hero-0BnFGdr81Ifnj3WbBZoNt1KE4D5DMT.mp4" type="video/mp4" />
-        </video>
+        </video>}
         <div className="absolute inset-0 bg-gradient-to-r from-black via-black/70 to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_transparent_0%,_black_100%)]" />
@@ -264,7 +277,7 @@ export default function LandingPage() {
               <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
             </span>
             <span className="text-xs font-medium tracking-wide text-white/80">
-              {uiI18n.t('app.now_in_beta_v6_0_released_39c85ddf')}
+              {uiI18n.t('app.latest_release_f7b7a560')}{latestVersion ? ` · v${latestVersion}` : ''}
             </span>
             <Sparkles className="h-3 w-3 text-violet-300" />
           </div>
@@ -273,14 +286,16 @@ export default function LandingPage() {
           <h1
             className={`mb-8 max-w-4xl text-[clamp(2.4rem,6vw,5.5rem)] font-display font-medium leading-[0.95] tracking-[-0.04em] text-white transition-all duration-1000 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"}`}
           >
-            <span className="block whitespace-nowrap text-white/60">{uiI18n.t('app.your_portal_to_36f136e1')}</span>
-            <span className="block whitespace-nowrap">
+            <span className="block sm:whitespace-nowrap text-white/60">{uiI18n.t('app.your_portal_to_36f136e1')}</span>
+            <span className="block sm:whitespace-nowrap">
               {uiI18n.t('app.anime_amp_manga_0cb1c231')}
             </span>
-            <span className="block whitespace-nowrap">
+            <span className="block sm:whitespace-nowrap">
               {uiI18n.t('app.you_8af56de6')}{" "}
               <span className="relative inline-block align-baseline">
-                <BlurWord word={words[wordIndex]} trigger={wordIndex} />
+                {motionStopped ? <span>{words[wordIndex]}</span> : (
+                  <BlurWord key={words[wordIndex]} word={words[wordIndex]} trigger={wordIndex} />
+                )}
                 <svg
                   className="absolute -bottom-2 left-0 h-3 w-full text-violet-400"
                   viewBox="0 0 200 12"
@@ -333,9 +348,10 @@ export default function LandingPage() {
             </Button>
           </div>
 
+
           {/* Trust line */}
           <div
-            className={`mt-10 flex items-center gap-4 text-xs text-white/40 transition-all duration-1000 delay-500 ${isVisible ? "opacity-100" : "opacity-0"}`}
+            className={`mt-10 flex items-center gap-4 text-xs text-white/70 transition-all duration-1000 delay-500 ${isVisible ? "opacity-100" : "opacity-0"}`}
           >
             <div className="flex -space-x-2">
               {avatars.length > 0
@@ -385,7 +401,7 @@ export default function LandingPage() {
                   <span className="font-display text-3xl font-medium text-white lg:text-4xl">
                     {stat.value}
                   </span>
-                  <span className="text-xs font-medium tracking-wide text-white/40">
+                  <span className="text-xs font-medium tracking-wide text-white/70">
                     {stat.label}
                   </span>
                 </div>
@@ -393,7 +409,7 @@ export default function LandingPage() {
             </div>
 
             {/* Scroll indicator */}
-            <div className="hidden items-center gap-3 text-xs font-mono text-white/40 md:flex">
+            <div className="hidden items-center gap-3 text-xs font-mono text-white/70 md:flex">
               <span>{uiI18n.t('app.scroll_da4313f4')}</span>
               <div className="relative h-px w-16 overflow-hidden bg-white/10">
                 <div className="absolute inset-y-0 left-0 w-1/2 animate-[shimmer_2s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-white to-transparent" />
@@ -411,6 +427,17 @@ export default function LandingPage() {
 
       {/* Custom shimmer keyframes */}
       <style>{`
+        .landing-hero[data-motion-stopped="true"] *,
+        .landing-hero[data-motion-stopped="true"] *::before,
+        .landing-hero[data-motion-stopped="true"] *::after {
+          animation-play-state: paused !important;
+        }
+        .landing-hero[data-motion-stopped="true"] h1,
+        .landing-hero[data-motion-stopped="true"] main > div {
+          transform: none;
+          transition: opacity 150ms ease;
+          transition-delay: 0ms;
+        }
         @keyframes shimmer {
           0% { transform: translateX(-100%); }
           100% { transform: translateX(200%); }

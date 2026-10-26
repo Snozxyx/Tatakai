@@ -1,0 +1,8 @@
+SekaiPop reference and bundled default wallpaper
+Source: https://github.com/Blapples/SekaiPop
+Upstream file: sekaipop/assets/images/default-wallpaper.png
+The source repository's GPL-3.0 license is preserved in SEKAIPOP-LICENSE.txt.
+Upstream notes that wallpapers belong to their original artists and that
+SekaiPop is an unofficial fan project, unaffiliated with SEGA, Colorful Palette,
+or Crypton Future Media. The screenshot's pink wallpaper is not included here.
+Tatakai's React interface adapts the supplied SekaiPop visual reference.

@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Check, Zap, Film } from 'lucide-react';
 import { useWatchRoomContext } from './WatchRoomContext';
 import { IconSwap } from './IconSwap';
+import { P2PRoomControls } from './P2PRoomControls';
 
 /** Slim info strip beneath the stage: poster · title · episode + participant "Mark ready". */
 export function WatchRoomInfoBar() {
@@ -12,6 +13,7 @@ export function WatchRoomInfoBar() {
 
     return (
         <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-white/[0.06] bg-background/60 p-3 shadow-[0_16px_40px_-16px_rgba(0,0,0,0.8)] backdrop-blur-2xl animate-in fade-in slide-in-from-bottom-2 duration-700">
+            <div className="w-full"><P2PRoomControls /></div>
             
             {/* Metadata (Left) */}
             <div className="flex min-w-0 flex-1 items-center gap-4 pl-1">

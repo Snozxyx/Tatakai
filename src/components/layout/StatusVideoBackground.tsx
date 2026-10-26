@@ -1,15 +1,10 @@
+import { backgroundVideo } from '@/lib/assets';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 
-const VIDEO_SOURCES = [
-'./assets/video/1.mp4',
-  './assets/video/2.webm',
-  './assets/video/3.mp4',
-  './assets/video/5.mp4',
-  './assets/video/6.mp4',
-];
+const VIDEO_SOURCES = ['1.mp4', '2.webm', '3.mp4', '5.mp4', '6.mp4'].map(backgroundVideo);
 
 interface StatusVideoBackgroundProps {
   overlayColor?: string;

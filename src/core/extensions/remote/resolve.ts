@@ -34,14 +34,14 @@ export async function matchRemoteTitle(row: RemoteExtension, opts: TitleMatchOpt
   const candidates: any[] = [];
   let selected: string | null = null;
   for (const query of titleSearchQueries(opts).slice(0, 4)) {
-    signal?.throwIfAborted();
+    throwCompatibilityAbort(signal);
     const results = await invokeRemote(row, 'remoteSearch', { ...opts, query });
     if (!Array.isArray(results)) throw new Error('Invalid provider search response');
     candidates.push(...results);
     selected = automaticTitleMatch(candidates, opts);
     if (selected) break;
   }
-  signal?.throwIfAborted();
+  throwCompatibilityAbort(signal);
   if (!selected) throw new Error('No matching title found automatically');
   row.matches[key] = selected; await updateRemoteExtension(row, false); return selected;
 }
@@ -73,7 +73,7 @@ export async function resolveRemoteSources(options: { anilistId?: number; title?
     const started = performance.now(); let subtitleCount = 0; let subtitleError: string | undefined; let lookup: 'mapping' | 'catalog-search' | undefined; let attempts = 0;
     try {
       return await extensionDeadline(async signal => {
-      signal?.throwIfAborted();
+      throwCompatibilityAbort(signal);
       let sources: any[];
       if (row.ecosystem === 'stremio') {
         const imdbId = mapping?.ids.imdbId;
@@ -89,7 +89,7 @@ export async function resolveRemoteSources(options: { anilistId?: number; title?
         let { type, id } = targets[0];
         let response: any = { streams: [] }; let lastError: unknown; let answered = false;
         for (const target of targets) {
-          signal?.throwIfAborted();
+          throwCompatibilityAbort(signal);
           if (!supportsResource(manifest, 'stream', target.type, target.id)) continue;
           try {
             attempts++;
@@ -106,7 +106,7 @@ export async function resolveRemoteSources(options: { anilistId?: number; title?
           try {
             const subs = await fetchExtensionJson(stremioResourceUrl(row.manifestUrl, 'subtitles', type, id), signal);
             const tracks = await Promise.all((subs.subtitles || []).filter((s: any) => typeof s.url === 'string' && /^https?:\/\//i.test(s.url)).map(async (s: any) => ({ url: await proxyRemoteUrl(s.url, s.headers), language: s.lang, lang: s.lang, label: `${languageLabel(s.lang)} · ${row.manifest.name}`, providerName: row.manifest.name })));
-            signal.throwIfAborted();
+            throwCompatibilityAbort(signal);
             subtitleCount = tracks.length;
             subtitles.push(...tracks);
           } catch (error) { subtitleError = error instanceof Error ? error.message : 'Subtitle lookup failed'; }
@@ -120,9 +120,9 @@ export async function resolveRemoteSources(options: { anilistId?: number; title?
         if (!Array.isArray(sources)) throw new Error('Invalid source response');
         sources = sources.map(s => ({ ...s, language: languageLabel(s.audioLanguage || s.language || row.manifest.lang), languageLabel: languageLabel(s.audioLanguage || s.language || row.manifest.lang), providerKey: row.id, providerName: row.manifest.name, source: row.manifest.name }));
       }
-      signal?.throwIfAborted();
+      throwCompatibilityAbort(signal);
       sources = await proxyRemoteSources(sources.map(source => ({ ...source, extensionId: row.id, extensionName: row.manifest.name, ecosystem: row.ecosystem })));
-      signal.throwIfAborted();
+      throwCompatibilityAbort(signal);
       report(row, started, subtitleError ? 'partial' : sources.length || subtitleCount ? 'ok' : 'empty', sources.length, subtitleCount + sources.reduce((n, s) => n + (s.subtitles?.length || 0), 0), subtitleError, lookup, attempts);
       remoteSources.push(...sources); publish(); return sources;
       }, 30000, signal);
@@ -132,7 +132,7 @@ export async function resolveRemoteSources(options: { anilistId?: number; title?
   }, signal);
   const compatibleSources = await compatibility;
   serverBatch = await servers;
-  signal?.throwIfAborted();
+  throwCompatibilityAbort(signal);
   const merged = [...settled.flat(), ...compatibleSources, ...serverBatch.sources].map(source => ({ ...source, subtitles: [...new Map([...(source.subtitles || []), ...subtitles].map(t => [t.url, t])).values()] }));
   return { sources: merged, subtitles: [...new Map([...subtitles, ...serverBatch.subtitles].map(t => [t.url, t])).values()], statuses: [...statuses, ...serverBatch.statuses] };
 }

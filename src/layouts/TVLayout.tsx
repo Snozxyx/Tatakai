@@ -14,6 +14,7 @@ import { installSpatialNavigation } from "@/core/tv/spatialNavigation";
 import { devicePlugin } from "@/core/tv/device";
 import { TVHandoff } from "@/components/tv/TVHandoff";
 import { useAuth } from "@/contexts/AuthContext";
+import { useProfilePresentation } from '@/contexts/ProfilePresentationContext';
 import { useSettingsModal } from "@/contexts/SettingsModalContext";
 import { TVLauncherSync } from "@/core/tv/TVLauncherSync";
 import { ConfirmProvider } from "@/components/ui/confirm-dialog";
@@ -36,6 +37,7 @@ const Saved = lazy(() => import("@/pages/tv/TVSavedPage"));
 const IPTV = lazy(() => import("@/pages/tv/TVIPTVPage"));
 const Library = lazy(() => import("@/pages/tv/TVLibraryPage"));
 export default function TVLayout({ children }: { children: React.ReactNode }) {
+  const { fullPage: fullPageProfile } = useProfilePresentation();
   const location = useLocation(),
     navigate = useNavigate(),
     root = useRef<HTMLDivElement>(null);
@@ -227,10 +229,10 @@ export default function TVLayout({ children }: { children: React.ReactNode }) {
   return (
     <ConfirmProvider>
       <CommunityRulesGateProvider>
-        <div ref={root} className={`tv-shell ${reading ? "tv-reading" : ""}`}>
-          <TVVideoWallpaper paused={reading || path.startsWith('/watch') || path === '/tv/iptv'} />
+        <div ref={root} className={`tv-shell ${reading ? "tv-reading" : ""}`} style={fullPageProfile ? { padding: 0, overflow: 'hidden' } : undefined}>
+          <TVVideoWallpaper paused={fullPageProfile || reading || path.startsWith('/watch') || path === '/tv/iptv'} />
           <TVLauncherSync />
-          <header className="tv-header">
+          {!fullPageProfile && <header className="tv-header">
             <Link
               className="tv-profile-link"
               to="/tv/library"
@@ -270,7 +272,7 @@ export default function TVLayout({ children }: { children: React.ReactNode }) {
             <Link className="tv-brand" to="/" aria-label="Tatakai home">
               tatakai<span>アニメの世界</span>
             </Link>
-          </header>
+          </header>}
           {reading && (
             <aside className="tv-experimental">
               Experimental TV reader · Arrow keys turn pages · Select opens

@@ -18,6 +18,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { uploadUserMedia } from '@/lib/userMedia';
 import { isAllowedImageUrl } from '@/lib/imageHosts';
 import { cn } from '@/lib/utils';
+import { optimizedImageUrl, originalImageUrl } from '@/lib/media/imageUrl';
 
 export interface LightboxImage {
   url: string;
@@ -89,7 +90,7 @@ export function LightboxProvider({ children }: { children: React.ReactNode }) {
   const open = useCallback((imgs: LightboxImage[], startIndex = 0) => {
     const list = (imgs || []).filter((i) => i && i.url);
     if (!list.length) return;
-    setImages(list);
+    setImages(list.map(image => ({ ...image, url: originalImageUrl(image.url) })));
     setIndex(Math.min(Math.max(0, startIndex), list.length - 1));
     setIsOpen(true);
   }, []);
@@ -139,13 +140,17 @@ function LightboxViewer({
   const panning = useRef<{ id: number; startX: number; startY: number; ox: number; oy: number } | null>(null);
   const [t, setT] = useState<Transform>(IDENTITY);
   const [busy, setBusy] = useState<'download' | 'save' | null>(null);
+  const [failedImageUrl, setFailedImageUrl] = useState<string | null>(null);
 
   const current = images[index];
+  // Keep the cache path used by thumbnails, but omit resizing for zooming.
+  const cachedImageUrl = optimizedImageUrl(current?.url, null);
   const multiple = images.length > 1;
 
   // Reset zoom/pan whenever the visible image changes or the viewer (re)opens.
   useEffect(() => {
     setT(IDENTITY);
+    setFailedImageUrl(null);
     panning.current = null;
   }, [index, isOpen]);
 
@@ -305,7 +310,12 @@ function LightboxViewer({
           >
             {current && (
               <img
-                src={current.url}
+                key={current.url}
+                data-image-original
+                src={failedImageUrl === cachedImageUrl ? current.url : cachedImageUrl}
+                onError={() => {
+                  if (cachedImageUrl !== current.url) setFailedImageUrl(cachedImageUrl!);
+                }}
                 alt={current.alt || ''}
                 draggable={false}
                 onDoubleClick={() => setT((prev) => (prev.scale > MIN_SCALE ? IDENTITY : { scale: 2, x: 0, y: 0 }))}

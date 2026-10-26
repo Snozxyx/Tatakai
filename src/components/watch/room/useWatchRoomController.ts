@@ -36,6 +36,7 @@ import { toast } from 'sonner';
 import { useIsDesktopApp, useIsMobileApp } from '@/hooks/ui/useIsNativeApp';
 import { setActivity, clearActivity } from '@/core/activity/activity-monitor';
 import { groupProviderServers } from './watchRoomShared';
+import { useP2PWatchRoom } from '@/hooks/media/useP2PWatchRoom';
 
 /**
  * useWatchRoomController — the entire Watch2Together room logic (state, refs,
@@ -350,13 +351,28 @@ export function useWatchRoomController() {
             subtitles: [], intro: null, outro: null, tracks: [], providerServers: [],
         } as any;
     }, [localShare?.localStreamUrl]);
-    const streamingData = isCustomRoom
+    const legacyStreamingData = isCustomRoom
         ? customStreamingData
         : isViewerOnShare
             ? viewerStreamingData
             : (isHost && localShareData)
                 ? localShareData
                 : resolvedSources;
+    const hostStreamingData = localShareData || (room?.manual_stream_url ? {
+        sources: [{ url: room.manual_stream_url, isM3U8: /\.m3u8(?:[?#]|$)/i.test(room.manual_stream_url), isEmbed: (room as any).manual_stream_type === 'embed' }],
+        headers: {}, subtitles: [], tracks: [],
+    } : isCustomRoom ? customStreamingData : resolvedSources);
+    const p2p = useP2PWatchRoom({
+        room, userId: user?.id, isMember: isParticipant || isHost, playerRef,
+        hostSource: isHost ? hostStreamingData?.sources?.[0] : undefined,
+        headers: hostStreamingData?.headers,
+        subtitles: [...(hostStreamingData?.subtitles || []), ...(room?.manual_subtitle_url ? [{ url: room.manual_subtitle_url, lang: 'Manual' }] : [])],
+        timelineId: `${roomId}:${room?.anime_id === 'custom' || room?.manual_stream_url ? 'custom' : currentEpisodeId || 'episode'}:${room?.category}`,
+        memberIds: participants.map(participant => participant.user_id),
+    });
+    const streamingData = p2p.enabled
+        ? (isHost ? hostStreamingData : p2p.streamingData)
+        : legacyStreamingData;
     // "Resolving" covers both the extension source stream AND the upstream
     // anime metadata fetch. After a host changes the anime, `useAnimeInfo` /
     // `useEpisodes` refetch for the new id; until they land, `anilistId` /
@@ -379,7 +395,7 @@ export function useWatchRoomController() {
     // room row so every participant plays the host's single synced source.
     const publishTokenRef = useRef<string>('');
     useEffect(() => {
-        if (!isHost || !roomId) return;
+        if (!isHost || !roomId || p2p.enabled) return;
         if (isCustomRoom) return; // custom rooms already carry a shareable URL
         if (localShare) return;   // host is streaming a local file — don't overwrite it
         const rt = (window as any).tatakaiRuntime;
@@ -452,7 +468,7 @@ export function useWatchRoomController() {
                 toast.error(uiI18n.t('app.watch_party_stream_failed_i18n_value_0_afc83d3b', { value0: err?.message || err }), { id: loadingId });
             }
         })();
-    }, [isHost, isDesktopApp, roomId, isCustomRoom, localShare, resolvedSources, currentEpisodeId, selectedServer, selectedCategory]);
+    }, [isHost, isDesktopApp, roomId, isCustomRoom, localShare, resolvedSources, currentEpisodeId, selectedServer, selectedCategory, p2p.enabled]);
 
     // ── Mobile host: publish the resolved REMOTE url directly (no tunnel) ──────
     // A phone can't run a loopback proxy + cloudflared, but the extension runtime
@@ -462,7 +478,7 @@ export function useWatchRoomController() {
     // need the guest to re-resolve — that's the documented mobile-host limit.
     const mobilePublishTokenRef = useRef<string>('');
     useEffect(() => {
-        if (!isHost || !roomId || !isMobileApp) return;
+        if (!isHost || !roomId || !isMobileApp || p2p.enabled) return;
         if (isCustomRoom) return; // already carries a shareable url
 
         const primary = (resolvedSources?.sources || []).find((s: any) => !s.isEmbed);
@@ -488,11 +504,11 @@ export function useWatchRoomController() {
                 share_host_platform: 'mobile',
             } as any,
         });
-    }, [isHost, isMobileApp, roomId, isCustomRoom, resolvedSources, currentEpisodeId, selectedServer, selectedCategory]);
+    }, [isHost, isMobileApp, roomId, isCustomRoom, resolvedSources, currentEpisodeId, selectedServer, selectedCategory, p2p.enabled]);
 
     // Stop the tunnel + clear share fields when the host leaves/unmounts.
     useEffect(() => {
-        if (!isHost) return;
+        if (!isHost || p2p.enabled) return;
         return () => {
             const rt = (window as any).tatakaiRuntime;
             try { rt?.stopShareTunnel?.(); } catch (_) { /* noop */ }
@@ -501,10 +517,11 @@ export function useWatchRoomController() {
             }
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isHost, roomId]);
+    }, [isHost, roomId, p2p.enabled]);
 
     // Error Handling for Video Player
     const handlePlayerError = useCallback(() => {
+        if (p2p.enabled && !isHost) return; // Viewers use transport failover; only the host may change providers.
         if (localShare) return; // local file — no server failover to attempt
         if (!serversData || !isHost) return;
         const allServers = serversData.all || [];
@@ -517,7 +534,7 @@ export function useWatchRoomController() {
         } else {
             toast.error(uiI18n.t('app.no_working_servers_found_try_another_episode_88faf833'));
         }
-    }, [serversData, isHost, triedServers, localShare]);
+    }, [serversData, isHost, triedServers, localShare, p2p.enabled]);
     // ── Host: stream a local file (device pick or offline-library episode) ────
     // Serves the file off the loopback proxy, tunnels it, and publishes the public
     // URL to the room so every participant plays it synced to the host clock. The
@@ -532,7 +549,7 @@ export function useWatchRoomController() {
         setPublishingLocal(true);
         const loadingId = toast.loading('Preparing your file for the watch party…');
         try {
-            const res = await rt.publishLocalFile({ path: filePath });
+            const res = await rt.publishLocalFile({ path: filePath, p2p: p2p.enabled });
             if (res?.shareStreamUrl && res?.localStreamUrl) {
                 // Stop anime resolution from clobbering this, then publish.
                 publishTokenRef.current = '';
@@ -541,7 +558,7 @@ export function useWatchRoomController() {
                     localStreamUrl: res.localStreamUrl,
                     fileName: res.fileName || label,
                 });
-                await updateRoom.mutateAsync({
+                if (!p2p.enabled) await updateRoom.mutateAsync({
                     roomId,
                     updates: {
                         share_stream_url: res.shareStreamUrl,
@@ -580,7 +597,7 @@ export function useWatchRoomController() {
         } finally {
             setPublishingLocal(false);
         }
-    }, [roomId, isDesktopApp, updateRoom]);
+    }, [roomId, isDesktopApp, updateRoom, p2p.enabled]);
     // Pick a video file from the device via the native dialog, then publish it.
     const handlePickLocalFile = useCallback(async () => {
         const electron = (window as any).electron;
@@ -658,7 +675,7 @@ export function useWatchRoomController() {
 
     // Participant Sync Logic (wall-clock + adaptive drift correction)
     useEffect(() => {
-        if (isHost || !playerRef.current || !room || room.scheduled_start_at) return;
+        if (p2p.enabled || isHost || !playerRef.current || !room || room.scheduled_start_at) return;
         const video = playerRef.current;
 
         if (!room.is_playing) {
@@ -698,7 +715,7 @@ export function useWatchRoomController() {
         if (video.playbackRate !== 1) {
             video.playbackRate = 1;
         }
-    }, [room?.is_playing, room?.current_time_seconds, room?.updated_at, room?.scheduled_start_at, isHost]);
+    }, [room?.is_playing, room?.current_time_seconds, room?.updated_at, room?.scheduled_start_at, isHost, p2p.enabled]);
     // Real-time Subscriptions
     useEffect(() => {
         if (!roomId) return;
@@ -770,7 +787,8 @@ export function useWatchRoomController() {
             if (diff <= 0) {
                 if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
                 if (isHost) {
-                    updatePlayback.mutate({ roomId: roomId!, isPlaying: true });
+                    if (p2p.enabled) p2p.requestPlay(true);
+                    else updatePlayback.mutate({ roomId: roomId!, isPlaying: true });
                     updateRoom.mutate({ roomId: roomId!, updates: { scheduled_start_at: null } as any });
                 }
             }
@@ -779,7 +797,7 @@ export function useWatchRoomController() {
         updateCountdown();
         countdownIntervalRef.current = setInterval(updateCountdown, 1000);
         return () => { if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current); };
-    }, [room?.scheduled_start_at, isHost, roomId]);
+    }, [room?.scheduled_start_at, isHost, roomId, p2p.enabled]);
     // Handlers
     const handleStartTimer = (seconds: number) => {
         const scheduledTime = new Date(Date.now() + seconds * 1000).toISOString();
@@ -791,6 +809,11 @@ export function useWatchRoomController() {
     };
 
     const handleForceStart = () => {
+        if (p2p.enabled) {
+            p2p.requestPlay(true);
+            updateRoom.mutate({ roomId: roomId!, updates: { scheduled_start_at: null } as any });
+            return;
+        }
         updateRoom.mutate({
             roomId: roomId!,
             updates: { scheduled_start_at: null, is_playing: true } as any
@@ -835,7 +858,7 @@ export function useWatchRoomController() {
         });
     };
     const handleLeave = async () => {
-        if (isHost && participants.length > 1) {
+        if (isHost && participants.length > 1 && !p2p.enabled) {
             const nextHost = participants
                 .filter(p => p.user_id !== user?.id)
                 .sort((a, b) => new Date(b.last_seen_at).getTime() - new Date(a.last_seen_at).getTime())[0];
@@ -938,7 +961,8 @@ export function useWatchRoomController() {
 
         setHostTransferTarget(targetUserId);
         try {
-            await updateRoom.mutateAsync({
+            if (p2p.enabled) await p2p.transfer(targetUserId);
+            else await updateRoom.mutateAsync({
                 roomId,
                 updates: { host_id: targetUserId } as any
             });
@@ -1091,6 +1115,7 @@ export function useWatchRoomController() {
     // Broadcast status chip — reflects host tunnel state / viewer sync mode.
     // Null-safe: the controller runs before WatchRoomLayout's room-exists guard.
     const broadcastChip = (() => {
+        if (p2p.enabled) return { label: p2p.status.replace(/-/g, ' '), live: p2p.status === 'synchronized' };
         if (!room) return { get label() { return uiI18n.t('app.synced_b2ef6af6'); }, live: false };
         if (isHost) {
             if (isCustomRoom || room.manual_stream_url) return { get label() { return uiI18n.t('app.hosting_custom_d42774ea'); }, live: !!room.is_playing };
@@ -1186,7 +1211,7 @@ export function useWatchRoomController() {
         participants, messages, queueItems, activePoll, episodesData,
 
         // Player + status
-        playerRef, lastUpdateRef, messagesEndRef, drift, broadcastChip,
+        playerRef, lastUpdateRef, messagesEndRef, drift: p2p.enabled ? p2p.drift : drift, broadcastChip, p2p,
 
         // UI state + setters
         message, setMessage,

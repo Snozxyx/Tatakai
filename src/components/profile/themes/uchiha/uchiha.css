@@ -1,0 +1,90 @@
+/* Default profile content, asymmetric layout, sourced Itachi artwork. */
+.uchiha-profile {
+  color-scheme: dark;
+  --background: 220 8% 5%; --foreground: 20 8% 92%;
+  --card: 220 6% 7%; --card-foreground: 20 8% 92%;
+  --popover: 220 6% 8%; --popover-foreground: 20 8% 92%;
+  --primary: 0 65% 62%; --primary-foreground: 0 0% 100%;
+  --secondary: 220 5% 12%; --secondary-foreground: 20 8% 92%;
+  --muted: 220 5% 12%; --muted-foreground: 20 4% 65%;
+  --accent: 0 15% 13%; --accent-foreground: 20 8% 92%;
+  --border: 220 4% 17%; --input: 220 4% 17%; --ring: 0 65% 62%;
+  --profile-accent: 0 55% 52%;
+  background: #0c0d0f; scrollbar-color: #5e4b4c #111214; overflow: clip;
+}
+.uchiha-profile ::selection { background: #8b272c; color: #fff; }
+.uchiha-profile :focus-visible { outline-color: #df6c6b; outline-offset: 4px; }
+.uchiha-atmosphere { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.uchiha-profile .profile-banner { height: 430px; }
+.uchiha-scene { position: absolute; inset: 0; overflow: hidden; background: #08090b; }
+.uchiha-scene > img, .uchiha-scene > video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 34%; }
+.uchiha-scene > video { opacity: 0; transition: opacity 600ms cubic-bezier(.23,1,.32,1); }
+.uchiha-scene[data-ready] > video { opacity: 1; }
+.uchiha-scene::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, #08090b88, transparent 38%, transparent 75%, #08090b44); }
+.uchiha-profile .profile-banner > .pointer-events-none { mask-image: linear-gradient(#000 70%, transparent) !important; }
+.uchiha-banner-mark { position: absolute; top: 80px; left: max(3rem, calc((100% - 1160px) / 2)); z-index: 2; display: flex; align-items: center; gap: 13px; pointer-events: none; }
+.uchiha-banner-mark svg { width: 32px; height: 40px; }
+.uchiha-banner-mark span { color: #ded9d7; font-size: 12px; font-weight: 600; letter-spacing: .22em; }
+.uchiha-profile .profile-content { max-width: 1360px; display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 44px; }
+.uchiha-profile-sidebar { min-width: 0; position: sticky; top: 96px; align-self: start; margin-top: -72px; padding: 8px; max-height: calc(100dvh - 120px); overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none; }
+.uchiha-profile-sidebar::-webkit-scrollbar { display: none; width: 0; height: 0; }
+.uchiha-profile .profile-identity { display: flex; flex-direction: column; align-items: stretch; gap: 24px; margin: 0 0 24px; }
+.uchiha-profile .profile-identity-main { flex-direction: column; align-items: flex-start; gap: 20px; width: 100%; min-width: 0; }
+.uchiha-profile .profile-avatar { width: 128px; height: 128px; border-radius: 12px; border: 1px solid #ffffff20; --tw-ring-color: #0c0d0f; box-shadow: none; }
+.uchiha-profile .profile-avatar-wrap { width: 128px; height: 128px; aspect-ratio: 1; flex: none; isolation: isolate; }
+.uchiha-profile .profile-avatar > span { width: 100%; height: 100%; min-width: 0; min-height: 0; }
+.uchiha-profile .profile-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.uchiha-profile .profile-identity-badges { max-width: 100%; flex-wrap: wrap; }
+.uchiha-profile .profile-avatar > span, .uchiha-profile .profile-avatar-fallback { border-radius: inherit; }
+.uchiha-profile .profile-avatar-fallback { background: #2c3035; color: #f2eeeb; }
+.uchiha-profile .profile-identity-copy { padding: 0; min-width: 0; align-items: flex-start; text-align: left; }
+.uchiha-profile .profile-identity-copy > div { justify-content: flex-start; }
+.uchiha-profile .profile-identity h1 { font-size: 34px; line-height: 1.15; letter-spacing: -.025em; overflow-wrap: anywhere; filter: none; }
+.uchiha-profile h1 .rn-1 { color: #eee9e6; }
+.uchiha-profile .profile-identity button { border-radius: 6px; box-shadow: none; backdrop-filter: none; padding-inline: 12px; }
+.uchiha-profile .profile-summary-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 12px; min-width: 0; padding: 22px 0; border: 0; border-block: 1px solid #ffffff14; border-radius: 0; background: transparent; backdrop-filter: none; box-shadow: none; font-variant-numeric: tabular-nums; }
+.uchiha-profile .profile-summary-stats > .w-px { display: none; }
+.uchiha-profile .profile-summary-stats > div { align-items: flex-start; padding: 0; }
+.uchiha-profile .profile-summary-stats span:first-child { font-size: 23px; white-space: nowrap; font-weight: 600; }
+.uchiha-profile .profile-summary-stats span:last-child { letter-spacing: .04em; color: #aaa5a2; }
+.uchiha-profile .profile-bio { max-width: 65ch; margin-bottom: 24px; }
+.uchiha-profile .profile-bio p { font-size: 13px; color: #aaa5a2; }
+.uchiha-profile .profile-content > .mt-4 { margin-top: 0; min-width: 0; }
+.uchiha-profile [role="tablist"] { justify-content: flex-start; width: 100%; max-width: 100%; border: 0; border-bottom: 1px solid #ffffff16; border-radius: 0; padding: 0; gap: 0; background: transparent; box-shadow: none; backdrop-filter: none; }
+.uchiha-profile [role="tablist"] > [role="tab"] { min-height: 48px; border-radius: 0; border-bottom: 2px solid transparent; padding-inline: 11px; font-weight: 500; font-size: 13px; color: #aaa5a2; box-shadow: none; }
+.uchiha-profile [role="tablist"] > [role="tab"][data-state="active"] { background: transparent; color: #ee7c79; border-bottom-color: #ca4b49; box-shadow: none; }
+.uchiha-profile [role="tablist"] > [role="tab"]:hover { color: #fff; }
+.uchiha-profile [role="tabpanel"] { margin-top: 24px; }
+.uchiha-profile .glass-panel { background: #0e1012; border: 1px solid #ffffff0b; border-radius: 12px; backdrop-filter: none; box-shadow: none; }
+.uchiha-profile .glass-panel > .space-y-4 > .grid.lg\:grid-cols-6 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.uchiha-profile .glass-panel::before { display: none; }
+.uchiha-profile .glass-panel > .pointer-events-none { opacity: .25; }
+.uchiha-profile .glass-panel [class*="text-muted-foreground"] { color: #aaa6a2; }
+.uchiha-profile .rn-1 { color: #aaa6a2; }
+@media (max-width: 1100px) {
+  .uchiha-profile .profile-content { grid-template-columns: 210px minmax(0, 1fr); gap: 24px; }
+}
+@media (max-width: 767px) {
+  .uchiha-profile .profile-banner { height: 300px; }
+  .uchiha-scene > img, .uchiha-scene > video { object-position: 50% 30%; }
+  .uchiha-banner-mark { top: 60px; left: 24px; gap: 9px; }
+  .uchiha-banner-mark svg { width: 24px; height: 32px; }
+  .uchiha-banner-mark span { font-size: 10px; }
+  .uchiha-profile .profile-content { display: block; }
+  .uchiha-profile-sidebar { position: static; margin-top: 0; padding: 0; max-height: none; overflow: visible; }
+  .uchiha-profile .profile-identity { margin-top: -44px; gap: 20px; margin-bottom: 20px; }
+  .uchiha-profile .profile-identity-main { gap: 16px; }
+  .uchiha-profile .profile-avatar { width: 92px; height: 92px; border-radius: 10px; }
+  .uchiha-profile .profile-avatar-wrap { width: 92px; height: 92px; }
+  .uchiha-profile .profile-identity h1 { font-size: 30px; }
+  .uchiha-profile .profile-summary-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; padding: 18px 0; }
+  .uchiha-profile .profile-summary-stats span:first-child { font-size: clamp(16px, 4.5vw, 21px); }
+  .uchiha-profile .profile-summary-stats span:last-child { font-size: 9px; }
+  .uchiha-profile .profile-bio { margin-bottom: 22px; }
+  .uchiha-profile [role="tablist"] > [role="tab"] { padding-inline: 12px; }
+  .uchiha-profile .glass-panel > .space-y-4 > .grid.lg\:grid-cols-6 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .uchiha-profile .profile-banner img, .uchiha-profile .profile-avatar img { transition: none; transform: none; }
+  .uchiha-scene > video { transition: none; }
+}

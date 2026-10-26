@@ -1,3 +1,4 @@
+import { CosmeticAvatar, CosmeticName } from '@/components/profile/IdentityCosmetics';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMemo, useState } from 'react';
@@ -9,7 +10,7 @@ import { Flame, ChevronRight, Heart, MessageCircle, Eye, EyeOff, ImagePlus } fro
 import { supabase } from '@/integrations/supabase/client';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ProfileWidgetCard } from '@/components/profile/ProfileWidgetCard';
 import { CommunityWidgetCard } from '@/components/community/CommunityWidgetCard';
 import { UserBadges } from '@/components/ui/UserBadges';
@@ -243,12 +244,12 @@ function TileHeader({ tile, shape }: { tile: TrendingTile; shape: 'hero' | 'side
           onClick={(e) => e.stopPropagation()}
           className="shrink-0 transition-transform hover:scale-105"
         >
-          <Avatar className={cn('ring-1 ring-white/15', shape === 'hero' ? 'h-9 w-9' : 'h-7 w-7')}>
+          <CosmeticAvatar userId={post.user_id} className={cn('ring-1 ring-white/15', shape === 'hero' ? 'h-9 w-9' : 'h-7 w-7')}>
             <AvatarImage src={author?.avatar_url || undefined} className="object-cover" />
             <AvatarFallback className={cn(shape === 'hero' ? 'text-xs' : 'text-[10px]')}>
               {authorName[0]?.toUpperCase() || 'U'}
             </AvatarFallback>
-          </Avatar>
+          </CosmeticAvatar>
         </button>
       </ProfileWidgetCard>
 
@@ -267,7 +268,7 @@ function TileHeader({ tile, shape }: { tile: TrendingTile; shape: 'hero' | 'side
               className={cn('truncate font-bold hover:underline decoration-white/30 underline-offset-2', rankStyle.className, shape === 'hero' ? 'text-[14px]' : 'text-[13px]')}
               style={rankStyle.style}
             >
-              {authorName}
+              <CosmeticName userId={post.user_id}>{authorName}</CosmeticName>
             </button>
           </ProfileWidgetCard>
           {tile.author_is_official && (

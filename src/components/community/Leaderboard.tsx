@@ -1,10 +1,11 @@
+import { CosmeticAvatar, CosmeticName } from '@/components/profile/IdentityCosmetics';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { GlassPanel } from '@/components/ui/GlassPanel';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useLeaderboard, LeaderboardType, useUserRank } from '@/hooks/community/useLeaderboard';
 import { useAuth } from '@/contexts/AuthContext';
 import { Trophy, Star, MessageSquare, TrendingUp, UserPlus, Flame, Crown, BookOpen } from 'lucide-react';
@@ -47,11 +48,11 @@ function PodiumCard({ entry, config, scoreLabel }: { entry: any; config: (typeof
       >
         <div className={cn('pointer-events-none absolute -top-8 h-24 w-24 rounded-full blur-[50px]', config.glow)} />
         <Crown className={cn('relative mb-1 h-4 w-4', config.crown)} />
-        <Avatar className={cn('relative h-14 w-14 ring-2', config.ring)}>
+        <CosmeticAvatar userId={entry.user_id} className={cn('relative h-14 w-14 ring-2', config.ring)}>
           <AvatarImage src={entry.avatar_url || ''} />
           <AvatarFallback>{displayName(entry)[0]}</AvatarFallback>
-        </Avatar>
-        <p className="relative mt-2 w-full truncate text-sm font-display font-bold tracking-tight">{displayName(entry)}</p>
+        </CosmeticAvatar>
+        <p className="relative mt-2 w-full truncate text-sm font-display font-bold tracking-tight"><CosmeticName userId={entry.user_id}>{displayName(entry)}</CosmeticName></p>
         <div className="relative mt-0.5 flex items-center gap-1">
           <img src={getRankImageUrl(rankTier.rank)} alt="" className="h-3.5 w-3.5 object-contain" />
           <span className={cn('text-[10px] font-semibold', rankTier.color)}>{rankTier.name}</span>
@@ -80,13 +81,13 @@ function LeaderboardRow({ entry, currentUserId, scoreLabel }: { entry: any; curr
         <span className="w-6 text-center font-display text-sm font-bold tabular-nums text-muted-foreground">
           {entry.rank}
         </span>
-        <Avatar className="h-10 w-10">
+        <CosmeticAvatar userId={entry.user_id} className="h-10 w-10">
           <AvatarImage src={entry.avatar_url || ''} />
           <AvatarFallback>{displayName(entry)[0]}</AvatarFallback>
-        </Avatar>
+        </CosmeticAvatar>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <p className="truncate font-display font-bold tracking-tight">{displayName(entry)}</p>
+            <p className="truncate font-display font-bold tracking-tight"><CosmeticName userId={entry.user_id}>{displayName(entry)}</CosmeticName></p>
             {isCurrentUser && (
               <span className="rounded-full bg-primary/20 px-2 py-0.5 text-[10px] font-bold uppercase text-primary">{uiI18n.t('app.you_905cb326')}</span>
             )}

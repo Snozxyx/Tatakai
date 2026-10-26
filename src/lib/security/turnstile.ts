@@ -13,7 +13,7 @@
  *  - No VITE_TURNSTILE_SITE_KEY   → disabled; callers proceed without a token.
  *  - Desktop file:// (null origin) → disabled; the widget can't render there and
  *    the siteverify would reject a null hostname, so we skip it entirely.
- *  - Native iOS → disabled for the packaged app; web Safari remains enabled.
+ *  - Native iOS → uses an HTTPS-hosted widget (the app origin is capacitor://).
  *  - TatakaiAPI unreachable        → verify fails OPEN (the server itself fails
  *    open on a Cloudflare outage; the DB backstop still guards the write).
  */
@@ -34,10 +34,37 @@ export const TURNSTILE_SCRIPT_SRC =
  * build), where the widget can't render and siteverify rejects the null host.
  */
 export function isTurnstileEnabled(): boolean {
-  if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios') return false;
   if (!TURNSTILE_SITE_KEY) return false;
   if (typeof window !== "undefined" && window.location.protocol === "file:") return false;
   return true;
+}
+
+/** WKWebView's custom-scheme origin cannot host the challenge directly. */
+export function needsHostedTurnstile(): boolean {
+  return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios';
+}
+
+export const HOSTED_TURNSTILE_URL = 'https://tatakai.me/security/turnstile.html';
+
+export type HostedTurnstileMessage = {
+  type: 'tatakai-turnstile';
+  id: string;
+  event: 'ready' | 'token' | 'expired' | 'error' | 'timeout';
+  token?: string;
+};
+
+/** Accept tokens only from this widget's HTTPS frame and current render. */
+export function readHostedTurnstileMessage(
+  event: MessageEvent,
+  source: Window | null,
+  id: string,
+): HostedTurnstileMessage | null {
+  if (!source || event.source !== source || event.origin !== new URL(HOSTED_TURNSTILE_URL).origin) return null;
+  const data = event.data;
+  if (!data || data.type !== 'tatakai-turnstile' || data.id !== id) return null;
+  if (!['ready', 'token', 'expired', 'error', 'timeout'].includes(data.event)) return null;
+  if (data.event === 'token' && (typeof data.token !== 'string' || !data.token || data.token.length > 2048)) return null;
+  return data;
 }
 
 /**

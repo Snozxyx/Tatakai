@@ -1,0 +1,25 @@
+.uchiha-crows { position: absolute; inset: 0; overflow: hidden; pointer-events: none; container-type: inline-size; }
+.uc-flight { position: absolute; left: -110px; color: #24101d; opacity: var(--uc-opacity); animation: uc-crossing var(--uc-duration) linear var(--uc-delay) infinite; }
+.uc-bird { display: block; width: 100%; height: auto; filter: brightness(0) invert(.18); transform-origin: center; animation: uc-soar var(--uc-flap) cubic-bezier(.77, 0, .175, 1) infinite; }
+.uchiha-crows-page { mask-image: linear-gradient(90deg, #000, transparent 25%, transparent 75%, #000); }
+.uchiha-crows-banner .uc-bird { filter: brightness(0); }
+.uchiha-crows-banner { z-index: 3; }
+.uchiha-crows-widget { z-index: 1; }
+.uchiha-crows-widget .uc-flight { color: #050407; }
+.uchiha-crows[data-paused] .uc-flight, .uchiha-crows[data-paused] .uc-bird { animation-play-state: paused; }
+.uchiha-crows[data-still] .uc-flight { animation: none; left: var(--uc-rest); opacity: .4; }
+.uchiha-crows[data-still] .uc-bird { animation: none; }
+@keyframes uc-crossing {
+  0% { transform: translate3d(0, 14px, 0) rotate(-8deg); }
+  28% { transform: translate3d(calc(30cqw + 60px), -24px, 0) rotate(3deg); }
+  64% { transform: translate3d(calc(68cqw + 120px), 22px, 0) rotate(-4deg); }
+  100% { transform: translate3d(calc(100cqw + 220px), -34px, 0) rotate(-8deg); }
+}
+@keyframes uc-soar {
+  0%, 100% { transform: scaleY(1) rotate(-4deg); }
+  50% { transform: scaleY(.8) rotate(5deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .uchiha-crows .uc-flight { animation: none; left: var(--uc-rest); opacity: .4; }
+  .uchiha-crows .uc-bird { animation: none; }
+}

@@ -1,3 +1,4 @@
+import { BRAND_ASSET_BASE } from '@/lib/assets';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 "use client";
@@ -8,7 +9,7 @@ import { animate, stagger } from "animejs";
 import { Reveal } from "@/components/ui/Reveal";
 import { Smartphone, ChevronLeft, ChevronRight, SlidersHorizontal } from "lucide-react";
 
-const BRAND = "/assets/brand";
+const BRAND = BRAND_ASSET_BASE;
 
 interface PhoneShot {
   src: string;

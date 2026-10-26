@@ -1,4 +1,10 @@
 {
+  "landingHero": {
+    "explore": "exploras",
+    "discover": "descubres",
+    "immerse": "vives",
+    "love": "amas"
+  },
   "extensionUpdate": {
     "translateTitle": "Lee más allá de las barreras del idioma.",
     "translateBody": "Un espacio de escritorio para traducir manga y páginas ilustradas, con capas de texto editables y control sobre el resultado final.",
@@ -3412,8 +3418,8 @@
     "episodes_watched_7ff033df": "Los episodios vistos",
     "manga_reading_054694f6": "Lectura de manga",
     "no_activity_history_4458aa8c": "No hay historial de actividad",
-    "this_user_has_no_watch_or_manga_activity_yet_2260bce7": "Este usuario no tiene ningún reloj o manga todavía.",
-    "your_anime_and_manga_activity_will_appear_here_cbd9c0d4": "Su actividad de anime y manga aparecerá aquí.",
+    "this_user_has_no_watch_or_manga_activity_yet_2260bce7": "Este usuario aún no tiene actividad de anime, manga o novelas.",
+    "your_anime_and_manga_activity_will_appear_here_cbd9c0d4": "Tu actividad de anime, manga y novelas aparecerá aquí.",
     "start_watching_e408bda7": "Empezar a ver",
     "continue_2e026239": "Continuar",
     "read_852b438f": "Leer",

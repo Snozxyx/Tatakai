@@ -37,6 +37,9 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.TimeUnit;
+import java.util.Set;
 
 /**
  * TatakaiLocalProxy — Android loopback media proxy, native counterpart to
@@ -96,6 +99,71 @@ public class TatakaiLocalProxyPlugin extends Plugin {
     private final Object tokenRegistrationSignal = new Object();
     private final ExecutorService apiExecutor = Executors.newFixedThreadPool(2);
     private final SecureRandom secureRandom = new SecureRandom();
+    private final Set<String> peerSources = ConcurrentHashMap.newKeySet();
+    private final Map<String, PeerMediaRequest> peerRequests = new ConcurrentHashMap<>();
+    private static final int PEER_BLOCK_LIMIT = 1024 * 1024;
+
+    private static final class PeerMediaRequest {
+        final String token;
+        final ArrayBlockingQueue<PeerMediaReply> replies = new ArrayBlockingQueue<>(1);
+        PeerMediaRequest(String token) { this.token = token; }
+    }
+    private static final class PeerMediaReply {
+        final PluginCall acknowledgement;
+        final int status;
+        final JSObject headers;
+        final byte[] body;
+        final boolean last;
+        PeerMediaReply(PluginCall call, int status, JSObject headers, byte[] body, boolean last) {
+            this.acknowledgement = call; this.status = status; this.headers = headers; this.body = body; this.last = last;
+        }
+    }
+
+    /** Opaque, loopback-only capability; resources are resolved by the room's JS transport. */
+    @PluginMethod public void registerPeerSource(PluginCall call) {
+        apiExecutor.execute(() -> {
+            if (peerSources.size() >= 4) { call.reject("Too many active watchroom media sources"); return; }
+            try {
+                String token = mintToken();
+                String base = requireServer().baseUrl();
+                peerSources.add(token);
+                call.resolve(new JSObject().put("token", token).put("proxyUrl", base + "/peer/" + token + "/root"));
+            } catch (Exception e) { call.reject("Unable to start watchroom media bridge"); }
+        });
+    }
+
+    @PluginMethod public void unregisterPeerSource(PluginCall call) {
+        String token = call.getString("token", "");
+        peerSources.remove(token);
+        for (Map.Entry<String, PeerMediaRequest> entry : peerRequests.entrySet()) {
+            if (entry.getValue().token.equals(token)) {
+                peerRequests.remove(entry.getKey());
+                PeerMediaReply queued = entry.getValue().replies.poll();
+                if (queued != null) queued.acknowledgement.reject("Watchroom media closed");
+            }
+        }
+        call.resolve();
+    }
+
+    @PluginMethod public void peerMediaResponse(PluginCall call) {
+        apiExecutor.execute(() -> {
+            String id = call.getString("id", ""), token = call.getString("token", "");
+            PeerMediaRequest request = peerRequests.get(id);
+            String encoded = call.getString("body", "");
+            if (request == null || !request.token.equals(token) || !peerSources.contains(token)
+                || encoded == null || encoded.length() > 4 * ((PEER_BLOCK_LIMIT + 2) / 3)) {
+                call.reject("Watchroom media request expired or block too large"); return;
+            }
+            try {
+                byte[] body = android.util.Base64.decode(encoded, android.util.Base64.DEFAULT);
+                if (body.length > PEER_BLOCK_LIMIT) { call.reject("Watchroom media block too large"); return; }
+                PeerMediaReply reply = new PeerMediaReply(call, call.getInt("status", 502),
+                    call.getObject("headers", new JSObject()), body, call.getBoolean("final", true));
+                if (!request.replies.offer(reply, 5, TimeUnit.SECONDS)) call.reject("Watchroom media backpressure timeout");
+                // The socket writer resolves this call only after flushing its bounded block.
+            } catch (Exception e) { call.reject("Invalid watchroom media block"); }
+        });
+    }
     private MobileMediaCache mediaCache;
     @Override public void load() { mediaCache = new MobileMediaCache(getContext()); }
 
@@ -284,6 +352,12 @@ public class TatakaiLocalProxyPlugin extends Plugin {
         }
         if (active != null) active.closeQuietly();
         tokenMap.clear();
+        peerSources.clear();
+        for (PeerMediaRequest request : peerRequests.values()) {
+            PeerMediaReply queued = request.replies.poll();
+            if (queued != null) queued.acknowledgement.reject("Watchroom media closed");
+        }
+        peerRequests.clear();
     }
 
     // ── Internals ───────────────────────────────────────────────────────
@@ -499,6 +573,10 @@ public class TatakaiLocalProxyPlugin extends Plugin {
                     handleExtensionFetch(output, method, reqHeaders, path);
                     return;
                 }
+                if (path.startsWith("/peer/")) {
+                    handlePeerMedia(output, method, path, reqHeaders.get("range"));
+                    return;
+                }
                 if (path.startsWith("/stream/")) {
                     String token = path.substring("/stream/".length()).split("[?#]", 2)[0]
                         .toLowerCase(Locale.US);
@@ -514,6 +592,58 @@ public class TatakaiLocalProxyPlugin extends Plugin {
                 // Client (seek cancel) went away mid-copy.
             } catch (Exception e) {
                 Log.w(TAG, "proxy serve failed: " + e.getMessage());
+            }
+        }
+
+        private void handlePeerMedia(OutputStream output, String method, String path, String range) throws IOException {
+            String[] parts = path.split("/", -1);
+            if ((!"GET".equals(method) && !"HEAD".equals(method)) || parts.length != 4
+                || !parts[2].matches("[a-f0-9]{32}") || !parts[3].matches("root|[a-f0-9]{32}")
+                || !peerSources.contains(parts[2])) { writeText(output, 410, "Watchroom media source closed"); return; }
+            if (peerRequests.size() >= 8) { writeText(output, 503, "Watchroom media bridge busy"); return; }
+            String id = mintToken();
+            PeerMediaRequest request = new PeerMediaRequest(parts[2]);
+            peerRequests.put(id, request);
+            JSObject event = new JSObject().put("id", id).put("token", parts[2])
+                .put("resourceId", parts[3]).put("method", method);
+            if (range != null) event.put("range", range);
+            getActivity().runOnUiThread(() -> notifyListeners("peerMediaRequest", event));
+            boolean sentHead = false;
+            try {
+                while (peerSources.contains(parts[2]) && peerRequests.containsKey(id)) {
+                    PeerMediaReply reply = request.replies.poll(30, TimeUnit.SECONDS);
+                    if (reply == null) {
+                        if (!sentHead) writeText(output, 504, "Watchroom media request timed out");
+                        return;
+                    }
+                    try {
+                        if (!sentHead) {
+                            StringBuilder headers = new StringBuilder(CORS_HEADERS);
+                            for (String name : new String[] { "Content-Type", "Content-Length", "Content-Range", "Accept-Ranges" }) {
+                                String value = reply.headers.getString(name, "");
+                                if (value != null && !value.isEmpty()) headers.append(name).append(": ")
+                                    .append(value.replace("\r", "").replace("\n", "")).append("\r\n");
+                            }
+                            headers.append("Cache-Control: no-store\r\nConnection: close\r\n\r\n");
+                            writeHead(output, reply.status >= 200 && reply.status <= 599 ? reply.status : 502, headers.toString(), null);
+                            sentHead = true;
+                        }
+                        if (!"HEAD".equals(method)) output.write(reply.body);
+                        output.flush();
+                        reply.acknowledgement.resolve();
+                    } catch (IOException failure) {
+                        reply.acknowledgement.reject("Watchroom media request cancelled");
+                        throw failure;
+                    }
+                    if (reply.last || "HEAD".equals(method)) return;
+                }
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            } finally {
+                peerRequests.remove(id);
+                PeerMediaReply queued = request.replies.poll();
+                if (queued != null) queued.acknowledgement.reject("Watchroom media request cancelled");
+                getActivity().runOnUiThread(() -> notifyListeners("peerMediaCancel", event));
             }
         }
 

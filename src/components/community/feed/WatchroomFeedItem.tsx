@@ -1,3 +1,4 @@
+import { CosmeticAvatar, CosmeticName } from '@/components/profile/IdentityCosmetics';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState } from 'react';
@@ -8,7 +9,7 @@ import { toast } from 'sonner';
 import { MessageCircle, Repeat2, Heart, Bookmark, Share, MoreHorizontal, Users, Play, Globe, Lock, Tv2 } from 'lucide-react';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { getProxiedImageUrl } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import type { WatchRoom } from '@/hooks/media/useWatchRoom';
@@ -161,10 +162,10 @@ export function WatchroomFeedItem({ room }: { room: WatchRoom }) {
         
         <div className="flex gap-3">
           <Link to={host?.username ? `/@${host.username}` : '#'} onClick={(e) => e.stopPropagation()} className="shrink-0 mt-0.5">
-            <Avatar className="h-11 w-11 ring-1 ring-white/10 transition-transform hover:scale-105">
+            <CosmeticAvatar userId={room.host_id} className="h-11 w-11 ring-1 ring-white/10 transition-transform hover:scale-105">
               <AvatarImage src={host?.avatar_url || undefined} className="object-cover" />
               <AvatarFallback>{hostName[0]?.toUpperCase() || 'U'}</AvatarFallback>
-            </Avatar>
+            </CosmeticAvatar>
           </Link>
 
           <div className="min-w-0 flex-1">
@@ -175,7 +176,7 @@ export function WatchroomFeedItem({ room }: { room: WatchRoom }) {
                 onClick={(e) => e.stopPropagation()}
                 className="truncate font-bold text-[15px] text-foreground hover:underline decoration-white/30 underline-offset-2"
               >
-                {hostName}
+                <CosmeticName userId={room.host_id}>{hostName}</CosmeticName>
               </Link>
               {host?.username && <span className="truncate text-muted-foreground/70 hidden sm:inline-block">@{host.username}</span>}
               <span className="text-muted-foreground/50">·</span>

@@ -324,6 +324,7 @@ export function ReaderImage({ page, mode, style, eager, onRetryChapter }: {
       )}
       {showImg ? (
         <img
+          data-image-original
           data-page={page.pageNumber}
           src={imgSrc}
           alt={t('reader.pageNumber', { number: page.pageNumber })}

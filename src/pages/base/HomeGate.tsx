@@ -1,6 +1,7 @@
 import { useIsNativeApp } from "@/hooks/ui/useIsNativeApp";
-import Index from "@/pages/base/Index";
-import Landingpage from "@/pages/base/LandingPage";
+import { lazy } from 'react';
+const Index = lazy(() => import('@/pages/base/Index'));
+const Landingpage = lazy(() => import('@/pages/base/LandingPage'));
 
 /**
  * `/` — native/desktop gets the full app home; web guests get the marketing landing.

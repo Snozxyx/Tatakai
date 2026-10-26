@@ -3,7 +3,10 @@ import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { CachedProfileImage } from '@/components/ui/cached-profile-image';
 import { useProfileWatchTime } from '@/hooks/user/useProfileWatchTime';
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
+import { readThemePreferences } from '@/lib/profileThemes';
+import { resolveProfileTheme } from '@/components/profile/themes/registry';
+import './themes/sekaipop/sekaipop-preview.css';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { motion, useReducedMotion, useMotionValue, useTransform, animate } from 'framer-motion';
@@ -56,7 +59,7 @@ function useWidgetProfile(userId?: string | null, enabled = false) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('profiles')
-        .select('username, display_name, avatar_url, banner_url, bio, is_public, show_history, created_at, app_settings, is_admin, role')
+        .select('username, display_name, avatar_url, banner_url, bio, is_public, show_history, show_watchlist, created_at, app_settings, is_admin, role')
         .eq('user_id', userId!)
         .maybeSingle();
       if (error) throw error;
@@ -66,11 +69,11 @@ function useWidgetProfile(userId?: string | null, enabled = false) {
 }
 
 /** Counts plus a cached, narrow watch-history total shared with full profiles. */
-function useWidgetStats(userId?: string | null, enabled = false, watchAllowed = false) {
+function useWidgetStats(userId?: string | null, enabled = false, watchAllowed = false, libraryAllowed = false) {
   useUiTranslation();
   const watched = useProfileWatchTime(userId, enabled && watchAllowed);
   const stats = useQuery({
-    queryKey: ['profile_widget_stats', userId],
+    queryKey: ['profile_widget_stats', userId, watchAllowed, libraryAllowed],
     enabled: enabled && !!userId,
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
@@ -82,8 +85,8 @@ function useWidgetStats(userId?: string | null, enabled = false, watchAllowed = 
       };
 
       const [episodes, mangaCount, commentsCount, ratingsCount, forumPostsCount] = await Promise.all([
-        countOf('watch_history'),
-        countOf('manga_readlist'),
+        watchAllowed ? countOf('watch_history') : Promise.resolve(0),
+        libraryAllowed ? countOf('manga_readlist') : Promise.resolve(0),
         countOf('comments'),
         countOf('ratings'),
         countOf('forum_posts', (q) => q.eq('is_approved', true)),
@@ -193,10 +196,10 @@ export function ProfileWidgetCard({
 
   // Gate the fetches on `open` so nothing runs until the user actually opens it.
   const activeId = open ? userId ?? undefined : undefined;
-  const { data: badges } = useUserBadges(activeId);
+  const { data: badges, isPending: pendingBadges, isSuccess: verifiedBadges } = useUserBadges(activeId);
   const { isFollowing, checkingFollow, followStats, follow, unfollow, isFollowingLoading } = useFollow(activeId);
-  const { data: fetched } = useWidgetProfile(userId, open);
-  const { data: stats } = useWidgetStats(activeId, open, user?.id === userId || (!!fetched?.is_public && fetched?.show_history !== false));
+  const { data: fetched, isPending: pendingProfile } = useWidgetProfile(userId, open);
+  const { data: stats } = useWidgetStats(activeId, open, user?.id === userId || (!!fetched?.is_public && fetched?.show_history !== false), user?.id === userId || (!!fetched?.is_public && fetched?.show_watchlist !== false));
 
   // Prefer freshly-fetched values, fall back to the props the comment already had.
   const name = fetched?.display_name || displayName || fetched?.username || username || 'User';
@@ -227,7 +230,10 @@ export function ProfileWidgetCard({
   const canFollow = !!user && !isSelf && !!userId;
 
   const goToProfile = () => {
-    if (handle) navigate(`/@${handle}`);
+    if (handle) {
+      setOpen(false);
+      navigate(`/@${handle}`, { state: fetched && (fetched.is_public || isSelf) ? { profileArrival: { username: handle, display_name: name, avatar_url: avatar, app_settings: { profileThemes: readThemePreferences(fetched.app_settings) } } } : undefined });
+    }
   };
 
   const isMobile = useIsMobile();
@@ -236,6 +242,23 @@ export function ProfileWidgetCard({
     void triggerHaptic('tap');
     setOpen(false);
   };
+
+  const widgetPreferences = readThemePreferences(fetched?.app_settings);
+  const widgetTheme = resolveProfileTheme(widgetPreferences, fetched, badges ?? [], verifiedBadges);
+  const Preview = widgetTheme.Preview;
+  const resolvingWidget = open && (pendingProfile || pendingBadges);
+  if (resolvingWidget || (Preview && fetched)) {
+    const loadingCard = <div className="profile-widget-resolving" role="status"><Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" />Opening profile card…</div>;
+    const themedBody = resolvingWidget ? loadingCard : Preview && fetched ? <Suspense fallback={loadingCard}><Preview
+      userId={userId ?? undefined} configuration={widgetPreferences.configurations[widgetTheme.id]} name={name} username={handle} avatar={avatar} banner={banner} bio={bio}
+      badges={badges ?? []} followers={followStats?.followers} following={followStats?.following} episodes={stats?.episodes} watchTimeSeconds={stats?.watchTimeSeconds}
+      privateProfile={!fetched.is_public && !isSelf} canViewHistory={isSelf || (fetched.is_public && fetched.show_history !== false)}
+      canFollow={canFollow} isFollowing={Boolean(isFollowing)} followPending={checkingFollow || isFollowingLoading}
+      onFollow={() => isFollowing ? unfollow() : follow()} onOpen={goToProfile} onClose={close}
+      moderation={userId ? <ModerationMenu contentType="user" contentId={userId} authorUserId={userId} authorName={name} /> : undefined}
+    /></Suspense> : loadingCard;
+    return isMobile || isTV() ? <Dialog open={open} onOpenChange={setOpen}><DialogTrigger asChild>{children}</DialogTrigger><DialogContent showCloseButton={false} aria-describedby={undefined} className={cn('profile-theme-preview-shell', className)}><DialogTitle className="sr-only">{name} profile preview</DialogTitle>{themedBody}</DialogContent></Dialog> : <Popover open={open} onOpenChange={setOpen}><PopoverTrigger asChild>{children}</PopoverTrigger><PopoverContent side={side} align="center" className={cn('profile-theme-preview-shell z-[60]', className)}>{themedBody}</PopoverContent></Popover>;
+  }
 
   if (isTV()) return (
     <Dialog open={open} onOpenChange={setOpen}>

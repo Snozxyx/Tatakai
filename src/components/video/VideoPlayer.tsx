@@ -117,6 +117,7 @@ export function VideoPlayer({
   poster,
   onError,
   onServerSwitch,
+  bufferingTimeoutMessage,
   onRetryCurrentServer,
   isLoading = false,
   serverName,
@@ -1260,7 +1261,7 @@ export function VideoPlayer({
         const isTorrent =
           currentSource?.url?.startsWith("magnet:") || currentSource?.sourceType === "torrent";
         if (!isTorrent) {
-          setVideoError("Server timed out. Auto-switching server in 3 seconds...");
+          setVideoError(bufferingTimeoutMessage || "Server timed out. Auto-switching server in 3 seconds...");
           if (onError) onError({ reason: "buffer-stall-timeout" });
         } else {
           setIsBuffering(true);
@@ -1274,7 +1275,7 @@ export function VideoPlayer({
         bufferingTimeoutRef.current = null;
       }
     };
-  }, [isBuffering, currentSource?.url, onError]);
+  }, [isBuffering, currentSource?.url, onError, bufferingTimeoutMessage]);
 
   // ---------------------------------------------------------------------------
   // Sync extracted audio

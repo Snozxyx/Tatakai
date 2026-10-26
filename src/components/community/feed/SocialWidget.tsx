@@ -1,8 +1,9 @@
+import { CosmeticAvatar, CosmeticName } from '@/components/profile/IdentityCosmetics';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useNavigate } from 'react-router-dom';
 import { Users, Check, UserPlus } from 'lucide-react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { UserBadges } from '@/components/ui/UserBadges';
 import { useLeaderboard } from '@/hooks/community/useLeaderboard';
 import { useSuggestedUsers } from '@/hooks/community/useSuggestedUsers';
@@ -57,19 +58,19 @@ function TopUserRow({ entry, badges, online }: { entry: FollowSuggestion; badges
       {/* Content */}
       <div className="relative flex items-center gap-2.5 p-2.5">
         <button onClick={goToProfile} aria-label={uiI18n.t('app.view_i18n_value_0_s_profile_9867fb9b', { value0: name })} className="relative shrink-0">
-          <Avatar className="h-9 w-9 ring-2 ring-white/10 transition-transform duration-200 group-hover/row:scale-105">
+          <CosmeticAvatar userId={entry.user_id} className="h-9 w-9 ring-2 ring-white/10 transition-transform duration-200 group-hover/row:scale-105">
             <AvatarImage src={entry.avatar_url || ''} className="object-cover" />
             <AvatarFallback className="bg-zinc-800 text-xs font-bold text-zinc-400">
               {name[0]?.toUpperCase()}
             </AvatarFallback>
-          </Avatar>
+          </CosmeticAvatar>
           {online && <OnlineDot size="sm" className="ring-[#08090b]" />}
         </button>
 
         <button onClick={goToProfile} className="min-w-0 flex-1 text-left">
           <div className="flex items-center gap-1">
             <p className="truncate text-xs font-semibold text-zinc-100">
-              {name}
+              <CosmeticName userId={entry.user_id}>{name}</CosmeticName>
             </p>
             <UserBadges badges={badges} size={11} max={1} />
           </div>

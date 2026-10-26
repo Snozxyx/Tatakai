@@ -18,6 +18,7 @@
 import { CapacitorHttp } from '@capacitor/core';
 import { registerNativeSource, prepareNativeRequestHeaders } from '@/core/mobile/localProxyNative';
 import { loadMobileConfig } from '@/hooks/ui/useMobileConfig';
+import { hasIosExtensionHttp, requestIosExtensionHttp } from './iosExtensionHttp';
 
 const unhealthyHosts = new Map<string, number>();
 const HOST_COOLDOWN_MS = 90_000;
@@ -68,7 +69,7 @@ export interface NativeFetchInit {
   method?: string;
   headers?: Record<string, string>;
   body?: unknown;
-  /** Present on standard fetch init; ignored by the native client. */
+  /** Aborts iOS native text requests; other native paths race their result. */
   signal?: unknown;
 }
 
@@ -221,7 +222,8 @@ export function createNativeFetch(allowedDomains: string[]) {
       const isProxyableGet = (init.method || 'GET').toUpperCase() === 'GET' && init.body == null && !binaryBody;
       const directHeaders = await prepareNativeRequestHeaders(url, headers);
       if (signal?.aborted) throw abortError();
-      const initial = await CapacitorHttp.request({
+      const iosText = hasIosExtensionHttp() && !binaryResponse && (requestData == null || typeof requestData === 'string');
+      const initial = iosText ? await requestIosExtensionHttp(url, { method: init.method || 'GET', headers: directHeaders, body: requestData as string | undefined, signal }).then(response => ({ status: response.status, headers: response.headers, data: response.body, url: response.url, cookies: response.cookies })) : await CapacitorHttp.request({
       url,
       method: (init.method || 'GET').toUpperCase(),
       headers: directHeaders,
@@ -292,7 +294,7 @@ export function createNativeFetch(allowedDomains: string[]) {
       url: (res as any).url || url,
       headers: toHeaderGetter((res as any).headers),
       rawHeaders: Object.fromEntries(Object.entries((res as any).headers || {}).map(([k, v]) => [k.toLowerCase(), [String(v)]])),
-      cookies: Object.fromEntries(String((res as any).headers?.['set-cookie'] || '').split(/,(?=[^;,]+=)/).map(pair => pair.split(';')[0].split('=')).filter(pair => pair.length > 1)),
+      cookies: { ...(res as any).cookies, ...Object.fromEntries(String((res as any).headers?.['set-cookie'] || '').split(/,(?=[^;,]+=)/).map(pair => pair.split(';')[0].split('=')).filter(pair => pair.length > 1)) },
       text: async () => bodyText,
       arrayBuffer: async () => bytes.slice().buffer,
       json: async () => {

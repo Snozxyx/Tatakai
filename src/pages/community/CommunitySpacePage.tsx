@@ -1,3 +1,4 @@
+import { CosmeticAvatar } from '@/components/profile/IdentityCosmetics';
 import { FollowButton } from '@/components/community/FollowButton';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
@@ -9,7 +10,7 @@ import { CommunitySidebar } from '@/components/community/feed/CommunitySidebar';
 import { MobileNav } from '@/components/layout/MobileNav';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   DropdownMenu,
@@ -257,10 +258,10 @@ export default function CommunitySpacePage() {
                   const RoleIcon = ROLE_ICON[m.role];
                   return (
                     <div key={m.user_id} className="flex items-center gap-3 rounded-xl border border-white/[0.03] bg-white/[0.015] px-3 py-2">
-                      <Avatar className="h-8 w-8">
+                      <CosmeticAvatar userId={m.user_id} className="h-8 w-8">
                         <AvatarImage src={m.avatar_url || undefined} />
                         <AvatarFallback>{(m.display_name || m.username || 'U')[0]?.toUpperCase()}</AvatarFallback>
-                      </Avatar>
+                      </CosmeticAvatar>
                       <span className="min-w-0 flex-1 truncate text-sm font-medium">{m.display_name || m.username || uiI18n.t('app.anonymous_9bed5104')}</span>
                       {RoleIcon && <RoleIcon className="h-3.5 w-3.5 text-amber" />}
                       <Select

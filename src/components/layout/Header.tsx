@@ -1,3 +1,4 @@
+import { CosmeticAvatar, CosmeticName } from '@/components/profile/IdentityCosmetics';
 import { fetchBetterStackStatus, type BetterStackHealth } from '@/lib/betterStackStatus';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
@@ -10,7 +11,7 @@ import { useIsDesktopApp, useIsMacOS, useIsNativeApp } from "@/hooks/ui/useIsNat
 import { useTitlebarHidden } from "@/hooks/ui/useTitlebarHidden";
 import { useMobileAppearance } from '@/hooks/ui/useMobileAppearance';
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { NotificationBell } from "@/components/ui/NotificationBell";
 import { HeaderSearchSuggestions } from "@/components/layout/HeaderSearchSuggestions";
 import {
@@ -394,10 +395,10 @@ export function Header({ providerSearch, providerControls }: HeaderProps = {}) {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button aria-label={t('migration.profileMenu')} className="flex h-11 w-11 items-center justify-center rounded-full outline-none transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-primary/60">
-                    <Avatar className="h-9 w-9 ring-1 ring-white/20 transition-shadow hover:ring-primary/40">
+                    <CosmeticAvatar userId={profile?.user_id} className="h-9 w-9 ring-1 ring-white/20 transition-shadow hover:ring-primary/40">
                       <AvatarImage src={profile?.avatar_url || undefined} alt={profile?.display_name || t('settings.groups.User')} />
                       <AvatarFallback className="bg-gradient-to-br from-primary to-secondary text-xs font-bold text-primary-foreground">{profile?.display_name?.[0]?.toUpperCase() || user.email?.[0]?.toUpperCase() || 'U'}</AvatarFallback>
-                    </Avatar>
+                    </CosmeticAvatar>
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-52 rounded-2xl border-white/10 bg-background/90 p-1.5 shadow-2xl backdrop-blur-xl data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=open]:duration-150">
@@ -429,7 +430,7 @@ export function Header({ providerSearch, providerControls }: HeaderProps = {}) {
         {/* Left: welcome + status */}
         {providerControls ? <div className="min-w-0 flex-1">{providerControls}</div> : <div className="flex items-center gap-3">
           <h2 className="text-muted-foreground text-sm font-medium tracking-wider uppercase">
-            {t("header.welcomeBack")} <span className="text-foreground">{profile?.display_name || t("header.traveler")}</span>
+            {t("header.welcomeBack")} <span className="text-foreground"><CosmeticName userId={profile?.user_id}>{profile?.display_name || t("header.traveler")}</CosmeticName></span>
           </h2>
           {isBanned && (
             <span className="px-2 py-0.5 rounded-full bg-destructive/20 text-destructive text-xs font-medium animate-pulse">{t("header.banned")}</span>
@@ -513,12 +514,12 @@ export function Header({ providerSearch, providerControls }: HeaderProps = {}) {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus:ring-offset-2 focus:ring-offset-background rounded-full active:scale-95 transition-transform">
-                  <Avatar className="w-10 h-10 cursor-pointer hover:ring-2 hover:ring-primary/50 transition-[transform,background-color,border-color,color,box-shadow,filter] duration-150">
+                  <CosmeticAvatar userId={profile?.user_id} className="w-10 h-10 cursor-pointer hover:ring-2 hover:ring-primary/50 transition-[transform,background-color,border-color,color,box-shadow,filter] duration-150">
                     <AvatarImage src={profile?.avatar_url || undefined} alt={profile?.display_name || t('settings.groups.User')} />
                     <AvatarFallback className="bg-gradient-to-br from-primary to-secondary text-primary-foreground font-bold">
                       {profile?.display_name?.[0]?.toUpperCase() || user.email?.[0]?.toUpperCase() || "U"}
                     </AvatarFallback>
-                  </Avatar>
+                  </CosmeticAvatar>
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">

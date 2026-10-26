@@ -59,6 +59,8 @@ export enum FeatureFlag {
 
   /** Phase 6 – Watch2Together v2 (WebRTC rooms) */
   WATCH_TOGETHER = 'watch_together',
+  /** Opt-in P2P room creation. Existing P2P rooms always use their own controller. */
+  WATCH_TOGETHER_P2P = 'watch_together_p2p',
 
   /** Phase 6 – Clip & share system */
 
@@ -99,6 +101,7 @@ const FLAG_DEFAULTS: Record<FeatureFlag, boolean> = {
   [FeatureFlag.ANIME_CALENDAR]: false,
   [FeatureFlag.TATAKAI_WRAPPED]: false,
   [FeatureFlag.WATCH_TOGETHER]: false,
+  [FeatureFlag.WATCH_TOGETHER_P2P]: false,
   [FeatureFlag.CROSS_DEVICE_SYNC]: false,
   [FeatureFlag.CHARACTER_DB]: false,
   [FeatureFlag.SMART_THEME_CREATOR]: false,

@@ -1,8 +1,9 @@
+import { CosmeticAvatar, CosmeticName } from '@/components/profile/IdentityCosmetics';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useNavigate } from 'react-router-dom';
 import { Users } from 'lucide-react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useLeaderboard } from '@/hooks/community/useLeaderboard';
 import type { PresenceUser } from '@/hooks/community/useCommunityPresence';
 import { OnlineDot } from './OnlineDot';
@@ -113,16 +114,16 @@ export function MembersShowcaseWidget({
                   title={name}
                 >
                   <div className="relative">
-                    <Avatar className="h-11 w-11 ring-2 ring-white/[0.06] transition-transform duration-200 group-hover/m:scale-105">
+                    <CosmeticAvatar userId={m.user_id} className="h-11 w-11 ring-2 ring-white/[0.06] transition-transform duration-200 group-hover/m:scale-105">
                       <AvatarImage src={m.avatar_url || ''} className="object-cover" />
                       <AvatarFallback className="bg-zinc-800 text-xs font-bold text-zinc-400">
                         {name[0]?.toUpperCase()}
                       </AvatarFallback>
-                    </Avatar>
+                    </CosmeticAvatar>
                     {onlineUserIds.has(m.user_id) && <OnlineDot size="sm" className="ring-[#08090b]" />}
                   </div>
                   <span className="w-full truncate text-center text-[10px] font-medium text-zinc-400 transition-colors group-hover/m:text-zinc-200">
-                    {name}
+                    <CosmeticName userId={m.user_id}>{name}</CosmeticName>
                   </span>
                 </button>
               );

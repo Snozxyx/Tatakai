@@ -1,3 +1,4 @@
+import { BRAND_ASSET_BASE } from '@/lib/assets';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 "use client";
@@ -41,7 +42,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-const BRAND = "/assets/brand";
+const BRAND = BRAND_ASSET_BASE;
 
 interface Flagship {
   icon: LucideIcon;
@@ -61,7 +62,7 @@ const flagships: Flagship[] = [
     get title() { return uiI18n.t('app.picks_that_actually_get_you_e15e6e8d'); },
     get body() { return uiI18n.t('app.a_hybrid_recommendation_engine_learns_from_every_6651bc2c'); },
     points: ["Personalized daily", "Learns as you go", "Anime & manga"],
-    media: `https://res.cloudinary.com/hgytxblu/video/upload/v1791138049/Recommendation.mp4`,
+    media: `${BRAND}/Recommendation.mp4`,
     accent: "text-violet-200",
     glow: "bg-violet-500/20",
   },
@@ -71,7 +72,7 @@ const flagships: Flagship[] = [
     get title() { return uiI18n.t('app.built_for_how_you_watch_7be46db6'); },
     get body() { return uiI18n.t('app.a_clean_player_for_episodes_you_own_custom_subti_169631c6'); },
     points: ["Custom subtitles", "Background playback", "Remembers progress"],
-    media: `https://res.cloudinary.com/hgytxblu/video/upload/v1791138043/Videoplayer.mp4`,
+    media: `${BRAND}/Videoplayer.mp4`,
     accent: "text-cyan-200",
     glow: "bg-cyan-500/20",
   },
@@ -81,7 +82,7 @@ const flagships: Flagship[] = [
     get title() { return uiI18n.t('app.read_the_way_you_like_e78bada9'); },
     get body() { return uiI18n.t('app.a_fast_comic_style_reader_with_per_device_settin_05aa8296'); },
     points: ["Custom keybinds", "Saved progress", "Manga · Manhwa · Comics"],
-    media: `https://res.cloudinary.com/hgytxblu/video/upload/v1791138030/MangaReader.mp4`,
+    media: `${BRAND}/MangaReader.mp4`,
     accent: "text-pink-200",
     glow: "bg-pink-500/20",
   },
@@ -91,8 +92,7 @@ const flagships: Flagship[] = [
     get title() { return uiI18n.t('app.get_lost_in_every_chapter_4121cc1b'); },
     get body() { return uiI18n.t('app.a_focused_light_novel_reader_with_a_calm_reading_dd724057'); },
     points: ["Light novel support", "Custom keybinds", "Saved progress"],
-    media:
-      "https://res.cloudinary.com/hgytxblu/video/upload/v1791808194/export-1791807786726.mp4",
+    media: `${BRAND}/NovelReader.mp4`,
     accent: "text-fuchsia-200",
     glow: "bg-fuchsia-500/20",
   },
@@ -102,7 +102,7 @@ const flagships: Flagship[] = [
     get title() { return uiI18n.t('app.your_taste_in_numbers_58a29751'); },
     get body() { return uiI18n.t('app.activity_heatmaps_taste_breakdowns_and_rich_insi_88ac2d3a'); },
     points: ["Activity heatmaps", "Taste breakdown", "Shareable profile"],
-    media: `https://res.cloudinary.com/hgytxblu/video/upload/v1791138031/Profile_with_stats.mp4`,
+    media: `${BRAND}/Profile_with_stats.mp4`,
     accent: "text-amber-200",
     glow: "bg-amber-500/20",
   },
@@ -130,7 +130,7 @@ const offline: OfflineCard[] = [
     icon: DownloadCloud,
     get title() { return uiI18n.t('app.download_anime_c3a1be15'); },
     get body() { return uiI18n.t('app.keep_episodes_on_your_device_for_the_flight_the__8eca8f49'); },
-    media: `https://res.cloudinary.com/hgytxblu/video/upload/v1791138041/Animedownload.mp4`,
+    media: `${BRAND}/Animedownload.mp4`,
     kind: "video",
     tag: "Offline ready",
   },
@@ -138,7 +138,7 @@ const offline: OfflineCard[] = [
     icon: DownloadCloud,
     get title() { return uiI18n.t('app.download_manga_5dcbeaab'); },
     get body() { return uiI18n.t('app.take_whole_series_offline_and_read_directly_from_d19d3d85'); },
-    media: `https://res.cloudinary.com/hgytxblu/video/upload/v1791138041/Mangadownload.mp4`,
+    media: `${BRAND}/Mangadownload.mp4`,
     kind: "video",
     tag: "Read anywhere",
   },

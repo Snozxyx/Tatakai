@@ -1023,6 +1023,7 @@ export function VideoSettingsPanel({
       }}
     >
       <SheetContent
+        data-player-interactive="true"
         side={isMobile ? 'bottom' : 'right'}
         portalContainer={portalContainer}
         className="flex max-w-full flex-col gap-0 overflow-hidden border-white/10 bg-background/95 p-0 backdrop-blur-xl md:w-[400px] md:max-w-[400px] max-md:max-h-[85dvh] max-md:rounded-t-2xl"

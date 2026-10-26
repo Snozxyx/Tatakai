@@ -3,9 +3,20 @@ import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { CachedProfileImage } from '@/components/ui/cached-profile-image';
 import { useProfileWatchTime } from '@/hooks/user/useProfileWatchTime';
-import { useState, useEffect, useMemo } from 'react';
+import { Suspense, useState, useEffect, useMemo } from 'react';
+import { readThemePreferences } from '@/lib/profileThemes';
+import { UchihaBannerMark } from '@/components/profile/themes/uchiha/UchihaBannerMark';
+import { UchihaCrows } from '@/components/profile/themes/uchiha/UchihaCrows';
+import { UchihaScene } from '@/components/profile/themes/uchiha/UchihaScene';
+import '@/components/profile/themes/uchiha/uchiha.css';
+import { FullPageProfileSurface } from '@/contexts/ProfilePresentationContext';
+import { ProfileThemeLoading } from '@/components/profile/themes/ProfileThemeLoading';
+import { PROFILE_THEMES, resolveProfileTheme } from '@/components/profile/themes/registry';
+import { useProfileArrival } from '@/hooks/user/useProfileArrival';
+import { useMotionPreference } from '@/hooks/ui/useMotionPreference';
+import type { ProfileThemeData, ThemeMediaItem } from '@/components/profile/themes/types';
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate, useParams, Link, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { MobileNav } from '@/components/layout/MobileNav';
@@ -43,6 +54,7 @@ import {
   type MangaReadlistStatus,
 } from '@/hooks/user/useMangaReadlist';
 import { useNovelReadlist } from '@/hooks/user/useNovelReadlist';
+import { getReadingHistory, readingHistoryHref } from '@/lib/readingHistory';
 import { useUserForumPosts } from '@/hooks/community/useForum';
 import { useFollow } from '@/hooks/community/useFollow';
 import { useUserRank } from '@/hooks/community/useLeaderboard';
@@ -96,8 +108,10 @@ const MANGA_READING_ONLY_STATUSES: MangaReadlistStatus[] = ['reading'];
 export default function ProfilePage({ username: providedUsername }: { username?: string } = {}) {
   useUiTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
+  const reducedMotion = useMotionPreference();
   const { username: usernameParam, atUsername, slug } = useParams<{ username?: string; atUsername?: string; slug?: string }>();
-  const { user, profile: ownProfile, signOut, refreshProfile, isAdmin } = useAuth();
+  const { user, profile: ownProfile, signOut, refreshProfile, isAdmin, isLoading: loadingAuth } = useAuth();
   const isNative = useIsNativeApp();
   const isDesktopApp = useIsDesktopApp();
   const isMobileApp = useIsMobileApp();
@@ -119,7 +133,20 @@ export default function ProfilePage({ username: providedUsername }: { username?:
   const { data: publicProfile, isLoading: loadingPublicProfile, error: publicProfileError } = usePublicProfile(viewingUsername || '');
 
   const profile = isViewingOther ? publicProfile : ownProfile;
-  const { data: profileBadges = [] } = useUserBadges(profile?.user_id);
+  const { data: profileBadges = [], isSuccess: verifiedProfileBadges, isPending: loadingProfileBadges } = useUserBadges(profile?.user_id);
+  const arrivalPreferences = readThemePreferences(profile?.app_settings);
+  const arrivalTheme = PROFILE_THEMES.find(theme => theme.id === arrivalPreferences.selected);
+  const arrivalConfig = arrivalTheme?.parse(arrivalPreferences.configurations[arrivalPreferences.selected]) as { motion?: boolean } | null | undefined;
+  const enterCustomWorld = Boolean(profile && arrivalConfig && arrivalTheme?.Loading && (loadingProfileBadges || (verifiedProfileBadges && arrivalTheme.entitled(profile, profileBadges))));
+  const arrivalPending = useProfileArrival(`${location.pathname}:${profile?.user_id || ''}`, enterCustomWorld, reducedMotion || arrivalConfig?.motion === false ? 0 : arrivalTheme?.arrivalMs ?? 0);
+  useEffect(() => { if (enterCustomWorld) void arrivalTheme?.preload?.().catch(() => undefined); }, [enterCustomWorld, arrivalTheme]);
+  const hint = (location.state as { profileArrival?: Record<string, unknown> } | null)?.profileArrival;
+  const arrivalHint = hint && typeof hint === 'object' ? {
+    username: typeof hint.username === 'string' ? hint.username : undefined,
+    display_name: typeof hint.display_name === 'string' ? hint.display_name : undefined,
+    avatar_url: typeof hint.avatar_url === 'string' ? hint.avatar_url : undefined,
+    app_settings: hint.app_settings,
+  } : null;
 
   // Per-profile customization (ambient accent + background effect) — read from the
   // resolved profile so it applies for own AND other viewers.
@@ -186,12 +213,12 @@ export default function ProfilePage({ username: providedUsername }: { username?:
   const loadingHistory = isViewingOther ? loadingPublicHistory : loadingOwnHistory;
   const loadingMangaReadlist = (isViewingOther ? loadingPublicMangaReadlist : loadingOwnMangaReadlist) || loadingMangaMetadata;
   const loadingMangaHistory = isViewingOther ? loadingPublicMangaReadingHistory : loadingOwnMangaReadingHistory;
-  const loadingCombinedHistory = loadingHistory || loadingMangaHistory;
+  const loadingCombinedHistory = loadingHistory || loadingMangaHistory || (!isViewingOther && loadingOwnNovelReadlist);
 
   const { data: computedWatchTimeSeconds = 0 } = useProfileWatchTime(profile?.user_id, !isViewingOther || (!!publicProfile?.is_public && publicProfile?.show_history !== false));
 
   const mangaHistoryEntries = useMemo(() => {
-    return [...(mangaHistorySource || [])]
+    return [...(mangaHistorySource || [])].filter(entry => entry.format !== 'novel')
       .filter((entry: any) => {
         if (!entry) return false;
         const status = String(entry.status || '').trim().toLowerCase();
@@ -204,6 +231,10 @@ export default function ProfilePage({ username: providedUsername }: { username?:
       })
       .sort((left: any, right: any) => new Date(right?.updated_at || 0).getTime() - new Date(left?.updated_at || 0).getTime());
   }, [mangaHistorySource]);
+
+  const novelHistoryEntries = useMemo(() => getReadingHistory(
+    isViewingOther ? publicMangaReadingHistory.filter(entry => entry.format === 'novel') : ownNovelReadlist,
+  ), [isViewingOther, publicMangaReadingHistory, ownNovelReadlist]);
 
   const hasAnimeHistory = Boolean(history && history.length > 0);
   const hasMangaHistory = mangaHistoryEntries.length > 0;
@@ -352,6 +383,13 @@ export default function ProfilePage({ username: providedUsername }: { username?:
     }
   }, []);
 
+  // Resolve the profile and its owner entitlements before painting any design.
+  // Rendering Default while the badge query is pending caused a theme flash.
+  const pendingTheme = profile && readThemePreferences(profile.app_settings).selected !== 'default' && loadingProfileBadges;
+  if ((isViewingOther && loadingPublicProfile) || (!isViewingOther && loadingAuth && !ownProfile) || pendingTheme || arrivalPending) {
+    return <FullPageProfileSurface><ProfileThemeLoading profile={profile ?? arrivalHint} /></FullPageProfileSurface>;
+  }
+
   if (isViewingOther && !loadingPublicProfile && (publicProfileError || !publicProfile)) {
     return (
       <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
@@ -418,11 +456,110 @@ export default function ProfilePage({ username: providedUsername }: { username?:
     return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
   };
 
+  const profileOverviewContent = (
+    <ProfileOverviewTab
+                  userId={profile?.user_id}
+                  username={profile?.username}
+                  isViewingOther={isViewingOther}
+                  isPublic={(profile as any)?.is_public ?? false}
+                  showCalendar={(profile as any)?.show_calendar ?? true}
+                  watchTimeSeconds={computedWatchTimeSeconds}
+                  episodesCount={effectiveEpisodeCount}
+                  completedAnimeCount={stats.completed}
+                  watchingAnimeCount={stats.watching}
+                  mangaCount={mangaCounts.manga}
+                  manhwaCount={mangaCounts.manhwa}
+                  comicsCount={mangaCounts.comics}
+                  totalChaptersRead={mangaCounts.totalChapters}
+                  readingTotals={readingTotals}
+                  planToWatchCount={stats.plan_to_watch}
+                  streakDays={viewedStreak?.currentStreak || 0}
+                  longestStreak={viewedStreak?.longestStreak || 0}
+                  totalDaysActive={viewedStreak?.totalDaysWatched || 0}
+                  commentCount={commentsCount}
+                  forumPostCount={forumPosts?.length || 0}
+                  forumUpvotes={forumUpvotes}
+                  reputationRate={reputationRate}
+                  reputationBreakdown={reputation.breakdown}
+                  leaderboardRank={userRank?.rank ?? null}
+                  totalRankedUsers={userRank?.totalUsers ?? null}
+                  followersCount={followStats?.followers || 0}
+                  followingCount={followStats?.following || 0}
+                  watchlist={watchlist || []}
+                  history={history || []}
+                  mangaReadlist={mangaReadlist || []}
+                  ratings={userRatings}
+                  commentDates={userCommentRows}
+                  favoriteCharacters={favoriteCharacters}
+                  favoriteCharactersLoading={loadingFavoriteCharacters}
+                  tasteProfile={tasteProfile}
+                  tasteProfileLoading={loadingTasteProfile}
+                  insights={overviewInsights}
+                  achievements={achievements}
+                  externalStats={externalStats}
+                  externalStatsLoading={externalStatsLoading}
+                  onNavigateTab={changeProfileTab}
+                />
+  );
+
+  const themePreferences = readThemePreferences(profile?.app_settings);
+  const selectedTheme = resolveProfileTheme(themePreferences, profile, profileBadges, verifiedProfileBadges);
+  const isUchiha = selectedTheme.id === 'uchiha';
+  if (selectedTheme.Renderer && profile) {
+    const Renderer = selectedTheme.Renderer;
+    const visibleLibrary: ThemeMediaItem[] = showWatchlistTab ? [
+      ...(watchlist ?? []).map(item => ({ id: item.id, title: item.anime_name, image: item.anime_poster || '', href: `/anime/${encodeURIComponent(item.anime_id)}`, detail: item.status.replace(/_/g, ' ') })),
+      ...(mangaReadlist ?? []).map(item => ({ id: item.id, title: item.manga_title, image: item.manga_poster || '', href: `/manga/${encodeURIComponent(item.manga_id)}`, detail: item.status.replace(/_/g, ' ') })),
+    ] : [];
+    const socialLinks = (profile as { social_links?: Record<string, unknown> }).social_links;
+    const data: ProfileThemeData = {
+      owner: profile, isOwner: !isViewingOther,
+      canViewLibrary: Boolean(showWatchlistTab), canViewHistory: Boolean(showHistoryTab),
+      canViewCalendar: !isViewingOther || (publicProfile?.is_public === true && publicProfile?.show_calendar !== false),
+      badges: profileBadges,
+      library: visibleLibrary,
+      activity: showHistoryTab ? (history ?? []).map(item => ({ id: item.id, title: item.anime_name, image: item.anime_poster || '', href: `/anime/${encodeURIComponent(item.anime_id)}`, detail: `Episode ${item.episode_number}` })) : [],
+      favorites: favoriteCharacters.map(item => ({ id: item.id, title: item.character_name, image: item.character_image || '', href: `/character/${encodeURIComponent(item.character_id)}` })),
+      links: Object.entries(socialLinks ?? {}).flatMap(([label, url]) => {
+        if (typeof url !== 'string') return [];
+        try { const parsed = new URL(url); return parsed.protocol === 'https:' ? [{ label, url: parsed.href }] : []; } catch { return []; }
+      }),
+      stats: { anime: showWatchlistTab ? watchlist?.length || 0 : 0, manga: showWatchlistTab ? mangaReadlist?.length || 0 : 0,
+        episodes: showHistoryTab ? effectiveEpisodeCount : 0, hours: showHistoryTab ? Math.floor(computedWatchTimeSeconds / 3600) : 0,
+        completed: showWatchlistTab ? stats.completed : 0, streak: showHistoryTab ? viewedStreak?.currentStreak || 0 : 0,
+        longestStreak: showHistoryTab ? viewedStreak?.longestStreak || 0 : 0 },
+      sections: {
+        watchlist: showWatchlistTab ? (watchlist ?? []).map(item => ({ id: item.id, title: item.anime_name, image: item.anime_poster || '', href: `/anime/${encodeURIComponent(item.anime_id)}`, status: item.status })) : [],
+        manga: showWatchlistTab ? (mangaReadlist ?? []).map(item => ({ id: item.id, title: item.manga_title, image: item.manga_poster || '', href: `/manga/${encodeURIComponent(item.manga_id)}`, status: item.status })) : [],
+        novels: !isViewingOther ? ownNovelReadlist.map(item => ({ id: item.id, title: item.manga_title, image: item.manga_poster || '', href: `/novel/${encodeURIComponent(item.manga_id)}`, status: item.status })) : [],
+        readingHistory: showHistoryTab ? [...mangaHistoryEntries, ...novelHistoryEntries].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()).map(item => ({ id: item.id, title: item.manga_title, image: item.manga_poster || '', href: readingHistoryHref(item), detail: item.last_chapter_title || `Chapter ${item.last_chapter_number || ''}` })) : [],
+      },
+      achievements: showHistoryTab ? achievements : [],
+      tabs: [
+        { id: 'overview', label: 'Overview', summary: 'Statistics, favorites, calendar, and profile insights.' },
+        ...(showWatchlistTab ? [
+          { id: 'watchlist', label: 'Watchlist', summary: `${watchlist?.length || 0} anime in this library.` },
+          { id: 'manga-readlist', label: 'Manga Readlist', summary: `${mangaReadlist?.length || 0} manga in this collection.` },
+        ] : []),
+        ...(!isViewingOther && showWatchlistTab ? [{ id: 'novel-readlist', label: 'Novel Readlist', summary: `${ownNovelReadlist.length} novels in your collection.` }] : []),
+        ...(showHistoryTab ? [
+          { id: 'history', label: 'History', summary: `${history?.length || 0} episodes and your recent reading.` },
+          { id: 'streaks', label: 'Streaks', summary: 'Watch streaks and achievements.' },
+        ] : []),
+        { id: 'vault', label: 'Vault', summary: 'Posts, comments, playlists, and tier lists.' },
+      ],
+      following: Boolean(isFollowing), followPending: checkingFollow || isFollowingLoading,
+      followers: followStats?.followers || 0, onFollow: () => { if (isFollowing) unfollow(); else follow(); },
+      loading: loadingWatchlist || loadingHistory || loadingFavoriteCharacters, error: false,
+    };
+    return <FullPageProfileSurface><Suspense fallback={<ProfileThemeLoading profile={profile} />}><Renderer key={profile.user_id} data={data} configuration={themePreferences.configurations[selectedTheme.id]} preferences={themePreferences} onBack={() => { if (window.history.state?.idx > 0) navigate(-1); else navigate('/'); }} /></Suspense></FullPageProfileSurface>;
+  }
+
   return (
     <div
       data-tv-profile={tv || undefined}
-      className="min-h-screen bg-background text-foreground overflow-x-hidden relative isolate"
-      style={profileSurfaceStyle(customization)}
+      className={cn('min-h-screen bg-background text-foreground relative isolate', isUchiha ? 'uchiha-profile' : 'overflow-x-hidden')}
+      style={isUchiha ? undefined : profileSurfaceStyle(customization)}
     >
       {profile?.username && (
         <Seo
@@ -433,13 +570,14 @@ export default function ProfilePage({ username: providedUsername }: { username?:
           kind="profile"
         />
       )}
+      {isUchiha && <div className="uchiha-atmosphere"><UchihaCrows /></div>}
       {showSidebar && <Sidebar />}
 
       {/* ── Per-profile animated background effect (visible to all viewers) ── */}
-      <ProfileBackgroundEffects effect={backgroundEffect} />
+      {!isUchiha && <ProfileBackgroundEffects effect={backgroundEffect} />}
 
       {/* ── Ambient Background Color Bleed Throughout Whole Page ── */}
-      {profile?.banner_url && (
+      {!isUchiha && profile?.banner_url && (
         <div className="fixed inset-0 w-full h-full overflow-hidden pointer-events-none -z-10">
           <CachedProfileImage
             src={profile.banner_url}
@@ -463,11 +601,13 @@ export default function ProfilePage({ username: providedUsername }: { username?:
           !isDesktopApp && "md:-ml-24 md:w-[calc(100%+6rem)]"
         )}>
           <ProfileCosmeticEffect effect={profileEffect} />
+          {isUchiha && <UchihaBannerMark />}
+          {isUchiha && <UchihaCrows variant="banner" />}
           <div
             className="absolute inset-0 pointer-events-none"
             style={{ maskImage: 'linear-gradient(to bottom, black 35%, rgba(0,0,0,0.85) 60%, rgba(0,0,0,0.25) 85%, transparent 100%)' }}
           >
-            {profile?.banner_url ? (
+            {isUchiha ? <UchihaScene /> : profile?.banner_url ? (
               <CachedProfileImage
                 src={profile.banner_url}
                 alt={uiI18n.t('app.profile_banner_7ed6014d')}
@@ -484,7 +624,7 @@ export default function ProfilePage({ username: providedUsername }: { username?:
           </div>
           
           {/* Banner Picker Button - Only show for own profile */}
-          {!isViewingOther && (
+          {!isViewingOther && !isUchiha && (
             <AvatarPickerSheet
               type="banner"
               currentImage={profile?.banner_url || undefined}
@@ -512,21 +652,21 @@ export default function ProfilePage({ username: providedUsername }: { username?:
 
         {/* ── Profile Header Section ── */}
         <div className="profile-content max-w-7xl mx-auto px-4 md:px-8 relative z-20 pb-20">
-          
+          <div className={isUchiha ? 'uchiha-profile-sidebar' : 'contents'}>
           <motion.div
             initial={isMobile ? false : { y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             className="profile-identity flex flex-col xl:flex-row justify-between items-start xl:items-end gap-6 md:gap-10 -mt-20 md:-mt-24 mb-10"
           >
             {/* Left side: Avatar and Core Details */}
-            <div className="flex flex-col md:flex-row items-center md:items-end gap-6 md:gap-8 w-full xl:w-auto">
+            <div className="profile-identity-main flex flex-col md:flex-row items-center md:items-end gap-6 md:gap-8 w-full xl:w-auto">
               
               {/* Avatar Container */}
-              <div className="relative group shrink-0">
+              <div className="profile-avatar-wrap relative group shrink-0">
                 <div className="profile-avatar w-36 h-36 md:w-48 md:h-48 rounded-full overflow-hidden bg-background ring-[6px] md:ring-[8px] ring-background shadow-[0_0_40px_rgba(0,0,0,0.5)] border border-white/10 z-10 relative">
                   <Avatar className="w-full h-full">
                     <AvatarImage src={profile?.avatar_url || undefined} className="object-cover w-full h-full transition-transform duration-700 group-hover:scale-105" />
-                    <AvatarFallback className="bg-gradient-to-br from-primary to-purple-600 text-white text-5xl font-black uppercase">
+                    <AvatarFallback className="profile-avatar-fallback bg-gradient-to-br from-primary to-purple-600 text-white text-5xl font-black uppercase">
                       {profile?.display_name?.[0] || (isViewingOther ? 'U' : user?.email?.[0]) || 'U'}
                     </AvatarFallback>
                   </Avatar>
@@ -547,7 +687,7 @@ export default function ProfilePage({ username: providedUsername }: { username?:
               </div>
 
               {/* User Details & Actions */}
-              <div className="flex flex-col items-center md:items-start text-center md:text-left w-full pb-2">
+              <div className="profile-identity-copy flex flex-col items-center md:items-start text-center md:text-left w-full pb-2">
                 
                 {/* Header Name & Badges */}
                 <div className="flex items-center justify-center md:justify-start gap-3 flex-wrap mb-1">
@@ -565,6 +705,7 @@ export default function ProfilePage({ username: providedUsername }: { username?:
                   })()}
                   
                   <UserBadges
+                    className="profile-identity-badges"
                     badges={profileBadges}
                     size={22}
                     userStats={{
@@ -657,7 +798,7 @@ export default function ProfilePage({ username: providedUsername }: { username?:
             </div>
 
             {/* Right side: Sleek Stats Card (Desktop Only) */}
-            <div className="hidden xl:flex items-center gap-6 bg-white/[0.03] backdrop-blur-2xl border border-white/10 rounded-[2rem] p-5 shadow-[0_8px_32px_rgba(0,0,0,0.3)] min-w-[380px] justify-between">
+            <div className="profile-summary-stats hidden xl:flex items-center gap-6 bg-white/[0.03] backdrop-blur-2xl border border-white/10 rounded-[2rem] p-5 shadow-[0_8px_32px_rgba(0,0,0,0.3)] min-w-[380px] justify-between">
               <div className="flex flex-col items-center px-2 flex-1">
                 <span className="text-2xl font-black text-white drop-shadow-md">{stats.completed}</span>
                 <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold mt-1">{uiI18n.t('app.anime_f1b32a19')}</span>
@@ -682,7 +823,7 @@ export default function ProfilePage({ username: providedUsername }: { username?:
           </motion.div>
 
           {/* Bio & Social Links Section */}
-          <div className="flex flex-col md:flex-row gap-8 mb-10 w-full max-w-3xl">
+          <div className="profile-bio flex flex-col md:flex-row gap-8 mb-10 w-full max-w-3xl">
             <div className="w-full">
               {profile?.bio && (
                 <p className="text-[15px] text-muted-foreground/90 leading-relaxed font-normal whitespace-pre-line mb-5">
@@ -697,6 +838,7 @@ export default function ProfilePage({ username: providedUsername }: { username?:
             </div>
           </div>
 
+          </div>
           {/* ── Content Tabs ── */}
           <div className="mt-4">
             <Tabs value={activeTab} onValueChange={changeProfileTab} className="space-y-8">
@@ -770,49 +912,7 @@ export default function ProfilePage({ username: providedUsername }: { username?:
               )}
 
               <TabsContent value="overview" className="mt-8 focus-visible:outline-none">
-                <ProfileOverviewTab
-                  userId={profile?.user_id}
-                  username={profile?.username}
-                  isViewingOther={isViewingOther}
-                  isPublic={(profile as any)?.is_public ?? false}
-                  showCalendar={(profile as any)?.show_calendar ?? true}
-                  watchTimeSeconds={computedWatchTimeSeconds}
-                  episodesCount={effectiveEpisodeCount}
-                  completedAnimeCount={stats.completed}
-                  watchingAnimeCount={stats.watching}
-                  mangaCount={mangaCounts.manga}
-                  manhwaCount={mangaCounts.manhwa}
-                  comicsCount={mangaCounts.comics}
-                  totalChaptersRead={mangaCounts.totalChapters}
-                  readingTotals={readingTotals}
-                  planToWatchCount={stats.plan_to_watch}
-                  streakDays={viewedStreak?.currentStreak || 0}
-                  longestStreak={viewedStreak?.longestStreak || 0}
-                  totalDaysActive={viewedStreak?.totalDaysWatched || 0}
-                  commentCount={commentsCount}
-                  forumPostCount={forumPosts?.length || 0}
-                  forumUpvotes={forumUpvotes}
-                  reputationRate={reputationRate}
-                  reputationBreakdown={reputation.breakdown}
-                  leaderboardRank={userRank?.rank ?? null}
-                  totalRankedUsers={userRank?.totalUsers ?? null}
-                  followersCount={followStats?.followers || 0}
-                  followingCount={followStats?.following || 0}
-                  watchlist={watchlist || []}
-                  history={history || []}
-                  mangaReadlist={mangaReadlist || []}
-                  ratings={userRatings}
-                  commentDates={userCommentRows}
-                  favoriteCharacters={favoriteCharacters}
-                  favoriteCharactersLoading={loadingFavoriteCharacters}
-                  tasteProfile={tasteProfile}
-                  tasteProfileLoading={loadingTasteProfile}
-                  insights={overviewInsights}
-                  achievements={achievements}
-                  externalStats={externalStats}
-                  externalStatsLoading={externalStatsLoading}
-                  onNavigateTab={changeProfileTab}
-                />
+                {profileOverviewContent}
               </TabsContent>
 
               {showWatchlistTab && (
@@ -853,6 +953,7 @@ export default function ProfilePage({ username: providedUsername }: { username?:
                   <HistoryTab
                     history={history || []}
                     mangaHistoryEntries={mangaHistoryEntries}
+                    novelHistoryEntries={novelHistoryEntries}
                     loading={loadingCombinedHistory}
                     isViewingOther={isViewingOther}
                     onNavigate={navigate}

@@ -13,11 +13,15 @@ import {
   useEffect,
   useImperativeHandle,
   useRef,
+  useState,
 } from "react";
 import {
   TURNSTILE_SITE_KEY,
   TURNSTILE_SCRIPT_SRC,
   isTurnstileEnabled,
+  needsHostedTurnstile,
+  HOSTED_TURNSTILE_URL,
+  readHostedTurnstileMessage,
 } from "@/lib/security/turnstile";
 
 interface TurnstileApi {
@@ -112,6 +116,62 @@ interface TurnstileWidgetProps {
 }
 
 export const TurnstileWidget = forwardRef<TurnstileWidgetHandle, TurnstileWidgetProps>(
+  function TurnstileWidget(props, ref) {
+    if (!isTurnstileEnabled()) return null;
+    return needsHostedTurnstile()
+      ? <HostedTurnstileWidget {...props} ref={ref} />
+      : <InlineTurnstileWidget {...props} ref={ref} />;
+  }
+);
+
+const HostedTurnstileWidget = forwardRef<TurnstileWidgetHandle, TurnstileWidgetProps>(
+  function HostedTurnstileWidget({ onToken, onExpire, onError, onTimeout, action, className }, ref) {
+    const frameRef = useRef<HTMLIFrameElement>(null);
+    const [attempt, setAttempt] = useState(0);
+    const cbRef = useRef({ onToken, onExpire, onError, onTimeout });
+    cbRef.current = { onToken, onExpire, onError, onTimeout };
+    const [frameUrl, setFrameUrl] = useState('');
+
+    useImperativeHandle(ref, () => ({ reset: () => {
+      cbRef.current.onExpire?.();
+      setAttempt(value => value + 1);
+    } }), []);
+
+    useEffect(() => {
+      // A new frame discards any consumed token, including on auth-mode changes.
+      cbRef.current.onExpire?.();
+      const id = Array.from(crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, '0')).join('');
+      const url = new URL(HOSTED_TURNSTILE_URL);
+      url.search = new URLSearchParams({ sitekey: TURNSTILE_SITE_KEY, action: action || '', id }).toString();
+      const timer = window.setTimeout(() => cbRef.current.onError?.(), 20000);
+      const onMessage = (event: MessageEvent) => {
+        const message = readHostedTurnstileMessage(event, frameRef.current?.contentWindow ?? null, id);
+        if (!message) return;
+        window.clearTimeout(timer);
+        switch (message.event) {
+          case 'token': cbRef.current.onToken(message.token!); break;
+          case 'expired': cbRef.current.onExpire?.(); break;
+          case 'error': cbRef.current.onError?.(); break;
+          case 'timeout': (cbRef.current.onTimeout ?? cbRef.current.onError)?.(); break;
+        }
+      };
+      window.addEventListener('message', onMessage);
+      setFrameUrl(url.href);
+      return () => {
+        window.clearTimeout(timer);
+        window.removeEventListener('message', onMessage);
+      };
+    }, [action, attempt]);
+
+    return <div className={className} style={{ width: '100%', maxWidth: 320, minHeight: 65 }}>
+      {frameUrl && <iframe ref={frameRef} key={frameUrl} src={frameUrl} title="Security verification"
+        onError={() => cbRef.current.onError?.()} referrerPolicy="no-referrer"
+        style={{ display: 'block', border: 0, width: '100%', height: 80 }} />}
+    </div>;
+  }
+);
+
+const InlineTurnstileWidget = forwardRef<TurnstileWidgetHandle, TurnstileWidgetProps>(
   function TurnstileWidget({ onToken, onExpire, onError, onTimeout, action, className }, ref) {
   useUiTranslation();
     const containerRef = useRef<HTMLDivElement | null>(null);

@@ -1,3 +1,4 @@
+import { BRAND_ASSET_BASE } from '@/lib/assets';
 import { Link } from 'react-router-dom';
 import { FileInput, Languages, Layers, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -21,7 +22,7 @@ export function Translate() {
           <p className="text-lg text-muted-foreground">{uiI18n.t('extensionUpdate.translateBody')}</p>
         </div>
         <img
-          src={`${import.meta.env.BASE_URL}assets/brand/translate-workspace.png`}
+          src={`${BRAND_ASSET_BASE}/translate-workspace.png`}
           alt="Tatakai Translate desktop workspace with page thumbnails, editing tools, and text layer properties"
           className="mb-10 w-full rounded-2xl border border-border"
           width={1920}

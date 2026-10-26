@@ -2,6 +2,12 @@ import { compatibilityAny, throwCompatibilityAbort } from '../compatibility/abor
 import { extensionFetch } from '../remote/transport';
 import type { SoraHttpRequest, SoraMethod } from './vm';
 import type { MangayomiContext, MangayomiMethod } from '../mangayomi/vm';
+import { localScriptConcurrency, recordLocalScriptRuntimeResult } from './runtime';
+
+export async function prepareLocalScriptRuntime(signal?: AbortSignal) {
+  try { await executeLocalScript('', '__runtime_probe', [], signal); recordLocalScriptRuntimeResult(); return { ready: true }; }
+  catch (error) { if (!signal?.aborted) recordLocalScriptRuntimeResult(error instanceof Error ? error.message : 'The local runtime could not start'); throw error; }
+}
 
 let active = 0;
 const waiting = new Set<() => void>();
@@ -13,10 +19,10 @@ async function acquire(signal?: AbortSignal) {
       let released = false;
       resolve(() => { if (released) return; released = true; active--; waiting.values().next().value?.(); });
     };
-    const abort = () => { cleanup(); reject(signal?.reason); };
+    const abort = () => { cleanup(); reject(signal?.reason || new DOMException('Aborted', 'AbortError')); };
     const cleanup = () => { waiting.delete(ready); signal?.removeEventListener('abort', abort); };
     signal?.addEventListener('abort', abort, { once: true });
-    if (signal?.aborted) abort(); else if (active < 4) ready(); else waiting.add(ready);
+    if (signal?.aborted) abort(); else if (active < localScriptConcurrency()) ready(); else waiting.add(ready);
   });
 }
 export async function executeSora(code: string, method: SoraMethod, args: unknown[], signal?: AbortSignal): Promise<any> {
@@ -35,14 +41,14 @@ async function executeLocalScript(code: string, method: string, args: unknown[],
     worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });
     return await new Promise<any>((resolve, reject) => {
       let inFlight = 0;
-      const abort = () => finish(combined.reason);
+      const abort = () => finish(combined.reason || new DOMException('Aborted', 'AbortError'));
       const timer = setTimeout(() => controller.abort(new Error('Sora module timed out')), 30000);
       const finish = (error?: unknown, result?: unknown) => { clearTimeout(timer); combined.removeEventListener('abort', abort); error ? reject(error) : resolve(result); };
       combined.addEventListener('abort', abort, { once: true });
       worker!.onerror = () => finish(Error('Sora worker stopped'));
       worker!.onmessage = async ({ data }) => {
         if (combined.aborted) return;
-        if (data.type === 'result') return finish(undefined, data.result);
+        if (data.type === 'result') { recordLocalScriptRuntimeResult(); return finish(undefined, data.result); }
         if (data.type === 'error') return finish(Error(data.error));
         if (data.type !== 'http' || !Number.isSafeInteger(data.id)) return;
         try {

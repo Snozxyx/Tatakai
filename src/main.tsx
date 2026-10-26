@@ -84,7 +84,7 @@ if (typeof window !== 'undefined') {
   }
 
   // Register service worker for PWA only in production (non-webapp mode).
-  if ('serviceWorker' in navigator && !isCapacitor() && import.meta.env.PROD && import.meta.env.MODE !== 'web') {
+  if ('serviceWorker' in navigator && !isCapacitor() && import.meta.env.VITE_PACKAGED_BUILD !== 'true' && import.meta.env.PROD && import.meta.env.MODE !== 'web') {
     window.addEventListener('load', () => {
       navigator.serviceWorker
         .register('/sw.js')

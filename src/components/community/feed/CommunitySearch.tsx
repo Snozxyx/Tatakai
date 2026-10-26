@@ -1,9 +1,10 @@
+import { CosmeticAvatar, CosmeticName } from '@/components/profile/IdentityCosmetics';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, X, User, Music2, Layers, MessageSquare, Loader2 } from 'lucide-react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { getProxiedImageUrl } from '@/lib/api';
 import { useCommunitySearch } from '@/hooks/community/useCommunitySearch';
 import { cn } from '@/lib/utils';
@@ -140,14 +141,14 @@ export function CommunitySearch({
                       onClick={() => u.username && go(`/user/${u.username}`)}
                       className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors hover:bg-white/[0.05]"
                     >
-                      <Avatar className="h-8 w-8 shrink-0">
+                      <CosmeticAvatar userId={u.user_id} className="h-8 w-8 shrink-0">
                         <AvatarImage src={u.avatar_url || ''} className="object-cover" />
                         <AvatarFallback className="bg-zinc-800 text-xs font-bold text-zinc-400">
                           {(u.display_name || u.username || '?')[0]?.toUpperCase()}
                         </AvatarFallback>
-                      </Avatar>
+                      </CosmeticAvatar>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-[13px] font-semibold text-zinc-100">{u.display_name || u.username}</p>
+                        <p className="truncate text-[13px] font-semibold text-zinc-100"><CosmeticName userId={u.user_id}>{u.display_name || u.username}</CosmeticName></p>
                         {u.username && <p className="truncate text-[11px] text-zinc-500">@{u.username}</p>}
                       </div>
                     </button>

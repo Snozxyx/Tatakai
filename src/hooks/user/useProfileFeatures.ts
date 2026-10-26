@@ -549,6 +549,7 @@ export function useUpdateProfileSettings() {
       queryClient.invalidateQueries({ queryKey: ['profile'] });
       queryClient.invalidateQueries({ queryKey: ['public_profile'] });
       queryClient.invalidateQueries({ queryKey: ['profile_widget'] });
+      queryClient.invalidateQueries({ queryKey: ['profile_cosmetics'] });
     },
   });
 }

@@ -6,6 +6,7 @@ import { createServer } from 'node:http';
 import { matchEntityRoute } from './seo/routes.mjs';
 import { resolveMeta, renderTags, injectIntoHtml, SITE_ORIGIN, SHARE_API_ORIGIN } from './seo/inject.mjs';
 import { canonicalSitemapPath, looksXml, degradedSitemapBody, sitemapContentType } from './seo/sitemap-utils.mjs';
+import { serveStaticMedia } from './media-cache.mjs';
 
 const port = Number(process.env.PORT || process.env.SERVER_PORT || 8088);
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -136,6 +137,7 @@ function startStaticServer() {
 
     // Real file on disk (assets, /index.html, favicon, …): stream it untouched.
     if (existsSync(filePath)) {
+      if (serveStaticMedia(req, res, filePath)) return;
       const contentType = MIME_TYPES[extname(filePath).toLowerCase()] || 'application/octet-stream';
       res.setHeader('Content-Type', contentType);
       createReadStream(filePath)

@@ -1,3 +1,4 @@
+import { CosmeticAvatar, CosmeticName } from '@/components/profile/IdentityCosmetics';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState } from 'react';
@@ -10,7 +11,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useLeaderboard, LeaderboardType, useUserRank } from '@/hooks/community/useLeaderboard';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -94,17 +95,17 @@ function PodiumCard({
           <Crown className={cn('h-5 w-5 drop-shadow-md', config.crown)} />
         </div>
 
-        <Avatar className={cn('relative h-14 w-14 ring-2 shadow-2xl transition-transform duration-300 group-hover:scale-105', config.ring)}>
+        <CosmeticAvatar userId={entry.user_id} className={cn('relative h-14 w-14 ring-2 shadow-2xl transition-transform duration-300 group-hover:scale-105', config.ring)}>
           <AvatarImage src={entry.avatar_url || ''} />
           <AvatarFallback className="font-bold">{displayName(entry)[0]?.toUpperCase()}</AvatarFallback>
-        </Avatar>
+        </CosmeticAvatar>
 
         <span className={cn('mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black border', config.badgeBg)}>
           #{config.rank}
         </span>
 
         <p className="relative mt-1.5 w-full truncate font-display text-xs font-bold tracking-tight text-white group-hover:text-primary transition-colors">
-          {displayName(entry)}
+          <CosmeticName userId={entry.user_id}>{displayName(entry)}</CosmeticName>
         </p>
 
         <div className="relative mt-1 flex items-center gap-1">
@@ -148,15 +149,15 @@ function LeaderboardRow({
           {entry.rank}
         </span>
 
-        <Avatar className="h-9 w-9 ring-1 ring-white/10 group-hover:ring-primary/40 transition-all">
+        <CosmeticAvatar userId={entry.user_id} className="h-9 w-9 ring-1 ring-white/10 group-hover:ring-primary/40 transition-all">
           <AvatarImage src={entry.avatar_url || ''} />
           <AvatarFallback className="font-bold text-xs">{displayName(entry)[0]?.toUpperCase()}</AvatarFallback>
-        </Avatar>
+        </CosmeticAvatar>
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             <p className="truncate font-display text-xs font-bold tracking-tight text-white group-hover:text-primary transition-colors">
-              {displayName(entry)}
+              <CosmeticName userId={entry.user_id}>{displayName(entry)}</CosmeticName>
             </p>
             {isCurrentUser && (
               <span className="rounded-full bg-primary/20 px-1.5 py-0.2 text-[9px] font-bold uppercase text-primary">

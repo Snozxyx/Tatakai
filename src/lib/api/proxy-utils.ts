@@ -2,6 +2,7 @@ import { getActiveStreamingProxySnapshot } from '@/hooks/user/useProxySettings';
 import { resolveBackendOrigin } from '@/lib/api/backendOrigin';
 import { isMobileProxyUrl } from '@/core/extensions/mobile/mobileProxy';
 import { downgradePosterForDataSaver, isDataSaverEnabled } from '@/lib/mobile/dataSaver';
+import { optimizedImageUrl } from '@/lib/media/imageUrl';
 
 const STREAM_PROXY_PASSWORD = String(
   import.meta.env.VITE_STREAM_PROXY_PASSWORD || import.meta.env.VITE_PROXY_PASSWORD || ''
@@ -56,7 +57,7 @@ function unwrapProxyUrl(rawUrl: string): string {
 export function getProxiedImageUrl(rawUrl?: string): string {
   const url = String(rawUrl || '').trim();
   if (!url) return '/placeholder.svg';
-  return url;
+  return optimizedImageUrl(url) || '/placeholder.svg';
 }
 
 /**

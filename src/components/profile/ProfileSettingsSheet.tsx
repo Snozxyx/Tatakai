@@ -14,22 +14,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { Loader2, Settings, Sparkles, Palette, User, Eye, Globe, Lock, Check, Crown } from 'lucide-react';
+import { Loader2, Settings, Sparkles, User, Eye, Globe, Lock, Check, ArrowUpRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { useUpdateProfileSettings } from '@/hooks/user/useProfileFeatures';
-import { useUserBadges } from '@/hooks/community/useUserBadges';
-import { ProfileCosmeticsPicker } from '@/components/profile/ProfileCosmeticsPicker';
-import { hasPremiumCosmetics, type AvatarDecorationKey, type ProfileCosmeticEffectKey, type ProfileNameplateKey } from '@/lib/profileCosmetics';
-import {
-  AMBIENT_PRESETS,
-  EFFECT_OPTIONS,
-  readProfileCustomization,
-  toHslTriplet,
-  type BackgroundEffectKey,
-} from '@/lib/profileSettings';
+import { useSettingsModal } from '@/contexts/SettingsModalContext';
 
 interface ProfileSettingsSheetProps {
   trigger: React.ReactNode;
@@ -41,13 +31,10 @@ export function ProfileSettingsSheet({ trigger, overlayClassName, contentClassNa
   useUiTranslation();
   const { user, profile, refreshProfile } = useAuth();
   const reduceMotion = useReducedMotion();
-  const updateSettings = useUpdateProfileSettings();
+  const { openSettings } = useSettingsModal();
 
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const { data: badges = [], isLoading: loadingBadges } = useUserBadges(open ? user?.id : undefined);
-  const canUsePremium = hasPremiumCosmetics(profile, badges);
-
   // Identity fields
   const [displayName, setDisplayName] = useState('');
   const [username, setUsername] = useState('');
@@ -58,13 +45,6 @@ export function ProfileSettingsSheet({ trigger, overlayClassName, contentClassNa
   const [showWatchlist, setShowWatchlist] = useState(true);
   const [showHistory, setShowHistory] = useState(true);
   const [showCalendar, setShowCalendar] = useState(true);
-
-  // Customization
-  const [ambientColor, setAmbientColor] = useState<string | null>(null);
-  const [backgroundEffect, setBackgroundEffect] = useState<BackgroundEffectKey>('none');
-  const [avatarDecoration, setAvatarDecoration] = useState<AvatarDecorationKey>('none');
-  const [profileEffect, setProfileEffect] = useState<ProfileCosmeticEffectKey>('none');
-  const [nameplate, setNameplate] = useState<ProfileNameplateKey>('none');
 
   // Seed local state whenever the sheet opens or the profile changes.
   useEffect(() => {
@@ -77,13 +57,7 @@ export function ProfileSettingsSheet({ trigger, overlayClassName, contentClassNa
     setShowWatchlist(p.show_watchlist ?? true);
     setShowHistory(p.show_history ?? true);
     setShowCalendar(p.show_calendar ?? true);
-    const custom = readProfileCustomization(profile, canUsePremium);
-    setAmbientColor(custom.ambientColor);
-    setBackgroundEffect(custom.backgroundEffect);
-    setAvatarDecoration(custom.avatarDecoration);
-    setProfileEffect(custom.profileEffect);
-    setNameplate(custom.nameplate);
-  }, [profile, open, canUsePremium]);
+  }, [profile, open]);
 
   const handleSave = async () => {
     if (!user) {
@@ -115,9 +89,6 @@ export function ProfileSettingsSheet({ trigger, overlayClassName, contentClassNa
         }
         throw identityError;
       }
-
-      // 2. Customization — single merged app_settings write (avoids read-modify-write race).
-      await updateSettings.mutateAsync({ ambientColor: ambientColor ?? undefined, backgroundEffect, avatarDecoration, profileEffect, nameplate });
 
       await refreshProfile();
       toast.success(uiI18n.t('app.profile_settings_saved_2ea46ddb'));
@@ -155,6 +126,11 @@ export function ProfileSettingsSheet({ trigger, overlayClassName, contentClassNa
 
         {/* Body */}
         <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-6 custom-scrollbar relative z-10">
+          <section className="space-y-3 rounded-2xl border border-primary/20 bg-primary/5 p-5">
+            <h3 className="flex items-center gap-2 text-sm font-bold"><Sparkles className="h-4 w-4 text-primary" />Make it yours</h3>
+            <p className="text-xs leading-relaxed text-muted-foreground">Choose themes, avatar frames, profile effects, nameplates, and colors in the Profile Store. Click below to open your collection.</p>
+            <Button type="button" variant="outline" className="gap-2" onClick={() => { setOpen(false); openSettings('profile-store'); }}>Open Profile Store<ArrowUpRight size={14} /></Button>
+          </section>
           {/* Identity */}
           <section className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5 space-y-4">
             <h3 className="flex items-center gap-2 text-sm font-bold text-white">
@@ -190,102 +166,6 @@ export function ProfileSettingsSheet({ trigger, overlayClassName, contentClassNa
             </div>
           </section>
 
-          {/* Ambient Color */}
-          <section className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5 space-y-4">
-            <h3 className="flex items-center gap-2 text-sm font-bold text-white">
-              <Palette className="h-4 w-4 text-primary" /> {uiI18n.t('app.ambient_color_ca9caa6e')}
-            </h3>
-            <p className="text-xs text-muted-foreground/70">
-              {uiI18n.t('app.sets_the_glow_accent_across_your_profile_cards_e_bb0e5b28')}
-            </p>
-            <div className="grid grid-cols-6 gap-2.5">
-              {AMBIENT_PRESETS.map((preset) => {
-                const active = ambientColor === preset.triplet;
-                return (
-                  <button
-                    key={preset.name}
-                    onClick={() => setAmbientColor(preset.triplet)}
-                    title={preset.name}
-                    className={cn(
-                      'relative aspect-square rounded-xl transition-all',
-                      active ? 'ring-2 ring-white scale-105 shadow-lg' : 'ring-1 ring-white/10 hover:scale-105',
-                    )}
-                    style={{ backgroundColor: `hsl(${preset.triplet})` }}
-                  >
-                    {active && (
-                      <Check className="absolute inset-0 m-auto h-4 w-4 text-white drop-shadow" />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-            <div className="flex items-center gap-3 pt-1">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <span className="text-xs font-medium text-muted-foreground">{uiI18n.t('app.custom_081ae3fd')}</span>
-                <input
-                  type="color"
-                  onChange={(e) => setAmbientColor(toHslTriplet(e.target.value))}
-                  className="h-8 w-12 cursor-pointer rounded-lg border border-white/10 bg-transparent"
-                />
-              </label>
-              {ambientColor && (
-                <button
-                  onClick={() => setAmbientColor(null)}
-                  className="text-xs font-medium text-muted-foreground/60 hover:text-white transition-colors"
-                >
-                  {uiI18n.t('app.reset_to_default_39c90eb7')}
-                </button>
-              )}
-            </div>
-          </section>
-
-          {/* Background Effect */}
-          <section className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5 space-y-4">
-            <h3 className="flex items-center gap-2 text-sm font-bold text-white">
-              <Sparkles className="h-4 w-4 text-primary" /> {uiI18n.t('app.background_effect_1cbf08b0')}
-            </h3>
-            <div className="grid grid-cols-3 gap-2.5">
-              {EFFECT_OPTIONS.map((opt) => {
-                const Icon = opt.icon;
-                const active = backgroundEffect === opt.key;
-                const locked = opt.premium && !canUsePremium;
-                return (
-                  <button
-                    key={opt.key}
-                    type="button"
-                    aria-pressed={active}
-                    disabled={locked}
-                    title={locked ? uiI18n.t('app.requires_a_premium_go_pro_or_ultra_badge_or_admi_ba321bdc') : opt.description}
-                    onClick={() => setBackgroundEffect(opt.key)}
-                    className={cn(
-                      'relative flex flex-col items-center gap-1.5 rounded-xl border p-3 transition-colors disabled:cursor-not-allowed disabled:opacity-60',
-                      active
-                        ? 'border-primary bg-primary/10 shadow-[0_0_15px_rgba(var(--primary),0.25)]'
-                        : 'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.05]',
-                    )}
-                  >
-                    {opt.premium && <span className="absolute right-1.5 top-1.5 text-amber-200">{locked ? <Lock className="h-3 w-3" /> : <Crown className="h-3 w-3" />}</span>}
-                    <Icon className={cn('h-5 w-5', active ? 'text-primary' : 'text-muted-foreground')} />
-                    <span className={cn('text-[11px] font-semibold', active ? 'text-white' : 'text-muted-foreground')}>
-                      {opt.label}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-            <p className="text-xs leading-relaxed text-muted-foreground">{uiI18n.t('app.the_four_crown_marked_scenes_are_included_with_p_1fb310c3')}</p>
-          </section>
-
-          <ProfileCosmeticsPicker
-            custom={{ ambientColor, backgroundEffect, avatarDecoration, profileEffect, nameplate }}
-            name={displayName || username || 'You'}
-            avatarUrl={profile?.avatar_url}
-            entitled={canUsePremium}
-            loading={loadingBadges}
-            onDecoration={setAvatarDecoration}
-            onEffect={setProfileEffect}
-            onNameplate={setNameplate}
-          />
           {/* Privacy */}
           <section className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5 space-y-4">
             <h3 className="flex items-center gap-2 text-sm font-bold text-white">
@@ -336,7 +216,7 @@ export function ProfileSettingsSheet({ trigger, overlayClassName, contentClassNa
           <Button
             onClick={handleSave}
             disabled={saving}
-            className="h-12 rounded-full px-8 text-sm font-black uppercase tracking-widest shadow-[0_0_20px_rgba(var(--primary),0.3)] transition-all hover:scale-105"
+            className="h-12 rounded-full px-8 text-sm font-black uppercase tracking-widest shadow-[0_0_20px_rgba(var(--primary),0.3)] transition-colors"
           >
             {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
             {uiI18n.t('app.save_changes_fa2984b3')}

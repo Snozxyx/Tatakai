@@ -2,11 +2,20 @@
 
 const { createHomeServerStore } = require('./store.cjs');
 const { createHomeServer } = require('./server.cjs');
+const pathApi = require('node:path');
+const { pathToFileURL } = require('node:url');
+
+function resolveExtensionServerEntry(app) {
+  // app.getAppPath() includes app.asar in installed builds. Four parents from
+  // this module escapes the archive and incorrectly points at resources/.
+  const appRoot = app.getAppPath?.() || pathApi.resolve(__dirname, '../../..');
+  return pathApi.join(appRoot, 'tatakai-server', 'src', 'desktop.mjs');
+}
 
 function createHomeServerRuntime({ app, fs, path, logger, adapters }) {
   const store = createHomeServerStore({ app, fs, path, logger });
   let extensionRuntime;
-  const ensureExtensionServer = () => extensionRuntime ||= import(require('node:url').pathToFileURL(require('node:path').join(__dirname, '../../../..', 'tatakai-server/src/desktop.mjs')).href)
+  const ensureExtensionServer = () => extensionRuntime ||= import(pathToFileURL(resolveExtensionServerEntry(app)).href)
     .then(module => module.createDesktopServer({ app, legacyStore: store, adapters }))
     .then(runtime => { app.once?.('before-quit', () => runtime.close()); return runtime; })
     .catch(error => { extensionRuntime = null; throw error; });
@@ -28,4 +37,4 @@ function createHomeServerRuntime({ app, fs, path, logger, adapters }) {
   };
 }
 
-module.exports = { createHomeServerRuntime };
+module.exports = { createHomeServerRuntime, resolveExtensionServerEntry };

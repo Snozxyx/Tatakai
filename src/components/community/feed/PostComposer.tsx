@@ -1,3 +1,4 @@
+import { CosmeticAvatar } from '@/components/profile/IdentityCosmetics';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { PostDrafts } from '@/components/community/PostDrafts';
 import { PostPreview } from '@/components/community/PostPreview';
@@ -23,7 +24,7 @@ import {
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
@@ -323,10 +324,10 @@ export function PostComposer({ onPosted, defaultCommunityId, defaultMedia }: { o
       )}
       <div className="pointer-events-none absolute -top-12 -right-12 h-48 w-48 rounded-full bg-primary/10 blur-[70px]" />
       <div className="relative flex gap-2.5 sm:gap-3">
-        <Avatar className="h-9 w-9 shrink-0 sm:h-10 sm:w-10">
+        <CosmeticAvatar userId={profile?.user_id} className="h-9 w-9 shrink-0 sm:h-10 sm:w-10">
           <AvatarImage src={profile?.avatar_url || undefined} />
           <AvatarFallback>{(profile?.display_name || profile?.username || 'U')[0]?.toUpperCase()}</AvatarFallback>
-        </Avatar>
+        </CosmeticAvatar>
 
         <div className="min-w-0 flex-1">
           <div className="mb-1 flex flex-wrap items-center gap-2">

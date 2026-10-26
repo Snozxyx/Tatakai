@@ -1,6 +1,7 @@
 import { automaticTitleMatch, titleSearchQueries } from './title-match';
 import { supportsResource, stremioResourceUrl, type StremioManifest } from './stremio';
 import type { RemoteExtension } from './installed';
+import { throwCompatibilityAbort } from '../compatibility/abort';
 
 const CINEMETA = 'https://v3-cinemeta.strem.io/manifest.json';
 export interface StremioTarget { type: string; id: string }
@@ -37,7 +38,7 @@ export async function searchStremioTargets(row: RemoteExtension, options: { anil
   catalogs.push(...kinds.map(type => ({ base: CINEMETA, type, id: 'top', own: false })));
   const deadline = Date.now() + 20_000;
   const read = async (url: string) => {
-    signal?.throwIfAborted();
+    throwCompatibilityAbort(signal);
     const remaining = deadline - Date.now();
     if (remaining <= 0) throw Error('Stremio search fallback timed out');
     let timer: ReturnType<typeof setTimeout>;
@@ -47,7 +48,7 @@ export async function searchStremioTargets(row: RemoteExtension, options: { anil
   const batches = await Promise.all(catalogs.map(async catalog => {
     const targets: StremioTarget[] = [];
     for (const query of queries) {
-      signal?.throwIfAborted();
+      throwCompatibilityAbort(signal);
       try {
         const url = new URL(stremioResourceUrl(catalog.base, 'catalog', catalog.type, catalog.id));
         url.pathname = url.pathname.replace(/\.json$/, `/search=${encodeURIComponent(query)}.json`);

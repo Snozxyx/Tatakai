@@ -238,6 +238,9 @@ public final class TatakaiLocalProxyPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "ensureStarted", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getBaseUrl", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "registerSource", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "registerPeerSource", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "unregisterPeerSource", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "peerMediaResponse", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setEmbedActive", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setWatchActive", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getStats", returnType: CAPPluginReturnPromise)
@@ -248,6 +251,25 @@ public final class TatakaiLocalProxyPlugin: CAPPlugin, CAPBridgedPlugin {
     ]
 
     private let proxy = TatakaiLocalProxy.shared
+    private lazy var peerMedia = PeerMediaBridge(proxy: proxy) { [weak self] name, data in
+        DispatchQueue.main.async { self?.notifyListeners(name, data: data) }
+    }
+
+    @objc func registerPeerSource(_ call: CAPPluginCall) {
+        proxy.ensureStarted { [weak self] result in
+            guard let self else { call.reject("Watchroom media bridge closed"); return }
+            switch result {
+            case .success(let base):
+                self.proxy.peerMediaHandler = { [weak self] connection, method, path, range in
+                    self?.peerMedia.serve(connection, method: method, path: path, range: range)
+                }
+                self.peerMedia.register(base: base, call: call)
+            case .failure: call.reject("Unable to start watchroom media bridge")
+            }
+        }
+    }
+    @objc func unregisterPeerSource(_ call: CAPPluginCall) { peerMedia.unregister(call) }
+    @objc func peerMediaResponse(_ call: CAPPluginCall) { peerMedia.respond(call) }
 
     @objc func prepareRequestHeaders(_ call: CAPPluginCall) {
         guard let raw = call.getString("url"), let url = URL(string: raw),
@@ -421,6 +443,12 @@ private final class TatakaiLocalProxy {
     private var listener: NWListener?
     private var readyBaseUrl: String?
     private var startWaiters: [(Result<String, Error>) -> Void] = []
+    private let peerHandlerLock = NSLock()
+    private var storedPeerMediaHandler: ((NWConnection, String, String, String?) -> Void)?
+    var peerMediaHandler: ((NWConnection, String, String, String?) -> Void)? {
+        get { peerHandlerLock.lock(); defer { peerHandlerLock.unlock() }; return storedPeerMediaHandler }
+        set { peerHandlerLock.lock(); storedPeerMediaHandler = newValue; peerHandlerLock.unlock() }
+    }
 
     var baseUrl: String? { stateQueue.sync { readyBaseUrl } }
 
@@ -581,6 +609,11 @@ private final class TatakaiLocalProxy {
         }
 
         let path = first[1].components(separatedBy: "?").first ?? first[1]
+        if path.hasPrefix("/peer/") {
+            guard let handler = peerMediaHandler else { sendText(connection, status: 410, text: "Watchroom media source closed"); return }
+            handler(connection, method, path, requestHeaders["range"])
+            return
+        }
         if path.hasPrefix("/offline/") {
             serveOffline(connection, method: method, path: path, range: requestHeaders["range"])
             return
@@ -746,6 +779,121 @@ private final class TatakaiLocalProxy {
         var payload = Data(head.utf8)
         if let body { payload.append(body) }
         connection.send(content: payload, completion: .contentProcessed { _ in connection.cancel() })
+    }
+}
+
+/// Native players consume loopback HTTP while room JS supplies bounded WebRTC bytes.
+private final class PeerMediaBridge {
+    private final class Request {
+        let connection: NWConnection, token: String, event: [String: Any]
+        var sentHead = false, inFlight = false, generation = 0
+        var acknowledgement: CAPPluginCall?
+        init(_ connection: NWConnection, token: String, event: [String: Any]) {
+            self.connection = connection; self.token = token; self.event = event
+        }
+    }
+    private let proxy: TatakaiLocalProxy
+    private let emit: (String, [String: Any]) -> Void
+    private let queue = DispatchQueue(label: "app.tatakai.watchroom-peer-media")
+    private var sources = Set<String>()
+    private var requests: [String: Request] = [:]
+    private static let blockLimit = 1024 * 1024
+    init(proxy: TatakaiLocalProxy, emit: @escaping (String, [String: Any]) -> Void) {
+        self.proxy = proxy; self.emit = emit
+    }
+    func register(base: String, call: CAPPluginCall) {
+        queue.async {
+            guard self.sources.count < 4 else { call.reject("Too many active watchroom media sources"); return }
+            let token = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
+            self.sources.insert(token)
+            call.resolve(["token": token, "proxyUrl": "\(base)/peer/\(token)/root"])
+        }
+    }
+    func unregister(_ call: CAPPluginCall) {
+        queue.async {
+            let token = call.getString("token") ?? ""
+            self.sources.remove(token)
+            let cancelled = self.requests.filter { $0.value.token == token }.map { $0.key }
+            for id in cancelled { self.cancel(id) }
+            call.resolve()
+        }
+    }
+    func serve(_ connection: NWConnection, method: String, path: String, range: String?) {
+        queue.async {
+            let parts = path.components(separatedBy: "/")
+            guard parts.count == 4, parts[2].range(of: "^[a-f0-9]{32}$", options: .regularExpression) != nil,
+                parts[3].range(of: "^(root|[a-f0-9]{32})$", options: .regularExpression) != nil,
+                self.sources.contains(parts[2]) else {
+                self.proxy.sendText(connection, status: 410, text: "Watchroom media source closed"); return
+            }
+            guard self.requests.count < 8 else { self.proxy.sendText(connection, status: 503, text: "Watchroom media bridge busy"); return }
+            let id = UUID().uuidString
+            var event: [String: Any] = ["id": id, "token": parts[2], "resourceId": parts[3], "method": method]
+            if let range { event["range"] = range }
+            let request = Request(connection, token: parts[2], event: event)
+            self.requests[id] = request
+            connection.stateUpdateHandler = { [weak self] state in
+                if case .cancelled = state { self?.queue.async { self?.cancel(id) } }
+                if case .failed = state { self?.queue.async { self?.cancel(id) } }
+            }
+            self.emit("peerMediaRequest", event)
+            self.timeout(id, generation: 0)
+        }
+    }
+    func respond(_ call: CAPPluginCall) {
+        queue.async {
+            let id = call.getString("id") ?? "", token = call.getString("token") ?? ""
+            let encoded = call.getString("body") ?? ""
+            guard let request = self.requests[id], request.token == token, self.sources.contains(token), !request.inFlight,
+                encoded.count <= 4 * ((Self.blockLimit + 2) / 3), let body = Data(base64Encoded: encoded), body.count <= Self.blockLimit else {
+                call.reject("Watchroom media request expired or block too large"); return
+            }
+            var payload = Data()
+            if !request.sentHead {
+                let status = call.getInt("status") ?? 502
+                var headers = self.proxy.corsHeaders()
+                let incoming = call.getObject("headers") ?? [:]
+                for name in ["Content-Type", "Content-Length", "Content-Range", "Accept-Ranges"] {
+                    if let value = incoming[name] as? String {
+                        headers[name] = value.replacingOccurrences(of: "\r", with: "").replacingOccurrences(of: "\n", with: "")
+                    }
+                }
+                headers["Connection"] = "close"; headers["Cache-Control"] = "no-store"
+                var head = "HTTP/1.1 \((200...599).contains(status) ? status : 502) HTTP\r\n"
+                for (name, value) in headers { head += "\(name): \(value)\r\n" }
+                head += "\r\n"; payload.append(Data(head.utf8)); request.sentHead = true
+            }
+            if request.event["method"] as? String != "HEAD" { payload.append(body) }
+            let final = (call.getBool("final") ?? true) || (request.event["method"] as? String == "HEAD")
+            request.inFlight = true; request.acknowledgement = call
+            request.generation += 1
+            self.timeout(id, generation: request.generation)
+            request.connection.send(content: payload, completion: .contentProcessed { error in
+                self.queue.async {
+                    guard self.requests[id] === request else { return }
+                    request.inFlight = false; request.acknowledgement = nil
+                    if error != nil { call.reject("Watchroom media request cancelled"); self.cancel(id); return }
+                    call.resolve()
+                    if final {
+                        self.requests.removeValue(forKey: id)
+                        request.connection.cancel()
+                    }
+                }
+            })
+        }
+    }
+    private func timeout(_ id: String, generation: Int) {
+        queue.asyncAfter(deadline: .now() + 30) {
+            guard let request = self.requests[id], request.generation == generation else { return }
+            if !request.sentHead { self.proxy.sendText(request.connection, status: 504, text: "Watchroom media request timed out") }
+            self.cancel(id)
+        }
+    }
+    private func cancel(_ id: String) {
+        guard let request = requests.removeValue(forKey: id) else { return }
+        request.acknowledgement?.reject("Watchroom media request cancelled")
+        request.connection.cancel()
+        emit("peerMediaCancel", request.event)
     }
 }
 

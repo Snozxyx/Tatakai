@@ -1,8 +1,9 @@
+import { CosmeticAvatar, CosmeticName } from '@/components/profile/IdentityCosmetics';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useNavigate } from 'react-router-dom';
 import { Crown, Shield, ShieldCheck } from 'lucide-react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import { OnlineDot } from './feed/OnlineDot';
 import type { CommunityMember } from '@/hooks/community/useCommunities';
@@ -69,15 +70,15 @@ export function CommunityStaffWidget({
               title={name}
             >
               <div className="relative shrink-0">
-                <Avatar className="h-9 w-9 ring-2 ring-white/[0.06]">
+                <CosmeticAvatar userId={m.user_id} className="h-9 w-9 ring-2 ring-white/[0.06]">
                   <AvatarImage src={m.avatar_url || ''} className="object-cover" />
                   <AvatarFallback className="bg-zinc-800 text-xs font-bold text-zinc-400">
                     {name[0]?.toUpperCase()}
                   </AvatarFallback>
-                </Avatar>
+                </CosmeticAvatar>
                 {onlineUserIds.has(m.user_id) && <OnlineDot size="sm" className="ring-background" />}
               </div>
-              <span className="min-w-0 flex-1 truncate text-sm font-semibold text-white">{name}</span>
+              <span className="min-w-0 flex-1 truncate text-sm font-semibold text-white"><CosmeticName userId={m.user_id}>{name}</CosmeticName></span>
               <span
                 className={cn(
                   'inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider',

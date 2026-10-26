@@ -2,15 +2,44 @@ import { AbstractSourceAdapter, AdapterLoadOptions } from './SourceAdapterRegist
 import { PlaybackMode } from './player-core';
 import { playbackEventBus, PlayerEvents } from './PlaybackEventBus';
 import { buildProxyCandidateUrls, isLoopbackProxyUrl } from './stream-resolver';
+import { findWatchPartyMedia } from '../watch-party/media';
+import { WatchPartyMp4Playback } from '../watch-party/media-mp4';
 
 export class DirectAdapter extends AbstractSourceAdapter {
   readonly mode: PlaybackMode = 'direct';
   private candidates: string[] = [];
   private candidateIndex = 0;
+  private peerMp4: WatchPartyMp4Playback | null = null;
+  private peerBridge: { close(): Promise<void> } | null = null;
 
   async load(options: AdapterLoadOptions): Promise<void> {
     await super.load(options);
     const { source, videoElement, startTime } = options;
+    const partyTransport = findWatchPartyMedia(source.url) || (source.originalUrl ? findWatchPartyMedia(source.originalUrl) : undefined);
+    if (partyTransport) {
+      // The transport reads the original media directly first, falling back per resource to the host.
+      videoElement.onplay = () => playbackEventBus.emit(PlayerEvents.PLAY);
+      videoElement.onpause = () => playbackEventBus.emit(PlayerEvents.PAUSE);
+      videoElement.ontimeupdate = () => playbackEventBus.emit(PlayerEvents.TIME_UPDATE, videoElement.currentTime);
+      videoElement.ondurationchange = () => playbackEventBus.emit(PlayerEvents.DURATION_CHANGE, videoElement.duration);
+      videoElement.onwaiting = () => playbackEventBus.emit(PlayerEvents.BUFFERING, true);
+      videoElement.onplaying = () => playbackEventBus.emit(PlayerEvents.BUFFERING, false);
+      videoElement.onended = () => playbackEventBus.emit(PlayerEvents.ENDED);
+      videoElement.onloadedmetadata = () => playbackEventBus.emit(PlayerEvents.LOADED);
+      const report = (error: Error) => playbackEventBus.emit(PlayerEvents.ERROR, { reason: 'peer_media_error', detail: error.message });
+      if (typeof MediaSource !== 'undefined') {
+        this.peerMp4 = new WatchPartyMp4Playback(partyTransport, videoElement, report);
+        await this.peerMp4.load(startTime);
+      } else {
+        const { registerNativeWatchPartyMedia } = await import('../watch-party/media-native');
+        const bridge = await registerNativeWatchPartyMedia(partyTransport);
+        if (options.signal?.aborted) { await bridge.close(); return; }
+        this.peerBridge = bridge; videoElement.src = bridge.url;
+        if (startTime) videoElement.currentTime = startTime;
+      }
+      if (options.autoPlay) void videoElement.play().catch(() => {});
+      return;
+    }
 
     const referer = (source as any).headers?.Referer;
     const userAgent = (source as any).headers?.['User-Agent'];
@@ -74,6 +103,8 @@ export class DirectAdapter extends AbstractSourceAdapter {
   }
 
   async unload(): Promise<void> {
+    this.peerMp4?.close(); this.peerMp4 = null;
+    await this.peerBridge?.close(); this.peerBridge = null;
     if (this.videoElement) {
       this.videoElement.src = '';
       this.videoElement.onplay = null;

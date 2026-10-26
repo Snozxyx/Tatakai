@@ -39,6 +39,19 @@ export async function startMediaMetadataCache(client: QueryClient, storage: Meta
   const entries = new Map<string, Entry>();
   let writes = Promise.resolve();
   let generation = 0;
+  let dirty = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  function persist() {
+    if (timer) clearTimeout(timer);
+    timer = undefined;
+    if (!dirty) return writes;
+    dirty = false;
+    const revision = generation;
+    writes = writes.then(async () => {
+      if (revision === generation) await storage.write(snapshot());
+    }).catch(() => { /* Disk full/private mode: keep the in-memory cache. */ });
+    return writes;
+  }
   const valid = (entry: Entry) => isStaticMediaKey(entry.key) && entry.data != null &&
     Number.isFinite(entry.updatedAt) && entry.updatedAt <= Date.now() &&
     entry.updatedAt > Date.now() - RETENTION;
@@ -86,17 +99,27 @@ export async function startMediaMetadataCache(client: QueryClient, storage: Meta
       updatedAt: event.query.state.dataUpdatedAt,
     };
     entries.set(JSON.stringify(entry.key), entry);
-    const revision = generation;
-    writes = writes.then(async () => {
-      if (revision === generation) await storage.write(snapshot());
-    }).catch(() => { /* Disk full/private mode: leave the in-memory cache intact. */ });
+    dirty = true;
+    // Collapse bursts into one snapshot instead of serializing up to 5 MB for
+    // every metadata response. A fixed window also flushes during steady traffic.
+    timer ??= setTimeout(persist, 250);
   });
 
+  const onPageHide = () => { void persist(); };
+  if (typeof window !== 'undefined') window.addEventListener('pagehide', onPageHide);
+
   return {
-    flush: () => writes,
-    stop: unsubscribe,
+    flush: persist,
+    stop() {
+      unsubscribe();
+      if (typeof window !== 'undefined') window.removeEventListener('pagehide', onPageHide);
+      void persist();
+    },
     async clear() {
       generation++;
+      dirty = false;
+      if (timer) clearTimeout(timer);
+      timer = undefined;
       entries.clear();
       // Remove matching memory queries as well, so revisits fetch fresh metadata.
       client.removeQueries({ predicate: query => isStaticMediaKey(query.queryKey) });

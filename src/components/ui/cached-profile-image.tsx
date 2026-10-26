@@ -1,10 +1,6 @@
-import {useEffect,useState,type ImgHTMLAttributes} from 'react';
-import {cachedProfileImageUrl} from '@/lib/profileImage';
+import type { ImgHTMLAttributes } from 'react';
 
-export function CachedProfileImage({src,onError,...props}:ImgHTMLAttributes<HTMLImageElement>){
-  const [direct,setDirect]=useState(false);useEffect(()=>setDirect(false),[src]);
-  const cached=cachedProfileImageUrl(src);
-  return <img {...props} src={direct?src:cached} onError={event=>{
-    if(!direct&&cached!==src){setDirect(true);return;}onError?.(event);
-  }}/>;
+export function CachedProfileImage(props: ImgHTMLAttributes<HTMLImageElement>) {
+  // The shared JSX runtime handles caching and the direct retry for all <img>s.
+  return <img {...props} />;
 }

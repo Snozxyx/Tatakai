@@ -1,3 +1,4 @@
+import { BRAND_ASSET_BASE } from '@/lib/assets';
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import uiI18n from "@/lib/uiI18n";
@@ -17,7 +18,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-const BRAND = "/assets/brand";
+const BRAND = BRAND_ASSET_BASE;
 
 interface Ext {
   icon: LucideIcon;

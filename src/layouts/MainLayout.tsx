@@ -1,4 +1,5 @@
 import { useDeveloperMode } from '@/hooks/ui/useDeveloperMode';
+import { useProfilePresentation } from '@/contexts/ProfilePresentationContext';
 import React, { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
@@ -51,6 +52,7 @@ import { useMobileUpdateOrchestrator } from '@/core/update/mobile-update';
 import { EmailProofBanner } from '@/components/auth/EmailProofBanner';
 
 const MainLayout = ({ children }: { children: React.ReactNode }) => {
+  const { fullPage: fullPageProfile } = useProfilePresentation();
   useTheme();
   const { enabled: isDeveloperMode } = useDeveloperMode();
   useMobileUpdateOrchestrator();
@@ -158,7 +160,7 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
   // Phone widths get the bottom nav instead (Sidebar is `hidden md:flex`, MobileNav is `md:hidden`).
   // The native-shell check is intentionally absent: a Capacitor tablet should still get the
   // floating sidebar rather than a stretched bottom bar.
-  const showSidebar = !isMobile && !isHiddenPage && !isCommunityFeed && online;
+  const showSidebar = !fullPageProfile && !isMobile && !isHiddenPage && !isCommunityFeed && online;
 
   useEffect(() => {
     if (isNative) document.body.classList.add('native-app');
@@ -236,7 +238,8 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
       data-main-layout
       style={{ '--desktop-content-height': isDesktopApp && !titlebarHidden && !isMac ? 'calc(100dvh - 2rem)' : '100dvh' } as React.CSSProperties}
       className={cn(
-        "min-h-screen relative flex flex-col transition-[padding] duration-300",
+        "min-h-screen relative flex flex-col",
+        !fullPageProfile && "transition-[padding] duration-300",
         isDesktopApp && showSidebar && online && "lg:pl-[var(--sidebar-width)]",
         // macOS keeps only a transparent drag overlay (native traffic lights),
         // so it needs no 32px layout clearance — Windows/Linux keep the solid bar.
@@ -291,7 +294,7 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
               {children}
             </main>
 
-            <ConditionalFooter />
+            {!fullPageProfile && <ConditionalFooter />}
           </>
       </OfflineGate>
     </div>

@@ -1,17 +1,18 @@
 import { compatibilityAny, compatibilityTimeout, throwCompatibilityAbort } from '../compatibility/abort';
-import { Capacitor } from '@capacitor/core';
 import { db } from '@/core/db/tatakai-db';
 import type { CompatibilityPackage, CompatibilitySource } from '../compatibility/client';
 import { languageLabel } from '../remote/metadata';
 import { proxyRemoteUrl } from '../remote/media';
-import { executeSora } from './execute';
+import { executeSora, prepareLocalScriptRuntime } from './execute';
+import { localScriptRuntimeState } from './runtime';
+import { extensionRequestId } from '../compatibility/request-id';
 import { soraHash, soraRepository, soraText, sourceUrl, type SoraPackage } from './repository';
 
 const stateKey = 'compatibility:sora:v1';
 interface State { version: 1; repositories: { url: string; name: string; ecosystem: 'sora' }[]; packages: Record<string, SoraPackage>; enabled: Record<string, boolean> }
 const calls = new Map<string, { controller: AbortController; sourceId?: string }>();
 let mutations = Promise.resolve<unknown>(null);
-export const hasSoraRuntime = () => typeof window !== 'undefined' && (!!(window as any).electron || Capacitor.isNativePlatform()) && typeof Worker !== 'undefined' && typeof WebAssembly !== 'undefined';
+export const hasSoraRuntime = () => localScriptRuntimeState().available;
 const sid = (pkg: SoraPackage) => `compat-sora-${pkg.id.slice(5)}`;
 async function state(): Promise<State> {
   const record = await db.kv.get(stateKey);
@@ -54,7 +55,7 @@ async function execute(p: Record<string, any>, signal: AbortSignal) {
   if (p.op === 'installedPackages') return inventory(value);
   if (p.op === 'sources') return Object.values(value.packages).map(pkg => source(pkg, value));
   if (p.op === 'repositories') return value.repositories;
-  if (p.op === 'prepare') return { ready: true };
+  if (p.op === 'prepare') return prepareLocalScriptRuntime(signal);
   if (p.op === 'addRepository' || p.op === 'removeRepository') {
     const url = sourceUrl(p.url, undefined, true);
     if (p.op === 'addRepository') await soraRepository(url, signal);
@@ -142,7 +143,7 @@ async function execute(p: Record<string, any>, signal: AbortSignal) {
 }
 export async function requestSora(payload: Record<string, any>, parentSignal?: AbortSignal) {
   if (!hasSoraRuntime()) throw Error('Sora extensions require an installed app with local workers and WebAssembly');
-  const requestId = String(payload.requestId || crypto.randomUUID());
+  const requestId = String(payload.requestId || extensionRequestId());
   if (payload.op === 'cancel') { calls.get(payload.target)?.controller.abort(); return null; }
   if (calls.size >= 24 || calls.has(requestId)) throw Error('Too many Sora requests');
   const controller = new AbortController();

@@ -1,6 +1,7 @@
 import { throwCompatibilityAbort } from './abort';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { EXTENSION_INSTALLED_EVENT } from '../ecosystems';
+import { localScriptRuntimeState } from '../sora/runtime';
 
 export const COMPATIBILITY_ECOSYSTEMS = ['cloudstream', 'mihon', 'sora', 'mangayomi', 'aniyomi'] as const;
 export type CompatibilityEcosystem = typeof COMPATIBILITY_ECOSYSTEMS[number];
@@ -21,7 +22,7 @@ type Reply = { ok: boolean; result?: unknown; error?: string };
 const android = registerPlugin<{ request(payload: { payload: string }): Promise<Reply> }>('TatakaiCompatibility');
 export function hasCompatibilityRuntime(kind: CompatibilityEcosystem): boolean {
   if (typeof window === 'undefined') return false;
-  return kind === 'sora' || kind === 'mangayomi' ? (!!(window as any).electron || Capacitor.isNativePlatform()) && typeof Worker !== 'undefined' && typeof WebAssembly !== 'undefined'
+  return kind === 'sora' || kind === 'mangayomi' ? localScriptRuntimeState().available
     : !!(window as any).electron?.compatibilityRequest || (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android' && Capacitor.isPluginAvailable('TatakaiCompatibility'));
 }
 
@@ -38,12 +39,13 @@ export async function compatibilityRequest<T>(payload: Record<string, unknown>, 
   }
   if (payload.ecosystem === 'sora' || String(payload.sourceId || '').startsWith('compat-sora-')) return (await import('../sora/broker')).requestSora(payload, signal) as Promise<T>;
   if (payload.op === 'status' || (payload.op === 'sources' && !payload.ecosystem)) {
-    const { requestSora, hasSoraRuntime } = await import('../sora/broker');
+    const { requestSora } = await import('../sora/broker');
     if (payload.op === 'status') {
       const original = await nativeCompatibilityRequest<CompatibilityStatus>(payload, signal).catch(() => ({ platform: Capacitor.getPlatform(), runtimes: (['cloudstream', 'mihon', 'aniyomi'] as const).map(ecosystem => ({ ecosystem, available: false, ready: false, message: 'This build has no local Android bytecode host for this platform yet.' })) }));
       throwCompatibilityAbort(signal);
-      return { ...original, runtimes: [...original.runtimes, { ecosystem: 'sora', available: hasSoraRuntime(), ready: hasSoraRuntime(), updates: true, message: 'Original Sora JavaScript modules run locally in an isolated interpreter. Source APIs and device validation vary.' },
-        { ecosystem: 'mangayomi', available: hasSoraRuntime(), ready: hasSoraRuntime(), updates: true, message: 'Original Mangayomi JavaScript anime/manga sources run locally. Dart, novels and advanced host APIs are pending.' }] } as T;
+      const portable = localScriptRuntimeState();
+      return { ...original, runtimes: [...original.runtimes, { ...portable, ecosystem: 'sora', updates: true },
+        { ...portable, ecosystem: 'mangayomi', updates: true, message: portable.message + ' Dart, novels and advanced host APIs are pending.' }] } as T;
     }
     const results = await Promise.allSettled([nativeCompatibilityRequest<CompatibilitySource[]>(payload, signal), requestSora(payload, signal),
       hasCompatibilityRuntime('mangayomi') ? (await import('../mangayomi/broker')).requestMangayomi(payload, signal) : Promise.resolve([])]);

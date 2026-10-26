@@ -1,3 +1,4 @@
+import { CosmeticAvatar, CosmeticName } from '@/components/profile/IdentityCosmetics';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 "use client";
@@ -8,14 +9,14 @@ import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Menu, X, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const navLinks = [
-  { name: "Browse",       href: "/browse"      },
-  { name: "Favorites",  href: "/favorites" },
-  { name: "Community",     href: "/community"    },
-  { name: "Calendar",  href: "/calendar" },
-  { name: "Download",     href: "/download"    },
+  { labelKey: 'app.browse_2f3b5c55', href: '/browse' },
+  { labelKey: 'nav.favorites', href: '/favorites' },
+  { labelKey: 'nav.community', href: '/community' },
+  { labelKey: 'nav.calendar', href: '/calendar' },
+  { labelKey: 'app.download_a479c9c3', href: '/download' },
 ];
 
 export function Navigation() {
@@ -55,7 +56,7 @@ export function Navigation() {
   const renderMobileMenu = () => {
     const overlay = (
       <DialogPrimitive.Content aria-describedby={undefined}
-        className={`md:hidden fixed inset-0 z-[55] bg-background overflow-hidden transition-[background-color,border-color,opacity,transform] duration-200 ${isMobileMenuOpen
+        className={`lg:hidden fixed inset-0 z-[55] bg-background overflow-hidden transition-[background-color,border-color,opacity,transform] duration-200 ${isMobileMenuOpen
             ? "opacity-100 pointer-events-auto"
             : "opacity-0 pointer-events-none"}`}
       >
@@ -72,7 +73,7 @@ export function Navigation() {
           </Link>
           <button
             onClick={() => setIsMobileMenuOpen(false)}
-            className="p-2 text-foreground"
+            className="min-h-11 min-w-11 p-2 text-foreground"
             aria-label={uiI18n.t('app.close_menu_6c9fc990')}
           >
             <X className="w-6 h-6" />
@@ -84,7 +85,7 @@ export function Navigation() {
           <div className="flex-1 flex flex-col justify-center gap-6">
             {navLinks.map((link, i) => (
               <Link
-                key={link.name}
+                key={link.href}
                 to={link.href}
                 onClick={() => setIsMobileMenuOpen(false)}
                 className={`text-4xl font-display text-foreground hover:text-muted-foreground transition-[background-color,border-color,opacity,transform] duration-200 ${isMobileMenuOpen
@@ -92,7 +93,7 @@ export function Navigation() {
                     : "opacity-0 translate-y-4"}`}
                 style={{ transitionDelay: isMobileMenuOpen ? `${i * 60}ms` : "0ms" }}
               >
-                {link.name}
+                {uiI18n.t(link.labelKey)}
               </Link>
             ))}
           </div>
@@ -166,35 +167,35 @@ export function Navigation() {
             </Link>
 
             {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center gap-8 lg:gap-10">
+            <div className="hidden lg:flex items-center gap-4 xl:gap-8">
               {navLinks.map((link) => (
                 <Link
-                  key={link.name}
+                  key={link.href}
                   to={link.href}
                   className={`text-sm transition-colors duration-300 relative group ${isScrolled ? "text-foreground/70 hover:text-foreground" : "text-white/70 hover:text-white"}`}
                 >
-                  {link.name}
+                  {uiI18n.t(link.labelKey)}
                   <span className={`absolute -bottom-1 left-0 w-0 h-px transition-[background-color,border-color,opacity,transform] duration-300 group-hover:w-full ${isScrolled ? "bg-foreground" : "bg-white"}`} />
                 </Link>
               ))}
             </div>
 
             {/* Desktop CTA */}
-            <div className="hidden md:flex items-center gap-4">
+            <div className="hidden lg:flex items-center gap-4">
               {user ? (
                 <div className="flex items-center gap-3">
                   <Link
                     to="/profile"
                     className={`flex items-center gap-2 text-sm transition-[background-color,border-color,opacity,transform] duration-200 ${isScrolled ? "text-foreground/80 hover:text-foreground" : "text-white/80 hover:text-white"}`}
                   >
-                    <Avatar className="h-7 w-7 border border-white/20">
+                    <CosmeticAvatar userId={profile?.user_id} className="h-7 w-7 border border-white/20">
                       <AvatarImage src={profile?.avatar_url || undefined} />
                       <AvatarFallback className="text-xs bg-primary text-primary-foreground">
                         {(profile?.display_name || user.email || "U")[0].toUpperCase()}
                       </AvatarFallback>
-                    </Avatar>
+                    </CosmeticAvatar>
                     <span className="font-medium text-xs max-w-[100px] truncate">
-                      {profile?.display_name || user.email?.split('@')[0]}
+                      <CosmeticName userId={profile?.user_id}>{profile?.display_name || user.email?.split('@')[0]}</CosmeticName>
                     </span>
                   </Link>
                   <Button
@@ -228,7 +229,7 @@ export function Navigation() {
             {/* Mobile Menu Button */}
             <DialogPrimitive.Trigger asChild>
             <button
-              className={`md:hidden min-h-11 min-w-11 p-2 transition-colors duration-200 relative z-[60] ${isScrolled || isMobileMenuOpen ? "text-foreground" : "text-white"}`}
+              className={`lg:hidden min-h-11 min-w-11 p-2 transition-colors duration-200 relative z-[60] ${isScrolled || isMobileMenuOpen ? "text-foreground" : "text-white"}`}
               aria-label={uiI18n.t('app.toggle_menu_52092247')}
               aria-expanded={isMobileMenuOpen}
               aria-haspopup="dialog"

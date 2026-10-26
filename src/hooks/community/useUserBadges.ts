@@ -24,10 +24,13 @@ export function useUserBadges(userId?: string) {
     queryKey: ['user_badges', userId],
     enabled: !!userId,
     queryFn: async () => {
-      const [{ data: badgeRows }, { data: profileRow }] = await Promise.all([
+      const [{ data: badgeRows, error: badgeError }, { data: profileRow, error: roleError }] = await Promise.all([
         supabase.from('user_badges' as any).select('badge_key').eq('user_id', userId!),
         supabase.from('profiles').select('is_admin, is_moderator, role').eq('user_id', userId!).maybeSingle(),
       ]);
+
+      if (badgeError) throw badgeError;
+      if (roleError) throw roleError;
 
       const storedKeys = ((badgeRows ?? []) as { badge_key: string }[]).map((r) => r.badge_key);
       return resolveBadges(storedKeys, {

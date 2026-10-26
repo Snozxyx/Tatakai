@@ -4,6 +4,28 @@ import { SourceAdapterRegistry, AbstractSourceAdapter } from '../src/core/player
 import type { AdapterLoadOptions } from '../src/core/player/SourceAdapterRegistry';
 
 describe('playback continuity', () => {
+  test('lazy engines load on selection, retry failures and reuse the loaded engine', async () => {
+    const registry = SourceAdapterRegistry.getInstance(); await registry.unload();
+    let imports = 0;
+    class Adapter extends AbstractSourceAdapter {
+      readonly mode = 'dash' as const;
+      async load() {} async unload() {} async play() {}
+      pause() {} seek() {} setVolume() {}
+    }
+    const adapter = new Adapter();
+    registry.registerLazy('dash', async () => {
+      if (++imports === 1) throw new Error('chunk unavailable');
+      return adapter;
+    });
+    expect(imports).toBe(0);
+    const options = { source: { id: 'lazy', url: 'local', mode: 'dash' as const }, videoElement: {} as HTMLVideoElement };
+    await expect(registry.switchTo(options)).rejects.toThrow('chunk unavailable');
+    await registry.switchTo(options);
+    await registry.switchTo(options);
+    expect(imports).toBe(2);
+    expect(registry.getCurrentAdapter()).toBe(adapter);
+    await registry.unload();
+  });
   test('same-episode switches retain position, episode changes reset it', () => {
     const core = new PlaybackCoordinator();
     const source = { id: 'a', url: 'a', mode: 'direct' as const, mediaId: 'series', episodeId: 'ep1' };

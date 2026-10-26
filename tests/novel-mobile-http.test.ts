@@ -5,7 +5,9 @@ let registered: any;
 let responseStatus = 200;
 let prepareHeaders = false;
 let requests: any[] = [];
-mock.module('@capacitor/core', () => ({ CapacitorHttp: { request: async (options: any) => { request = options; requests.push(options); return { status: options.url.startsWith('http://127.0.0.1') ? 200 : responseStatus, headers: {}, data: options.responseType === 'arraybuffer' ? btoa(String.fromCharCode(0, 255, 128, 10)) : 'hello' }; } } }));
+let ios = false;
+const iosCalls: any[] = [];
+mock.module('@capacitor/core', () => ({ Capacitor: { isNativePlatform: () => true, getPlatform: () => ios ? 'ios' : 'android', isPluginAvailable: (name: string) => ios && name === 'TatakaiExtensionHttp' }, registerPlugin: () => ({ request: async (options: any) => { iosCalls.push(options); return { status: 200, headers: {}, cookies: { session: 'native-fixture' }, body: 'native text', url: 'https://source.test/final' }; }, cancel: async () => {} }), CapacitorHttp: { request: async (options: any) => { request = options; requests.push(options); return { status: options.url.startsWith('http://127.0.0.1') ? 200 : responseStatus, headers: {}, data: options.responseType === 'arraybuffer' ? btoa(String.fromCharCode(0, 255, 128, 10)) : 'hello' }; } } }));
 mock.module('@/core/mobile/localProxyNative', () => ({ registerNativeSource: async (url: string, headers: any) => { registered = {url,headers}; return proxyUrl; }, prepareNativeRequestHeaders: async (_url: string, headers: any) => prepareHeaders ? {...headers,Cookie:'cf_clearance=fixture','User-Agent':'Solved UA'} : headers }));
 mock.module('@/hooks/ui/useMobileConfig', () => ({ loadMobileConfig: () => ({ cloudflareBypass: false }) }));
 const { createNativeFetch } = await import('../src/core/extensions/mobile/nativeHttp');
@@ -61,4 +63,15 @@ test('mobile HTTP keeps text responses and domain gates', async () => {
  expect(await (await nativeFetch('https://www.wuxiaworld.com')).text()).toBe('hello');
  expect(request.responseType).toBe('text');
  await expect(nativeFetch('https://unrelated.example')).rejects.toThrow('allowed domain');
+});
+
+test('iOS source text requests use the cancellable native bridge and retain final URLs and cookies', async () => {
+ ios=true;requests=[];iosCalls.length=0;
+ try {
+  const result=await createNativeFetch(['source.test'])('https://source.test/search',{method:'POST',headers:{Referer:'https://source.test/'},body:'query=rain'});
+  expect(await result.text()).toBe('native text');expect(result.url).toBe('https://source.test/final');expect(result.cookies?.session).toBe('native-fixture');
+  expect(requests).toHaveLength(0);expect(iosCalls).toHaveLength(1);expect(iosCalls[0].body).toBe('query=rain');
+  await createNativeFetch(['source.test'])('https://source.test/binary',{method:'POST',headers:{'Content-Type':'application/grpc-web+proto'},body:new Uint8Array([0,255])});
+  expect(requests).toHaveLength(1);expect(requests[0].dataType).toBe('file');
+ } finally {ios=false;}
 });

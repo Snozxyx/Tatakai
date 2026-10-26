@@ -1,3 +1,4 @@
+import { backgroundVideo } from '@/lib/assets';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -10,30 +11,7 @@ interface NoInternetPageProps {
   isNative?: boolean;
 }
 
-// Helper function to get correct video path
-const getVideoPath = (filename: string) => {
-  const isElectron = typeof window !== 'undefined' && (window as any).electron;
-  if (!isElectron) return `/${filename}`;
-  try {
-    // In Electron: window.location.href = file:///C:/...dist/index.html
-    // Strip the filename to get base directory
-    const base = window.location.href
-      .replace(/[?#].*$/, '')
-      .replace(/\/[^/]*$/, '/');
-    return `${base}${filename}`;
-  } catch {
-    return `/${filename}`;
-  }
-};
-
-// Video sources - local videos bundled with the app (in public/videos)
-const VIDEO_SOURCES = [
-  getVideoPath('assets/video/1.mp4'),
-  getVideoPath('assets/video/3.mp4'),
-  getVideoPath('assets/video/2.webm'),
-  getVideoPath('assets/video/5.mp4'),
-  getVideoPath('assets/video/6.mp4'),
-];
+const VIDEO_SOURCES = ['1.mp4', '2.webm', '3.mp4', '5.mp4', '6.mp4'].map(backgroundVideo);
 
 // Text variations for the right side
 const TEXT_VARIATIONS = [

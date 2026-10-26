@@ -1,3 +1,4 @@
+import { CosmeticAvatar, CosmeticName } from '@/components/profile/IdentityCosmetics';
 import { supabase } from '@/integrations/supabase/client';
 import uiI18n from '@/lib/uiI18n';
 import { requestTVWriting } from '@/core/tv/writingHandoff';
@@ -8,7 +9,7 @@ import { useComments, useAddComment, useDeleteComment, useLikeComment, useEditCo
 import { useAuth } from '@/contexts/AuthContext';
 import { useCommunityRulesGate } from '@/components/community/CommunityRulesGate';
 import { GlassPanel } from '@/components/ui/GlassPanel';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { Textarea } from '@/components/ui/textarea';
@@ -391,12 +392,12 @@ export function Comments({ entityType, entityId, episodeId, entityName, fallback
                   </div>
                 )}
                 <div className="flex gap-3">
-                  <Avatar className="w-9 h-9 flex-shrink-0 mt-0.5">
+                  <CosmeticAvatar userId={profile?.user_id} className="w-9 h-9 flex-shrink-0 mt-0.5">
                     <AvatarImage src={profile?.avatar_url || undefined} />
                     <AvatarFallback className="bg-gradient-to-br from-primary to-secondary text-primary-foreground text-sm font-bold">
                       {profile?.display_name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || '?'}
                     </AvatarFallback>
-                  </Avatar>
+                  </CosmeticAvatar>
                   <div className="flex-1 min-w-0">
                     <RichCommentComposer
                       generalCommunity={generalCommunity}
@@ -546,12 +547,12 @@ export function Comments({ entityType, entityId, episodeId, entityName, fallback
                             avatarUrl={comment.profile?.avatar_url}
                             rankScore={comment.profile?.total_episodes || 0}
                           >
-                            <Avatar className="w-8 h-8 flex-shrink-0 cursor-pointer hover:ring-2 ring-primary/30 transition-all">
+                            <CosmeticAvatar userId={comment.user_id} className="w-8 h-8 flex-shrink-0 cursor-pointer hover:ring-2 ring-primary/30 transition-all">
                               <AvatarImage src={comment.profile?.avatar_url || undefined} />
                               <AvatarFallback className="bg-gradient-to-br from-primary/60 to-secondary/60 text-primary-foreground text-xs font-bold">
                                 {comment.profile?.display_name?.[0]?.toUpperCase() || '?'}
                               </AvatarFallback>
-                            </Avatar>
+                            </CosmeticAvatar>
                           </ProfileWidgetCard>
 
                           <div className="flex-1 min-w-0">
@@ -570,7 +571,7 @@ export function Comments({ entityType, entityId, episodeId, entityName, fallback
                                       className={cn('text-sm font-semibold hover:opacity-80 transition-opacity truncate', ns.className)}
                                       style={ns.style}
                                     >
-                                      {comment.profile?.display_name || uiI18n.t('app.user_9f8a2389')}
+                                      <CosmeticName userId={comment.user_id}>{comment.profile?.display_name || uiI18n.t('app.user_9f8a2389')}</CosmeticName>
                                     </button>
                                   </ProfileWidgetCard>
                                 );

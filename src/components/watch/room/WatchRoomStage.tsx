@@ -12,7 +12,7 @@ export function WatchRoomStage() {
     const {
         room, streamingData, currentEpisodeId, selectedServer, playerRef,
         isHost, roomId, lastUpdateRef, updatePlayback, handlePlayerError,
-        loadingSources, drift, countdown, participants, handleForceStart,
+        loadingSources, drift, countdown, participants, handleForceStart, p2p,
     } = useWatchRoomContext();
 
     return (
@@ -92,7 +92,7 @@ export function WatchRoomStage() {
                 // VIDEO / EMBED SCREEN
                 // -----------------------------------------------------
                 <div className="w-full h-full relative animate-in fade-in duration-700">
-                    {(room.manual_stream_url || !!streamingData?.sources?.length) ? (
+                    {(!p2p.enabled || p2p.mediaReady) && (room.manual_stream_url || !!streamingData?.sources?.length) ? (
                         
                         // Check if Embed vs Video Player
                         ((room.manual_stream_url ? ((room as any).manual_stream_type === 'embed' || (!room.manual_stream_url.includes('.m3u8') && !room.manual_stream_url.includes('.mp4') && !room.manual_stream_url.includes('.webm'))) : streamingData?.sources?.[0]?.isEmbed)) ? (
@@ -114,15 +114,15 @@ export function WatchRoomStage() {
                             </div>
                         ) : (
                             <VideoPlayer
-                                key={`${currentEpisodeId}-${selectedServer}-${room.manual_stream_url}`}
+                                key={`${currentEpisodeId}-${selectedServer}-${room.manual_stream_url}-${p2p.enabled ? p2p.state?.source_revision : 'legacy'}`}
                                 externalRef={playerRef}
-                                sources={room.manual_stream_url ? [{
+                                sources={!p2p.enabled && room.manual_stream_url ? [{
                                     url: room.manual_stream_url,
                                     isM3U8: room.manual_stream_url.includes('.m3u8'),
                                     quality: 'Custom',
                                     isEmbed: false
                                 }] : streamingData?.sources!}
-                                headers={room.manual_stream_url ? {} : streamingData?.headers}
+                                headers={!p2p.enabled && room.manual_stream_url ? {} : streamingData?.headers}
                                 subtitles={[
                                     ...((sData) => {
                                         const all = [...(sData?.subtitles || []), ...(sData?.tracks || [])];
@@ -133,13 +133,16 @@ export function WatchRoomStage() {
                                             return true;
                                         });
                                     })(streamingData || { subtitles: [], tracks: [] }),
-                                    ...(room.manual_subtitle_url ? [{ lang: 'Manual', url: room.manual_subtitle_url, get label() { return uiI18n.t('app.manual_4e836fdc'); } }] : [])
+                                    ...((!p2p.enabled || isHost) && room.manual_subtitle_url ? [{ lang: 'Manual', url: room.manual_subtitle_url, get label() { return uiI18n.t('app.manual_4e836fdc'); } }] : [])
                                 ]}
-                                isLive={!isHost}
+                                isLive={!p2p.enabled && !isHost}
+                                isTimelineLocked={p2p.enabled && !isHost}
+                                timelineLockReason="The host controls the room timeline."
+                                bufferingTimeoutMessage={!isHost || p2p.enabled ? 'Playback stalled. Retry the room connection or ask the host to check the source.' : undefined}
                                 initialSeekSeconds={room.current_time_seconds}
-                                onPlay={isHost ? () => updatePlayback.mutate({ roomId: roomId!, isPlaying: true }) : undefined}
-                                onPause={isHost ? () => updatePlayback.mutate({ roomId: roomId!, isPlaying: false }) : undefined}
-                                onProgressUpdate={isHost ? (t) => {
+                                onPlay={isHost && !p2p.enabled ? () => updatePlayback.mutate({ roomId: roomId!, isPlaying: true }) : undefined}
+                                onPause={isHost && !p2p.enabled ? () => updatePlayback.mutate({ roomId: roomId!, isPlaying: false }) : undefined}
+                                onProgressUpdate={isHost && !p2p.enabled ? (t) => {
                                     if (Math.abs(t - lastUpdateRef.current) > 5) {
                                         lastUpdateRef.current = t;
                                         updatePlayback.mutate({ roomId: roomId!, currentTime: t });

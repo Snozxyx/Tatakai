@@ -10,9 +10,11 @@ import { useAuth } from '@/contexts/AuthContext';
 // to all columns (including password_hash), which the role can't read -> 403.
 // Selecting these columns explicitly keeps the hash server-side and works.
 export const WATCH_ROOM_COLUMNS =
-    'id,name,host_id,anime_id,anime_title,anime_poster,episode_id,episode_number,episode_title,category,access_type,current_time_seconds,is_playing,is_active,max_participants,created_at,updated_at,expires_at,scheduled_start_at,manual_subtitle_url,manual_stream_url,manual_stream_type,selected_server,share_stream_url,share_stream_type,share_subtitle_url,share_active,share_host_platform';
+    'id,name,host_id,anime_id,anime_title,anime_poster,episode_id,episode_number,episode_title,category,access_type,current_time_seconds,is_playing,is_active,max_participants,created_at,updated_at,expires_at,scheduled_start_at,manual_subtitle_url,manual_stream_url,manual_stream_type,selected_server,share_stream_url,share_stream_type,share_subtitle_url,share_active,share_host_platform,p2p_enabled,host_epoch';
 
 export interface WatchRoom {
+    p2p_enabled?: boolean;
+    host_epoch?: number;
     id: string;
     name: string;
     host_id: string;

@@ -1,9 +1,10 @@
+import { CosmeticAvatar, CosmeticName } from '@/components/profile/IdentityCosmetics';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Home, Bookmark, Radio, Layers, Music2, Users, LogIn } from 'lucide-react';
 import { NavIcon } from '@/components/ui/NavIcon';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsDesktopApp, useIsMobileApp } from '@/hooks/ui/useIsNativeApp';
 import { useIsPhone } from '@/hooks/ui/use-mobile';
@@ -103,14 +104,14 @@ export function CommunitySidebar() {
                 : 'h-11 w-11 justify-center rounded-full',
             )}
           >
-            <Avatar className="h-[38px] w-[38px] shrink-0 ring-2 ring-white/10 transition-all duration-300 group-hover:ring-primary/50 group-hover:shadow-[0_0_16px_hsl(var(--primary)/0.4)]">
+            <CosmeticAvatar userId={profile?.user_id} className="h-[38px] w-[38px] shrink-0 ring-2 ring-white/10 transition-all duration-300 group-hover:ring-primary/50 group-hover:shadow-[0_0_16px_hsl(var(--primary)/0.4)]">
               <AvatarImage src={profile?.avatar_url || ''} className="object-cover" />
               <AvatarFallback className="bg-zinc-800 text-xs font-bold text-zinc-300">{avatarLetter}</AvatarFallback>
-            </Avatar>
+            </CosmeticAvatar>
             {expanded && (
               <div className="min-w-0 text-left">
                 <p className="truncate text-sm font-semibold text-white">
-                  {profile?.display_name || profile?.username || uiI18n.t('app.you_905cb326')}
+                  <CosmeticName userId={profile?.user_id}>{profile?.display_name || profile?.username || uiI18n.t('app.you_905cb326')}</CosmeticName>
                 </p>
                 {profile?.username && <p className="truncate text-xs text-muted-foreground">@{profile.username}</p>}
               </div>

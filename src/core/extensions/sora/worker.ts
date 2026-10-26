@@ -13,6 +13,15 @@ self.onmessage = async ({ data }) => {
   running = true;
   try {
     const engine = await newQuickJSWASMModule(newVariant(RELEASE_SYNC, { wasmLocation: wasmUrl }));
+    if (data.method === '__runtime_probe') {
+      const context = engine.newContext();
+      try {
+        const handle = context.unwrapResult(context.evalCode('6 * 7'));
+        const value = context.dump(handle); handle.dispose();
+        if (value !== 42) throw Error('Local JavaScript runtime returned an invalid result');
+        self.postMessage({ type: 'result', result: { ready: true } }); return;
+      } finally { context.dispose(); }
+    }
     const http: Parameters<typeof evaluateSora>[4] = request => new Promise((resolve, reject) => {
       const id = ++next; pending.set(id, { resolve, reject }); self.postMessage({ type: 'http', id, request });
     });

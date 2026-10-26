@@ -40,6 +40,7 @@ export abstract class AbstractSourceAdapter {
 
 export class SourceAdapterRegistry {
   private adapters: Map<PlaybackMode, AbstractSourceAdapter> = new Map();
+  private loaders = new Map<PlaybackMode, () => Promise<AbstractSourceAdapter>>();
   private currentAdapter: AbstractSourceAdapter | null = null;
   private generation = 0;
   private controller: AbortController | null = null;
@@ -59,6 +60,10 @@ export class SourceAdapterRegistry {
     this.adapters.set(mode, adapter);
   }
 
+  registerLazy(mode: PlaybackMode, load: () => Promise<AbstractSourceAdapter>) {
+    this.loaders.set(mode, load);
+  }
+
   getAdapter(mode: PlaybackMode): AbstractSourceAdapter | undefined {
     return this.adapters.get(mode);
   }
@@ -73,7 +78,13 @@ export class SourceAdapterRegistry {
     if (options.signal?.aborted) controller.abort();
     const operation = this.pending.catch(() => {}).then(async () => {
       if (controller.signal.aborted || generation !== this.generation) return;
-      const adapter = this.adapters.get(options.source.mode);
+      let adapter = this.adapters.get(options.source.mode);
+      const load = this.loaders.get(options.source.mode);
+      if (!adapter && load) {
+        adapter = await load();
+        this.adapters.set(options.source.mode, adapter);
+      }
+      if (controller.signal.aborted || generation !== this.generation) return;
       if (!adapter) throw new Error(`No adapter registered for mode: ${options.source.mode}`);
       await this.currentAdapter?.unload();
       this.currentAdapter = null;

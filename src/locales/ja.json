@@ -1,4 +1,10 @@
 {
+  "landingHero": {
+    "explore": "探す",
+    "discover": "発見する",
+    "immerse": "没頭する",
+    "love": "愛する"
+  },
   "extensionUpdate": {
     "translateTitle": "言語の壁を越えて読もう。",
     "translateBody": "マンガやイラスト付きページを翻訳するデスクトップ作業環境。編集可能なテキストレイヤーで仕上がりを調整できます。",
@@ -3412,8 +3418,8 @@
     "episodes_watched_7ff033df": "観られたエピソード",
     "manga_reading_054694f6": "マンガ読書",
     "no_activity_history_4458aa8c": "活動履歴なし",
-    "this_user_has_no_watch_or_manga_activity_yet_2260bce7": "このユーザはまだ時計やマンガ活動を行っていない.",
-    "your_anime_and_manga_activity_will_appear_here_cbd9c0d4": "アニメやマンガの活動はここに現れる",
+    "this_user_has_no_watch_or_manga_activity_yet_2260bce7": "このユーザーにはまだアニメ・マンガ・小説の履歴がありません。",
+    "your_anime_and_manga_activity_will_appear_here_cbd9c0d4": "アニメ・マンガ・小説の履歴がここに表示されます。",
     "start_watching_e408bda7": "視聴を開始",
     "continue_2e026239": "続ける",
     "read_852b438f": "読む",

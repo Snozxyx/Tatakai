@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, LogOut, Search, Settings as SettingsIcon, User } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -232,7 +232,9 @@ export function SettingsModal() {
 
             {/* Scrollable body */}
             <div className="flex-1 min-w-0 overflow-x-hidden overflow-y-auto overscroll-contain custom-scrollbar p-4 sm:p-6">
-              <ActiveComponent section={section} />
+              <Suspense fallback={<div role="status" aria-busy="true" className="min-h-24" />}>
+                <ActiveComponent section={section} />
+              </Suspense>
 
               {/* Extension mount point — bottom of every settings panel (scoped by category). */}
               <ExtensionSlot slotId="settings-panel-bottom" props={{ category }} />

@@ -16,6 +16,7 @@ import { ExtensionUpdateSheet } from "@/components/extensions/ExtensionUpdateShe
 import { toast } from "sonner";
 import { useEffect, lazy, Suspense } from "react";
 import { isTV } from '@/core/tv/device';
+import { ProfilePresentationProvider } from '@/contexts/ProfilePresentationContext';
 const TVLayout = lazy(() => import('@/layouts/TVLayout'));
 
 
@@ -120,9 +121,9 @@ const App = () => {
                 <MobileDeepLinkBridge />
                 <SettingsModalProvider>
                   <LightboxProvider>
-                    <Suspense fallback={<div role="status">Loading Tatakai…</div>}><Layout>
+                    <ProfilePresentationProvider><Suspense fallback={<div role="status">Loading Tatakai…</div>}><Layout>
                       <AppRoutes />
-                    </Layout></Suspense>
+                    </Layout></Suspense></ProfilePresentationProvider>
             <ExtensionUpdateSheet />
                   </LightboxProvider>
                 </SettingsModalProvider>

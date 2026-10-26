@@ -5,6 +5,7 @@ import * as React from "react";
 import { useTranslation } from "react-i18next";
 
 import { cn } from "@/lib/utils";
+import { getFullscreenPortalContainer } from '@/lib/video/fullscreenPortal';
 
 const Sheet = SheetPrimitive.Root;
 
@@ -60,7 +61,7 @@ const SheetContent = React.forwardRef<React.ElementRef<typeof SheetPrimitive.Con
   ({ side = "right", className, overlayClassName, portalContainer, children, ...props }, ref) => {
   const { t } = useTranslation();
   return (
-    <SheetPortal container={portalContainer}>
+    <SheetPortal container={portalContainer ?? getFullscreenPortalContainer()}>
       <SheetOverlay className={overlayClassName} />
       <SheetPrimitive.Content
         ref={ref}

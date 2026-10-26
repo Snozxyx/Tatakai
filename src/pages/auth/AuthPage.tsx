@@ -1,3 +1,4 @@
+import { backgroundVideo } from '@/lib/assets';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useMemo, useEffect, useRef } from 'react';
@@ -20,15 +21,7 @@ const emailSchema = z.string().email('Please enter a valid email');
 const passwordSchema = z.string().min(6, 'Password must be at least 6 characters');
 
 // Random video backgrounds
-const VIDEO_SOURCES = [
-  './assets/video/1.mp4',
-  './assets/video/2.webm',
-  './assets/video/3.mp4',
-  './assets/video/5.mp4',
-  './assets/video/6.mp4',
-  `${window.location.origin}/assets/video/5.mp4`,
-  `${window.location.origin}/assets/video/6.mp4`,
-];
+const VIDEO_SOURCES = ['1.mp4', '2.webm', '3.mp4', '5.mp4', '6.mp4'].map(backgroundVideo);
 
 // Random text variations
 const TEXT_VARIATIONS = [

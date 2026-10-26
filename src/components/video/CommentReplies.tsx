@@ -1,10 +1,11 @@
+import { CosmeticAvatar, CosmeticName } from '@/components/profile/IdentityCosmetics';
 import uiI18n from '@/lib/uiI18n';
 import { requestTVWriting } from '@/core/tv/writingHandoff';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMemo, useState } from 'react';
 import { formatDistanceToNow } from '@/lib/localeFormat';
 import { Heart, Edit2, Trash2, Save, X, Loader2, Reply } from 'lucide-react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { Textarea } from '@/components/ui/textarea';
@@ -219,18 +220,18 @@ function ReplyRow({
         avatarUrl={reply.profile?.avatar_url}
         rankScore={reply.profile?.total_episodes || 0}
       >
-        <Avatar className="h-7 w-7 flex-shrink-0 cursor-pointer hover:ring-2 ring-primary/30 transition-all">
+        <CosmeticAvatar userId={reply.user_id} className="h-7 w-7 flex-shrink-0 cursor-pointer hover:ring-2 ring-primary/30 transition-all">
           <AvatarImage src={reply.profile?.avatar_url || undefined} />
           <AvatarFallback className="bg-gradient-to-br from-primary/60 to-secondary/60 text-primary-foreground text-[10px] font-bold">
             {reply.profile?.display_name?.[0]?.toUpperCase() || '?'}
           </AvatarFallback>
-        </Avatar>
+        </CosmeticAvatar>
       </ProfileWidgetCard>
 
       <div className="min-w-0 flex-1">
         <div className="mb-0.5 flex flex-wrap items-center gap-2">
           <span className={cn('text-sm font-semibold truncate', ns.className)} style={ns.style}>
-            {reply.profile?.display_name || uiI18n.t('app.user_9f8a2389')}
+            <CosmeticName userId={reply.user_id}>{reply.profile?.display_name || uiI18n.t('app.user_9f8a2389')}</CosmeticName>
           </span>
           <RankBadge score={reply.profile?.total_episodes || 0} size="xs" showName={false} />
           <UserBadges badges={badges} size={12} />

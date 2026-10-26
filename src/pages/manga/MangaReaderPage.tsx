@@ -4,6 +4,7 @@ import { readerImageStyles, readerPageIsEager } from "@/components/reader/reader
 import { useReaderFullscreen } from "@/hooks/media/useReaderFullscreen";
 import { ReaderToolButton as ToolBtn, ReaderTopbar, ReaderToolbar, ReaderSettingsSheet, ReaderNavigationSheet } from "@/components/reader/ReaderChrome";
 import { ThemedSelect } from '@/components/ui/themed-select';
+import { useReaderPinchZoom } from '@/pages/manga/hooks/useReaderPinchZoom';
 import uiI18n from '@/lib/uiI18n';
 import { useTVReader } from '@/core/tv/useTVReader';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
@@ -31,6 +32,8 @@ import {
   ZoomOut,
   Play,
   Pause,
+  Lock,
+  Unlock,
 } from "lucide-react";
 import { getMangaReadByKey } from "@/core/content/manga-client";
 import { useIsNativeApp } from "@/hooks/ui/useIsNativeApp";
@@ -121,6 +124,8 @@ export default function MangaReaderPage() {
 
   const chapterKey = searchParams.get("chapterKey") || searchParams.get("chapter") || "";
   const provider = searchParams.get("provider") || "";
+  const lockedProvider = searchParams.get("lockedProvider") || "";
+  const [blockedChapter, setBlockedChapter] = useState<MappedMangaChapter | null>(null);
   // Resume links (home/profile history) persist the public chapter key but do
   // not always have the provider's private chapter id. Do not invent one from
   // `chapterKey`: once the chapter list arrives, its source alternative carries
@@ -169,8 +174,8 @@ export default function MangaReaderPage() {
       const k = `${s.provider}::${s.chapterKey}::${s.providerChapterId || ""}`;
       if (!seen.has(k)) { seen.add(k); merged.push(s); }
     }
-    return merged;
-  }, [stateAlternatives, matchedSources]);
+    return merged.filter((source) => !lockedProvider || source.provider === lockedProvider);
+  }, [stateAlternatives, matchedSources, lockedProvider]);
 
   // Alternatives fingerprint in the query key. Without it, the prefetch below
   // (primary-only, no alternatives) and the main query (with alternatives)
@@ -293,13 +298,14 @@ export default function MangaReaderPage() {
   // header, nav buttons and progress so everything tracks what you're reading.
   const continuous = settings.continuousScroll && settings.readingMode === "vertical";
   const {
-    before, after, appendNext, prependPrev, loadingNext, loadingPrev, hasNext, hasPrev,
+    before, after, appendNext, prependPrev, loadingNext, loadingPrev, hasNext, hasPrev, blockedIndex,
   } = useContinuousReader({
     enabled: continuous,
     mangaId: mangaId || "",
     chapters,
     entryIndex: currentIndex,
     preferProvider: resolvedProvider,
+    lockedProvider,
   });
 
   const [activeIndex, setActiveIndex] = useState(-1);
@@ -385,9 +391,14 @@ export default function MangaReaderPage() {
     // previous fallback winner when the next chapter lacks it forced a dead
     // source (ch1 fallback allmanga → ch2 forced allmanga even when dead).
     // Otherwise fall back to the chapter's first (reliability-ordered) source.
-    const source = pickMangaChapterSource(src, resolvedProvider);
-    if (!source) return;
+    const source = pickMangaChapterSource(src, lockedProvider || displayProvider, Boolean(lockedProvider));
+    if (!source) {
+      if (lockedProvider) setBlockedChapter(chapter);
+      return;
+    }
+    setBlockedChapter(null);
     const params = new URLSearchParams();
+    if (lockedProvider) params.set("lockedProvider", lockedProvider);
     params.set("chapterKey", source.chapterKey);
     if (source.provider) params.set("provider", source.provider);
     if (source.providerChapterId) params.set("providerChapterId", source.providerChapterId);
@@ -398,7 +409,7 @@ export default function MangaReaderPage() {
     // reader reachable for the whole downloaded run (ban / maintenance / down).
     if (searchParams.get("offline") === "true") params.set("offline", "true");
     navigate(`/manga/read/${mangaId}?${params.toString()}`, { state: { sources: src } });
-  }, [mangaId, navigate, resolvedProvider, searchParams]);
+  }, [mangaId, navigate, displayProvider, lockedProvider, searchParams]);
 
   const switchProvider = useCallback((
     source: MangaChapterSource,
@@ -408,6 +419,8 @@ export default function MangaReaderPage() {
     const params = new URLSearchParams(searchParams);
     params.set("chapterKey", source.chapterKey);
     params.set("provider", source.provider);
+    if (lockedProvider) params.set("lockedProvider", source.provider);
+    setBlockedChapter(null);
     if (source.providerChapterId) params.set("providerChapterId", source.providerChapterId);
     else params.delete("providerChapterId");
     if (targetChapter?.chapterNumber != null) {
@@ -421,7 +434,7 @@ export default function MangaReaderPage() {
       : alternatives;
     navigate(`/manga/read/${mangaId}?${params.toString()}`, { state: { sources: targetSources } });
     void triggerHaptic('select');
-  }, [mangaId, alternatives, navigate, searchParams]);
+  }, [mangaId, alternatives, navigate, searchParams, lockedProvider]);
 
   const retryChapterPages = useCallback(() => {
     const currentProvider = resolvedProvider || provider;
@@ -453,7 +466,7 @@ export default function MangaReaderPage() {
   const retryStreamedChapter = useCallback((seg: ReaderSegment) => {
     const chapter = chapters[seg.index];
     if (!chapter) return;
-    const fallback = nextMangaChapterSource(chapter.sources, {
+    const fallback = nextMangaChapterSource(chapter.sources.filter((s) => !lockedProvider || s.provider === lockedProvider), {
       provider: seg.provider,
       chapterKey: seg.key,
       providerChapterId: seg.providerChapterId,
@@ -468,7 +481,7 @@ export default function MangaReaderPage() {
       return;
     }
     navToChapter(chapter);
-  }, [chapters, navToChapter, switchProvider]);
+  }, [chapters, navToChapter, switchProvider, lockedProvider]);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -520,7 +533,7 @@ export default function MangaReaderPage() {
   // Placed after the pageIndex state — effects may not read it before init.
   useEffect(() => {
     if (!nextChapter || total === 0 || pageIndex < total - 3) return;
-    const orderedNextSources = sortMangaChapterSources(nextChapter.sources);
+    const orderedNextSources = sortMangaChapterSources(nextChapter.sources).filter((s) => !lockedProvider || s.provider === lockedProvider);
     const src = pickMangaChapterSource(orderedNextSources, resolvedProvider);
     if (!src) return;
     const nextAlternatives = orderedNextSources;
@@ -531,7 +544,7 @@ export default function MangaReaderPage() {
     void queryClient.prefetchQuery({
       queryKey: [
         "manga-read", mangaId, src.chapterKey, src.provider,
-        src.providerChapterId || src.chapterKey, nextAltKey, 0,
+        src.providerChapterId || "", nextAltKey, 0,
       ],
       queryFn: async () => {
         const res = await getMangaReadByKey(mangaId || "", src.chapterKey, {
@@ -546,7 +559,7 @@ export default function MangaReaderPage() {
       },
       staleTime: 10 * 60 * 1000,
     }).catch(() => {});
-  }, [pageIndex, total, nextChapter, mangaId, resolvedProvider, queryClient]);
+  }, [pageIndex, total, nextChapter, mangaId, resolvedProvider, queryClient, lockedProvider]);
 
   // Vertical mode (single chapter): track the top-most visible page for progress.
   useEffect(() => {
@@ -605,7 +618,7 @@ export default function MangaReaderPage() {
     }, { root, rootMargin: "400px 0px" });
     io.observe(el);
     return () => io.disconnect();
-  }, [continuous, hasNext, appendNext, before.length, after.length]);
+  }, [continuous, total, hasNext, appendNext, before.length, after.length]);
 
   // Top sentinel → prepend the previous chapter (once the reader's been scrolled),
   // snapshotting scroll geometry so the layout effect below can pin the viewport.
@@ -622,7 +635,7 @@ export default function MangaReaderPage() {
     }, { root, rootMargin: "300px 0px" });
     io.observe(el);
     return () => io.disconnect();
-  }, [continuous, hasPrev, prependPrev, before.length, after.length]);
+  }, [continuous, total, hasPrev, prependPrev, before.length, after.length]);
 
   // After a previous chapter is prepended, restore the scroll offset by the height
   // that was inserted above, so the reader stays on the same page (no jump).
@@ -776,7 +789,8 @@ export default function MangaReaderPage() {
       ),
     );
   }, [chapterSearch, chapters]);
-  const navigatorChapter = navIndex >= 0 ? chapters[navIndex] ?? null : null;
+  const unavailableChapter = blockedChapter || (blockedIndex != null ? chapters[blockedIndex] : null);
+  const navigatorChapter = unavailableChapter || (navIndex >= 0 ? chapters[navIndex] ?? null : null);
   const navigatorSources = useMemo(
     () => sortMangaChapterSources(navigatorChapter?.sources),
     [navigatorChapter],
@@ -786,39 +800,21 @@ export default function MangaReaderPage() {
   const updateRef = useRef(updateSetting);
   updateRef.current = updateSetting;
   const activePointersRef = useRef(new Map<number, { x: number; y: number }>());
-  const pinchRef = useRef<{ distance: number; zoom: number } | null>(null);
   const lastReaderTapRef = useRef<{ at: number; x: number; y: number } | null>(null);
+  const pinchGesture = useReaderPinchZoom(scrollRef, settings.zoom, (zoom) => updateRef.current('zoom', zoom), settings.zoomWithWheel);
 
   const handleReaderPointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.pointerType !== 'touch') return;
     if (settingsRef.current.autoScroll) updateRef.current('autoScroll', false);
     activePointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
-    if (activePointersRef.current.size === 2) {
-      const [a, b] = [...activePointersRef.current.values()];
-      pinchRef.current = {
-        distance: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)),
-        zoom: settingsRef.current.zoom,
-      };
-      lastReaderTapRef.current = null;
-    }
-  }, []);
-
-  const handleReaderPointerMove = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-    if (event.pointerType !== 'touch' || !activePointersRef.current.has(event.pointerId)) return;
-    activePointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
-    if (activePointersRef.current.size !== 2 || !pinchRef.current) return;
-    event.preventDefault();
-    const [a, b] = [...activePointersRef.current.values()];
-    const distance = Math.max(1, Math.hypot(a.x - b.x, a.y - b.y));
-    const next = Math.min(300, Math.max(50, Math.round((pinchRef.current.zoom * distance / pinchRef.current.distance) / 5) * 5));
-    if (next !== settingsRef.current.zoom) updateRef.current('zoom', next);
+    if (activePointersRef.current.size > 1) lastReaderTapRef.current = null;
   }, []);
 
   const handleReaderPointerUp = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.pointerType !== 'touch') return;
-    const wasPinching = pinchRef.current !== null;
+    const wasPinching = pinchGesture.current;
     activePointersRef.current.delete(event.pointerId);
-    if (activePointersRef.current.size < 2) pinchRef.current = null;
+
     if (wasPinching) return;
     const previous = lastReaderTapRef.current;
     const current = { at: Date.now(), x: event.clientX, y: event.clientY };
@@ -834,11 +830,10 @@ export default function MangaReaderPage() {
       void triggerHaptic('light');
       lastReaderTapRef.current = null;
     }
-  }, [isFs, exitFullscreen]);
+  }, [isFs, exitFullscreen, pinchGesture]);
 
   const handleReaderPointerCancel = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     activePointersRef.current.delete(event.pointerId);
-    if (activePointersRef.current.size < 2) pinchRef.current = null;
   }, []);
 
   const goNextPage = useCallback(() => {
@@ -879,25 +874,6 @@ export default function MangaReaderPage() {
       }
     }
   }, [total, activeMeta?.total, currentIndex, settings.readingMode]);
-
-  // Ctrl + wheel and trackpad pinch (which the browser reports as ctrl-wheel) zoom
-  // the pages. Needs a non-passive native listener to cancel the browser's own
-  // page-zoom. Gated by the `zoomWithWheel` setting; keyboard zoom stays separate.
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const onWheel = (e: WheelEvent) => {
-      if (!e.ctrlKey || !settingsRef.current.zoomWithWheel) return;
-      e.preventDefault();
-      const step = Math.abs(e.deltaY) > 40 ? 8 : 3;
-      const dir = e.deltaY < 0 ? 1 : -1;
-      const cur = settingsRef.current.zoom;
-      const next = Math.min(300, Math.max(50, cur + dir * step));
-      if (next !== cur) updateRef.current("zoom", next);
-    };
-    el.addEventListener("wheel", onWheel, { passive: false });
-    return () => el.removeEventListener("wheel", onWheel);
-  }, []);
 
   // Auto-scroll (vertical mode): advance the scroll position continuously.
   useEffect(() => {
@@ -1083,7 +1059,15 @@ export default function MangaReaderPage() {
       <div
         ref={scrollRef}
         data-reader-scroll
-        onScroll={() => { interactedRef.current = true; }}
+        onScroll={(event) => {
+          interactedRef.current = true;
+          // At high zoom the narrow sentinel can be outside the horizontal
+          // viewport. Vertical proximity must still advance the chapter.
+          const root = event.currentTarget;
+          if (continuous && hasNext && root.scrollHeight - root.scrollTop - root.clientHeight < 400) {
+            void appendNext();
+          }
+        }}
         onDoubleClick={(event) => {
           const capabilities = (event.nativeEvent as MouseEvent & { sourceCapabilities?: { firesTouchEvents?: boolean } }).sourceCapabilities;
           if (capabilities?.firesTouchEvents) return;
@@ -1092,7 +1076,6 @@ export default function MangaReaderPage() {
           void triggerHaptic('light');
         }}
         onPointerDown={handleReaderPointerDown}
-        onPointerMove={handleReaderPointerMove}
         onPointerUp={handleReaderPointerUp}
         onPointerCancel={handleReaderPointerCancel}
         onWheel={() => { if (settingsRef.current.autoScroll) updateRef.current('autoScroll', false); }}
@@ -1101,6 +1084,8 @@ export default function MangaReaderPage() {
           height: `${scrollH}px`,
           filter: settings.brightness < 100 ? `brightness(${settings.brightness / 100})` : undefined,
           touchAction: 'pan-x pan-y',
+          overflowAnchor: 'none',
+          scrollBehavior: 'auto',
         }}
       >
         {isLoading ? (
@@ -1289,6 +1274,13 @@ export default function MangaReaderPage() {
         ) : null}
       </div>
 
+      {lockedProvider && unavailableChapter && (
+        <div role="status" className="fixed inset-x-3 bottom-20 z-50 mx-auto flex max-w-xl flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-background p-4 text-sm shadow-lg">
+          <p>No more sources available from {chapters.flatMap((c) => c.sources).find((s) => s.provider === lockedProvider)?.providerName || lockedProvider} for chapter {unavailableChapter.chapterNumber ?? unavailableChapter.canonicalOrder + 1}.</p>
+          <button type="button" onClick={() => setShowReaderNavigator(true)} className="ui-button min-h-11 rounded-lg bg-primary px-4 font-semibold text-primary-foreground">{uiI18n.t('app.change_provider_85169368')}</button>
+        </div>
+      )}
+
       <ReaderNavigationSheet open={showReaderNavigator} onOpenChange={setShowReaderNavigator} page={pageIndex} total={activeMeta?.total || total} onPage={jumpToPage} settings={settings} updateSetting={updateSetting}>
             <label className="relative block">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -1302,6 +1294,26 @@ export default function MangaReaderPage() {
             </label>
             <section>
               <h3 className="mb-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">{uiI18n.t('app.provider_7ceee3f3')}</h3>
+              <button type="button" aria-pressed={Boolean(lockedProvider)} disabled={!displayProvider} onClick={() => {
+                const params = new URLSearchParams(searchParams);
+                if (lockedProvider) params.delete('lockedProvider');
+                else {
+                  params.set('lockedProvider', displayProvider);
+                  params.set('provider', displayProvider);
+                  params.set('chapterKey', activeMeta?.key || data?.data?.chapter?.chapterKey || chapterKey);
+                  const activeProviderChapterId = activeMeta?.providerChapterId || data?.data?.chapter?.providerChapterId || providerChapterId;
+                  if (activeProviderChapterId) params.set('providerChapterId', activeProviderChapterId);
+                  else params.delete('providerChapterId');
+                  if (displayNumber != null) params.set('chapterNumber', String(displayNumber));
+                  params.set('chapterTitle', displayTitle);
+                  params.set('page', String(pageIndex));
+                }
+                setBlockedChapter(null);
+                navigate(`${location.pathname}?${params}`, { replace: true, state: location.state });
+              }} className="ui-button mb-3 flex min-h-11 w-full items-center gap-3 rounded-xl border border-border px-4 py-3 text-left text-sm disabled:opacity-50">
+                {lockedProvider ? <Lock className="h-4 w-4 shrink-0" /> : <Unlock className="h-4 w-4 shrink-0" />}
+                <span><span className="block font-semibold">Lock provider{lockedProvider ? ' · On' : ' · Off'}</span><span className="text-xs text-muted-foreground">Stay with your selected provider across chapters.</span></span>
+              </button>
               <div className="max-h-48 space-y-2 overflow-y-auto pr-1 scrollbar-thin">
                 {navigatorSources.map((source) => {
                   const active = source.provider === displayProvider && source.chapterKey === (activeMeta?.key || chapterKey);

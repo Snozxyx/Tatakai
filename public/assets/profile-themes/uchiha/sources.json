@@ -1,0 +1,29 @@
+{
+  "liveWallpaper": {
+    "source": "https://wallsflow.com/live-wallpapers/anime/1092-itachi-uchiha-red-sharingan-rain-live-wallpaper.html",
+    "title": "Itachi Uchiha Red Sharingan Rain Live Wallpaper",
+    "sharedBy": "Caen on Wallsflow",
+    "sourceUsageNotice": "Personal, non-commercial use only, per Wallsflow.",
+    "input": "User-downloaded itachi-uchiha-red-sharingan-rain-live-wallpaper-wallsflow-com.mp4",
+    "inputBytes": 55088548,
+    "inputResolution": "3840x2160",
+    "inputFps": 60,
+    "durationSeconds": 12.933333,
+    "outputs": {
+      "itachi-rain-4k.mp4": { "bytes": 9459636, "resolution": "3840x2160", "fps": 60, "codec": "AV1", "encoding": "libsvtav1 preset 7 CRF 23; no audio; faststart" },
+      "itachi-rain.mp4": { "bytes": 5909101, "resolution": "1920x1080", "fps": 60, "codec": "H264", "encoding": "libx264 slow CRF 18; yuv420p; no audio; faststart" },
+      "itachi-rain-mobile.mp4": { "bytes": 2973428, "resolution": "1280x720", "fps": 60, "codec": "H264", "encoding": "libx264 slow CRF 18; yuv420p; no audio; faststart" },
+      "itachi-rain-widget.mp4": { "bytes": 982732, "resolution": "640x360", "fps": 30, "codec": "H264", "encoding": "libx264 slow CRF 18; yuv420p; no audio; faststart" },
+      "itachi-rain-poster.webp": { "bytes": 70820, "resolution": "1920x1080", "encoding": "Source frame at 2 seconds; WebP quality 90" }
+    },
+    "qualityCheck": { "metric": "SSIM", "value": 0.996258, "sampling": "26 frames at 2 fps; 4K AV1 versus the user-provided 4K original", "note": "High visual similarity; lossy compression, not mathematically lossless." },
+    "processing": "Only resizing, video encoding, audio removal, and source-frame poster extraction. No generated artwork."
+  },
+  "crow.svg": {
+    "source": "https://commons.wikimedia.org/wiki/File:Crow_(NIH_BioArt_833_-_796095).svg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/0/05/Crow_%28NIH_BioArt_833_-_796095%29.svg",
+    "author": "NIAID / Ryan Kissinger",
+    "license": "Public domain (US federal government work), per source",
+    "processing": "Original SVG used for CSS flight animation."
+  }
+}

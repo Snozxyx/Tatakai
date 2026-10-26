@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Security verification</title>
+  <style>html,body{margin:0;background:transparent;color-scheme:dark}#challenge{width:100%}</style>
+</head>
+<body>
+  <div id="challenge"></div>
+  <script>
+    // Serve this file over HTTPS. The iOS app uses capacitor:// and cannot
+    // obtain a valid Supabase CAPTCHA token by skipping the challenge.
+    const params = new URLSearchParams(location.search);
+    const id = params.get('id');
+    const sitekey = params.get('sitekey');
+    const action = params.get('action') || undefined;
+    function send(event, token) {
+      // WKWebView's custom scheme has an opaque origin. Only the embedding
+      // parent receives this; the app checks our HTTPS origin, source and id.
+      parent.postMessage({ type: 'tatakai-turnstile', id, event, token }, '*');
+    }
+    if (parent !== window && /^[a-f0-9]{32}$/.test(id || '') && sitekey && (!action || /^[\w-]{1,32}$/.test(action))) {
+      const script = document.createElement('script');
+      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+      script.onerror = () => send('error');
+      script.onload = () => {
+        try {
+          window.turnstile.render('#challenge', {
+            sitekey, action, theme: 'dark', size: 'flexible',
+            retry: 'auto', 'retry-interval': 1500,
+            'refresh-expired': 'auto', 'refresh-timeout': 'auto',
+            callback: token => send('token', token),
+            'expired-callback': () => send('expired'),
+            'error-callback': () => send('error'),
+            'timeout-callback': () => send('timeout'),
+          });
+          send('ready');
+        } catch { send('error'); }
+      };
+      document.head.appendChild(script);
+    }
+  </script>
+</body>
+</html>

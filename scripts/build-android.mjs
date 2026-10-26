@@ -13,7 +13,7 @@ function run(command, args, cwd = process.cwd()) {
   if (result.error) throw result.error;
   if (result.status !== 0) process.exit(result.status || 1);
 }
-run(windows ? "npm.cmd" : "npm", ["run", "build"]);
+run(windows ? "npm.cmd" : "npm", ["run", "build:native"]);
 run(windows ? "npx.cmd" : "npx", ["cap", "sync", "android"]);
 run(
   windows ? "gradlew.bat" : "./gradlew",

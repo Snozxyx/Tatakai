@@ -163,6 +163,8 @@ export interface VideoPlayerProps {
   poster?: string;
   onError?: (context?: { statusCode?: number; reason?: string }) => void;
   onServerSwitch?: () => void;
+  /** Room playback owns recovery; never promise a provider switch to viewers. */
+  bufferingTimeoutMessage?: string;
   onRetryCurrentServer?: () => void;
   isLoading?: boolean;
   serverName?: string;

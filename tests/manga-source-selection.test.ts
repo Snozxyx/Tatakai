@@ -18,6 +18,13 @@ function source(provider: string, chapterKey: string, providerChapterId = chapte
 }
 
 describe("manga source selection", () => {
+  test("locked navigation stops at a provider gap instead of switching or skipping chapters", () => {
+    expect(pickMangaChapterSource([source('mangadex', 'md:4')], 'comick', true)).toBeNull();
+    expect(pickMangaChapterSource([], 'comick', true)).toBeNull();
+    expect(pickMangaChapterSource([
+      source('mangadex', 'md:4'), source('comick', 'comick:4'),
+    ], 'comick', true)?.chapterKey).toBe('comick:4');
+  });
   test("uses reliability order when no current provider is available", () => {
     const ordered = sortMangaChapterSources([
       source("allmanga", "allmanga:2"),

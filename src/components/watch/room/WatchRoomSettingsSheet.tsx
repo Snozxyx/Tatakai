@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { getFriendlyServerName } from '@/lib/serverNames';
 import { useWatchRoomContext } from './WatchRoomContext';
+import { P2PRoomControls } from './P2PRoomControls';
 
 /** Host controls as a left slide-in Sheet: anime · episodes · providers · manual · local files. */
 export function WatchRoomSettingsSheet() {
@@ -32,6 +33,7 @@ export function WatchRoomSettingsSheet() {
                 </SheetHeader>
                 <ScrollArea className="h-[calc(100vh_-_5rem)] px-6 pb-6">
                     <div className="space-y-6">
+                        <P2PRoomControls settings />
                         <div className="space-y-3">
                             <h3 className="text-sm font-semibold text-foreground flex items-center gap-2"><Search className="w-4 h-4 text-muted-foreground" /> {uiI18n.t('app.anime_f1b32a19')}</h3>
                             <Button

@@ -13,25 +13,28 @@ import { getProxiedImageUrl } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { MANGA_STATUS_LABELS, TAB_PANEL_CLASS } from './statusLabels';
 import { useResolvedMangaReadlist } from '@/hooks/api/useResolvedMangaReadlist';
+import { readingHistoryHref } from '@/lib/readingHistory';
 
 interface HistoryTabProps {
   history: any[];
   mangaHistoryEntries: any[];
+  novelHistoryEntries?: any[];
   loading?: boolean;
   isViewingOther?: boolean;
   onNavigate: (path: string) => void;
   formatDate: (dateString: string) => string;
 }
 
-type HistoryFilter = 'all' | 'anime' | 'manga';
+type HistoryFilter = 'all' | 'anime' | 'manga' | 'novel';
 
 const FILTERS: { key: HistoryFilter; label: string; icon: typeof Play }[] = [
   { key: 'all', get label() { return uiI18n.t('app.all_6a720856'); }, icon: LayoutGrid },
   { key: 'anime', get label() { return uiI18n.t('app.anime_f1b32a19'); }, icon: Play },
   { key: 'manga', get label() { return uiI18n.t('app.manga_87db0f99'); }, icon: BookOpen },
+  { key: 'novel', get label() { return uiI18n.t('app.novels_4ae488fd'); }, icon: BookOpen },
 ];
 
-export function HistoryTab({ history, mangaHistoryEntries, loading, isViewingOther, onNavigate, formatDate }: HistoryTabProps) {
+export function HistoryTab({ history, mangaHistoryEntries, novelHistoryEntries = [], loading, isViewingOther, onNavigate, formatDate }: HistoryTabProps) {
   useUiTranslation();
   const [filter, setFilter] = useState<HistoryFilter>('all');
   const [search, setSearch] = useState('');
@@ -40,6 +43,8 @@ export function HistoryTab({ history, mangaHistoryEntries, loading, isViewingOth
 
   const hasAnyAnime = (history?.length || 0) > 0;
   const hasAnyManga = resolvedMangaHistory.length > 0;
+  const hasAnyNovel = novelHistoryEntries.length > 0;
+  const hasAnyHistory = hasAnyAnime || hasAnyManga || hasAnyNovel;
 
   const animeFiltered = useMemo(
     () => (history || []).filter((i: any) => !term || (i.anime_name || '').toLowerCase().includes(term)),
@@ -50,9 +55,13 @@ export function HistoryTab({ history, mangaHistoryEntries, loading, isViewingOth
     [resolvedMangaHistory, term],
   );
 
-  const showAnime = filter !== 'manga' && animeFiltered.length > 0;
-  const showManga = filter !== 'anime' && mangaFiltered.length > 0;
-  const nothingToShow = (hasAnyAnime || hasAnyManga) && !showAnime && !showManga;
+  const novelFiltered = novelHistoryEntries.filter(i => !term || (i.manga_title || '').toLowerCase().includes(term));
+  const showAnime = (filter === 'all' || filter === 'anime') && animeFiltered.length > 0;
+  const readingSections = [
+    { key: 'manga', label: uiI18n.t('app.manga_reading_054694f6'), rows: mangaFiltered },
+    { key: 'novel', label: uiI18n.t('app.novels_4ae488fd'), rows: novelFiltered },
+  ].filter(section => (filter === 'all' || filter === section.key) && section.rows.length > 0);
+  const nothingToShow = hasAnyHistory && !showAnime && readingSections.length === 0;
   return (
     <GlassPanel className={TAB_PANEL_CLASS}>
       <div className="absolute -top-12 -right-12 w-48 h-48 bg-[hsl(var(--profile-accent)/0.10)] blur-[70px] rounded-full pointer-events-none" />
@@ -64,7 +73,7 @@ export function HistoryTab({ history, mangaHistoryEntries, loading, isViewingOth
             <h3 className="font-display font-bold text-base sm:text-lg text-foreground tracking-tight">{uiI18n.t('app.activity_history_ca84f7d0')}</h3>
           </div>
 
-          {(hasAnyAnime || hasAnyManga) && (
+          {hasAnyHistory && (
             <div className="flex items-center gap-3 flex-wrap w-full sm:w-auto">
               <div className="flex items-center gap-1 rounded-full bg-white/[0.03] border border-white/[0.08] p-1">
                 {FILTERS.map((f) => {
@@ -100,13 +109,13 @@ export function HistoryTab({ history, mangaHistoryEntries, loading, isViewingOth
             </div>
           )}
         </div>
-        {loading || (filter !== 'anime' && metadataLoading) ? (
+        {loading || ((filter === 'all' || filter === 'manga') && metadataLoading) ? (
           <div className="space-y-4">
             {[...Array(3)].map((_, i) => (
               <div key={i} className="h-28 bg-white/[0.02] rounded-2xl animate-pulse" />
             ))}
           </div>
-        ) : hasAnyAnime || hasAnyManga ? (
+        ) : hasAnyHistory ? (
           nothingToShow ? (
             <div className="text-center py-16 text-muted-foreground text-sm">
               {term ? uiI18n.t('app.no_history_matches_i18n_value_0_526a8e4d', { value0: search }) : uiI18n.t('app.nothing_in_this_filter_592d07b9')}
@@ -197,38 +206,29 @@ export function HistoryTab({ history, mangaHistoryEntries, loading, isViewingOth
                 </div>
               </section>
             )}
-            {showManga && (
-              <section>
+            {readingSections.map(section => (
+              <section key={section.key}>
                 <div className="mb-4 flex items-center gap-2 px-2">
                   <BookOpen className="w-4 h-4 text-primary" />
-                  <h3 className="text-sm font-black uppercase tracking-widest text-muted-foreground">{uiI18n.t('app.manga_reading_054694f6')}</h3>
+                  <h3 className="text-sm font-black uppercase tracking-widest text-muted-foreground">{section.label}</h3>
                 </div>
 
                 <div className="space-y-3">
-                  {mangaFiltered.map((item: any, index: number) => {
+                  {section.rows.map((item: any, index: number) => {
                     const status = MANGA_STATUS_LABELS[item.status || 'plan_to_read'] || MANGA_STATUS_LABELS.plan_to_read;
                     const chapterLabel =
                       item.last_chapter_number != null
                         ? uiI18n.t('app.chapter_i18n_value_0_e0f6e591', { value0: item.last_chapter_number })
                         : item.last_chapter_title || uiI18n.t('app.reading_progress_updated_a6460dcf');
-                    const chapterKey = String(item.last_chapter_key || '').trim();
-                    const nextPage = Math.max(0, Number(item.last_page_index || 0));
-                    const mangaId = encodeURIComponent(item.resolved_manga_id || item.manga_id);
 
                     return (
                       <motion.button
-                        key={`manga-history-${item.id}`}
+                        key={`${section.key}-history-${item.id}`}
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.03 }}
                         className="w-full text-left rounded-2xl border border-white/[0.05] bg-white/[0.02] p-4 hover:bg-white/[0.04] transition-colors shadow-lg group"
-                        onClick={() => {
-                          if (chapterKey) {
-                            onNavigate(`/manga/read/${mangaId}?chapterKey=${encodeURIComponent(chapterKey)}&page=${nextPage}`);
-                            return;
-                          }
-                          onNavigate(`/manga/${mangaId}`);
-                        }}
+                        onClick={() => onNavigate(readingHistoryHref(item))}
                       >
                         <div className="flex items-center gap-4">
                           <div className="w-12 h-16 rounded-xl overflow-hidden bg-white/[0.02] flex-shrink-0 shadow-inner">
@@ -258,7 +258,7 @@ export function HistoryTab({ history, mangaHistoryEntries, loading, isViewingOth
                   })}
                 </div>
               </section>
-            )}
+            ))}
           </div>
           )
         ) : (

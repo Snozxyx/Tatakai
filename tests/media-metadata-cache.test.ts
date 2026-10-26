@@ -14,6 +14,20 @@ function disk() {
 const client = () => new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
 
 describe('persistent static media metadata', () => {
+  test('metadata bursts persist one snapshot containing the latest data', async () => {
+    const first = client();
+    let count = 0;
+    let saved = '';
+    const cache = await startMediaMetadataCache(first, {
+      read: async () => null, remove: async () => {},
+      write: async value => { count++; saved = value; },
+    });
+    for (let id = 0; id < 100; id++) first.setQueryData(['anime', id], { title: id });
+    await cache.flush();
+    expect(count).toBe(1);
+    expect(JSON.parse(saved).entries).toHaveLength(100);
+    cache.stop();
+  });
   test('a fresh app instance shows all three metadata types without server requests', async () => {
     const saved = disk();
     const first = client();

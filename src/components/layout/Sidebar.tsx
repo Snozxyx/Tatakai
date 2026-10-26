@@ -1,3 +1,4 @@
+import { CosmeticAvatar } from '@/components/profile/IdentityCosmetics';
 import {
   LayoutGrid,
   Search,
@@ -212,24 +213,9 @@ export function Sidebar() {
             title={t("nav.profile")}
             className="group relative"
           >
-            <span
-              className={cn(
-                "block h-10 w-10 overflow-hidden rounded-2xl transition-[color,background-color,opacity,transform] duration-300",
-                profile?.avatar_url ? "bg-muted" : "nav-icon-inactive"
-              )}
-            >
-              {profile?.avatar_url ? (
-                <img
-                  src={profile.avatar_url}
-                  alt={profile.display_name || profile.username || t('nav.profile')}
-                  className="h-full w-full object-cover group-hover:scale-105"
-                />
-              ) : (
-                <span className="flex h-full w-full items-center justify-center">
-                  <User className="h-5 w-5" />
-                </span>
-              )}
-            </span>
+            <CosmeticAvatar userId={profile?.user_id} className="h-10 w-10 rounded-2xl transition-transform group-hover:scale-105">
+              {profile?.avatar_url ? <img src={profile.avatar_url} alt={profile.display_name || profile.username || t('nav.profile')} className="h-full w-full object-cover" /> : <span className="flex h-full w-full items-center justify-center nav-icon-inactive"><User className="h-5 w-5" /></span>}
+            </CosmeticAvatar>
             {isActive("/profile") || location.pathname.startsWith("/@") ? (
               <span className="pointer-events-none absolute inset-0 rounded-2xl bg-foreground/25 shadow-[0_0_20px_hsl(var(--foreground)/0.4)]" />
             ) : null}

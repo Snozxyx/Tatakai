@@ -251,6 +251,11 @@ module.exports = function registerRuntimeHandlers(ipcMain, app, fs, path, logger
 
             await localProxy.ensureStarted();
             const proxyBase = localProxy.baseUrl();
+            if (payload?.p2p === true) {
+                const { path: localPath } = localProxy.registerLocalFile({ path: filePath });
+                const localStreamUrl = `${proxyBase}${localPath}`;
+                return { localStreamUrl, shareStreamUrl: localStreamUrl, shareStreamType: 'direct', fileName: path.basename(filePath) };
+            }
             const { publicUrl } = await shareTunnel.start(proxyBase);
             const secret = localProxy.getShareSecret();
             const q = `?s=${encodeURIComponent(secret)}`;

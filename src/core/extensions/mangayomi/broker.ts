@@ -1,6 +1,8 @@
 import { db } from '@/core/db/tatakai-db';
 import { compatibilityAny, compatibilityTimeout, throwCompatibilityAbort } from '../compatibility/abort';
 import { hasCompatibilityRuntime, type CompatibilitySource } from '../compatibility/client';
+import { prepareLocalScriptRuntime } from '../sora/execute';
+import { extensionRequestId } from '../compatibility/request-id';
 import { proxyRemoteUrl } from '../remote/media';
 import { executeMangayomi } from '../sora/execute';
 import { soraHash, soraText, sourceUrl } from '../sora/repository';
@@ -61,7 +63,7 @@ async function execute(p: Record<string, any>, signal: AbortSignal) {
   if (p.op === 'repositories') return value.repositories;
   if (p.op === 'installedPackages') return inventory(value);
   if (p.op === 'sources') return Object.values(value.packages).map(pkg => source(pkg, value));
-  if (p.op === 'prepare') return { ready: true };
+  if (p.op === 'prepare') return prepareLocalScriptRuntime(signal);
   if (p.op === 'addRepository' || p.op === 'removeRepository') {
     const url = sourceUrl(p.url, undefined, true);
     if (p.op === 'addRepository') await mangayomiRepository(url, signal);
@@ -181,7 +183,7 @@ async function execute(p: Record<string, any>, signal: AbortSignal) {
 }
 export async function requestMangayomi(payload: Record<string, any>, parentSignal?: AbortSignal) {
   if (!hasCompatibilityRuntime('mangayomi')) throw Error('Mangayomi extensions require an installed app with local workers and WebAssembly');
-  const requestId = String(payload.requestId || crypto.randomUUID());
+  const requestId = String(payload.requestId || extensionRequestId());
   if (payload.op === 'cancel') { calls.get(payload.target)?.controller.abort(); return null; }
   if (calls.size >= 24 || calls.has(requestId)) throw Error('Too many Mangayomi requests');
   const controller = new AbortController();

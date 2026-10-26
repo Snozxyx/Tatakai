@@ -1,9 +1,10 @@
+import { CosmeticAvatar, CosmeticName } from '@/components/profile/IdentityCosmetics';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Users, Music2, Layers, MessageSquare } from 'lucide-react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { UserBadges } from '@/components/ui/UserBadges';
 import { getProxiedImageUrl } from '@/lib/api';
 import { useCommunitySearch } from '@/hooks/community/useCommunitySearch';
@@ -80,15 +81,15 @@ export function CommunitySearchResults({ query }: { query: string }) {
                     <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
                   </div>
                   <div className="px-3 pb-3">
-                    <Avatar className="-mt-6 h-12 w-12 ring-4 ring-background transition-transform duration-300 group-hover/row:scale-105">
+                    <CosmeticAvatar userId={u.user_id} className="-mt-6 h-12 w-12 ring-4 ring-background transition-transform duration-300 group-hover/row:scale-105">
                       <AvatarImage src={u.avatar_url || ''} className="object-cover" />
                       <AvatarFallback className="bg-zinc-800 text-sm font-bold text-zinc-400">
                         {name[0]?.toUpperCase()}
                       </AvatarFallback>
-                    </Avatar>
+                    </CosmeticAvatar>
                     <div className="mt-2 flex items-center gap-1.5">
                       <p className="truncate text-[13px] font-semibold text-foreground/90 transition-colors group-hover/row:text-primary">
-                        {name}
+                        <CosmeticName userId={u.user_id}>{name}</CosmeticName>
                       </p>
                       <UserBadges badges={badgeMap?.[u.user_id]} size={13} max={2} />
                     </div>

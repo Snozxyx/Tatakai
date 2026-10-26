@@ -338,7 +338,7 @@ jobs:
         run: node scripts/write-client-env.mjs mobile
 
       - name: Build web app
-        run: npx cross-env NODE_ENV=production vite build
+        run: npm run build:native
         env:
           NODE_OPTIONS: --max-old-space-size=8192
 
@@ -411,7 +411,7 @@ jobs:
         run: node scripts/write-client-env.mjs mobile
 
       - name: Build web app
-        run: npx cross-env NODE_ENV=production vite build
+        run: npm run build:native
         env:
           NODE_OPTIONS: --max-old-space-size=8192
 

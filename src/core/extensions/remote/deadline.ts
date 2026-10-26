@@ -1,3 +1,5 @@
+import { throwCompatibilityAbort } from '../compatibility/abort';
+
 /** Bound callers even when a native bridge cannot cancel its in-flight request. */
 export async function extensionDeadline<T>(work: (signal: AbortSignal) => Promise<T>, milliseconds = 15000, parent?: AbortSignal): Promise<T> {
   const controller = new AbortController();
@@ -6,9 +8,9 @@ export async function extensionDeadline<T>(work: (signal: AbortSignal) => Promis
   const timer = setTimeout(() => controller.abort(new DOMException('Extension request timed out', 'TimeoutError')), milliseconds);
   let rejectAbort: () => void = () => {};
   try {
-    controller.signal.throwIfAborted();
+    throwCompatibilityAbort(controller.signal);
     const cancelled = new Promise<never>((_, reject) => {
-      rejectAbort = () => reject(controller.signal.reason);
+      rejectAbort = () => reject(controller.signal.reason || new DOMException('Aborted', 'AbortError'));
       controller.signal.addEventListener('abort', rejectAbort, { once: true });
     });
     return await Promise.race([work(controller.signal), cancelled]);
