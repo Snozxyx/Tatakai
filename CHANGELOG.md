@@ -6,6 +6,7 @@ All notable changes to Tatakai are documented here.
 
 ## Unreleased
 
+- Load the novel homepage through one cached `/novel/home` response, with live trending refreshed separately from stored sections.
 - Play community-server media directly through its existing proxy, preserving signed tickets and HLS segments instead of nesting another streaming proxy.
 - Keep mobile-web video settings and their menus inside fullscreen, and connect community servers in the browser instead of opening the installed app.
 

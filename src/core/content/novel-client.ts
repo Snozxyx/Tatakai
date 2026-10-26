@@ -93,6 +93,22 @@ function rowToNovelItem(media: any): NovelSearchItem | null {
   };
 }
 
+export interface NovelHomeData {
+  spotlight: NovelSearchItem[]; trending: NovelSearchItem[]; popular: NovelSearchItem[]; topRated: NovelSearchItem[];
+  newChapters: NovelSearchItem[]; adultLatest: NovelSearchItem[]; adultPopular: NovelSearchItem[];
+  genres: string[]; fetchedAt: number; trendingPending: boolean;
+}
+
+/** One above-the-fold request, with the same public bundle contract as manga/home. */
+export async function getNovelHome(adult = false): Promise<NovelHomeData> {
+  const data = await apiGet<Record<string, any>>('/api/v3/novel/home', { adult: adult ? 1 : 0 });
+  const lane = (name: string) => (Array.isArray(data[name]) ? data[name] : []).map(rowToNovelItem)
+    .filter((item: NovelSearchItem | null): item is NovelSearchItem => Boolean(item));
+  return { spotlight: lane('spotlight'), trending: lane('trending'), popular: lane('popular'), topRated: lane('topRated'),
+    newChapters: lane('newChapters'), adultLatest: lane('adultLatest'), adultPopular: lane('adultPopular'),
+    genres: data.genres || [], fetchedAt: data.fetchedAt, trendingPending: data.trendingPending === true };
+}
+
 export async function searchNovels(
   query: string,
   page = 1,
@@ -169,7 +185,7 @@ export async function searchNovels(
     totalPages: pageInfo.lastPage,
     total: pageInfo.total,
     hasNextPage: pageInfo.hasNextPage,
-    source: 'anilist',
+    source: payload.extensions?.source || 'anilist',
   };
 }
 

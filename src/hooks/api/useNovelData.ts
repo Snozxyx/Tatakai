@@ -3,6 +3,7 @@ import {
   searchNovels,
   getNovelDetail,
   getNovelChapters,
+  getNovelHome,
   type NovelSearchOptions,
 } from '@/core/content/novel-client';
 import { useContentSafetySettings } from '@/hooks/user/useContentSafetySettings';
@@ -62,11 +63,7 @@ export function useNovelChapters(novelId: string | undefined, title?: string, fu
   });
 }
 
-const NOVEL_GENRES = [
-  'Action', 'Adventure', 'Fantasy', 'Isekai', 'Romance', 'Drama', 'Mystery',
-  'Horror', 'Sci-Fi', 'Slice of Life', 'Supernatural', 'Thriller', 'Harem',
-  'Martial Arts', 'Historical', 'Psychological', 'Comedy',
-];
+
 
 /**
  * The novel hub's above-the-fold data — mirrors `useMangaHome`.
@@ -80,30 +77,8 @@ export function useNovelHome() {
 
   const query = useQuery({
     queryKey: ['novel-home', adult],
-    queryFn: async () => {
-      const [trending, popular, topRated, adultLatest, adultPopular] = await Promise.all([
-        searchNovels('', 1, 12, { sort: 'TRENDING_DESC' }).catch(() => null),
-        searchNovels('', 1, 12, { sort: 'POPULARITY_DESC' }).catch(() => null),
-        searchNovels('', 1, 8, { sort: 'SCORE_DESC' }).catch(() => null),
-        adult
-          ? searchNovels('', 1, 12, { sort: 'POPULARITY_DESC', adult: true }).catch(() => null)
-          : null,
-        adult
-          ? searchNovels('', 1, 12, { sort: 'TRENDING_DESC', adult: true }).catch(() => null)
-          : null,
-      ]);
-      return {
-        spotlight: topRated?.results ?? [],
-        trending: trending?.results ?? [],
-        popular: popular?.results ?? [],
-        topRated: topRated?.results ?? [],
-        newChapters: [] as NonNullable<typeof trending>['results'],
-        adultLatest: adultLatest?.results ?? [],
-        adultPopular: adultPopular?.results ?? [],
-        genres: NOVEL_GENRES,
-        fetchedAt: Date.now(),
-      };
-    },
+    queryFn: () => getNovelHome(adult),
+    refetchInterval: query => query.state.data?.trendingPending ? 5000 : false,
     staleTime: 10 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
