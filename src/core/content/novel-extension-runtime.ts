@@ -1,3 +1,4 @@
+import { discoverReadingBatches } from './reading-discovery';
 /**
  * Novel extension bridge — text twin of `manga-extension-runtime.ts`.
  *
@@ -260,14 +261,14 @@ export interface NovelContentAttempt {
 }
 
 export async function fetchExtensionNovelChapters(params: Parameters<typeof fetchLocalNovelChapters>[0]): Promise<NovelChaptersPayload> {
-  const [local, remote] = await Promise.all([
-    fetchLocalNovelChapters(params).catch(() => ({ chapters: [], providersAvailable: [], failedProviders: ['local-runtime'], pending: false })),
-    serverNovelChapters(params),
-  ]);
+  const [local, remote] = await discoverReadingBatches('novel:'+JSON.stringify(params), {
+    local: () => fetchLocalNovelChapters(params).then(value => value || {chapters:[],providersAvailable:[],failedProviders:[]}),
+    server: () => serverNovelChapters(params),
+  });
   const byNumber = new Map<number, NovelChapterAggregate>();
   mergeRows(byNumber, local.chapters, 'local');
   mergeRows(byNumber, remote.chapters, 'server');
-  return { chapters: [...byNumber.values()].sort((a, b) => a.number - b.number), pending: !!local.pending,
+  return { chapters: [...byNumber.values()].sort((a, b) => a.number - b.number), pending: !!local.pending || !!remote.pending,
     providersAvailable: [...local.providersAvailable, ...remote.providersAvailable], failedProviders: [...local.failedProviders, ...remote.failedProviders] };
 }
 

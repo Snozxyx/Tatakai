@@ -140,6 +140,7 @@ export function useMangaChapters(id: string | undefined, providers?: string, lan
 
   return useQuery({
     queryKey: ["manga-chapters", id, providers, language],
+    refetchInterval: query => query.state.data?.sourcesPending ? 1000 : false,
     queryFn: () => {
       const metadata = client.ensureQueryData({ queryKey: ['manga-detail', id], queryFn: () => getMangaDetail(id!), staleTime: MEDIA_METADATA_STALE_TIME }).catch(() => null);
       return getMangaChapters(id!, providers, language, metadata);

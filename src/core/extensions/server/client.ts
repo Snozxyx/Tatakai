@@ -50,7 +50,7 @@ export function connectionFor(namespace: string) {
   if (!server) throw Error('This server is disabled or disconnected'); return server;
 }
 export function serverInvoke(namespace: string, sourceId: string, op: string, args: Record<string, unknown>, signal?: AbortSignal) {
-  return serverRequest(connectionFor(namespace), '/invoke', { sourceId, op, args }, signal);
+  return serverRequest(connectionFor(namespace), '/invoke', { sourceId, op, args, progressive: ['chapters','novelChapters'].includes(op) }, signal);
 }
 export async function resolveServerSources(options: Record<string, unknown>, signal?: AbortSignal, progress?: (batch: WatchExtensionBatch) => void): Promise<WatchExtensionBatch> {
   const batches = new Map<string, WatchExtensionBatch>();
@@ -110,7 +110,7 @@ export async function serverCustomRead(namespace: string, sourceId: string, chap
 }
 export async function serverMappedChapters(params: { anilistId?: number; title?: string; titles?: string[] }) {
   const sources = (await serverCustomSources()).filter(source => source.kind === 'read');
-  const chapters: any[] = [], failedProviders: string[] = [];
+  const chapters: any[] = [], failedProviders: string[] = []; let pending = false;
   await Promise.all(sources.map(async source => {
     const provider = `${source.namespace}|${source.id}`;
     try {
@@ -124,6 +124,7 @@ export async function serverMappedChapters(params: { anilistId?: number; title?:
       if (matches.length !== 1) throw Error('Select the title from the server catalog to read');
       result = await serverInvoke(source.namespace, source.id, 'chapters', { id: matches[0].id, url: matches[0].id });
       }
+      pending ||= result?.partial === true;
       for (const chapter of Array.isArray(result) ? result : result.entries || result.chapters || []) {
         const number = Number(chapter.number ?? chapter.chapter), id = String(chapter.id || chapter.url || '');
         if (!Number.isFinite(number)) continue;
@@ -138,7 +139,7 @@ export async function serverMappedChapters(params: { anilistId?: number; title?:
       }
     } catch { failedProviders.push(provider); }
   }));
-  return { chapters, failedProviders, providersAvailable: sources.map(source => `${source.namespace}|${source.id}`) };
+  return { chapters, failedProviders, pending, providersAvailable: sources.map(source => `${source.namespace}|${source.id}`) };
 }
 export async function serverMappedPages(params: { extensionId: string; chapterKey: string; providerChapterId?: string; anilistId?: number }): Promise<MangaReadResponse> {
   const [namespace, sourceId] = params.extensionId.split('|');
@@ -149,13 +150,14 @@ export async function serverMappedPages(params: { extensionId: string; chapterKe
 
 export async function serverNovelChapters(params: { anilistId?: number; title?: string; titles?: string[]; fullScan?: boolean }) {
   const results = await Promise.all(listServers().filter(row => row.enabled).map(async server => {
-    const chapters: any[] = [], providersAvailable: string[] = [], failedProviders: string[] = [];
+    const chapters: any[] = [], providersAvailable: string[] = [], failedProviders: string[] = []; let pending = false;
     try {
       const sources = await serverRequest<ServerSource[]>(server, '/sources');
       await Promise.all(sources.filter(source => source.available && source.kind === 'novel').map(async source => {
         const provider = `server-${server.id}|${source.id}`;
         try {
           const result = await serverInvoke(`server-${server.id}`, source.id, 'novelChapters', params);
+          pending ||= result?.partial === true;
           providersAvailable.push(provider);
           for (const chapter of Array.isArray(result) ? result : result.chapters || []) {
             const entries = Array.isArray(chapter.sources) && chapter.sources.length ? chapter.sources : [chapter];
@@ -168,9 +170,9 @@ export async function serverNovelChapters(params: { anilistId?: number; title?: 
         } catch { failedProviders.push(provider); }
       }));
     } catch { failedProviders.push(`server-${server.id}`); }
-    return { chapters, providersAvailable, failedProviders };
+    return { chapters, providersAvailable, failedProviders, pending };
   }));
-  return { chapters: results.flatMap(row => row.chapters), providersAvailable: results.flatMap(row => row.providersAvailable), failedProviders: results.flatMap(row => row.failedProviders) };
+  return { pending: results.some(row => row.pending), chapters: results.flatMap(row => row.chapters), providersAvailable: results.flatMap(row => row.providersAvailable), failedProviders: results.flatMap(row => row.failedProviders) };
 }
 
 export async function serverNovelContent(params: { extensionId: string; chapterKey: string; providerChapterId?: string; anilistId?: number }): Promise<NovelContentResponse> {

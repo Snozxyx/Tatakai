@@ -468,11 +468,11 @@ export async function getMangaChapters(id: string, _providers?: string, _languag
     fetchMangaDexChapters(id),
     fetchMangaUpdatesCatalog(id),
     (async () => runtime.fetchExtensionMangaChapters(mangaExtensionContext(id, metadata === undefined ? await getMangaDetail(id).catch(() => undefined) : await metadata || undefined)))()
-      .catch(() => ({chapters:[],providersAvailable:[],failedProviders:[]})),
+      .catch(() => ({chapters:[],providersAvailable:[],failedProviders:[],pending:false})),
   ]);
   const empty: MangaChapterResponse = {anilistId:Number.isFinite(anilistId)?anilistId:0,partial:false,failedProviders:[],chapters:[],mappedChapters:[]};
   // Reader providers always contribute, regardless of which metadata API answers.
-  const base = mangaDex || (updatesCatalog || extensionPayload.chapters.length ? empty : await apiGet<MangaChapterResponse>(`/api/v3/manga/${encodeURIComponent(id)}/chapters`,undefined,undefined,10000).catch(()=>empty));
+  const base = mangaDex || (updatesCatalog || extensionPayload.chapters.length || extensionPayload.pending ? empty : await apiGet<MangaChapterResponse>(`/api/v3/manga/${encodeURIComponent(id)}/chapters`,undefined,undefined,10000).catch(()=>empty));
   const cacheKey = mangaChaptersCacheKey(id, _providers, _language);
 
   const merged = applyMangaUpdatesCatalog(runtime.mergeChaptersWithExtensions(base, extensionPayload), updatesCatalog);

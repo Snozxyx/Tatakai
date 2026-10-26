@@ -554,6 +554,13 @@ export function useExtensionInstaller() {
       extension: StoreExtension;
       version?: StoreVersion;
     }) => {
+      // A catalogue row may be stale or omit server metadata. Resolve the same
+      // authoritative detail used by the detail page before choosing a deep link.
+      if (!isNative() || extension.capabilities?.includes('extension-server')) {
+        const detail = await fetchStoreExtension(extension.id);
+        if (!detail) throw new Error('Extension details are unavailable. Please retry.');
+        extension = detail;
+      }
       const targetId = extension.slug || extension.id;
       if(extension.capabilities?.includes('extension-server')) {
         const url=new URL(extension.sourceUrl||'');

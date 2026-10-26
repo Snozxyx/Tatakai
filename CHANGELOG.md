@@ -6,6 +6,9 @@ All notable changes to Tatakai are documented here.
 
 ## Unreleased
 
+- Show manga and novel sources progressively, retain later provider results, and reuse bounded hosted chapter caches.
+- Bound slow extension title searches, preserve supplied title aliases, and refresh community-server metadata before connecting from the catalog.
+
 - Load the novel homepage through one cached `/novel/home` response, with live trending refreshed separately from stored sections.
 - Play community-server media directly through its existing proxy, preserving signed tickets and HLS segments instead of nesting another streaming proxy.
 - Keep mobile-web video settings and their menus inside fullscreen, and connect community servers in the browser instead of opening the installed app.
