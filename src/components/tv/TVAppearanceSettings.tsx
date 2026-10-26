@@ -1,26 +1,35 @@
 import { ThemedCheckbox } from '@/components/ui/themed-checkbox';
 import { useState } from "react";
+import { Check } from "lucide-react";
 import { saveTVAppearance, useTVAppearance } from "@/core/tv/appearance";
-import { TV_WALLPAPERS, validTVWallpaper } from "@/core/tv/wallpapers";
+import { DEFAULT_TV_THEME, TV_THEMES, tvThemeInfo } from "@/core/tv/themes";
+
 export function TVAppearanceSettings() {
   const { appearance, reduced } = useTVAppearance();
-  const [url, setUrl] = useState(appearance.wallpaper.startsWith('https:') ? appearance.wallpaper : '');
   const [message, setMessage] = useState('');
   return <section className="tv-appearance-settings">
-    <h2>Wallpapers & atmosphere</h2>
-    <p>Pick a scene. Cards and glass surfaces take their color from the background.</p>
-    <div className="tv-wallpaper-presets">
-      {TV_WALLPAPERS.map(preset => <button key={preset.id} className="tv-wallpaper-preset" data-tv-key={`wallpaper-${preset.id}`} aria-pressed={appearance.wallpaper === preset.src} onClick={() => {
-        saveTVAppearance({ ...appearance, wallpaper: preset.src }); setMessage(`${preset.name} selected.`);
-      }}><img src={preset.poster} alt="" loading="lazy" /><span>{preset.name}{appearance.wallpaper === preset.src && <small>Active</small>}</span></button>)}
+    <h2>Themes & appearance</h2>
+    <p>Choose the colors for your TV. Cherry Blossom is the default.</p>
+    <div className="tv-theme-options" aria-label="TV themes">
+      {TV_THEMES.map(theme => {
+        const { name, colors } = tvThemeInfo(theme);
+        const selected = appearance.theme === theme;
+        return <button key={theme} className="tv-theme-option" data-tv-key={`theme-${theme}`}
+          aria-pressed={selected} onClick={() => {
+            saveTVAppearance({ ...appearance, theme });
+            setMessage(`${name} selected.`);
+          }}>
+          <span className="tv-theme-preview" style={{ background: `hsl(${colors.background})`, borderColor: `hsl(${colors.border})` }} aria-hidden="true">
+            <span className="tv-theme-preview-sidebar" style={{ background: `hsl(${colors.sidebarBackground})` }}><i style={{ background: `hsl(${colors.primary})` }} /></span>
+            <span className="tv-theme-preview-content"><i style={{ background: `hsl(${colors.primary})` }} /><span><i style={{ background: `hsl(${colors.card})` }} /><i style={{ background: `hsl(${colors.card})` }} /><i style={{ background: `hsl(${colors.card})` }} /></span></span>
+          </span>
+          <span className="tv-theme-label"><strong>{name}</strong>{selected && <Check aria-label="Active" />}</span>
+          <small>{theme === DEFAULT_TV_THEME ? 'Default · Soft sakura pink' : tvThemeInfo(theme).description}</small>
+        </button>;
+      })}
     </div>
-    <label className="tv-setting-row"><span><strong>Animated wallpaper</strong><small>Lightweight offline scenes. Animation pauses during playback and reading.</small></span><ThemedCheckbox type="checkbox" checked={appearance.videoWallpaper} onChange={event => saveTVAppearance({ ...appearance, videoWallpaper: event.target.checked })} /></label>
     <label className="tv-setting-row"><span><strong>Title previews</strong><small>Play muted previews after focusing a title. Availability depends on the title.</small></span><ThemedCheckbox type="checkbox" checked={appearance.previews} onChange={event => saveTVAppearance({ ...appearance, previews: event.target.checked })} /></label>
-    <details className="tv-custom-wallpaper"><summary>Use your own video</summary><label>HTTPS video URL<input type="url" value={url} onChange={event => setUrl(event.target.value)} placeholder="https://example.com/wallpaper.mp4" /></label><button onClick={() => {
-      if (!url.startsWith('https:') || !validTVWallpaper(url)) { setMessage('Enter an HTTPS video URL without credentials.'); return; }
-      saveTVAppearance({ ...appearance, wallpaper: url }); setMessage('Custom wallpaper selected. A still image is shown if the video cannot play.');
-    }}>Apply video</button></details>
-    {reduced && <p>Reduced motion is active. Wallpaper is shown as a still image.</p>}
+    {reduced && <p>Reduced motion is active. Automatic title previews are paused.</p>}
     <p role="status" aria-live="polite">{message}</p>
   </section>;
 }

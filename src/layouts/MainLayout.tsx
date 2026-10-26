@@ -40,7 +40,8 @@ import { MobileUpdateBanner } from "@/components/mobile/MobileUpdateBanner";
 import { EasterEggs } from "@/components/layout/EasterEggs";
 import { CelebrationHost } from "@/components/effects/Celebrate";
 import { MagnetAlignmentModal } from "@/components/modals/MagnetAlignmentModal";
-import { SettingsModal } from "@/components/settings/SettingsModal";
+import { useSettingsModal } from "@/contexts/SettingsModalContext";
+const SettingsModal = React.lazy(() => import("@/components/settings/SettingsModal").then(module => ({default:module.SettingsModal})));
 import { MediaQuickPeekHost } from "@/components/media/MediaQuickPeek";
 import { ConfirmProvider } from "@/components/ui/confirm-dialog";
 import { CommunityRulesGateProvider } from "@/components/community/CommunityRulesGate";
@@ -53,6 +54,9 @@ import { EmailProofBanner } from '@/components/auth/EmailProofBanner';
 
 const MainLayout = ({ children }: { children: React.ReactNode }) => {
   const { fullPage: fullPageProfile } = useProfilePresentation();
+  const { open: settingsOpen } = useSettingsModal();
+  const [settingsReady, setSettingsReady] = useState(false);
+  useEffect(() => { if (settingsOpen) setSettingsReady(true); }, [settingsOpen]);
   useTheme();
   const { enabled: isDeveloperMode } = useDeveloperMode();
   useMobileUpdateOrchestrator();
@@ -284,7 +288,7 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
               initialTorrentBuffer={initialTorrentBuffer}
             />
 
-            <SettingsModal />
+            {(settingsOpen || settingsReady) && <React.Suspense fallback={null}><SettingsModal /></React.Suspense>}
 
             {/* Long-press quick peek for anime/manga cards (global sheet). */}
             <MediaQuickPeekHost />

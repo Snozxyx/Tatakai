@@ -1,3 +1,5 @@
+import { isTV } from "@/core/tv/device";
+import { TVPlaybackOverlay } from "@/components/tv/TVPlaybackOverlay";
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { usePlaybackCoordinator } from '@/core/player/usePlaybackCoordinator';
@@ -1518,6 +1520,8 @@ export function VideoPlayer({
       onMouseMove={!isMobile ? handleContainerMouseMove : undefined}
       onMouseLeave={() => !isMobile && isPlaying && setControlsVisible(false)}
       onTouchStart={showControlsTemporarily}
+      onFocusCapture={isTV() ? showControlsTemporarily : undefined}
+      onKeyDownCapture={isTV() ? showControlsTemporarily : undefined}
     >
       {/* Double-click fullscreen discovery hint (desktop only, one-time).
           Non-interactive so it never swallows clicks. */}
@@ -1676,7 +1680,7 @@ export function VideoPlayer({
 
       {/* Center Play Button */}
       <CenterPlayButton
-        isVisible={!isPlaying && !isLoading && !isBuffering && !videoError && !isLive}
+        isVisible={!isTV() && !isPlaying && !isLoading && !isBuffering && !videoError && !isLive}
         onClick={togglePlay}
       />
 
@@ -1711,6 +1715,13 @@ export function VideoPlayer({
           onCancel={() => setUpNextCountdown(null)}
         />
       )}
+
+      {isTV() && !videoError && !isLoading && <TVPlaybackOverlay
+        visible={getShowControls() || !isPlaying} playing={isPlaying}
+        seekingLocked={timelineSeekingLocked || Boolean(isLive)}
+        onToggle={togglePlay} onSeek={skip} fallbackTitle={animeName}
+        episodeTitle={episodeTitle} episodeNumber={episodeNumber}
+      />}
 
       {/* Controls Overlay */}
       <div
@@ -1790,6 +1801,7 @@ export function VideoPlayer({
         <div className="flex items-center justify-between gap-3 md:gap-4">
           {/* Left Controls */}
           <div className="flex items-center gap-1.5 md:gap-2">
+            <div className={isTV() ? "tv-bottom-transport" : "contents"}>
             <PlaybackControls
               isPlaying={isPlaying}
               isLive={Boolean(isLive)}
@@ -1800,6 +1812,7 @@ export function VideoPlayer({
               onSkip={skip}
             />
 
+            </div>
             <VolumeControl
               volume={volume}
               isMuted={isMuted}

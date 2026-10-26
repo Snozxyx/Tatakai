@@ -54,6 +54,7 @@ export interface CommentsProps {
   episodeId?: string;
   /** Context chip label (anime/series/playlist name). */
   entityName?: string;
+  sourceKind?: 'anime' | 'manga' | 'novel';
   /**
    * Anime-info page only: episode 1's id, used to turn a timestamp on a global
    * comment into a `/watch/<ep1>?t=<s>` deep link. Ignored for other surfaces.
@@ -95,7 +96,7 @@ function embedLabel(e: CommentEmbed): string {
  * when entityType === 'anime'; every other surface gets the same GIF / poll /
  * mention / embed feature set without them.
  */
-export function Comments({ entityType, entityId, episodeId, entityName, fallbackEpisodeId, quoteDraft, generalCommunity = false }: CommentsProps) {
+export function Comments({ entityType, entityId, episodeId, entityName, sourceKind, fallbackEpisodeId, quoteDraft, generalCommunity = false }: CommentsProps) {
   useUiTranslation();
   const { user, profile, isAdmin, isModerator } = useAuth();
   const confirm = useConfirm();
@@ -177,6 +178,9 @@ export function Comments({ entityType, entityId, episodeId, entityName, fallback
       await addComment.mutateAsync({
         entityType,
         entityId,
+        sourceTitle: entityName,
+        sourceKind: sourceKind ?? (entityType === 'anime' || entityType === 'manga' ? entityType : undefined),
+        sourcePath: location.pathname + location.search,
         episodeId: epId,
         content: payload.content,
         isSpoiler: payload.isSpoiler,
@@ -196,6 +200,9 @@ export function Comments({ entityType, entityId, episodeId, entityName, fallback
       await addComment.mutateAsync({
         entityType,
         entityId,
+        sourceTitle: entityName,
+        sourceKind: sourceKind ?? (entityType === 'anime' || entityType === 'manga' ? entityType : undefined),
+        sourcePath: location.pathname + location.search,
         episodeId: epId,
         parentId,
         content: payload.content,
@@ -489,6 +496,11 @@ export function Comments({ entityType, entityId, episodeId, entityName, fallback
                   const sourceEp = episodeNumberOf(comment.episode_id);
 
                   // Soft-deleted comment: tombstone the body, keep its replies.
+                  if (comment.is_deleted && entityType === 'forum_post') {
+                    return <CommentReplies key={comment.id} generalCommunity={generalCommunity}
+                      parentId={comment.id} entityType={entityType} entityId={entityId}
+                      episodeId={epId} currentUserId={user?.id} highlightId={highlightId} />;
+                  }
                   if (comment.is_deleted) {
                     return (
                       <motion.div

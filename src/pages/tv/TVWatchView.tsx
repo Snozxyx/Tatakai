@@ -1,3 +1,4 @@
+import { TVPlaybackContext } from "@/components/tv/TVPlaybackContext";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Play, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
@@ -45,6 +46,7 @@ export function TVWatchView({
     (episode) => episode.episodeId === currentEpisodeId
   );
   return (
+    <TVPlaybackContext.Provider value={{ title, poster, episodes, currentEpisodeId, onEpisode }}>
     <div className="tv-page tv-watch-page">
       <div className="tv-watch-heading">
         {poster && <img src={poster} alt="" />}
@@ -163,5 +165,6 @@ export function TVWatchView({
       )}
       {dialogs}
     </div>
+    </TVPlaybackContext.Provider>
   );
 }

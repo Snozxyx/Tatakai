@@ -1,0 +1,34 @@
+.tv-playback-overlay { position: absolute; inset: 0; z-index: 20; color: #fff; background: linear-gradient(0deg,#100a18b8,transparent 55%,#100a1870); opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 160ms ease-out, visibility 160ms; }
+.tv-playback-overlay[data-visible] { opacity: 1; visibility: visible; }
+.tv-playback-overlay :is(a,button) { pointer-events: auto; }
+.tv-playback-top { position: absolute; top: 5%; left: 3.7%; right: 3.7%; display: flex; align-items: center; gap: 1.5em; }
+.tv-playback-top .tv-playback-wordmark { flex: 1; font-weight: 800; font-size: clamp(18px,1.7vw,36px); letter-spacing: -.03em; }
+.tv-playback-top :is(a,button), .tv-playback-episodes-heading button { display: inline-flex; align-items: center; justify-content: center; gap: .5em; background: #17111c55; border: 1px solid #ffffff4a; border-radius: 999px; min-width: 44px; min-height: 44px; padding: .55em .8em; font-size: clamp(14px,1.1vw,24px); }
+.tv-playback-transport { position: absolute; top: 49%; left: 50%; transform: translate(-50%,-50%); display: flex; align-items: center; gap: 3.5vw; }
+.tv-playback-transport button { position: relative; display: grid; place-items: center; padding: 0; width: 56px; height: 56px; min-width: 44px; border: 0; border-radius: 50%; background: transparent; color: white; }
+.tv-playback-transport button > svg { width: 40px; height: 40px; }
+.tv-playback-transport button > span { position: absolute; font-size: 12px; bottom: 15px; }
+.tv-playback-transport button.tv-playback-toggle { width: clamp(78px,9vw,150px); height: clamp(78px,9vw,150px); border: 4px solid #fff; background: #120d1b22; }
+.tv-playback-toggle > svg { width: 42%; height: 42%; }
+.tv-playback-description { position: absolute; left: 3.7%; bottom: 17%; max-width: 39%; text-shadow: 0 2px 10px #0008; }
+.tv-playback-description p { margin: 0 0 .6em; font-size: clamp(16px,1.2vw,26px); }
+.tv-playback-description .tv-playback-format { font-size: clamp(13px,1vw,22px); color: #dfd5e7; }
+.tv-playback-description h2 { font-size: clamp(28px,3vw,62px); line-height: 1.15; font-weight: 700; margin: .25em 0 .45em; }
+.tv-playback-description .tv-playback-synopsis { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.45; }
+.tv-playback-episodes { pointer-events: auto; position: absolute; right: 3.5%; top: 17%; bottom: 17%; width: 26%; min-width: 250px; }
+.tv-playback-episodes-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; font-size: clamp(14px,1.1vw,24px); }
+.tv-playback-stack { overflow-y: auto; height: calc(100% - 56px); padding: 8px; scrollbar-width: thin; scrollbar-color: hsl(var(--primary)) transparent; scroll-padding: 20px; mask-image: linear-gradient(transparent,#000 4%,#000 94%,transparent); }
+.tv-playback-stack button { position: relative; display: block; width: 92%; margin: -12px auto 0; aspect-ratio: 16/8; overflow: hidden; padding: 0; background: #231a2d; border: 1px solid #ffffff38; border-radius: 12px; text-align: left; }
+.tv-playback-stack button:first-child { margin-top: 4px; }
+.tv-playback-stack button img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.tv-playback-stack button > span { position: absolute; inset: auto 0 0; display: grid; gap: .3em; padding: 2.5em 1em 1em; background: linear-gradient(transparent,#100b16f0); }
+.tv-playback-stack strong { font-size: clamp(14px,1.18vw,26px); line-height: 1.2; }
+.tv-playback-stack small { font-size: clamp(12px,.95vw,20px); color: #dfd5e7; }
+.tv-playback-stack button[aria-current] { z-index: 2; width: 100%; aspect-ratio: 16/9; border: 2px solid #fff; }
+.tv-playback-stack button i { position: absolute; bottom: 10px; left: 1em; right: 1em; height: 2px; background: hsl(var(--primary)); }
+.tv-playback-overlay :is(a,button):focus-visible { outline: 3px solid hsl(var(--primary)); outline-offset: 4px; }
+.tv-playback-overlay button:disabled { opacity: .45; }
+.tatakai-tv .video-controls-gradient { z-index: 22; padding: 28px 3.7% 2.5%; background: linear-gradient(transparent,#100a1899); }
+.tatakai-tv .video-controls-gradient .tv-bottom-transport { display: none; }
+@media (max-height:650px) { .tv-playback-description { bottom: 19%; } .tv-playback-description .tv-playback-synopsis { -webkit-line-clamp: 2; } }
+@media (prefers-reduced-motion: reduce) { .tv-playback-overlay { transition: none; } }

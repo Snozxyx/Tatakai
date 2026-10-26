@@ -1,3 +1,4 @@
+import { useOwnedProfileThemes } from '@/hooks/user/useProfileThemeClaims';
 import { isTV } from "@/core/tv/device";
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
@@ -243,10 +244,11 @@ export function ProfileWidgetCard({
     setOpen(false);
   };
 
+  const ownedThemes = useOwnedProfileThemes(open ? userId : undefined);
   const widgetPreferences = readThemePreferences(fetched?.app_settings);
-  const widgetTheme = resolveProfileTheme(widgetPreferences, fetched, badges ?? [], verifiedBadges);
+  const widgetTheme = resolveProfileTheme(widgetPreferences, fetched, badges ?? [], verifiedBadges, ownedThemes.data);
   const Preview = widgetTheme.Preview;
-  const resolvingWidget = open && (pendingProfile || pendingBadges);
+  const resolvingWidget = open && (pendingProfile || pendingBadges || ownedThemes.isLoading);
   if (resolvingWidget || (Preview && fetched)) {
     const loadingCard = <div className="profile-widget-resolving" role="status"><Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" />Opening profile card…</div>;
     const themedBody = resolvingWidget ? loadingCard : Preview && fetched ? <Suspense fallback={loadingCard}><Preview

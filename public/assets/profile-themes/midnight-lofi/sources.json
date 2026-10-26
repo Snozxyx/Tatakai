@@ -1,0 +1,12 @@
+{
+  "artwork": {
+    "file": "midnight-room.webp",
+    "source": "OpenAI built-in Imagegen",
+    "prompt": "Japanese anime bedroom at midnight; cobalt sky, cyan monitor, warm desk lamp, bookshelves and a low bed; no text or people."
+  },
+  "music": {
+    "file": "after-the-last-train.mp3",
+    "title": "After the last train",
+    "source": "Original procedural electric-piano chord loop and percussion, authored for Tatakai"
+  }
+}

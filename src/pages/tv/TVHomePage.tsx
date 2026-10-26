@@ -1,3 +1,4 @@
+import { TVLoadingScreen } from "@/components/tv/TVLoadingScreen";
 import { TVCinematicHero } from "@/components/tv/TVCinematicHero";
 import { TVDiscoveryGrid } from "@/components/tv/TVDiscoveryGrid";
 import { memo, useCallback, useMemo, useState, useEffect, useRef } from "react";
@@ -119,9 +120,7 @@ export default function TVHomePage() {
   const topCards = useMemo(() => (data?.top10Animes?.today || []).slice(0, 10).map((item, index) => ({ ...item, rank: index + 1 })), [data?.top10Animes?.today]);
   if (isLoading)
     return (
-      <div className="tv-state" role="status">
-        Finding your next watch…
-      </div>
+      <TVLoadingScreen message="Finding your next watch…" />
     );
   if (error)
     return (

@@ -9,7 +9,7 @@ import { useVideoSettings } from "@/hooks/media/useVideoSettings";
 import { useAuth } from "@/contexts/AuthContext";
 import { getTVDeviceInfo } from "@/core/tv/device";
 import { TVPairingModal } from "./TVPairingModal";
-const PANELS = [['appearance', 'Wallpapers & appearance'], ['playback', 'TV playback'], ['accessibility', 'Remote & accessibility'], ['accounts', 'Accounts & debrid'], ['library', 'Downloads & sources'], ['about', 'About this TV']] as const;
+const PANELS = [['appearance', 'Themes & appearance'], ['playback', 'TV playback'], ['accessibility', 'Remote & accessibility'], ['accounts', 'Accounts & debrid'], ['library', 'Downloads & sources'], ['about', 'About this TV']] as const;
 export default function TVSettingsPage() {
   const [params, setParams] = useSearchParams();
   const selected = PANELS.some(([id]) => id === params.get('panel')) ? params.get('panel') : 'appearance';
@@ -34,7 +34,7 @@ export default function TVSettingsPage() {
         </>}
         {selected === 'accessibility' && <>
           <h2>Remote & accessibility</h2>
-          <label className="tv-setting-row"><span><strong>Reduce motion</strong><small>Use still wallpapers and pause automatic title previews. Your device’s reduced-motion setting is also respected.</small></span><ThemedCheckbox type="checkbox" checked={appearance.reducedMotion} onChange={event => saveTVAppearance({ ...appearance, reducedMotion: event.target.checked })} /></label>
+          <label className="tv-setting-row"><span><strong>Reduce motion</strong><small>Pause automatic title previews and reduce interface motion. Your device’s reduced-motion setting is also respected.</small></span><ThemedCheckbox type="checkbox" checked={appearance.reducedMotion} onChange={event => saveTVAppearance({ ...appearance, reducedMotion: event.target.checked })} /></label>
           <dl className="tv-remote-guide"><div><dt>D-Pad</dt><dd>Move between cards, menus and controls.</dd></div><div><dt>Select</dt><dd>Open the focused item or change its setting.</dd></div><div><dt>Back</dt><dd>Close a drawer or return to the previous screen.</dd></div><div><dt>In the player</dt><dd>Up reveals controls, Down reveals episodes. Left and Right on the timeline seek.</dd></div></dl>
         </>}
         {selected === 'accounts' && <><h2>Accounts & debrid</h2><p>{user ? `Signed in as ${profile?.display_name || profile?.username || 'your account'}.` : 'Pair with your phone to sign in and transfer your selected setup.'}</p><div className="tv-actions"><button onClick={() => setPairing(true)}>{user ? 'Sync a companion device' : 'Link account'}</button>{user && <button onClick={() => void signOut()}>Sign out on this TV</button>}</div><DebridSettingsPanel /></>}

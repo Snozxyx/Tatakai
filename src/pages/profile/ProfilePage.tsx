@@ -1,3 +1,4 @@
+import { useOwnedProfileThemes } from '@/hooks/user/useProfileThemeClaims';
 import { isTV } from "@/core/tv/device";
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
@@ -11,7 +12,7 @@ import { UchihaScene } from '@/components/profile/themes/uchiha/UchihaScene';
 import '@/components/profile/themes/uchiha/uchiha.css';
 import { FullPageProfileSurface } from '@/contexts/ProfilePresentationContext';
 import { ProfileThemeLoading } from '@/components/profile/themes/ProfileThemeLoading';
-import { PROFILE_THEMES, resolveProfileTheme } from '@/components/profile/themes/registry';
+import { PROFILE_THEMES, resolveProfileTheme, canUseProfileTheme } from '@/components/profile/themes/registry';
 import { useProfileArrival } from '@/hooks/user/useProfileArrival';
 import { useMotionPreference } from '@/hooks/ui/useMotionPreference';
 import type { ProfileThemeData, ThemeMediaItem } from '@/components/profile/themes/types';
@@ -134,10 +135,11 @@ export default function ProfilePage({ username: providedUsername }: { username?:
 
   const profile = isViewingOther ? publicProfile : ownProfile;
   const { data: profileBadges = [], isSuccess: verifiedProfileBadges, isPending: loadingProfileBadges } = useUserBadges(profile?.user_id);
+  const ownedThemes = useOwnedProfileThemes(profile?.user_id);
   const arrivalPreferences = readThemePreferences(profile?.app_settings);
   const arrivalTheme = PROFILE_THEMES.find(theme => theme.id === arrivalPreferences.selected);
   const arrivalConfig = arrivalTheme?.parse(arrivalPreferences.configurations[arrivalPreferences.selected]) as { motion?: boolean } | null | undefined;
-  const enterCustomWorld = Boolean(profile && arrivalConfig && arrivalTheme?.Loading && (loadingProfileBadges || (verifiedProfileBadges && arrivalTheme.entitled(profile, profileBadges))));
+  const enterCustomWorld = Boolean(profile && arrivalConfig && arrivalTheme?.Loading && (loadingProfileBadges || (verifiedProfileBadges && canUseProfileTheme(arrivalTheme, profile, profileBadges, ownedThemes.data))));
   const arrivalPending = useProfileArrival(`${location.pathname}:${profile?.user_id || ''}`, enterCustomWorld, reducedMotion || arrivalConfig?.motion === false ? 0 : arrivalTheme?.arrivalMs ?? 0);
   useEffect(() => { if (enterCustomWorld) void arrivalTheme?.preload?.().catch(() => undefined); }, [enterCustomWorld, arrivalTheme]);
   const hint = (location.state as { profileArrival?: Record<string, unknown> } | null)?.profileArrival;
@@ -503,7 +505,7 @@ export default function ProfilePage({ username: providedUsername }: { username?:
   );
 
   const themePreferences = readThemePreferences(profile?.app_settings);
-  const selectedTheme = resolveProfileTheme(themePreferences, profile, profileBadges, verifiedProfileBadges);
+  const selectedTheme = resolveProfileTheme(themePreferences, profile, profileBadges, verifiedProfileBadges, ownedThemes.data);
   const isUchiha = selectedTheme.id === 'uchiha';
   if (selectedTheme.Renderer && profile) {
     const Renderer = selectedTheme.Renderer;

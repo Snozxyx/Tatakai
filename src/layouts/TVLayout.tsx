@@ -1,3 +1,6 @@
+import { TVLoadingScreen } from "@/components/tv/TVLoadingScreen";
+import { useTVAppearance } from "@/core/tv/appearance";
+import { tvThemeStyle } from "@/core/tv/themes";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import {
   Link,
@@ -6,7 +9,7 @@ import {
   useNavigate,
   matchPath,
 } from "react-router-dom";
-import { Search, ChevronDown } from "lucide-react";
+import { Search, Home as HomeIcon, TrendingUp, Library as LibraryIcon, Tv, Zap, Settings as SettingsIcon, Clapperboard, Film, Users } from "lucide-react";
 import { App as CapacitorApp } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
 import { Toaster } from "sonner";
@@ -20,10 +23,10 @@ import { TVLauncherSync } from "@/core/tv/TVLauncherSync";
 import { ConfirmProvider } from "@/components/ui/confirm-dialog";
 import { CommunityRulesGateProvider } from "@/components/community/CommunityRulesGate";
 import { ProtectedRoute } from "@/routes/AppRoutes";
-import { TVVideoWallpaper } from "@/components/tv/TVVideoBackdrop";
 import "./tv.css";
 import "./tv-atmosphere.css";
 import "./tv-refined.css";
+import "./tv-reference.css";
 const Home = lazy(() => import("@/pages/tv/TVHomePage"));
 const SearchPage = lazy(() => import("@/pages/tv/TVSearchPage"));
 const Details = lazy(() => import("@/pages/tv/TVAnimePage"));
@@ -37,6 +40,7 @@ const Saved = lazy(() => import("@/pages/tv/TVSavedPage"));
 const IPTV = lazy(() => import("@/pages/tv/TVIPTVPage"));
 const Library = lazy(() => import("@/pages/tv/TVLibraryPage"));
 export default function TVLayout({ children }: { children: React.ReactNode }) {
+  const { appearance } = useTVAppearance();
   const { fullPage: fullPageProfile } = useProfilePresentation();
   const location = useLocation(),
     navigate = useNavigate(),
@@ -229,50 +233,38 @@ export default function TVLayout({ children }: { children: React.ReactNode }) {
   return (
     <ConfirmProvider>
       <CommunityRulesGateProvider>
-        <div ref={root} className={`tv-shell ${reading ? "tv-reading" : ""}`} style={fullPageProfile ? { padding: 0, overflow: 'hidden' } : undefined}>
-          <TVVideoWallpaper paused={fullPageProfile || reading || path.startsWith('/watch') || path === '/tv/iptv'} />
+        <div ref={root} className={`tv-shell ${path.startsWith("/watch") ? "tv-shell-watching" : ""} ${reading ? "tv-reading" : ""}`} data-tv-theme={appearance.theme} style={{ ...tvThemeStyle(appearance.theme), ...(fullPageProfile ? { padding: 0, overflow: 'hidden' } : {}) }}>
           <TVLauncherSync />
-          {!fullPageProfile && <header className="tv-header">
-            <Link
-              className="tv-profile-link"
-              to="/tv/library"
-              aria-label="Profile and account"
-            >
-              <span className="tv-avatar">
-                <img
-                  src={
-                    profile?.avatar_url ||
-                    "/assets/logo/tatakai-logo-square.png"
-                  }
-                  alt=""
-                />
-              </span>
-              <ChevronDown />
+          {!fullPageProfile && !reading && <aside className="tv-icon-rail" aria-label="TV navigation">
+            <Link to="/" className="tv-rail-brand" aria-label="Tatakai home">
+              <img src="/assets/logo/tatakai-logo-square.png" alt="" />
+              <span className="tv-rail-label tv-rail-wordmark">tatakai</span>
             </Link>
             <nav aria-label="Main navigation">
-              <NavLink
-                className="tv-nav-search"
-                to="/search"
-                aria-label="Search"
-              >
-                <Search />
-              </NavLink>
-              {[
-                ["/", "Home"],
-                ["/tv/shows", "Shows"],
-                ["/tv/movies", "Movies"],
-                ["/community", "Community"],
-                ["/tv/library", "My Tatakai"],
-              ].map(([to, label]) => (
-                <NavLink key={to} to={to} end data-tv-key={`nav-${label}`}>
-                  {label}
+              {([
+                ["/search", "Search", Search],
+                ["/", "Home", HomeIcon],
+                ["/tv/shows", "Shows", Clapperboard],
+                ["/tv/movies", "Movies", Film],
+                ["/trending", "Trending", TrendingUp],
+                ["/tv/library", "My Tatakai", LibraryIcon],
+                ["/community", "Community", Users],
+                ["/tv/iptv", "Live TV", Tv],
+                ["/extensions", "Extensions", Zap],
+              ] as Array<[string, string, typeof HomeIcon]>).map(([to, label, Icon]) => (
+                <NavLink key={to} to={to} end aria-label={label} data-tv-key={`nav-${label}`}>
+                  <Icon /><span className="tv-rail-label">{label}</span>
                 </NavLink>
               ))}
             </nav>
-            <Link className="tv-brand" to="/" aria-label="Tatakai home">
-              tatakai<span>アニメの世界</span>
+            <NavLink className="tv-rail-settings" to="/settings" aria-label="Settings" data-tv-key="nav-Settings">
+              <SettingsIcon /><span className="tv-rail-label">Settings</span>
+            </NavLink>
+            <Link to="/tv/library" className="tv-rail-account" aria-label="Profile and account">
+              <img src={profile?.avatar_url || "/assets/logo/tatakai-logo-square.png"} alt="" />
+              <span className="tv-rail-label">Your profile</span>
             </Link>
-          </header>}
+          </aside>}
           {reading && (
             <aside className="tv-experimental">
               Experimental TV reader · Arrow keys turn pages · Select opens
@@ -296,9 +288,7 @@ export default function TVLayout({ children }: { children: React.ReactNode }) {
           >
             <Suspense
               fallback={
-                <div className="tv-state" role="status">
-                  Loading…
-                </div>
+                <TVLoadingScreen compact={path !== "/" && !details} />
               }
             >
               <ProtectedRoute>{specialized}</ProtectedRoute>

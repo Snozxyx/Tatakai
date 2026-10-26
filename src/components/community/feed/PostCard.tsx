@@ -31,7 +31,6 @@ import { useToggleRepost, useToggleBookmark } from '@/hooks/community/usePostSoc
 import { useTagEngagement } from '@/hooks/community/useTagEngagement';
 import { useCreateForumPost, useUpdateForumPost, useDeleteForumPost, useSetPinned } from '@/hooks/community/useForum';
 import { useMyCommunityRole } from '@/hooks/community/useCommunities';
-import { tombstoneLabel } from '@/lib/tombstone';
 import { ModerationMenuItems } from '@/components/moderation/ModerationMenu';
 import { useContentFlags } from '@/hooks/moderation/useModeration';
 import { useAuth } from '@/contexts/AuthContext';
@@ -223,17 +222,7 @@ export function PostCard({ post, defaultShowComments = false, contextCommunityId
   const author = post.profiles;
   const authorName = author?.display_name || author?.username || 'Anonymous';
 
-  if (post.is_deleted && !defaultShowComments) return null;
-
-  if (post.is_deleted) {
-    return (
-      <div data-mobile-community-post>
-        <GlassPanel className="p-4 border-dashed border-white/10">
-          <p className="text-sm italic text-muted-foreground">{tombstoneLabel(post.deleted_by_role)}</p>
-        </GlassPanel>
-      </div>
-    );
-  }
+  if (post.is_deleted) return null;
 
   return (
     <div data-mobile-community-post>

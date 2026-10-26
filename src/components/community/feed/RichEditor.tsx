@@ -1,7 +1,8 @@
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { forwardRef, useImperativeHandle, useEffect, useState } from 'react';
-import { useEditor, EditorContent, ReactRenderer, BubbleMenu, type Editor } from '@tiptap/react';
+import { useEditor, EditorContent, ReactRenderer, type Editor } from '@tiptap/react';
+import { BubbleMenu } from '@tiptap/react/menus';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import Mention from '@tiptap/extension-mention';
@@ -322,7 +323,7 @@ export const RichEditor = forwardRef<RichEditorHandle, RichEditorProps>(function
   // Re-seed when the caller swaps `content` (e.g. opening the inline edit form).
   useEffect(() => {
     if (editor && content !== editor.getHTML()) {
-      editor.commands.setContent(content || '', false);
+      editor.commands.setContent(content || '', { emitUpdate: false });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [content]);
@@ -332,7 +333,7 @@ export const RichEditor = forwardRef<RichEditorHandle, RichEditorProps>(function
       {editor && (
         <BubbleMenu
           editor={editor}
-          tippyOptions={{ duration: 100 }}
+          options={{ placement: 'top' }}
           className="flex items-center gap-0.5 rounded-full border border-white/[0.08] bg-[#08090b]/95 p-1 shadow-[0_10px_40px_rgba(0,0,0,0.5)] backdrop-blur-xl"
         >
           <ToolbarBtn active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()}><Bold className="h-3.5 w-3.5" /></ToolbarBtn>

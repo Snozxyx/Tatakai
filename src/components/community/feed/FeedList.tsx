@@ -1,12 +1,14 @@
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { Loader2, MessageSquare, Pin } from 'lucide-react';
 
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { useFeed, type FeedTab, type FeedPostType } from '@/hooks/community/useFeed';
 import { useAuth } from '@/contexts/AuthContext';
 
+import { useEnrichedComments } from '@/hooks/user/useUserCommentsDetailed';
+import { CommentFeedCard } from './CommentFeedCard';
 import { PostComposer } from './PostComposer';
 import { PostCard } from './PostCard';
 import { WatchroomFeedItem } from './WatchroomFeedItem';
@@ -35,6 +37,7 @@ export function FeedList({
   const {
     data,
     isLoading,
+    isError,
     refetch,
     fetchNextPage,
     hasNextPage,
@@ -47,6 +50,10 @@ export function FeedList({
   });
 
   const items = (data?.pages.flat() ?? []).filter((item) => item.kind !== 'post' || !item.post.is_deleted);
+
+  const commentRows = useMemo(() => (data?.pages.flat() ?? []).flatMap(item => item.kind === 'comment' ? [item.comment] : []), [data]);
+  const comments = useEnrichedComments(commentRows, true);
+  const commentMap = new Map(comments.map(comment => [comment.id, comment]));
 
   // Pinned posts logic (Community pin vs Global pin)
   const isCommunityView = !!communityId;
@@ -112,6 +119,13 @@ export function FeedList({
         ))}
       </div>
     );
+  }
+
+  if (isError && items.length === 0) {
+    return <div role="alert" className="rounded-xl border border-border p-6 text-center">
+      <p className="text-sm text-muted-foreground">Could not load the community feed.</p>
+      <button type="button" onClick={() => void refetch()} className="mt-3 min-h-11 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">Try again</button>
+    </div>;
   }
 
   /* =========================================================
@@ -184,13 +198,13 @@ export function FeedList({
       {layout === 'masonry' ? (
         <div className="columns-1 gap-4 [column-fill:_balance] lg:columns-2">
           {timelineItems.map((item) => {
-            const key = item.kind === 'post' ? item.post.id : `room-${item.room.id}`;
+            const key = item.kind === 'post' ? item.post.id : item.kind === 'comment' ? `comment-${item.comment.id}` : `room-${item.room.id}`;
             return (
               <article key={key} className="break-inside-avoid mb-4">
                 {item.kind === 'post' ? (
                   <PostCard post={item.post} contextCommunityId={communityId ?? null} />
                 ) : (
-                  <WatchroomFeedItem room={item.room} />
+                  item.kind === 'comment' ? <CommentFeedCard comment={commentMap.get(item.comment.id)!} /> : <WatchroomFeedItem room={item.room} />
                 )}
               </article>
             );
@@ -199,13 +213,13 @@ export function FeedList({
       ) : (
         <div className="flex flex-col gap-4">
           {timelineItems.map((item) => {
-            const key = item.kind === 'post' ? item.post.id : `room-${item.room.id}`;
+            const key = item.kind === 'post' ? item.post.id : item.kind === 'comment' ? `comment-${item.comment.id}` : `room-${item.room.id}`;
             return (
               <article key={key}>
                 {item.kind === 'post' ? (
                   <PostCard post={item.post} contextCommunityId={communityId ?? null} />
                 ) : (
-                  <WatchroomFeedItem room={item.room} />
+                  item.kind === 'comment' ? <CommentFeedCard comment={commentMap.get(item.comment.id)!} /> : <WatchroomFeedItem room={item.room} />
                 )}
               </article>
             );

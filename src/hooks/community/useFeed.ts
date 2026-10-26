@@ -7,6 +7,8 @@ import { WATCH_ROOM_COLUMNS } from '@/hooks/media/useWatchRoom';
 import { tallyPoll, type PostPoll } from './usePostPolls';
 import { resolveBadges, type BadgeDef } from '@/lib/badges';
 import type { ReactionCounts } from './useReactions';
+import { nextFeedCursor, type FeedCursor } from '@/lib/communityFeedCursor';
+import type { RawComment } from '@/hooks/user/useUserCommentsDetailed';
 import { deriveIsAdmin, deriveIsModerator } from '@/lib/roles';
 
 export type FeedTab = 'foryou' | 'following' | 'news';
@@ -41,6 +43,7 @@ export interface FeedPost extends ForumPost {
 
 export type FeedItem =
   | { kind: 'post'; sortAt: number; post: FeedPost }
+  | { kind: 'comment'; sortAt: number; comment: RawComment }
   | { kind: 'watchroom'; sortAt: number; room: WatchRoom };
 
 export type FeedPostType = 'watchroom' | 'tierlist' | 'playlist';
@@ -71,12 +74,16 @@ export function useFeed(tab: FeedTab, opts: FeedOptions = {}) {
 
   return useInfiniteQuery({
     queryKey: ['feed', tab, tag ?? null, communityId ?? null, postType ?? null, searchTerm || null, user?.id],
-    initialPageParam: null as string | null,
+    initialPageParam: null as FeedCursor | null,
     refetchOnWindowFocus: false,
     getNextPageParam: (lastPage: FeedItem[]) => {
       const posts = lastPage.filter((i) => i.kind === 'post');
-      if (posts.length < PAGE_SIZE) return undefined;
-      return new Date(posts[posts.length - 1].sortAt).toISOString();
+      const comments = lastPage.filter((i) => i.kind === 'comment');
+      return nextFeedCursor(
+        posts.map(i => ({ createdAt: i.post.created_at, id: i.post.id })),
+        comments.map(i => ({ createdAt: i.comment.created_at, id: i.comment.id })),
+        PAGE_SIZE,
+      );
     },
     queryFn: async ({ pageParam }): Promise<FeedItem[]> => {
       const db = supabase as any;
@@ -117,10 +124,13 @@ export function useFeed(tab: FeedTab, opts: FeedOptions = {}) {
           'id, user_id, community_id, title, content, image_url, flair, metadata, anime_id, anime_name, anime_poster, playlist_id, tierlist_id, is_pinned, is_approved, is_deleted, is_spoiler, deleted_by_role, comments_count, created_at',
         )
         .eq('is_approved', true)
-        .order('created_at', { ascending: false })
+        .order('created_at', { ascending: false }).order('id', { ascending: false })
         .limit(PAGE_SIZE);
 
-      if (pageParam) postQuery = postQuery.lt('created_at', pageParam);
+      if (pageParam?.posts) {
+        const { createdAt, id } = pageParam.posts;
+        postQuery = postQuery.or(`created_at.lt.${createdAt},and(created_at.eq.${createdAt},id.lt.${id})`);
+      }
       if (tab === 'news') postQuery = postQuery.eq('flair', 'News');
       if (tab === 'following') postQuery = postQuery.in('user_id', followingIds);
       if (communityId) postQuery = postQuery.eq('community_id', communityId);
@@ -133,7 +143,28 @@ export function useFeed(tab: FeedTab, opts: FeedOptions = {}) {
       else if (postType === 'tierlist') postQuery = postQuery.not('tierlist_id', 'is', null);
       else if (postType === 'watchroom') postQuery = postQuery.not('metadata->>watch_room_id', 'is', null);
 
-      const { data: rawPosts, error: postErr } = await postQuery;
+      const wantsComments = tab !== 'news' && !communityId && !tag && !postType && pageParam?.comments !== false;
+      const loadComments = async (): Promise<RawComment[]> => {
+        if (!wantsComments) return [];
+        let query = db.from('comments')
+          .select('id, user_id, entity_type, entity_id, episode_id, content, is_spoiler, created_at, attachments, embeds, source_title, source_kind, source_path')
+          .in('entity_type', ['anime', 'manga'])
+          .eq('is_deleted', false)
+          .order('created_at', { ascending: false }).order('id', { ascending: false }).limit(PAGE_SIZE);
+        if (pageParam?.comments) {
+          const { createdAt, id } = pageParam.comments;
+          query = query.or(`created_at.lt.${createdAt},and(created_at.eq.${createdAt},id.lt.${id})`);
+        }
+        if (tab === 'following') query = query.in('user_id', followingIds);
+        if (searchTerm) query = query.ilike('content', `%${searchTerm}%`);
+        const { data, error } = await query;
+        if (error) throw error;
+        return (data || []) as RawComment[];
+      };
+      const [{ data: rawPosts, error: postErr }, commentRows] = await Promise.all([
+        pageParam?.posts === false ? Promise.resolve({ data: [], error: null }) : postQuery,
+        loadComments(),
+      ]);
       if (postErr) throw postErr;
       const posts = (rawPosts || []) as any[];
       const ids = posts.map((p) => p.id);
@@ -454,7 +485,8 @@ export function useFeed(tab: FeedTab, opts: FeedOptions = {}) {
         room: { ...room, participant_count: countMap.get(room.id) || 0, host_profile: hostMap.get(room.host_id) } as WatchRoom,
       }));
 
-      return [...feedPosts, ...feedRooms].sort((a, b) => {
+      const feedComments: FeedItem[] = commentRows.map(comment => ({ kind: 'comment', sortAt: new Date(comment.created_at).getTime(), comment }));
+      return [...feedPosts, ...feedRooms, ...feedComments].sort((a, b) => {
         // Pinned posts always float to the top; then rank score (recency + interest).
         const pa = isPinned(a) ? 1 : 0;
         const pb = isPinned(b) ? 1 : 0;

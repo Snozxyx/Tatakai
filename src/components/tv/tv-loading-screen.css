@@ -1,0 +1,49 @@
+.tatakai-tv .tv-shell .tv-main > .tv-loading-screen {
+  margin: 0;
+  padding: 0;
+}
+.tv-loading-screen {
+  position: relative;
+  overflow: hidden;
+  min-height: 100dvh;
+  color: hsl(var(--foreground));
+  background: radial-gradient(ellipse at 77% 26%, hsl(var(--primary) / .12), transparent 58%);
+}
+.tv-loading-hero {
+  display: flex;
+  align-items: center;
+  height: 78vh;
+  min-height: 460px;
+  padding: 6vh 4vw;
+}
+.tv-loading-copy { width: min(44vw, 760px); }
+.tv-loading-identity { display: flex; align-items: center; gap: .65em; font-size: clamp(26px, 2.5vw, 48px); font-weight: 800; letter-spacing: -.03em; }
+.tv-loading-identity img { width: 1.35em; height: 1.35em; border-radius: .3em; }
+.tv-loading-message { margin: 1em 0 2em; font-size: clamp(16px, 1.25vw, 26px); line-height: 1.5; color: hsl(var(--foreground) / .75); }
+.tv-loading-screen i { display: block; background: hsl(var(--foreground) / .07); border-radius: 5px; }
+.tv-loading-title { display: grid; gap: .8vw; margin-bottom: 1.8vw; }
+.tv-loading-title i { width: 85%; height: clamp(24px, 3vw, 56px); }
+.tv-loading-title i:last-child { width: 57%; }
+.tv-loading-facts { display: flex; gap: .7vw; margin-bottom: 1.8vw; }
+.tv-loading-facts i { width: 4vw; min-width: 42px; height: 14px; }
+.tv-loading-lines { display: grid; gap: .7em; margin-bottom: 2vw; }
+.tv-loading-lines i { height: 12px; width: 94%; }
+.tv-loading-lines i:last-child { width: 68%; }
+.tv-loading-actions { display: flex; gap: 1vw; }
+.tv-loading-actions i { width: clamp(110px, 8vw, 180px); height: clamp(48px, 3.7vw, 72px); border-radius: 12px; }
+.tv-loading-actions i:first-child { background: hsl(var(--primary) / .22); }
+.tv-loading-shelves { padding: 0 2.4vw 3vh; }
+.tv-loading-shelf { margin-bottom: 3vh; }
+.tv-loading-shelf-heading { width: 12vw; min-width: 150px; height: 18px; border-radius: 4px; background: hsl(var(--foreground) / .09); margin-bottom: 1.2vw; }
+.tv-loading-cards { display: flex; gap: 1.25vw; width: max-content; }
+.tv-loading-card { position: relative; width: 20vw; min-width: 220px; aspect-ratio: 16/9; border-radius: 8px; background: hsl(var(--foreground) / .045); overflow: hidden; }
+.tv-loading-card i { position: absolute; bottom: 12%; left: 7%; height: 10px; width: 65%; }
+.tv-loading-pulse { animation: tv-loading-breathe 1800ms ease-in-out infinite; }
+.tv-loading-compact .tv-loading-hero { height: 58vh; min-height: 360px; }
+@keyframes tv-loading-breathe { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+.tv-loading-screen[data-reduced-motion] .tv-loading-pulse { animation: none; }
+@media (prefers-reduced-motion: reduce) { .tv-loading-pulse { animation: none; } }
+@media (max-height: 650px) {
+  .tv-loading-hero { min-height: 380px; }
+  .tv-loading-message { margin-bottom: 1.4em; }
+}

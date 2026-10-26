@@ -309,7 +309,7 @@ function walk(dir, out = []) {
   ];
   // The hardening migration is the single place that documents the decision for
   // these tables; if it disappears, they silently fall back to anon-writable.
-  const hardening = 'supabase/migrations/20261024000001_rls_hardening_internal_tables.sql';
+  const hardening = 'supabase/migrations/20261026000007_rls_hardening_internal_tables.sql';
   if (!existsSync(join(ROOT, hardening))) {
     fail(
       'DB-1',
@@ -390,7 +390,7 @@ function walk(dir, out = []) {
   //   • the table lives in a schema whose client privileges are revoked, or is
   //     named in the backend-only list of the hardening migration.
   const dir = join(ROOT, 'supabase/migrations');
-  const HARDENING = '20261024000001_rls_hardening_internal_tables.sql';
+  const HARDENING = '20261026000007_rls_hardening_internal_tables.sql';
   const ident = String.raw`("?[\w]+"?\s*\.\s*"?[\w]+"?|"?[\w]+"?)`;
   const norm = (v) => v.replace(/\s+/g, '').replace(/"/g, '').toLowerCase();
   const created = new Map();
@@ -419,7 +419,8 @@ function walk(dir, out = []) {
   const backendOnly = new Set();
   if (migrations.includes(HARDENING)) {
     const sql = readFileSync(join(dir, HARDENING), 'utf8').toLowerCase();
-    const block = sql.slice(sql.indexOf('foreach target in array'), sql.indexOf('end loop'));
+    const start = sql.indexOf('foreach target in array');
+    const block = start < 0 ? '' : sql.slice(start, sql.indexOf('end loop', start));
     // Only the explicit string literals of the table array — NOT the
     // `format('ALTER TABLE public.%I …')` template, which would otherwise mark
     // every public table as handled.

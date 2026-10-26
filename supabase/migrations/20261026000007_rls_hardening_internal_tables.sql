@@ -27,12 +27,28 @@
 -- bypasses RLS.
 -- =============================================================================
 
+-- Retire permissive legacy write policies before installing the explicit rules.
+-- RLS policies are ORed: adding a staff-only policy cannot restrict an older
+-- FOR ALL policy that still grants access. Analytics reads must also be staff-only.
+DO $$
+DECLARE p record;
+BEGIN
+  FOR p IN SELECT schemaname,tablename,policyname FROM pg_policies
+    WHERE schemaname='public'
+      AND tablename IN ('app_config','redirects','admin_popups','analytics_events','anime_trending_scores')
+      AND (cmd IN ('ALL','INSERT','UPDATE','DELETE') OR tablename='analytics_events')
+  LOOP
+    EXECUTE format('DROP POLICY %I ON %I.%I',p.policyname,p.schemaname,p.tablename);
+  END LOOP;
+END;
+$$;
+
 -- ---------------------------------------------------------------------------
 -- 1) Staff check, inlined the same way as the rest of the schema
 -- ---------------------------------------------------------------------------
 -- Matches the convention already used across the schema
 -- (see 20260201000001_moderator_permissions.sql).
-CREATE OR REPLACE FUNCTION public.is_staff_user()
+CREATE OR REPLACE FUNCTION public.security_is_staff()
 RETURNS boolean
 LANGUAGE sql
 STABLE
@@ -47,12 +63,12 @@ AS $$
   );
 $$;
 
-REVOKE ALL ON FUNCTION public.is_staff_user() FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.is_staff_user() TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.security_is_staff() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.security_is_staff() TO authenticated, service_role;
 
 -- app_config drives the in-app updater (android_download_url), so writes are
 -- admin-only rather than staff-only.
-CREATE OR REPLACE FUNCTION public.is_admin_user()
+CREATE OR REPLACE FUNCTION public.security_is_admin()
 RETURNS boolean
 LANGUAGE sql
 STABLE
@@ -66,8 +82,8 @@ AS $$
   );
 $$;
 
-REVOKE ALL ON FUNCTION public.is_admin_user() FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.is_admin_user() TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.security_is_admin() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.security_is_admin() TO authenticated, service_role;
 
 -- ---------------------------------------------------------------------------
 -- 2) app_config — public read (version gates must work before login),
@@ -83,8 +99,8 @@ CREATE POLICY app_config_public_read ON public.app_config
 DROP POLICY IF EXISTS app_config_admin_write ON public.app_config;
 CREATE POLICY app_config_admin_write ON public.app_config
   FOR ALL TO authenticated
-  USING (public.is_admin_user())
-  WITH CHECK (public.is_admin_user());
+  USING (public.security_is_admin())
+  WITH CHECK (public.security_is_admin());
 
 -- ---------------------------------------------------------------------------
 -- 3) redirects — public read (router resolves slugs), staff-only write.
@@ -98,7 +114,7 @@ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS redirects_public_read ON public.redirects';
   EXECUTE 'CREATE POLICY redirects_public_read ON public.redirects FOR SELECT TO anon, authenticated USING (true)';
   EXECUTE 'DROP POLICY IF EXISTS redirects_staff_write ON public.redirects';
-  EXECUTE 'CREATE POLICY redirects_staff_write ON public.redirects FOR ALL TO authenticated USING (public.is_staff_user()) WITH CHECK (public.is_staff_user())';
+  EXECUTE 'CREATE POLICY redirects_staff_write ON public.redirects FOR ALL TO authenticated USING (public.security_is_staff()) WITH CHECK (public.security_is_staff())';
 END;
 $$;
 
@@ -114,7 +130,7 @@ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS admin_popups_public_read ON public.admin_popups';
   EXECUTE 'CREATE POLICY admin_popups_public_read ON public.admin_popups FOR SELECT TO anon, authenticated USING (true)';
   EXECUTE 'DROP POLICY IF EXISTS admin_popups_staff_write ON public.admin_popups';
-  EXECUTE 'CREATE POLICY admin_popups_staff_write ON public.admin_popups FOR ALL TO authenticated USING (public.is_staff_user()) WITH CHECK (public.is_staff_user())';
+  EXECUTE 'CREATE POLICY admin_popups_staff_write ON public.admin_popups FOR ALL TO authenticated USING (public.security_is_staff()) WITH CHECK (public.security_is_staff())';
 END;
 $$;
 
@@ -131,7 +147,7 @@ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS analytics_events_insert_any ON public.analytics_events';
   EXECUTE 'CREATE POLICY analytics_events_insert_any ON public.analytics_events FOR INSERT TO anon, authenticated WITH CHECK (true)';
   EXECUTE 'DROP POLICY IF EXISTS analytics_events_staff_read ON public.analytics_events';
-  EXECUTE 'CREATE POLICY analytics_events_staff_read ON public.analytics_events FOR SELECT TO authenticated USING (public.is_staff_user())';
+  EXECUTE 'CREATE POLICY analytics_events_staff_read ON public.analytics_events FOR SELECT TO authenticated USING (public.security_is_staff())';
 END;
 $$;
 
@@ -197,4 +213,4 @@ $$;
 -- 9) Keep the existing guard authoritative for the one key it protects.
 -- ---------------------------------------------------------------------------
 COMMENT ON TABLE public.app_config IS
-  'App-wide configuration. RLS: public SELECT, staff-only writes (see migration 20261024000001). SECURITY: android_download_url / min_supported_version drive the in-app updater — treat as supply-chain material.';
+  'App-wide configuration. RLS: public SELECT, staff-only writes (see migration 20261026000007). SECURITY: android_download_url / min_supported_version drive the in-app updater — treat as supply-chain material.';

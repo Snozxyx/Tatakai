@@ -282,7 +282,7 @@ un-RLS'd table is **writable by anyone holding the public anon key**.
 holds `min_supported_version`, `latest_version`, `force_update_message` and
 `android_download_url`. An anonymous client could rewrite `android_download_url`
 and point the in-app Android updater at an attacker's APK.
-**Fix:** `supabase/migrations/20261024000001_rls_hardening_internal_tables.sql`:
+**Fix:** `supabase/migrations/20261026000007_rls_hardening_internal_tables.sql`:
 `app_config` → public `SELECT`, admin-only (`is_admin_user()`) writes;
 `redirects`/`admin_popups` → public read, staff write; `analytics_events` →
 append-only for clients, staff read; `anime_trending_scores` → public read (its

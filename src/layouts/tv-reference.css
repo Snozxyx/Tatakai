@@ -1,0 +1,113 @@
+/* Reference composition, scoped to the remote-first TV surface. */
+.tatakai-tv .tv-shell { --tv-rail-width: max(72px, 6vw); padding: 0 0 5vh var(--tv-rail-width); background: hsl(var(--background)); }
+.tatakai-tv .tv-icon-rail {
+  --rail-target: clamp(44px, 3.4vw, 66px);
+  position: fixed; z-index: 25; inset: 0 auto 0 0;
+  width: max(72px, 6vw); display: flex; flex-direction: column;
+  align-items: stretch; padding: 2vh max(8px, .8vw); gap: .6vh;
+  overflow: hidden; background: hsl(var(--sidebar-background)); border-right: 1px solid #ffffff0d;
+  transition: width 180ms ease-out, background-color 180ms ease-out;
+}
+.tatakai-tv .tv-icon-rail:is(:hover, :focus-within) { width: clamp(220px, 17vw, 330px); background: hsl(var(--card)); box-shadow: 18px 0 45px #0005; }
+.tatakai-tv .tv-icon-rail a {
+  position: relative; flex-shrink: 0; display: flex; align-items: center;
+  justify-content: flex-start; gap: 1.1vw; width: 100%; min-height: var(--rail-target);
+  padding: 0 max(12px, .9vw); border: 1px solid transparent; border-radius: 12px;
+  color: #b9b0c6; background: transparent; white-space: nowrap;
+  transition: color 120ms ease-out, background-color 120ms ease-out;
+}
+.tatakai-tv .tv-icon-rail nav { display: flex; flex-direction: column; gap: .4vh; margin-top: 2vh; }
+.tatakai-tv .tv-icon-rail a.active { color: #e7dcff; background: hsl(var(--primary) / .2); border-color: hsl(var(--primary) / .25); }
+.tatakai-tv .tv-icon-rail a:is(:hover, :focus-visible) { color: #fff; background: hsl(var(--primary) / .28); border-color: hsl(var(--primary) / .45); transform: none; }
+.tatakai-tv .tv-shell .tv-icon-rail a:focus-visible { outline: 2px solid hsl(var(--primary)) !important; outline-offset: -2px; }
+.tatakai-tv .tv-icon-rail svg { width: clamp(22px, 1.6vw, 32px); height: clamp(22px, 1.6vw, 32px); flex-shrink: 0; }
+.tatakai-tv .tv-icon-rail img { width: clamp(26px, 2vw, 38px); height: clamp(26px, 2vw, 38px); object-fit: cover; border-radius: 9px; flex-shrink: 0; }
+.tatakai-tv .tv-icon-rail .tv-rail-brand { padding-left: max(10px, .7vw); }
+.tatakai-tv .tv-rail-label { opacity: 0; visibility: hidden; font-size: clamp(16px, 1.15vw, 24px); font-weight: 500; transition: opacity 120ms ease-out; }
+.tatakai-tv .tv-icon-rail:is(:hover, :focus-within) .tv-rail-label { opacity: 1; visibility: visible; }
+.tatakai-tv .tv-rail-label.tv-rail-wordmark { color: #fff; font-size: clamp(24px, 1.8vw, 36px); font-weight: 800; letter-spacing: -.03em; }
+.tatakai-tv .tv-icon-rail .tv-rail-settings { margin-top: auto; }
+.tatakai-tv .tv-icon-rail .tv-rail-account img { border-radius: 50%; }
+.tatakai-tv .tv-main > :not(.tv-cinema, .tv-title-page, .tv-watch-page, .tv-art-atmosphere) { margin-left: 2.4vw; margin-right: 2.4vw; }
+.tatakai-tv .tv-main > :not(.tv-cinema, .tv-title-page, .tv-watch-page, .tv-rail, .tv-discovery-grid, .tv-art-atmosphere) { padding-top: 11vh; }
+.tatakai-tv .tv-cinema { height: 78vh; min-height: 460px; max-height: none; margin: 0 0 -1vh; border-radius: 0; background: transparent; }
+.tatakai-tv .tv-cinema-art { width: 92%; object-position: 65% 30%; }
+.tatakai-tv .tv-cinema-scrim { background: linear-gradient(90deg, hsl(var(--background) / .94) 0%, hsl(var(--background) / .78) 18%, hsl(var(--background) / .45) 38%, transparent 73%), linear-gradient(0deg, hsl(var(--background) / .35), transparent 40%); }
+.tatakai-tv .tv-cinema-copy { left: 4vw; top: 10vh; bottom: 10vh; width: 44%; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; }
+.tatakai-tv .tv-cinema h1 { font-size: clamp(34px, 4vw, 80px); line-height: 1.06; max-width: 18ch; margin-bottom: 1.5vw; letter-spacing: -.025em; }
+.tatakai-tv .tv-cinema .tv-title-logo { height: 16vh; max-width: 100%; }
+.tatakai-tv .tv-cinema-description { -webkit-line-clamp: 3; font-size: clamp(16px, 1.28vw, 28px); line-height: 1.6; margin: 1.4vw 0 2vw; color: #e4dce9; }
+.tatakai-tv .tv-cinema .tv-hero-facts { gap: .7em; }
+.tatakai-tv .tv-cinema .tv-hero-facts > span + span::before { content: none; }
+.tatakai-tv .tv-cinema .tv-hero-score { order: 1; color: #efbc65; }
+.tatakai-tv .tv-cinema-actions > :is(a, button) { border-radius: 12px; padding: .85em 1.5em; min-height: 52px; background: #ffffff16; border-color: #ffffff24; }
+.tatakai-tv .tv-cinema-actions > .tv-primary { color: #fff; background: hsl(var(--primary)); border-color: transparent; }
+.tatakai-tv .tv-cinema-navigation { top: auto; bottom: 5vh; right: 3vw; }
+.tatakai-tv .tv-cinema-corner { bottom: 12vh; right: 3vw; }
+.tatakai-tv .tv-rail { position: relative; margin-bottom: 2.5vw; }
+.tatakai-tv .tv-rail h2 { font-size: clamp(18px, 1.4vw, 30px); margin-bottom: .8vw; }
+.tatakai-tv .tv-rail .tv-content-card { position: relative; width: 20vw; min-width: 220px; border-radius: 8px; overflow: hidden; border: 1px solid #ffffff38; }
+.tatakai-tv .tv-rail .tv-card-art { border-radius: 0; }
+.tatakai-tv .tv-rail .tv-card-caption { position: absolute; inset: auto 0 0; padding: 2.2em .7em .7em; background: linear-gradient(transparent, #000d); }
+.tatakai-tv .tv-rail .tv-card-caption strong { min-height: 0; margin: 0; -webkit-line-clamp: 1; font-size: clamp(14px, 1.05vw, 24px); }
+.tatakai-tv .tv-rail :is(.tv-card-facts, .tv-card-tags, .tv-card-caption > span) { display: none; }
+.tatakai-tv .tv-title-tabs { position: relative; margin: 0 2.4vw 1vw; gap: 1.2vw; border-bottom: 1px solid #ffffff3b; }
+.tatakai-tv .tv-title-tabs :is(a, button) { padding: .8em 1em; border: 0; border-radius: 0; background: transparent; color: #c9bfce; }
+.tatakai-tv .tv-title-tabs .active { color: #fff; border-bottom: 2px solid hsl(var(--primary)); }
+.tatakai-tv #tv-title-episodes, .tatakai-tv .tv-title-full-synopsis { padding: 0 2.4vw; }
+.tatakai-tv #tv-title-episodes .tv-section-heading h2 { font-size: 1em; }
+.tatakai-tv .tv-episode-grid { display: flex; gap: 1vw; overflow-x: auto; padding: .5vw .35vw 1vw; scroll-snap-type: x proximity; }
+.tatakai-tv .tv-shell button.tv-episode-card { position: relative; flex: 0 0 21vw; min-width: 230px; border-radius: 8px; overflow: hidden; border: 1px solid #ffffff55; scroll-snap-align: start; }
+.tatakai-tv .tv-episode-card strong { position: absolute; inset: auto 0 0; padding: 2em .7em .8em; background: linear-gradient(transparent,#000e); font-size: clamp(14px,1.05vw,24px); }
+.tatakai-tv .tv-episode-card p { display: none; }
+.tatakai-tv .tv-episode-image { aspect-ratio: 16/9; }
+.tatakai-tv .tv-episode-image > span { top: .6em; left: .6em; bottom: auto; background: hsl(var(--primary)); border-radius: 5px; }
+.tatakai-tv .tv-shell-watching { padding-left: 0; }
+.tatakai-tv .tv-shell-watching > :is(.tv-icon-rail, .tv-header) { display: none; }
+.tatakai-tv .tv-watch-page { padding: 0; }
+.tatakai-tv .tv-watch-heading { display: none; }
+.tatakai-tv .tv-watch-player { border-radius: 0; height: 100dvh; max-height: none; }
+.tatakai-tv .tv-watch-player .video-player-container { width: 100%; height: 100dvh; min-height: 0; border-radius: 0; }
+.tatakai-tv .tv-watch-page > :is(.tv-filter-tabs, .tv-source-grid, .tv-pagination, .tv-chapter-grid) { margin: 1.5vw 3vw; }
+.tatakai-tv :is(a,button,input):focus-visible { outline: 3px solid #f5eaff; outline-offset: 4px; }
+@media (max-height: 650px) { .tatakai-tv .tv-cinema-copy { top: 7vh; bottom: 9vh; } .tatakai-tv .tv-cinema { height: 78vh; min-height: 410px; } .tatakai-tv .tv-cinema-description { margin: 1vw 0 1.5vw; } }
+@media (max-width: 900px) { .tatakai-tv .tv-shell { --tv-rail-width: 72px; } .tatakai-tv .tv-cinema-copy { width: 52%; } .tatakai-tv .tv-cinema h1 { font-size: 34px; } }
+@media (prefers-reduced-motion: reduce) { .tatakai-tv .tv-shell * { scroll-behavior: auto; transition: none; } }
+
+.tatakai-tv .tv-title-page .tv-cinema { height: 72vh; }
+.tatakai-tv #tv-title-episodes .tv-section-heading { margin-bottom: 0; }
+.tatakai-tv #tv-title-episodes .tv-section-heading h2 { display: none; }
+.tatakai-tv .tv-title-page .tv-cinema-copy { top: 7vh; bottom: 8vh; }
+
+.tatakai-tv .tv-cinema .tv-title-logo img { max-width: 100%; max-height: 100%; object-fit: contain; object-position: left center; }
+.tatakai-tv .tv-cinema .tv-title-logo img.tv-logo-square { width: auto; height: 100%; object-fit: contain; }
+.tatakai-tv .tv-shell .tv-cinema-actions > :is(a,button):is(:hover,:focus-visible) { color: #fff; background: hsl(var(--primary) / .32); border-color: hsl(var(--primary) / .65); outline-color: hsl(var(--primary)) !important; }
+.tatakai-tv .tv-shell .tv-cinema-actions > .tv-primary:is(:hover,:focus-visible) { background: hsl(var(--primary) / .85); }
+@media (max-height: 650px) { .tatakai-tv .tv-icon-rail { padding-block: 8px; gap: 2px; --rail-target: 40px; } .tatakai-tv .tv-icon-rail nav { margin-top: 6px; gap: 2px; } }
+.tatakai-tv .tv-theme-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.2vw; margin-block: 1.5em 2em; }
+.tatakai-tv .tv-shell button.tv-theme-option { display: flex; flex-direction: column; align-items: stretch; padding: 1em; gap: .65em; text-align: left; white-space: normal; border: 1px solid hsl(var(--border)); border-radius: 14px; background: hsl(var(--card)); color: hsl(var(--foreground)); }
+.tatakai-tv .tv-shell button.tv-theme-option:is(:hover,:focus-visible), .tatakai-tv .tv-shell button.tv-theme-option[aria-pressed=true] { background: hsl(var(--primary) / .1); border-color: hsl(var(--primary)); color: hsl(var(--foreground)); }
+.tv-theme-preview { display: flex; height: clamp(80px, 8vw, 150px); border: 1px solid; border-radius: 8px; overflow: hidden; }
+.tv-theme-preview-sidebar { width: 18%; padding: 12% 4%; }
+.tv-theme-preview-sidebar > i { display: block; height: 12px; border-radius: 3px; }
+.tv-theme-preview-content { display: flex; flex: 1; flex-direction: column; justify-content: flex-end; gap: 15%; padding: 8%; }
+.tv-theme-preview-content > i { width: 36%; height: 15%; min-height: 8px; border-radius: 3px; }
+.tv-theme-preview-content > span { display: flex; height: 30%; gap: 6%; }
+.tv-theme-preview-content > span > i { flex: 1; border-radius: 3px; }
+.tv-theme-label { display: flex; justify-content: space-between; align-items: center; gap: .5em; }
+.tv-theme-label strong { font-size: .9em; font-weight: 600; }
+.tv-theme-option small { font-size: .72em; line-height: 1.5; color: hsl(var(--foreground) / .72); }
+@media (max-width: 1000px) { .tatakai-tv .tv-theme-options { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+
+/* One still-art backdrop continues the hero's colors beneath the shelves. */
+.tatakai-tv .tv-main { isolation: isolate; }
+.tv-art-atmosphere { display: none; }
+.tatakai-tv .tv-art-atmosphere { display: block; position: fixed; z-index: -1; inset: 0; overflow: hidden; pointer-events: none; background: hsl(var(--background)); }
+.tatakai-tv .tv-art-atmosphere img { width: 100%; height: 100%; object-fit: cover; filter: blur(48px) saturate(.8); transform: scale(1.12); opacity: .42; }
+.tatakai-tv .tv-art-atmosphere::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, hsl(var(--background) / .55), hsl(var(--background) / .2)), linear-gradient(0deg, hsl(var(--background) / .5), transparent 65%); }
+.tatakai-tv .tv-cinema-art, .tatakai-tv .tv-cinema-scrim, .tatakai-tv .tv-cinema > .tv-trailer-layer { mask-image: linear-gradient(0deg, transparent 0%, #000 42%, #000 100%); -webkit-mask-image: linear-gradient(0deg, transparent 0%, #000 42%, #000 100%); }
+.tatakai-tv .tv-cinema-art { width: 100%; }
+@media (max-width: 1280px) { .tatakai-tv .tv-art-atmosphere img { filter: blur(32px) saturate(.8); } }
+/* A parked mouse must not expand navigation during remote browsing. */
+.tatakai-tv .tv-shell[data-tv-input="remote"] .tv-icon-rail:not(:focus-within) { width: max(72px, 6vw); background: hsl(var(--sidebar-background)); box-shadow: none; }
+.tatakai-tv .tv-shell[data-tv-input="remote"] .tv-icon-rail:not(:focus-within) .tv-rail-label { opacity: 0; visibility: hidden; }

@@ -1,3 +1,4 @@
+import { TVLoadingScreen } from "@/components/tv/TVLoadingScreen";
 import { TVCinematicHero } from "@/components/tv/TVCinematicHero";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useEffect, useState } from "react";
@@ -40,9 +41,7 @@ export default function TVAnimePage({ animeId }: { animeId: string }) {
   }, [params, episodes.data, history.data]); // eslint-disable-line react-hooks/exhaustive-deps
   if (isLoading)
     return (
-      <div className="tv-state" role="status">
-        Loading title…
-      </div>
+      <TVLoadingScreen message="Loading title…" />
     );
   if (error || !data)
     return (
@@ -107,7 +106,7 @@ export default function TVAnimePage({ animeId }: { animeId: string }) {
         </>}
       />
       <div className="tv-title-tabs">
-        <a href="#tv-title-episodes">Episodes</a>
+        <a className="active" href="#tv-title-episodes">Episodes</a>
         <button onClick={() => setShowAll((value) => !value)}>
           {showAll ? "Less detail" : "Full synopsis"}
         </button>
@@ -165,7 +164,7 @@ export default function TVAnimePage({ animeId }: { animeId: string }) {
                 <span>{episode.number}</span>
                 <Play />
               </div>
-              <strong>{episode.title || `Episode ${episode.number}`}</strong>
+              <strong><span>Episode {episode.number}: </span>{episode.title || "Untitled"}</strong>
               <p>
                 {episode.hasAired === false
                   ? "Coming soon"

@@ -26,6 +26,9 @@ export interface DetailedComment {
   user_id: string;
   entity_type: CommentEntityType;
   entity_id: string;
+  source_title?: string | null;
+  source_kind?: 'anime' | 'manga' | 'novel' | null;
+  source_path?: string | null;
   episode_id: string | null;
   content: string;
   is_spoiler: boolean;
@@ -43,11 +46,14 @@ export interface DetailedComment {
   author: DetailedCommentAuthor | null;
 }
 
-interface RawComment {
+export interface RawComment {
   id: string;
   user_id: string;
   entity_type: CommentEntityType;
   entity_id: string;
+  source_title?: string | null;
+  source_kind?: 'anime' | 'manga' | 'novel' | null;
+  source_path?: string | null;
   episode_id: string | null;
   content: string;
   is_spoiler: boolean;
@@ -57,7 +63,7 @@ interface RawComment {
 }
 
 const SELECT =
-  'id, user_id, entity_type, entity_id, episode_id, content, is_spoiler, created_at, is_deleted, attachments, embeds';
+  'id, user_id, entity_type, entity_id, episode_id, content, is_spoiler, created_at, is_deleted, attachments, embeds, source_title, source_kind, source_path';
 
 const digits = (v: string) => v.match(/(\d+)/)?.[1] ?? v;
 
@@ -67,14 +73,14 @@ const digits = (v: string) => v.match(/(\d+)/)?.[1] ?? v;
  * polls, and (when `withAuthors`) joins author profiles. Anime/manga titles come
  * from AniList (batched); playlist / tier_list / forum titles from Supabase.
  */
-function useEnrichedComments(rows: RawComment[], withAuthors: boolean) {
+export function useEnrichedComments(rows: RawComment[], withAuthors: boolean) {
   useUiTranslation();
   const animeIds = useMemo(
-    () => rows.filter((r) => r.entity_type === 'anime').map((r) => r.entity_id),
+    () => rows.filter((r) => r.entity_type === 'anime' && !r.source_title).map((r) => r.entity_id),
     [rows],
   );
   const mangaIds = useMemo(
-    () => rows.filter((r) => r.entity_type === 'manga').map((r) => r.entity_id),
+    () => rows.filter((r) => r.entity_type === 'manga' && (!r.source_title || !r.source_kind)).map((r) => r.entity_id),
     [rows],
   );
   const { data: animeMeta = {} } = useAnimeMetaByIds(animeIds);
@@ -176,8 +182,10 @@ function useEnrichedComments(rows: RawComment[], withAuthors: boolean) {
           break;
         }
         case 'manga': {
-          title = (mangaMeta as any)[Number(digits(r.entity_id))]?.title || 'Manga';
-          target = `/manga/${r.entity_id}${hash}`;
+          const meta = (mangaMeta as any)[Number(digits(r.entity_id))];
+          const isNovel = r.source_kind === 'novel' || meta?.format === 'NOVEL';
+          title = meta?.title || 'Manga';
+          target = `/${isNovel ? 'novel' : 'manga'}/${r.entity_id.split(':')[0]}${hash}`;
           break;
         }
         case 'playlist': {
@@ -197,7 +205,12 @@ function useEnrichedComments(rows: RawComment[], withAuthors: boolean) {
           break;
         }
       }
+      if (r.source_title) title = r.source_title;
+      if (r.source_path?.startsWith('/') && !r.source_path.startsWith('//') && !/[\\#]/.test(r.source_path)) {
+        target = r.source_path + hash;
+      }
       return {
+        source_kind: r.source_kind ?? (target.startsWith('/novel/') ? 'novel' : r.entity_type === 'anime' ? 'anime' : 'manga'),
         id: r.id,
         user_id: r.user_id,
         entity_type: r.entity_type,
@@ -227,7 +240,7 @@ export function useUserCommentsDetailed(userId: string | undefined) {
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ['user-comments-detailed', userId],
     queryFn: async () => {
-      if (!userId) return [] as RawComment[];
+      if (!userId) return [] as unknown as RawComment[];
       const { data, error } = await supabase
         .from('comments')
         .select(SELECT)
@@ -235,7 +248,7 @@ export function useUserCommentsDetailed(userId: string | undefined) {
         .order('created_at', { ascending: false })
         .limit(60);
       if (error) throw error;
-      return (data || []).filter((c: any) => !c.is_deleted) as RawComment[];
+      return (data || []).filter((c: any) => !c.is_deleted) as unknown as RawComment[];
     },
     enabled: !!userId,
   });
@@ -260,7 +273,7 @@ export function useRecentCommentsDetailed(limit = 30) {
         .order('created_at', { ascending: false })
         .limit(limit);
       if (error) throw error;
-      return (data || []).filter((c: any) => !c.is_deleted) as RawComment[];
+      return (data || []).filter((c: any) => !c.is_deleted) as unknown as RawComment[];
     },
   });
 

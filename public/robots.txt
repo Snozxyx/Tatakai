@@ -8,7 +8,6 @@ Disallow: /api/
 Disallow: /admin
 Disallow: /auth
 Disallow: /settings
-Disallow: /watch
 Disallow: /manga/read
 Disallow: /downloads
 Disallow: /offline-library
@@ -25,7 +24,6 @@ Allow: /
 Disallow: /api/
 Disallow: /admin
 Disallow: /auth
-Disallow: /watch
 Disallow: /manga/read
 Disallow: /settings
 
@@ -34,7 +32,6 @@ Allow: /
 Disallow: /api/
 Disallow: /admin
 Disallow: /auth
-Disallow: /watch
 Disallow: /settings
 
 User-agent: Slurp

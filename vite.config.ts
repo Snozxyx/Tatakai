@@ -56,6 +56,9 @@ export default defineConfig(({ mode }) => {
     esbuild: mode === 'production' || mode === 'web' ? { drop: ['debugger'] } : {},
     base: isElectronBuild ? './' : '/',
     resolve: {
+      // Workers explicitly supply the packaged WASM URL; avoid bundling every
+      // ONNX backend variant through the SDK fallback imports.
+      conditions: ['onnxruntime-web-use-extern-wasm', 'module', 'browser', 'development|production'],
       alias: {
         '@translation-ort-assets': translationOrtAssets,
         "@tatakai/release-parser": path.resolve(__dirname, "./desktop/runtime/torrent/naming/release-parser.cjs"),
@@ -117,7 +120,12 @@ export default defineConfig(({ mode }) => {
       // Webapp specific build config
       rollupOptions: {
         output: {
-          onlyExplicitManualChunks: true,
+          codeSplitting: {
+            includeDependenciesRecursively: false,
+            groups: [
+              { name: 'react-vendor', test: /[\\/]node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler|@remix-run[\\/]router)[\\/]/ },
+            ],
+          },
           ...(isWebMode ? {
             // Don't generate service worker for webapp
             entryFileNames: 'assets/[name].[hash].js',
@@ -127,29 +135,7 @@ export default defineConfig(({ mode }) => {
           // Split heavy, independently-cacheable vendors out of the main bundle
           // (was one ~2.7MB index chunk). React + router stay together so shared
           // React internals resolve before any consumer chunk evaluates.
-          manualChunks(id) {
-            if (!id.includes('node_modules')) return;
-            if (/[\\/]node_modules[\\/]typescript[\\/]/.test(id)) return 'extension-typescript';
-            // React + the whole router stack (incl. @remix-run/router, the core
-            // that react-router/react-router-dom re-export) MUST stay together.
-            // Splitting @remix-run/router into the catch-all `vendor` chunk while
-            // react-vendor imports it creates a react-vendor ↔ vendor cycle:
-            // `vendor` then evaluates first and touches `React.createContext`
-            // (react-helmet-async) before react-vendor initialises `React` →
-            // "Cannot access 'React' before initialization" and a black screen.
-            if (/[\\/]node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler|@remix-run[\\/]router)[\\/]/.test(id)) return 'react-vendor';
-            if (id.includes('@radix-ui')) return 'radix';
-            if (id.includes('framer-motion')) return 'motion';
-            if (id.includes('recharts') || id.includes('d3-')) return 'charts';
-            if (id.includes('hls.js')) return 'hls';
-            if (id.includes('@tiptap') || id.includes('prosemirror')) return 'editor';
-            if (id.includes('@supabase')) return 'supabase';
-            if (id.includes('@tanstack')) return 'tanstack';
-            if (id.includes('lucide-react')) return 'icons';
-            // Let Rollup split the remaining dependencies by actual usage.
-            // A catch-all vendor merges lazy AI/reader/player libraries into startup.
-            return undefined;
-          },
+
         },
       },
     },

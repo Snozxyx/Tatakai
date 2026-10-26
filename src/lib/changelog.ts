@@ -14,6 +14,25 @@ export interface ChangelogRelease {
 
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: "6.4.0",
+    date: "2026-10-26",
+    changes: [
+      "Add the profile collection registry, public cosmetics and configured theme launch claims.",
+      "Refresh Android TV navigation, playback controls, loading screens and appearance settings. Add comment activity to supported feeds with stable pagination and richer link embeds.",
+      "Add customizable profile themes, widget layouts and cosmetic access checks, including SekaiPop, Uchiha, Gothic Empress, Midnight Lofi and Komorebi presentations with mobile layouts.",
+      "Add peer watch-room media sharing, playback synchronization and connection controls, with bounded media handling and clearer readiness states.",
+      "Improve the manga reader with touch pinch-to-zoom, stable provider selection, continuous-reading behavior and consistent manga/novel history.",
+      "Show manga and novel sources progressively while slow providers continue; retain later sources, coalesce duplicate lookups and reuse bounded hosted chapter caches.",
+      "Load novel home shelves through one cached response. Keep stored catalog fallbacks available during upstream outages without relabeling popularity as live trending.",
+      "Connect community servers within the website from both catalog cards and detail pages. Preserve signed media URLs and fix mobile-web fullscreen settings panels.",
+      "Improve iOS extension HTTP support and Turnstile verification, with matching native proxy handling and more reliable compatibility-provider requests.",
+      "Reduce repeated media requests, optimize cached profile artwork and packaged assets, and refresh the landing page with novel-reader previews.",
+      "Harden desktop IPC, extension workers, local service origins, external media/file operations, Android backup exclusions and AniList OAuth state validation.",
+      "Preserve Supabase as the API catalog source of truth while bounding upstream concurrency, sharing request limits and validating server credentials.",
+      "Merge the dependency and security pull requests, update the Rust translation engine dependencies, and align the frontend build plugins and offline speech runtime versions."
+],
+  },
+  {
     version: "6.3.0",
     date: "2026-10-23",
     changes: [

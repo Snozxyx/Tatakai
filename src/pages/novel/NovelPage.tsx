@@ -1747,7 +1747,7 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
 
               <section>
                 <Comments
-                  entityType="manga"
+                  sourceKind="novel" entityType="manga"
                   entityId={String(novelId || info.anilistId || info.malId || "")}
                   entityName={displayTitle}
                 />

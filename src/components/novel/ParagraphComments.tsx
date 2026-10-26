@@ -64,7 +64,7 @@ export function ParagraphThread({
           {uiI18n.t('app.close_bbfa773e')}
         </button>
       </div>
-      <Comments entityType="manga" entityId={threadId} entityName={`Paragraph ${paragraphIndex + 1}`} />
+      <Comments sourceKind="novel" entityType="manga" entityId={threadId} entityName={`Paragraph ${paragraphIndex + 1}`} />
     </div>
   );
 }

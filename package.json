@@ -1,7 +1,7 @@
 {
   "name": "tatakai",
   "private": true,
-  "version": "6.3.0",
+  "version": "6.4.0",
   "description": "Tatakai \u00e2\u20ac\u201d an extension-based otaku community for tracking anime & manga",
   "author": {
     "name": "Snozxyx",
@@ -146,7 +146,7 @@
     "lucide-react": "^0.462.0",
     "mp4box": "^2.4.1",
     "next-themes": "^0.3.0",
-    "onnxruntime-web": "^1.27.0",
+    "onnxruntime-web": "1.27.0",
     "pako": "^3.0.2",
     "playwright": "^1.62.1",
     "playwright-extra": "^4.3.6",
@@ -190,7 +190,7 @@
     "@types/react": "^18.3.23",
     "@types/react-dom": "^18.3.7",
     "@types/three": "^0.186.0",
-    "@vitejs/plugin-react-swc": "^3.11.0",
+    "@vitejs/plugin-react-swc": "^4.3.3",
     "autoprefixer": "^10.4.21",
     "concurrently": "^9.2.5",
     "cross-env": "^7.0.3",
@@ -220,7 +220,8 @@
   "overrides": {
     "esbuild": "^0.25.0",
     "baseline-browser-mapping": "latest",
-    "caniuse-lite": "1.0.30001812"
+    "caniuse-lite": "1.0.30001812",
+    "adm-zip": "^0.6.1"
   },
   "build": {
     "appId": "app.tatakai.me",

@@ -140,6 +140,8 @@ function ReplyRow({
   const [draft, setDraft] = useState(reply.content ?? '');
   const [replying, setReplying] = useState(false);
 
+  if (reply.is_deleted && entityType === 'forum_post') return null;
+
   if (reply.is_deleted) {
     return (
       <p id={`comment-${reply.id}`} className="scroll-mt-24 text-sm italic text-muted-foreground">

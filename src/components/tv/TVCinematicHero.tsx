@@ -20,6 +20,10 @@ export function TVCinematicHero({
   navigation?: ReactNode;
 }) {
   return (
+    <>
+    <div className="tv-art-atmosphere" aria-hidden="true">
+      <img src={artwork} alt="" decoding="async" />
+    </div>
     <section className="tv-cinema" aria-label={title}>
       <img className="tv-cinema-art" src={artwork} alt="" fetchPriority="high" />
       <TVTrailerPreview anilistId={anilistId} title={title} />
@@ -36,5 +40,6 @@ export function TVCinematicHero({
       </div>
       {navigation && <div className="tv-cinema-navigation">{navigation}</div>}
     </section>
+    </>
   );
 }

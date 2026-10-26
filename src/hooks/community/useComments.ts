@@ -231,6 +231,9 @@ export function useAddComment() {
     mutationFn: async ({
       entityType,
       entityId,
+      sourceTitle,
+      sourceKind,
+      sourcePath,
       episodeId,
       content,
       parentId,
@@ -241,6 +244,9 @@ export function useAddComment() {
     }: {
       entityType: CommentEntityType;
       entityId: string;
+      sourceTitle?: string;
+      sourceKind?: 'anime' | 'manga' | 'novel';
+      sourcePath?: string;
       episodeId?: string;
       content: string;
       parentId?: string;
@@ -292,6 +298,9 @@ export function useAddComment() {
           user_id: user!.id,
           entity_type: entityType,
           entity_id: entityId,
+          source_title: sourceTitle ?? null,
+          source_kind: sourceKind ?? null,
+          source_path: sourcePath ?? null,
           // episode_id scopes a sub-thread: episode number for anime, canonical
           // chapter number for manga (DB CHECK allows both).
           episode_id: entityType === 'anime' || entityType === 'manga' ? (episodeId ?? null) : null,
@@ -374,6 +383,7 @@ export function useAddComment() {
       return { previous, targetKey };
     },
     onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['feed'] });
       queryClient.invalidateQueries({ queryKey: ['comments', variables.entityType, variables.entityId] });
       if (variables.parentId) {
         queryClient.invalidateQueries({ queryKey: ['replies', variables.parentId] });
@@ -438,6 +448,7 @@ export function useDeleteComment() {
       await softDeleteComment(commentId);
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['feed'] });
       queryClient.invalidateQueries({ queryKey: ['comments'] });
       queryClient.invalidateQueries({ queryKey: ['replies'] });
       toast.success(uiI18n.t('app.comment_deleted_ff337dce'));
@@ -497,6 +508,7 @@ export function useEditComment() {
       }
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['feed'] });
       queryClient.invalidateQueries({ queryKey: ['comments'] });
       queryClient.invalidateQueries({ queryKey: ['replies'] });
     },
@@ -533,6 +545,7 @@ export function useLikeComment() {
       }
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['feed'] });
       queryClient.invalidateQueries({ queryKey: ['comments'] });
       queryClient.invalidateQueries({ queryKey: ['replies'] });
     },
@@ -567,6 +580,7 @@ export function usePinComment() {
       return commentId;
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['feed'] });
       queryClient.invalidateQueries({ queryKey: ['comments'] });
       queryClient.invalidateQueries({ queryKey: ['replies'] });
       queryClient.invalidateQueries({ queryKey: ['admin_logs'] });

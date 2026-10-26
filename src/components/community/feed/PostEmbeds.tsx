@@ -3,11 +3,11 @@ import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
-import { Layers, Music2, Loader2, EyeOff } from 'lucide-react';
+import { Layers, Music2, Loader2, EyeOff, ArrowUpRight, Film, BookOpen } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { getProxiedImageUrl } from '@/lib/api';
 import { cn } from '@/lib/utils';
-import { UnifiedMediaCard } from '@/components/UnifiedMediaCard';
+import { RichEmbedFrame } from '@/components/community/RichEmbedFrame';
 import { useLightbox } from '@/components/media/ImageLightbox';
 import { Poll } from './Poll';
 import { TranslatedPostContent } from './TranslatedPostContent';
@@ -74,12 +74,13 @@ export function PostImageGrid({ images, spoiler }: { images: string[]; spoiler?:
 export function QuotedPostEmbed({ postId, preview = false }: { postId: string; preview?: boolean }) {
   useUiTranslation();
   const navigate = useNavigate();
+  const [revealed, setRevealed] = useState(false);
   const { data: post, isLoading } = useQuery({
     queryKey: ['quoted-post', postId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('forum_posts')
-        .select('id, title, content, user_id, image_url, metadata, is_spoiler, created_at, playlist_id, tierlist_id, anime_id, anime_name, anime_poster')
+        .select('id, title, content, user_id, image_url, metadata, is_spoiler, created_at, playlist_id, tierlist_id, anime_id, anime_name, anime_poster, is_deleted, is_approved')
         .eq('id', postId)
         .maybeSingle();
       if (error) throw error;
@@ -99,7 +100,7 @@ export function QuotedPostEmbed({ postId, preview = false }: { postId: string; p
   const { data: quotedPoll } = usePostPoll(postId);
 
   if (isLoading) return <EmbedShell><EmbedSkeleton /></EmbedShell>;
-  if (!post) return null;
+  if (!post || (post as any).is_deleted || (post as any).is_approved === false) return null;
   const name = post.profile?.display_name || post.profile?.username || 'Anonymous';
   // Resolve the quoted post's media the same way the feed does: a picked GIF,
   // else metadata.images, else the legacy single image_url column.
@@ -120,9 +121,10 @@ export function QuotedPostEmbed({ postId, preview = false }: { postId: string; p
     <div
       role={preview ? undefined : 'link'}
       tabIndex={preview ? undefined : 0}
+      onKeyDown={preview ? undefined : event => { if (event.key === 'Enter' && event.target === event.currentTarget) { event.preventDefault(); event.stopPropagation(); navigate(`/community/forum/${post.id}`); } }}
       onClick={preview ? undefined : (e) => { e.stopPropagation(); navigate(`/community/forum/${post.id}`); }}
       className={cn(
-        'block rounded-2xl border border-white/[0.06] bg-white/[0.015] p-3 transition-colors',
+        'block w-full min-w-0 max-w-xl rounded-xl border border-border/60 border-l-[3px] border-l-primary bg-muted/25 p-4 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary',
         !preview && 'cursor-pointer hover:border-white/10',
       )}
     >
@@ -143,6 +145,9 @@ export function QuotedPostEmbed({ postId, preview = false }: { postId: string; p
         <span className="font-display font-bold tracking-tight">{name}</span>
         {post.profile?.username && <span className="text-muted-foreground">@{post.profile.username}</span>}
       </div>
+      {post.is_spoiler && !revealed ? <button type="button" onClick={event => { event.stopPropagation(); setRevealed(true); }} className="mt-3 flex min-h-24 w-full items-center justify-center gap-2 rounded-lg bg-muted/50 px-4 text-sm text-muted-foreground hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
+        <EyeOff aria-hidden="true" className="h-4 w-4" />{uiI18n.t('app.spoiler_tap_to_view_0932d1f5')}
+      </button> : <>
       <TranslatedPostContent title={post.title} content={post.content}
         titleClassName="mt-1 line-clamp-1 text-sm font-semibold"
         contentClassName="mt-0.5 text-sm text-muted-foreground" />
@@ -176,6 +181,7 @@ export function QuotedPostEmbed({ postId, preview = false }: { postId: string; p
           />
         </div>
       )}
+      </>}
     </div>
   );
 }
@@ -222,7 +228,7 @@ export function PostImageEmbed({ url, alt }: { url: string; alt?: string }) {
 function EmbedShell({ children }: { children: React.ReactNode }) {
   useUiTranslation();
   return (
-    <div className="rounded-2xl border border-white/[0.05] bg-white/[0.015] p-3">{children}</div>
+    <RichEmbedFrame><div className="p-4">{children}</div></RichEmbedFrame>
   );
 }
 
@@ -244,9 +250,9 @@ export function PostPlaylistEmbed({ playlistId, size = 'default' }: { playlistId
       <Link
         to={`/playlist/${playlist.id}`}
         onClick={(e) => e.stopPropagation()}
-        className="group flex items-center gap-4"
+        className="group flex items-start gap-4 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
       >
-        <div className={cn('relative flex-shrink-0 overflow-hidden rounded-xl bg-muted', lg ? 'h-32 w-32' : 'h-24 w-24')}>
+        <div className={cn('relative flex-shrink-0 overflow-hidden rounded-xl bg-muted', lg ? 'h-28 w-28 sm:h-32 sm:w-32' : 'h-24 w-24')}>
           {covers.length > 0 ? (
             <div className={cn('grid h-full w-full', covers.length >= 2 ? 'grid-cols-2' : 'grid-cols-1')}>
               {covers.slice(0, 4).map((img, idx) => (
@@ -260,10 +266,10 @@ export function PostPlaylistEmbed({ playlistId, size = 'default' }: { playlistId
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-primary/80">{uiI18n.t('app.playlist_cd95b41f')}</span>
+          <span className="text-xs font-medium text-muted-foreground">{uiI18n.t('app.playlist_cd95b41f')}</span>
           <h4
             className={cn(
-              'truncate font-display font-semibold tracking-tight group-hover:text-primary transition-colors',
+              'line-clamp-3 break-words font-display font-semibold leading-snug tracking-tight text-primary group-hover:underline underline-offset-4 transition-colors',
               lg ? 'text-lg' : 'text-base',
             )}
           >
@@ -313,7 +319,7 @@ export function PostTierlistEmbed({ tierlistId }: { tierlistId: string }) {
             <Layers className="h-4 w-4 text-primary/70" />
           </span>
           <div className="min-w-0 flex-1">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-primary/80">{uiI18n.t('app.tier_list_63062d48')}</span>
+            <span className="text-xs font-medium text-muted-foreground">{uiI18n.t('app.tier_list_63062d48')}</span>
             <h4 className="truncate font-display font-semibold tracking-tight group-hover:text-primary transition-colors">
               {tierlist.title}
             </h4>
@@ -384,25 +390,26 @@ export function PostMediaEmbed({
     : isAnime ? `/anime/${id}` : isNovel ? `/novel/${id}` : `/manga/${id}`;
   const kindLabel = isCharacter ? uiI18n.t('app.character_ee9946c8') : isAnime ? uiI18n.t('app.anime_f1b32a19') : isNovel ? uiI18n.t('app.novel_1a9fdb91') : kind.replace(/^\w/, (c) => c.toUpperCase());
 
-  // The primary attachment upgrades to the app's canonical media card so a
-  // shared title reads like it does everywhere else (poster + type badge),
-  // instead of a hand-rolled pill. Sub-formats (manhwa/manhua/comics) collapse
-  // to the `manga` media type but keep their own label via `type`; novels use
-  // the `novel` media type.
   if (variant === 'card') {
-    const mediaType: 'anime' | 'manga' | 'novel' | 'character' = isCharacter
-      ? 'character'
-      : isAnime
-        ? 'anime'
-        : isNovel
-          ? 'novel'
-          : 'manga';
+    const Icon = isAnime ? Film : BookOpen;
     return (
-      <div className="max-w-[190px]" onClick={(e) => e.stopPropagation()}>
-        <UnifiedMediaCard
-          item={{ id, name, poster: poster || '', type: kind, mediaType, href }}
-        />
-      </div>
+      <RichEmbedFrame>
+        <Link to={href} onClick={event => event.stopPropagation()}
+          className="group block focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary">
+          <div className="space-y-2 p-4">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Icon aria-hidden="true" className="h-4 w-4" />
+              <span>Tatakai · {kindLabel}</span>
+              <ArrowUpRight aria-hidden="true" className="ml-auto h-4 w-4" />
+            </div>
+            <h4 className="break-words text-base font-semibold leading-snug text-primary underline-offset-4 group-hover:underline">{name}</h4>
+          </div>
+          {poster && <div className="border-t border-border/40 bg-background/40">
+            <img src={getProxiedImageUrl(poster)} alt={name} loading="lazy" decoding="async"
+              className="max-h-80 w-full object-contain" />
+          </div>}
+        </Link>
+      </RichEmbedFrame>
     );
   }
 
@@ -430,7 +437,7 @@ export function PostWatchroomEmbed({ roomId }: { roomId: string }) {
   const { data: room, isLoading } = useQuery({
     queryKey: ['embed-watchroom', roomId],
     queryFn: async (): Promise<WatchRoom | null> => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('watch_rooms')
         .select(WATCH_ROOM_COLUMNS)
         .eq('id', roomId)

@@ -746,7 +746,7 @@ export default function NovelReaderPage() {
             </button>
             {showComments && (
               <div className="mt-3 rounded-2xl border border-white/10 bg-black/30 p-4">
-                <Comments entityType="manga" entityId={`${novelId}:${quoteDraft?.chapterKey || chapterKey}`} entityName={quoteDraft?.chapterKey && quoteDraft.chapterKey !== chapterKey ? appended?.title : title} quoteDraft={quoteDraft} />
+                <Comments sourceKind="novel" entityType="manga" entityId={`${novelId}:${quoteDraft?.chapterKey || chapterKey}`} entityName={quoteDraft?.chapterKey && quoteDraft.chapterKey !== chapterKey ? appended?.title : title} quoteDraft={quoteDraft} />
               </div>
             )}
           </div>

@@ -1,9 +1,11 @@
+import { resolveTVTheme, type TVTheme } from "./themes";
 import { useEffect, useState } from "react";
 import { TV_WALLPAPERS, resolveTVWallpaper } from "./wallpapers";
 export const DEFAULT_TV_WALLPAPER =
   TV_WALLPAPERS[0].src;
 const KEY = "tatakai-tv-appearance";
 export interface TVAppearance {
+  theme: TVTheme;
   wallpaper: string;
   videoWallpaper: boolean;
   previews: boolean;
@@ -13,16 +15,18 @@ export function readTVAppearance(): TVAppearance {
   try {
     const saved = JSON.parse(localStorage.getItem(KEY) || "{}");
     return {
-      videoWallpaper: true,
+      videoWallpaper: false,
       previews: false,
       reducedMotion: false,
       ...saved,
+      theme: resolveTVTheme(saved.theme),
       wallpaper: resolveTVWallpaper(saved.wallpaper),
     };
   } catch {
     return {
+      theme: resolveTVTheme(undefined),
       wallpaper: DEFAULT_TV_WALLPAPER,
-      videoWallpaper: true,
+      videoWallpaper: false,
       previews: false,
       reducedMotion: false,
     };

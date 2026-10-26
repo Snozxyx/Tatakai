@@ -4,14 +4,38 @@ All notable changes to Tatakai are documented here.
 
 ---
 
-## Unreleased
+## [6.4.0] - 2026-10-26
 
-- Show manga and novel sources progressively, retain later provider results, and reuse bounded hosted chapter caches.
-- Bound slow extension title searches, preserve supplied title aliases, and refresh community-server metadata before connecting from the catalog.
+### Profiles and community
 
-- Load the novel homepage through one cached `/novel/home` response, with live trending refreshed separately from stored sections.
-- Play community-server media directly through its existing proxy, preserving signed tickets and HLS segments instead of nesting another streaming proxy.
-- Keep mobile-web video settings and their menus inside fullscreen, and connect community servers in the browser instead of opening the installed app.
+- Add customizable profile themes and widget layouts, including SekaiPop, Uchiha, Gothic Empress, Midnight Lofi and Komorebi styles, responsive presentations and server-enforced cosmetic access.
+- Add the profile collection registry, public cosmetics and configured theme launch claims.
+- Add comment activity to supported community feeds with stable pagination, and improve rich-link embeds.
+- Refresh Android TV playback controls, navigation, loading screens, themes and appearance settings.
+- Add peer watch-room media sharing, synchronized playback, connection controls and bounded media/upload handling.
+
+### Reading and playback
+
+- Add touch pinch-to-zoom, improve continuous manga reading, preserve selected chapter providers and unify manga/novel reading history.
+- Display manga and novel sources progressively, keep later results, coalesce duplicate discovery and cache large hosted chapter lists within a memory budget.
+- Load novel home shelves through one cached API response and keep stored catalog fallbacks available during upstream outages. Refresh real trending separately.
+- Fix community-server Connect actions on the website, preserve signed streaming URLs and keep mobile-web settings menus within fullscreen playback.
+- Improve native extension networking on iOS, Turnstile verification and compatibility-provider request handling.
+
+### Performance and presentation
+
+- Defer settings and optional diagnostics until needed; package the standard profile videos instead of the website-only 4K variant.
+- Reduce repeated media requests, improve profile-image caching and packaged-asset handling, and refine responsive media/background behavior.
+- Refresh landing-page media, including the novel-reader showcase, and improve navigation and profile settings presentation.
+
+### Security and maintenance
+
+- Merge Tatakai PRs #23–#26 and integrate the compatible API PRs #14–#15, preserving Supabase catalog administration, filtering and ingestion.
+- Harden desktop IPC, extension workers, local-service Host/Origin validation, external media/file handling, Android backup exclusions and AniList OAuth state checks.
+- Add reviewed database migrations for peer rooms, profile themes/widgets and internal-table RLS hardening. Applying SQL remains a separate deployment step.
+- Bound API upstream admission and share request limits through durable control state.
+- Update Rust translation dependencies and frontend dependencies; align the Vite plugin and pin offline speech runtimes to their supported versions.
+- Add automated changelog generation for configured release integrations.
 
 ## [6.3.0] - 2026-10-23
 

@@ -1,8 +1,10 @@
-import { useCallback, useRef, useEffect } from "react";
+import { isTV } from "@/core/tv/device";
+import { useCallback, useRef, useEffect, useState } from "react";
 import type { UseControlsVisibilityParams } from "../VideoPlayer.types";
 
 export function useControlsVisibility({ isPlaying, isMobile }: UseControlsVisibilityParams) {
   const showControlsRef = useRef(true);
+  const [, renderTVControls] = useState(true);
   const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Expose getter for the current value
@@ -10,6 +12,7 @@ export function useControlsVisibility({ isPlaying, isMobile }: UseControlsVisibi
 
   const setShowControls = useCallback((value: boolean) => {
     showControlsRef.current = value;
+    if (isTV()) renderTVControls(value);
   }, []);
 
   const showControlsTemporarily = useCallback(() => {

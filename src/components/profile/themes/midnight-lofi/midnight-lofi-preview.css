@@ -1,0 +1,333 @@
+/* Midnight Lo-Fi Profile Widget Preview - Translucent Frosted Glass & Veranda */
+
+.mlp-preview {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 28px;
+  background: rgba(8, 12, 22, 0.78);
+  backdrop-filter: blur(36px) saturate(190%);
+  -webkit-backdrop-filter: blur(36px) saturate(190%);
+  color: #f1f5f9;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  font-size: 13px;
+  color-scheme: dark;
+  width: 100%;
+  max-width: 384px;
+}
+
+.mlp-preview ::selection {
+  color: #fff;
+  background: #f59e0b;
+}
+
+.mlp-preview :focus-visible {
+  outline: 2px solid #f59e0b;
+  outline-offset: 3px;
+}
+
+.mlp-preview button {
+  font: inherit;
+  cursor: pointer;
+}
+
+.mlp-preview button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ==========================================================================
+   CINEMATIC VERANDA HEADER (Summer Horizon & Clouds)
+   ========================================================================== */
+.mlp-scene-header {
+  height: 185px;
+  position: relative;
+  background: #050811;
+  overflow: hidden;
+}
+
+.mlp-scene-header .ml-scene {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.mlp-scene-header::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(0deg, rgba(8, 12, 22, 0.95) 0%, rgba(8, 12, 22, 0.75) 20%, transparent 65%);
+  pointer-events: none;
+}
+
+/* Floating top bar actions */
+.mlp-top-actions {
+  position: absolute;
+  z-index: 10;
+  top: 14px;
+  inset-inline: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.mlp-top-actions > button,
+.mlp-top-actions .mlp-icon-btn {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  background: rgba(8, 12, 22, 0.65);
+  color: #e2e8f0;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  transition: all 0.2s ease;
+}
+
+.mlp-top-actions > button:hover,
+.mlp-top-actions .mlp-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+/* ==========================================================================
+   CARD BODY & TRANSLUCENT FROSTED SURFACE
+   ========================================================================== */
+.mlp-content {
+  position: relative;
+  z-index: 2;
+  margin-top: -42px;
+  padding: 0 20px 20px;
+}
+
+/* Identity row */
+.mlp-identity {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  margin-bottom: 14px;
+  min-width: 0;
+}
+
+.mlp-avatar-btn {
+  position: relative;
+  display: block;
+  width: 72px;
+  height: 72px;
+  aspect-ratio: 1;
+  flex: 0 0 72px;
+  isolation: isolate;
+  border: 3px solid rgba(8, 12, 22, 0.9);
+  border-radius: 50%;
+  background: #0f172a;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
+  padding: 0;
+  transition: transform 0.2s ease;
+}
+
+.mlp-avatar-btn:hover {
+  transform: scale(1.02);
+}
+
+.mlp-avatar-btn img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+
+.mlp-identity-info {
+  min-width: 0;
+  padding-bottom: 4px;
+}
+
+.mlp-name-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #ffffff;
+  font-size: 20px;
+  font-weight: 700;
+  text-align: left;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+  display: block;
+  transition: color 0.15s ease;
+}
+
+.mlp-name-btn:hover {
+  color: #f59e0b;
+}
+
+.mlp-handle {
+  color: #cbd5e1;
+  margin-top: 2px;
+  font-size: 12px;
+}
+
+/* Badges row */
+.mlp-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 14px;
+}
+
+.mlp-badges img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
+/* Bio */
+.mlp-bio, .mlp-private {
+  color: #cbd5e1;
+  line-height: 1.55;
+  font-size: 12.5px;
+  margin-bottom: 16px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 95px;
+  overflow-y: auto;
+}
+
+.mlp-private {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #94a3b8;
+}
+
+/* ==========================================================================
+   TRANSLUCENT PILL STATS (Image 2 - Animanga Heaven)
+   ========================================================================== */
+.mlp-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 9px;
+  margin-bottom: 18px;
+}
+
+.mlp-pill-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 15px;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  transition: all 0.2s ease;
+}
+
+.mlp-pill-chip:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.mlp-pill-data {
+  display: flex;
+  flex-direction: column;
+}
+
+.mlp-pill-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #94a3b8;
+}
+
+.mlp-pill-val {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.mlp-pill-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #f59e0b;
+  color: #090d16;
+  font-weight: bold;
+}
+
+/* ==========================================================================
+   ACTIONS FOOTER (Image 2 White Pill & Translucent Secondary)
+   ========================================================================== */
+.mlp-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.mlp-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 9999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.07);
+  color: #ffffff;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  transition: all 0.2s ease;
+}
+
+.mlp-btn-secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+.mlp-btn-white-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  flex: 1;
+  padding: 0 8px 0 20px;
+  border-radius: 9999px;
+  font-size: 13px;
+  font-weight: 700;
+  background: #ffffff;
+  color: #090d16;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  border: 0;
+}
+
+.mlp-btn-white-pill:hover:not(:disabled) {
+  background: #f8fafc;
+  transform: translateY(-1px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+.mlp-btn-white-pill .mlp-arrow-circle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #f59e0b;
+  color: #090d16;
+  transition: transform 0.2s ease;
+}
+
+.mlp-btn-white-pill:hover:not(:disabled) .mlp-arrow-circle {
+  transform: translate(1.5px, -1.5px);
+}

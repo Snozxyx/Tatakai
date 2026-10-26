@@ -3,7 +3,11 @@ import { HelmetProvider } from "react-helmet-async";
 import { MotionPreferences } from '@/components/ui/MotionPreferences';
 import App from "./App.tsx";
 import "./index.css";
-import "./utils/debug-extension"; // Extension debugger for console
+import { isDeveloperModeEnabled, DEVELOPER_MODE_EVENT } from '@/lib/developerMode';
+// Load diagnostics only after the user explicitly enables Developer Mode.
+const loadExtensionDebugger = () => { if (isDeveloperModeEnabled()) void import('./utils/debug-extension'); };
+loadExtensionDebugger();
+window.addEventListener(DEVELOPER_MODE_EVENT, loadExtensionDebugger);
 import "@/lib/i18n"; // Must be loaded once before React renders
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { WebappWrapper } from '@/components/WebappWrapper';

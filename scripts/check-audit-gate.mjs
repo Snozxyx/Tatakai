@@ -31,7 +31,11 @@ const ALLOWLIST = join(ROOT, 'scripts/security-audit-allowlist.json');
 
 function runAudit() {
   try {
-    const out = execFileSync('npm', ['audit', '--omit=dev', '--json'], {
+    const npmCli = process.env.npm_execpath || join(dirname(process.execPath), 'node_modules/npm/bin/npm-cli.js');
+    const command = process.platform === 'win32' ? process.execPath : 'npm';
+    const args = process.platform === 'win32' ? [npmCli, 'audit', '--omit=dev', '--json'] : ['audit', '--omit=dev', '--json'];
+    const out = execFileSync(command, args, {
+      windowsHide: true,
       cwd: ROOT,
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],

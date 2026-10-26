@@ -19,7 +19,7 @@ export function packagedAssetsPlugin() {
         filter(file) {
           const relative = path.relative(source, file).split(path.sep).join('/');
           return !['assets/brand', 'assets/video', 'altstore'].some(dir =>
-            relative === dir || relative.startsWith(`${dir}/`)) && relative !== 'sw.js';
+            relative === dir || relative.startsWith(`${dir}/`)) && relative !== 'sw.js' && relative !== 'assets/profile-themes/uchiha/itachi-rain-4k.mp4';
         },
       });
     },

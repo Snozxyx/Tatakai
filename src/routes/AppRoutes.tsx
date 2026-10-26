@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
+import { useRoutePreload } from '@/hooks/ui/useRoutePreload';
 import TVLinkPage from '@/pages/tv/TVLinkPage';
 import { Routes, Route, Navigate, useLocation, useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -112,7 +113,7 @@ const StatusPage = lazy(() => import("../pages/error/StatusPage"));
 const MobileOfflinePage = lazy(() => import("../pages/error/MobileOfflinePage"));
 
 const PageLoader = () => (
-  <div className="min-h-screen bg-background flex items-center justify-center">
+  <div role="status" aria-label="Loading page" className="min-h-screen bg-background flex items-center justify-center">
     <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
   </div>
 );
@@ -442,6 +443,7 @@ function ExternalIdRedirect({ type }: { type: 'mal' | 'anilist' }) {
 }
 
 const AppRoutes = () => {
+  useRoutePreload();
   const { isBanned } = useAuth();
   const { isMaintenanceMode } = useMaintenanceMode();
   const isMobileApp = Capacitor.isNativePlatform();
@@ -453,7 +455,7 @@ const AppRoutes = () => {
   const routeSection = location.pathname.split('/')[1] || 'root';
 
   return (
-    <Suspense fallback={<PageLoader />}>
+    <Suspense key={routeSection} fallback={<PageLoader />}>
       <div key={routeSection} className="route-enter">
       <Routes>
         <Route path="/translate" element={<TranslatePage />} />
