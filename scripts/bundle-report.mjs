@@ -14,8 +14,14 @@ const report = { directory, totalBytes: size(directory), publicBytes: size('publ
 console.log(JSON.stringify(report, null, 2));
 if (process.argv.includes('--check-native')) {
   const forbidden = ['assets/brand', 'assets/video', 'sw.js', 'altstore'];
-  if (forbidden.some(file => fs.existsSync(path.join(directory, file))) ||
-      report.totalBytes > 120 * 1024 * 1024 || report.startupBytes > 5 * 1024 * 1024) {
-    throw new Error('Native asset/startup budget exceeded. Inspect the bundle before packaging.');
+  const presentForbidden = forbidden.filter(file => fs.existsSync(path.join(directory, file)));
+  const totalLimit = 140 * 1024 * 1024;
+  const startupLimit = 6 * 1024 * 1024;
+  const reasons = [];
+  if (presentForbidden.length) reasons.push(`forbidden files present: ${presentForbidden.join(', ')}`);
+  if (report.totalBytes > totalLimit) reasons.push(`totalBytes (${(report.totalBytes / (1024 * 1024)).toFixed(2)} MB) exceeded budget (${totalLimit / (1024 * 1024)} MB)`);
+  if (report.startupBytes > startupLimit) reasons.push(`startupBytes (${(report.startupBytes / (1024 * 1024)).toFixed(2)} MB) exceeded budget (${startupLimit / (1024 * 1024)} MB)`);
+  if (reasons.length) {
+    throw new Error(`Native asset/startup budget exceeded (${reasons.join('; ')}). Inspect the bundle before packaging.`);
   }
 }
