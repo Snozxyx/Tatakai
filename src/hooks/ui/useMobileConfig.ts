@@ -45,6 +45,7 @@ export interface MobileConfig {
   generalNotifications: boolean; // route in-app notifications to the tray
   // Data & offline (mobile smooth-experience bundle)
   dataSaver: boolean; // cap quality, preload, autoplay on metered links
+  cloudProxyByDefault: boolean; // explicit consent to route video through Hoko
   autoDownloadNext: boolean; // queue the next episode/chapter when one finishes
   wifiOnlyDownloads: boolean; // only auto-download on unmetered WiFi
   autoEvictWatched: boolean; // free watched offline items when storage is tight
@@ -66,6 +67,7 @@ export const DEFAULT_MOBILE_CONFIG: MobileConfig = {
   downloadCompleteNotifications: true,
   generalNotifications: true,
   dataSaver: false,
+  cloudProxyByDefault: false,
   autoDownloadNext: false,
   wifiOnlyDownloads: true,
   autoEvictWatched: false,
@@ -108,6 +110,7 @@ function normalizeConfig(raw: Partial<MobileConfig> | null | undefined): MobileC
     ),
     generalNotifications: asBool(raw?.generalNotifications, DEFAULT_MOBILE_CONFIG.generalNotifications),
     dataSaver: asBool(raw?.dataSaver, DEFAULT_MOBILE_CONFIG.dataSaver),
+    cloudProxyByDefault: asBool(raw?.cloudProxyByDefault, DEFAULT_MOBILE_CONFIG.cloudProxyByDefault),
     autoDownloadNext: asBool(raw?.autoDownloadNext, DEFAULT_MOBILE_CONFIG.autoDownloadNext),
     wifiOnlyDownloads: asBool(raw?.wifiOnlyDownloads, DEFAULT_MOBILE_CONFIG.wifiOnlyDownloads),
     autoEvictWatched: asBool(raw?.autoEvictWatched, DEFAULT_MOBILE_CONFIG.autoEvictWatched),

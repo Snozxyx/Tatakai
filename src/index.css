@@ -2470,6 +2470,7 @@ body.manga-reader-open main { transform: none; perspective: none; backface-visib
 /* Capacitor 8 can run edge-to-edge on Android. Use its injected insets,
    falling back to WebKit/Chromium env values in the browser and on iOS. */
 .capacitor-native [data-main-layout] { padding-top: var(--sat); }
+.capacitor-native [data-mobile-header] > div { padding-top: 0; }
 .capacitor-native .ui-sheet:is([data-sheet-side="left"], [data-sheet-side="right"]) {
   top: var(--sat); bottom: var(--sab); height: auto;
   max-height: calc(100dvh - var(--sat) - var(--sab));

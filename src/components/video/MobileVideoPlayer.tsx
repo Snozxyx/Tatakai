@@ -5,6 +5,7 @@ import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { ExternalPlayerButton } from './controls/ExternalPlayerButton';
 import { uploadSubtitle, fetchSubtitle, decodeSubtitle } from '@/core/player/subtitle-service';
 import { usePlaybackCoordinator } from '@/core/player/usePlaybackCoordinator';
+import { useMobileCloudProxy } from './hooks/useMobileCloudProxy';
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import {
   Play,
@@ -309,6 +310,7 @@ function BuiltinMobileVideoPlayer({
   const [isScrubbing, setIsScrubbing] = useState(false);
   const [buffered, setBuffered] = useState(0);
   const [videoError, setVideoError] = useState<string | null>(null);
+  const [playbackAttempt, setPlaybackAttempt] = useState(0);
   const [isBuffering, setIsBuffering] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const retryCountRef = useRef(0);
@@ -395,11 +397,15 @@ function BuiltinMobileVideoPlayer({
   const playbackReferer = sourceHeaders?.Referer || sourceHeaders?.referer || headers?.Referer || '';
   const playbackUserAgent = sourceHeaders?.["User-Agent"] || sourceHeaders?.['user-agent'] || headers?.["User-Agent"] || '';
   const autoSkippedWindowRef = useRef<string | null>(null);
+  const { cloudProxyUrl, offerCloudProxy, cloudProxyDialog, cloudResumePosition } = useMobileCloudProxy({
+    source: currentSource,
+    headers,
+    enabled: nativeMobile && !isOffline && !['torrent', 'debrid'].includes(sourceType || ''),
+    videoRef,
+  });
 
-  // A source failure replaces the video element with the error surface. This
-  // component is reused for server switches, so clear that source-local error
-  // whenever a different URL is selected; otherwise the new source never gets
-  // a video element or a chance to initialize.
+  // Clear source-local errors on a server switch. Keep the media element
+  // mounted under the error overlay so its effects can initialize the new URL.
   //
   // Resolved debrid stream URL for magnet: sources (async — the mount effect
   // below waits for it). Cleared here so a server switch re-resolves.
@@ -413,6 +419,8 @@ function BuiltinMobileVideoPlayer({
     setCurrentHlsAudioTrack(-1);
     setDebridResolvedUrl(null);
   }, [sourceUrlKey]);
+
+  useEffect(() => { if (cloudProxyUrl) setVideoError(null); }, [cloudProxyUrl]);
 
   // Fetch skip times for intro/outro
   useEffect(() => {
@@ -617,9 +625,10 @@ function BuiltinMobileVideoPlayer({
     // through the hosted proxy, which was the mobile/desktop speed gap. A
     // cached token from an earlier app process/port is re-minted from the
     // source-carried upstream URL and headers before mounting.
-    let activeSourceUrl = source.url;
+    let activeSourceUrl = cloudProxyUrl || source.url;
+    const startPosition = cloudProxyUrl ? cloudResumePosition.current || initialSeekSeconds : initialSeekSeconds;
     if (
-      !isOffline &&
+      !cloudProxyUrl && !isOffline &&
       isAnyProxyUrl(activeSourceUrl) &&
       !resolveMobileProxy(activeSourceUrl) &&
       (source as any)?.originalUrl
@@ -693,7 +702,7 @@ function BuiltinMobileVideoPlayer({
     // Register them here as a final guard so native playback stays on the
     // device-local iOS/Android proxy and never uses Tatakai's hosted proxy.
     if (
-      nativeMobile && !isOffline && !isDebridOrigin &&
+      !cloudProxyUrl && nativeMobile && !isOffline && !isDebridOrigin &&
       /^https?:/i.test(activeSourceUrl) && !isAnyProxyUrl(activeSourceUrl)
     ) {
       activeSourceUrl = registerMobileSource({
@@ -732,7 +741,7 @@ function BuiltinMobileVideoPlayer({
       Object.keys(replayHeaders).some((name) =>
         ['referer', 'origin', 'cookie', 'authorization'].includes(String(name).toLowerCase()),
       );
-    let candidates = isAnyProxyUrl(upstreamUrl)
+    let candidates = cloudProxyUrl ? [cloudProxyUrl] : isAnyProxyUrl(upstreamUrl)
       ? [upstreamUrl]
       : buildMobilePlaybackCandidates(
         /^https?:/i.test(upstreamUrl) ? upstreamUrl : activeSourceUrl,
@@ -743,7 +752,7 @@ function BuiltinMobileVideoPlayer({
           refererCandidates: (source as any)?.refererCandidates,
         },
       );
-    if (!isAnyProxyUrl(upstreamUrl) && needsHeaderReplay) {
+    if (!cloudProxyUrl && !isAnyProxyUrl(upstreamUrl) && needsHeaderReplay) {
       candidates = candidates.filter((url) => /^https?:/i.test(url) && url !== upstreamUrl);
       if (!candidates.includes(hostedUrl)) candidates.unshift(hostedUrl);
     }
@@ -756,10 +765,14 @@ function BuiltinMobileVideoPlayer({
 
     function giveUp(statusCode?: number, reason?: string): void {
       if (disposed || terminalFailure) return;
+      const reportFailure = () => {
+        if (disposed) return;
+        setVideoError("Failed to load video. Please try another server.");
+        onPlaybackErrorRef.current?.({ statusCode, reason });
+      };
       terminalFailure = true;
       try { hlsRef.current?.stopLoad(); video.pause(); } catch { /* detached */ }
-      setVideoError("Failed to load video. Please try another server.");
-      onPlaybackErrorRef.current?.({ statusCode, reason });
+      if (!offerCloudProxy(reportFailure)) reportFailure();
     }
 
     let mounted = false;
@@ -790,6 +803,8 @@ function BuiltinMobileVideoPlayer({
           setRetryCount(retryCountRef.current);
           if (sourceTypeKey === 'dash') { mountAt(candidateIndexRef.current); return; }
           if (hlsRef.current) {
+            // startLoad cannot reload a manifest that never parsed.
+            if (!hlsRef.current.levels.length) { mountAt(candidateIndexRef.current); return; }
             try { hlsRef.current.startLoad(); return; } catch { /* fall through */ }
           }
           try { video.load(); return; } catch { /* fall through */ }
@@ -844,7 +859,7 @@ function BuiltinMobileVideoPlayer({
       if (sourceTypeKey === 'dash') {
         const controller = new AbortController(); dashAttempt = controller;
         void import('@/core/player/DashAdapter').then(({ attachDashTransport }) => attachDashTransport({
-          videoElement: video, signal: controller.signal, autoPlay: shouldAutoplayVideo(settings.autoplay), startTime: initialSeekSeconds || 0,
+          videoElement: video, signal: controller.signal, autoPlay: shouldAutoplayVideo(settings.autoplay), startTime: startPosition || 0,
           source: { id: 'mobile-dash', mode: 'dash', url: finalUrlResolved, originalUrl: (source as any).originalUrl || source.url,
             headers: { ...replayHeaders, ...(playbackReferer ? { Referer: playbackReferer } : {}), ...(playbackUserAgent ? { 'User-Agent': playbackUserAgent } : {}) } },
         }, () => { if (!disposed && !controller.signal.aborted) recover(); })).then(player => {
@@ -890,6 +905,9 @@ function BuiltinMobileVideoPlayer({
           // Referer/UA replay
           // happens inside the native service.
           manifestLoadingMaxRetry: 1,
+          manifestLoadingTimeOut: 8000,
+          levelLoadingTimeOut: 8000,
+          fragLoadingTimeOut: 15000,
           levelLoadingMaxRetry: 2,
           fragLoadingMaxRetry: 1,
           manifestLoadingRetryDelay: 400,
@@ -930,8 +948,8 @@ function BuiltinMobileVideoPlayer({
             const preferred = hls.audioTracks.findIndex(track => String(track.lang || '').toLowerCase().split('-')[0] === preferredAudioRef.current);
             if (preferred >= 0) { hls.audioTrack = preferred; setCurrentHlsAudioTrack(preferred); }
           }
-          if (initialSeekSeconds && initialSeekSeconds > 0) {
-            video.currentTime = initialSeekSeconds;
+          if (startPosition && startPosition > 0) {
+            video.currentTime = startPosition;
           }
           if (shouldAutoplayVideo(settings.autoplay)) {
             video.play().catch(console.error);
@@ -972,6 +990,9 @@ function BuiltinMobileVideoPlayer({
             retryCountRef.current += 1;
             setRetryCount(retryCountRef.current);
             console.warn(`[MobileVideoPlayer] retry ${retryCountRef.current}/${MAX_SAME_URL_RETRIES} (${String(data.details || 'error')}${status ? ` status=${status}` : ''})`);
+            // Fatal network failures must reload the manifest/transport. A
+            // startLoad() alone leaves a failed initial manifest stuck forever.
+            if (data.type === Hls.ErrorTypes.NETWORK_ERROR) { mountAt(candidateIndexRef.current); return; }
             try { hls.startLoad(); return; } catch { /* fall through */ }
           }
 
@@ -991,8 +1012,8 @@ function BuiltinMobileVideoPlayer({
         // Safari native HLS support (iOS has no hls.js MSE path — the native
         // element fetches segments itself, so it needs a network URL).
         video.src = finalUrlResolved;
-        if (initialSeekSeconds && initialSeekSeconds > 0) {
-          video.currentTime = initialSeekSeconds;
+        if (startPosition && startPosition > 0) {
+          video.currentTime = startPosition;
         }
 
         if (shouldAutoplayVideo(settings.autoplay)) {
@@ -1014,8 +1035,8 @@ function BuiltinMobileVideoPlayer({
         // torrent engine and offline files.
         setIsBuffering(false);
         video.src = finalUrlResolved;
-        if (initialSeekSeconds && initialSeekSeconds > 0) {
-          video.currentTime = initialSeekSeconds;
+        if (startPosition && startPosition > 0) {
+          video.currentTime = startPosition;
         }
 
         if (shouldAutoplayVideo(settings.autoplay)) {
@@ -1082,7 +1103,7 @@ function BuiltinMobileVideoPlayer({
       }
       try { video.pause(); video.removeAttribute('src'); video.load(); } catch { /* detached */ }
     };
-  }, [sourceUrlKey, sourceTypeKey, sourceHeadersKey, initialSeekSeconds, isOffline, nativeMobile, playbackReferer, playbackUserAgent, headers?.Origin, settings.autoplay, debridResolvedUrl]);
+  }, [sourceUrlKey, sourceTypeKey, sourceHeadersKey, initialSeekSeconds, isOffline, nativeMobile, playbackReferer, playbackUserAgent, headers?.Origin, settings.autoplay, debridResolvedUrl, playbackAttempt, cloudProxyUrl, cloudResumePosition, offerCloudProxy]);
 
   // Load subtitles — parallel + incremental so the first (English) track mounts
   // in ~1s instead of after every track serially times out. Each resolved track
@@ -1817,11 +1838,11 @@ function BuiltinMobileVideoPlayer({
     setVideoError(null);
     retryCountRef.current = 0;
     setRetryCount(0);
+    setPlaybackAttempt(attempt => attempt + 1);
   };
 
-  if (videoError) {
-    return (
-      <div className="relative w-full aspect-video bg-black flex items-center justify-center">
+  const errorOverlay = videoError ? (
+      <div role="alert" className="absolute inset-0 z-50 bg-black flex items-center justify-center">
         <div className="text-center p-6">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <p className="text-white text-lg mb-4">{videoError}</p>
@@ -1851,8 +1872,7 @@ function BuiltinMobileVideoPlayer({
           </div>
         </div>
       </div>
-    );
-  }
+    ) : null;
 
   return (
     <div
@@ -1867,6 +1887,8 @@ function BuiltinMobileVideoPlayer({
       onTouchCancel={() => { gestureRef.current.moved = true; clearPendingTap(); }}
       onClickCapture={() => setControlsActivity(value => value + 1)}
     >
+      {errorOverlay}
+      {cloudProxyDialog}
       {settings.ambientMode && (
         <canvas ref={ambientCanvasRef} className="mobile-player-ambient" aria-hidden="true" />
       )}

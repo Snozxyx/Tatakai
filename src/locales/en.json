@@ -33,7 +33,6 @@
     "translateExportBody": "Save your project and export finished pages or layered PSD files.",
     "translateDownload": "Get Tatakai for desktop",
     "translateRequirements": "The native translation engine requires the desktop app. Model downloads or a configured provider may be needed; supported offline workflows depend on the models installed.",
-
     "landingTitle": "One hub. More ways to watch and read.",
     "landingBody": "Mix Tatakai packages, Stremio add-ons and Seanime providers with compatible CloudStream, Mihon, Aniyomi, Sora and Mangayomi sources. Browse by language, install a community stack, or connect your own extension server.",
     "compatibilityNote": "Compatibility depends on your app, platform and each source. Local runtimes require a supported installed app; a listed ecosystem does not guarantee every extension works.",
@@ -7062,5 +7061,15 @@
     "manga": "Install a manga extension to load chapters for this title.",
     "novel": "Install a novel extension to load chapters and start reading.",
     "hub": "Open Extension Hub"
+  },
+  "mobileCloudProxy": {
+    "sectionTitle": "Cloud video proxy",
+    "sectionDescription": "Choose how mobile video reaches your device.",
+    "defaultLabel": "Use cloud proxy by default",
+    "defaultDescription": "Route videos through hoko.tatakai.me. Enabling this allows the cloud server to receive video URLs and relay streams. When off, you will be asked before using it if loading stalls.",
+    "title": "Use cloud proxy?",
+    "description": "The video is taking a while to load. Try routing this video through hoko.tatakai.me? The cloud server will receive the video URL and relay the stream to your device.",
+    "accept": "Use cloud proxy",
+    "decline": "Keep loading locally"
   }
 }

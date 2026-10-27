@@ -581,6 +581,14 @@ export function MobileAppSettingsPanel(_props: { section?: string }) {
         <p className="mt-2 text-xs text-muted-foreground">{uiI18n.t('app.leave_blank_to_use_the_on_device_browser_a_confi_d57284ef')}</p>
       </SettingsSection>
 
+      <SettingsSection title={uiI18n.t('mobileCloudProxy.sectionTitle')} description={uiI18n.t('mobileCloudProxy.sectionDescription')}>
+        <SettingRow
+          title={uiI18n.t('mobileCloudProxy.defaultLabel')}
+          description={uiI18n.t('mobileCloudProxy.defaultDescription')}
+          control={<Switch checked={config.cloudProxyByDefault} onCheckedChange={value => updateConfig({ cloudProxyByDefault: value })} aria-label={uiI18n.t('mobileCloudProxy.defaultLabel')} />}
+        />
+      </SettingsSection>
+
       <SettingsSection
         title={uiI18n.t('app.data_saver_07147bcc')}
         description={uiI18n.t('app.cap_quality_to_720p_force_low_memory_buffers_dis_2c25402b')}

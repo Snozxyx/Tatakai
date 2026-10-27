@@ -4,6 +4,14 @@ All notable changes to Tatakai are documented here.
 
 ---
 
+## [6.4.2] - 2026-10-27
+
+- Remove duplicate mobile status-bar and header safe-area spacing.
+- Recover failed video manifests by reloading the transport, bound loading timeouts, and keep retry and server switching usable after playback errors.
+- Offer the Hoko cloud video proxy after eight seconds of stalled loading, with explicit consent before routing a video through the cloud.
+- Add a Use cloud proxy by default option in Mobile App Settings. It is off until enabled and can be turned off at any time.
+- Keep local files, torrents, debrid streams and watch-party shares on their existing playback paths.
+
 ## [6.4.1] - 2026-10-27
 
 - Improve mobile video controls with accessible seeking, clearer buffering feedback, rewind/forward controls and keyboard focus handling.

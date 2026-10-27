@@ -52,7 +52,8 @@ const config: CapacitorConfig = {
       // dark icons, causing the white strip seen above the WebView.
       style: 'light',
       backgroundColor: '#09090b',
-      overlaysWebView: false
+      // SystemBars and --sat own the inset; native padding would count it twice.
+      overlaysWebView: true
     },
     Keyboard: {
       resize: 'body',

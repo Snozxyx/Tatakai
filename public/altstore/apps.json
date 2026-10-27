@@ -20,25 +20,25 @@
       "iconURL": "https://tatakai.me/assets/logo/tatakai-logo-square.png",
       "tintColor": "#a855f7",
       "category": "entertainment",
-      "version": "6.3.0",
-      "versionDate": "2026-10-23T17:44:44.980Z",
-      "versionDescription": "Tatakai 6.3.0 for iPhone & iPad. Unsigned build: sideload with AltStore, SideStore or TrollStore using your own Apple ID, then refresh before the 7-day free-account expiry. See the GitHub release notes for the full changelog.",
-      "downloadURL": "https://github.com/snozxyx/tatakai/releases/download/v6.3.0/Tatakai-v6.3.0-ios-unsigned.ipa",
-      "size": 250773305,
+      "version": "6.4.2",
+      "versionDate": "2026-10-27T17:34:12.565Z",
+      "versionDescription": "Fix mobile header spacing and video startup; add consent-based Hoko cloud fallback and an opt-in default in Mobile App Settings.",
+      "downloadURL": "https://github.com/snozxyx/tatakai/releases/download/v6.4.2/Tatakai-v6.4.2-ios-unsigned.ipa",
+      "size": 0,
       "screenshots": [],
       "permissions": []
     }
   ],
   "news": [
     {
-      "identifier": "tatakai-6.3.0-ios-source",
-      "title": "Tatakai 6.3.0 available for sideloading",
+      "identifier": "tatakai-6.4.2-ios-source",
+      "title": "Tatakai 6.4.2 available for sideloading",
       "caption": "Add this source in AltStore or SideStore to install on iPhone & iPad.",
-      "date": "2026-10-23T17:44:44.980Z",
+      "date": "2026-10-27T17:34:12.565Z",
       "tintColor": "#a855f7",
       "imageURL": "https://tatakai.me/assets/logo/tatakaibanner.png",
       "notify": false,
-      "url": "https://github.com/snozxyx/tatakai/releases/tag/v6.3.0",
+      "url": "https://github.com/snozxyx/tatakai/releases/tag/v6.4.2",
       "appID": "app.tatakai.me"
     }
   ]
