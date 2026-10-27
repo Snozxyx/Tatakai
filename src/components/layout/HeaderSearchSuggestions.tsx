@@ -49,6 +49,7 @@ async function fetchSuggestions(q: string): Promise<Suggestion[]> {
 }
 
 interface Props {
+  inline?: boolean;
   query: string;
   visible: boolean;
   onSelect: (name: string) => void;
@@ -68,7 +69,7 @@ function formatSuggestionType(item: Suggestion): string {
   return i18n.t('layout.searchTypeManga');
 }
 
-export function HeaderSearchSuggestions({ query, visible, onSelect, onClose }: Props) {
+export function HeaderSearchSuggestions({ query, visible, onSelect, onClose, inline = false }: Props) {
   useUiTranslation();
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -83,7 +84,8 @@ export function HeaderSearchSuggestions({ query, visible, onSelect, onClose }: P
   const [history, setHistory] = useState<string[]>(() => {
     try {
       const raw = localStorage.getItem("tatakai_search_history");
-      return raw ? JSON.parse(raw) : [];
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed.filter(item => typeof item === 'string') : [];
     } catch {
       return [];
     }
@@ -104,16 +106,16 @@ export function HeaderSearchSuggestions({ query, visible, onSelect, onClose }: P
         onClose();
       }
     };
-    if (visible) document.addEventListener("mousedown", handler);
+    if (visible && !inline) document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [visible, onClose]);
+  }, [visible, onClose, inline]);
 
   if (!visible) return null;
 
   const showHistory = query.trim().length < 2 && history.length > 0;
   const showSuggestions = query.trim().length >= 2;
   const isWaitingForQuery = query !== debouncedQuery;
-  const hasContent = showHistory || (showSuggestions && (isWaitingForQuery || isFetching || suggestions.length > 0));
+  const hasContent = showHistory || showSuggestions;
   if (!hasContent) return null;
 
   const handleSelect = (item: Suggestion) => {
@@ -144,8 +146,8 @@ export function HeaderSearchSuggestions({ query, visible, onSelect, onClose }: P
   return (
     <div
       ref={containerRef}
-      className="absolute top-full left-0 right-0 mt-2 z-[200] bg-background/95 backdrop-blur-xl border border-border/40 rounded-2xl shadow-2xl overflow-hidden"
-      onMouseDown={(e) => e.preventDefault()} // prevent input blur on click
+      className={inline ? 'relative' : 'absolute top-full left-0 right-0 mt-2 z-[200] bg-background/95 backdrop-blur-xl border border-border/40 rounded-2xl shadow-2xl overflow-hidden'}
+      onMouseDown={inline ? undefined : (e) => e.preventDefault()}
     >
       {showHistory && (
         <div className="p-2">

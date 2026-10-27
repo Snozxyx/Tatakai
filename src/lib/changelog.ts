@@ -14,6 +14,20 @@ export interface ChangelogRelease {
 
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: "6.4.1",
+    date: "2026-10-27",
+    changes: [
+      "Improve mobile video controls with accessible seeking, clearer buffering feedback, rewind/forward controls and keyboard focus handling.",
+      "Add optional JW Player playback and its settings while retaining the built-in player.",
+      "Improve manga source selection, reader navigation and reader controls.",
+      "Refresh extension browsing, compatibility listings and connected-server status.",
+      "Reduce repeated mobile viewport and motion-preference updates, and improve mobile overlays, back navigation and pull-to-refresh behavior.",
+      "Load interface translations before rendering and improve shared request identifiers across supported runtimes.",
+      "Improve image handling, home shelves, search suggestions and update notifications.",
+      "Retain the 6.4 native packaging fixes, release upload retries and Windows installer improvements."
+]
+  },
+  {
     version: "6.4.0",
     date: "2026-10-26",
     changes: [

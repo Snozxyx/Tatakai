@@ -25,7 +25,7 @@ export function useVideoKeyboard({
       // The TV focus controller owns D-Pad and Select on visible controls.
       if (isTV() && document.activeElement?.closest('button,a,[data-tv-modal]')) return;
       const activeTag = document.activeElement?.tagName;
-      if (activeTag === "INPUT" || activeTag === "TEXTAREA") return;
+      if (e.defaultPrevented || document.activeElement?.closest('[role="dialog"], [contenteditable="true"], select, button, a, [role="slider"]') || activeTag === "INPUT" || activeTag === "TEXTAREA") return;
       // Don't hijack keys while a modifier is held (browser/OS shortcuts).
       if (e.ctrlKey || e.metaKey || e.altKey) return;
 

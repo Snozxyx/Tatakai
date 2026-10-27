@@ -21,7 +21,7 @@ export function mediaProps(type: unknown, props: Record<string, any> | null) {
     const width = Number(props.width);
     const src = optimizedImageUrl(props.src, width > 0 ? width * 2 : undefined);
     let original = props.src;
-    try {
+    if (/^https?:\/\/wsrv\.nl(?:[/:?#]|$)/i.test(props.src)) try {
       const cached = new URL(props.src);
       if (cached.hostname === 'wsrv.nl') original = cached.searchParams.get('url') || original;
     } catch { /* Relative/offline asset. */ }

@@ -15,6 +15,7 @@ export const CSP_POLICY = {
     'https://www.googletagmanager.com',
     'https://www.google-analytics.com',
     'https://challenges.cloudflare.com', // Cloudflare Turnstile widget
+    'https://cdn.jwplayer.com', // Optional licensed player and its modules
   ],
   'style-src': [
     "'self'",

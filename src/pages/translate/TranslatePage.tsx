@@ -1,3 +1,4 @@
+import { randomUUID } from '../../lib/uuid';
 import { ThemedCheckbox } from '@/components/ui/themed-checkbox';
 import { ThemedSelect } from '@/components/ui/themed-select';
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -885,7 +886,7 @@ export default function TranslatePage() {
                     })
                   }
                   onText={(rect) => {
-                    const id = crypto.randomUUID();
+                    const id = randomUUID();
                     commit((p) => {
                       p.pages
                         .find((pg) => pg.id === activePage)

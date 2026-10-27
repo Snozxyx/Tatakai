@@ -1,3 +1,4 @@
+import { randomUUID } from '../../lib/uuid';
 import { db } from "@/core/db/tatakai-db";
 import { secretStorage } from "@/core/tv/secretStorage";
 import { parseM3U } from "./m3uParser";
@@ -19,7 +20,7 @@ export async function savePlaylist(
   existing?: IPTVPlaylist,
   signal?: AbortSignal
 ) {
-  const id = existing?.id || crypto.randomUUID();
+  const id = existing?.id || randomUUID();
   const streams: Array<{
     name: string;
     tvgId?: string;
@@ -86,7 +87,7 @@ export async function savePlaylist(
     );
   const channels: IPTVChannel[] = [];
   // Stage a new encrypted generation; old data remains usable if an import fails.
-  const generation = crypto.randomUUID(),
+  const generation = randomUUID(),
     staged: string[] = [];
   const credentialRef = `iptv:source:${id}:${generation}`;
   try {

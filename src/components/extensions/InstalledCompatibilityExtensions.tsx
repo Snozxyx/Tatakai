@@ -1,12 +1,13 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { useQueries, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { EXTENSION_INSTALLED_EVENT } from '@/core/extensions/ecosystems';
 import { compatibilityRequest, hasCompatibilityBridge, hasCompatibilityRuntime, COMPATIBILITY_ECOSYSTEMS, compatibilityLabel, type CompatibilityPackage } from '@/core/extensions/compatibility/client';
-import { CompatibilityExtensionsPanel } from './CompatibilityExtensionsPanel';
 import { ExtensionLogo, compatibilityPackageIcon } from './ExtensionLogo';
+
+const CompatibilityExtensionsPanel = lazy(() => import('./CompatibilityExtensionsPanel').then(module => ({ default: module.CompatibilityExtensionsPanel })));
 
 /** Reads installed metadata, without refreshing repository catalogs or using the JS installer. */
 export function InstalledCompatibilityExtensions({ search, ecosystem, type, compatibility }: { search: string; ecosystem: string; type: string; compatibility: string }) {
@@ -44,6 +45,6 @@ export function InstalledCompatibilityExtensions({ search, ecosystem, type, comp
       {pkg.error && <p className="break-words text-sm text-destructive">{pkg.error}</p>}
     </div>)}</div>
     {packages.length > limit && <Button variant="outline" className="self-center" onClick={() => setLimit(count => count + 36)}>Show more ({packages.length - limit} remaining)</Button>}
-    <Dialog open={!!selected} onOpenChange={open => { if (!open) setSelected(undefined); }}><DialogContent className="max-h-[85dvh] min-w-0 w-[calc(100%_-_2rem)] max-w-3xl overflow-y-auto"><DialogHeader><DialogTitle className="break-words">Manage {selected?.name}</DialogTitle><DialogDescription>Manage this package and its sources on this device.</DialogDescription></DialogHeader>{selected && <CompatibilityExtensionsPanel key={`${selected.ecosystem}:${selected.id}`} embedded initialRepository={{ url: '', ecosystem: selected.ecosystem }} initialFilter={selected.id} />}</DialogContent></Dialog>
+    <Dialog open={!!selected} onOpenChange={open => { if (!open) setSelected(undefined); }}><DialogContent className="max-h-[85dvh] min-w-0 w-[calc(100%_-_2rem)] max-w-3xl overflow-y-auto"><DialogHeader><DialogTitle className="break-words">Manage {selected?.name}</DialogTitle><DialogDescription>Manage this package and its sources on this device.</DialogDescription></DialogHeader>{selected && <Suspense fallback={<p role="status">Loading source tools…</p>}><CompatibilityExtensionsPanel key={`${selected.ecosystem}:${selected.id}`} embedded initialRepository={{ url: '', ecosystem: selected.ecosystem }} initialFilter={selected.id} /></Suspense>}</DialogContent></Dialog>
   </section>;
 }

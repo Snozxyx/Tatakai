@@ -1,3 +1,4 @@
+import { randomUUID } from '../../../../lib/uuid';
 import { useEffect, useRef, useState } from 'react';
 import { Copy, Plus, Trash2, ArrowUp, ArrowDown, ImagePlus, RotateCcw } from 'lucide-react';
 import { applyScrapbookLayout, defaultSekaiConfig, makeWidget, mobileWidgets, moveMobileWidget, readSekaiConfig, safeThemeImage, SEKAI_PALETTES, SEKAI_WALLPAPERS, SEKAI_MASCOTS, sekaiMascotUrl, WIDGET_KINDS, type SekaiConfig, type ScrapWidget, type WidgetKind } from '@/lib/profileThemes';
@@ -77,7 +78,7 @@ export default function SekaiEditor({ configuration, onChange, preferences, onPr
     if (config.widgets.length >= 32) return;
     const existing = config.widgets.find(w => w.kind === kind);
     if (existing && kind !== 'note' && kind !== 'image') { setSelected(existing.id); patch({ widgets: config.widgets.map(w => w.id === existing.id ? { ...w, visible: true } : w) }); return; }
-    const next = { ...makeWidget(kind), id: `${kind}-${crypto.randomUUID()}`, x: 400, y: 100, z: Math.min(100, Math.max(...config.widgets.map(w => w.z)) + 1) };
+    const next = { ...makeWidget(kind), id: `${kind}-${randomUUID()}`, x: 400, y: 100, z: Math.min(100, Math.max(...config.widgets.map(w => w.z)) + 1) };
     patch({ widgets: [...config.widgets, next] }); setSelected(next.id);
   };
   const upload = async (file: File | undefined, target: 'wallpaper' | 'image') => {
@@ -118,7 +119,7 @@ export default function SekaiEditor({ configuration, onChange, preferences, onPr
           <div className="sp-pair"><WidgetNumber label="X position" value={widget.x} min={0} max={1144 - widget.w} onChange={x => patchWidget({ x })} /><WidgetNumber label="Y position" value={widget.y} min={0} max={4000 - widget.h} onChange={y => patchWidget({ y })} /></div>
           <div className="sp-pair"><WidgetNumber label="Width" value={widget.w} min={200} max={Math.min(900, 1144 - widget.x)} onChange={w => patchWidget({ w })} /><WidgetNumber label="Height" value={widget.h} min={160} max={Math.min(900, 4000 - widget.y)} onChange={h => patchWidget({ h })} /></div>
           <div className="sp-pair">
-            {['note', 'image'].includes(widget.kind) && <button type="button" disabled={config.widgets.length >= 32} onClick={() => { const copy = { ...widget, id: `${widget.kind}-${crypto.randomUUID()}`, x: Math.min(1144 - widget.w, widget.x + 24), y: Math.min(4000 - widget.h, widget.y + 24) }; patch({ widgets: [...config.widgets, copy] }); setSelected(copy.id); }}><Copy size={14} />Duplicate</button>}
+            {['note', 'image'].includes(widget.kind) && <button type="button" disabled={config.widgets.length >= 32} onClick={() => { const copy = { ...widget, id: `${widget.kind}-${randomUUID()}`, x: Math.min(1144 - widget.w, widget.x + 24), y: Math.min(4000 - widget.h, widget.y + 24) }; patch({ widgets: [...config.widgets, copy] }); setSelected(copy.id); }}><Copy size={14} />Duplicate</button>}
             {widget.kind !== 'identity' && <button type="button" onClick={() => { patch({ widgets: config.widgets.filter(w => w.id !== widget.id), mobile: config.mobile.filter(m => m.id !== widget.id) }); setSelected(config.widgets.find(w => w.kind === 'identity')!.id); }}><Trash2 size={14} />Remove</button>}
           </div>
         </>}
@@ -178,7 +179,7 @@ export default function SekaiEditor({ configuration, onChange, preferences, onPr
       {tab === 'Presets' && <>
         <p className="sp-help">Save up to eight layouts. Presets are saved to your account when you save the profile.</p>
         <label className="sp-field">Preset name<input value={presetName} maxLength={40} onChange={e => setPresetName(e.target.value)} /></label>
-        <button type="button" disabled={!presetName.trim() || preferences.presets.length >= 8} onClick={() => { onPresets([...preferences.presets, { id: crypto.randomUUID(), name: presetName.trim(), theme: 'sekaipop', configuration: config }]); setPresetName(''); }}><Plus size={14} />Save preset</button>
+        <button type="button" disabled={!presetName.trim() || preferences.presets.length >= 8} onClick={() => { onPresets([...preferences.presets, { id: randomUUID(), name: presetName.trim(), theme: 'sekaipop', configuration: config }]); setPresetName(''); }}><Plus size={14} />Save preset</button>
         {preferences.presets.filter(p => p.theme === 'sekaipop').map(p => <div className="sp-order-row" key={p.id}><button type="button" onClick={() => { const restored = readSekaiConfig(p.configuration); if (restored) onChange(restored); else setError('This preset uses an unsupported version.'); }}>{p.name}</button><button type="button" aria-label={`Delete ${p.name}`} onClick={() => onPresets(preferences.presets.filter(item => item.id !== p.id))}><Trash2 size={14} /></button></div>)}
         <button type="button" onClick={() => onChange(defaultSekaiConfig())}><RotateCcw size={14} />Reset starter layout</button>
       </>}

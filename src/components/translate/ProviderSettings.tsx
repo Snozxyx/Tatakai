@@ -1,3 +1,4 @@
+import { randomUUID } from '../../lib/uuid';
 import { ThemedCheckbox } from '@/components/ui/themed-checkbox';
 import { ThemedSelect } from '@/components/ui/themed-select';
 import { useEffect, useState } from "react";
@@ -231,7 +232,7 @@ export function ProviderSettings({
           <Button
             variant="outline"
             onClick={() => {
-              const p = { ...presets[preset], id: crypto.randomUUID() };
+              const p = { ...presets[preset], id: randomUUID() };
               setSettings((s) => ({ ...s, providers: [...s.providers, p] }));
               setSelected(p.id);
               setSecret("");

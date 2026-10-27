@@ -1,18 +1,19 @@
-import { isTV } from "@/core/tv/device";
 import { useCallback, useRef, useEffect, useState } from "react";
 import type { UseControlsVisibilityParams } from "../VideoPlayer.types";
 
 export function useControlsVisibility({ isPlaying, isMobile }: UseControlsVisibilityParams) {
   const showControlsRef = useRef(true);
-  const [, renderTVControls] = useState(true);
+  const [, renderControls] = useState(true);
   const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Expose getter for the current value
   const getShowControls = useCallback(() => showControlsRef.current, []);
 
   const setShowControls = useCallback((value: boolean) => {
+    if (!value && document.activeElement?.matches(':focus-visible') && document.activeElement.closest('.video-controls-gradient')) return;
+    if (showControlsRef.current === value) return;
     showControlsRef.current = value;
-    if (isTV()) renderTVControls(value);
+    renderControls(value);
   }, []);
 
   const showControlsTemporarily = useCallback(() => {

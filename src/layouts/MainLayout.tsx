@@ -1,3 +1,4 @@
+import { ReviewPopup } from '@/components/ui/ReviewPopup';
 import { useDeveloperMode } from '@/hooks/ui/useDeveloperMode';
 import { useProfilePresentation } from '@/contexts/ProfilePresentationContext';
 import React, { useEffect, useRef, useState } from 'react';
@@ -257,6 +258,7 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
       <OfflineBanner />
       <MobileBackHandler />
       <MobilePullToRefresh />
+      {!/^\/(watch|manga\/read|novel\/read|auth|welcome|setup|onboarding|integration)(\/|$)/.test(location.pathname) && <ReviewPopup />}
       {/* Rendered OUTSIDE OfflineGate: the titlebar (drag region + window
           controls) must stay visible even when NoInternetPage takes over the
           viewport, otherwise the desktop window can't be moved or closed. */}

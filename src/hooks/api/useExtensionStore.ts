@@ -458,28 +458,32 @@ export function useExtensionInstaller() {
    * and the installed id (the `.kai` manifest id) never intersect, which is why
    * a freshly installed extension kept reading "Get".
    */
+  const aliasGroups = useMemo(() => {
+    // Install and storage events invalidate this snapshot, never individual cards.
+    void aliasEpoch;
+    return readAliasGroups();
+  }, [aliasEpoch]);
+  const installedSet = useMemo(() => new Set(installedIds.map(id => String(id ?? "").toLowerCase())), [installedIds]);
+
   const aliasesOf = useCallback(
     (extension: Pick<StoreExtension, "id" | "slug">): string[] => {
-      void aliasEpoch;
       const own = extensionAliases(extension);
       const expanded = new Set(own);
-      readAliasGroups().forEach((group) => {
+      aliasGroups.forEach((group) => {
         if (group.some((id) => expanded.has(id)))
           group.forEach((id) => expanded.add(id));
       });
       return Array.from(expanded);
     },
-    [aliasEpoch]
+    [aliasGroups]
   );
 
   const isInstalled = useCallback(
     (extension: Pick<StoreExtension, "id" | "slug">) => {
       const aliases = aliasesOf(extension);
-      return installedIds.some((id) =>
-        aliases.includes(String(id ?? "").toLowerCase())
-      );
+      return aliases.some(id => installedSet.has(id));
     },
-    [aliasesOf, installedIds]
+    [aliasesOf, installedSet]
   );
 
   const stateFor = useCallback(

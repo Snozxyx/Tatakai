@@ -60,24 +60,28 @@ export function UpdateChangelogSheet() {
         if (!value) dismiss();
       }}
     >
-      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-lg">
-        <SheetHeader>
+      <SheetContent side="right" className="flex w-full flex-col overflow-hidden p-0 sm:max-w-lg">
+        <SheetHeader className="shrink-0 px-6 pb-4 pt-6 pr-16">
           <SheetTitle>{t('releaseSheet.title', { version })}</SheetTitle>
           <SheetDescription>{t('releaseSheet.description')}</SheetDescription>
         </SheetHeader>
-        <ul className="my-8 list-disc space-y-4 pl-5 text-sm leading-relaxed">
-          {release?.changes.map((change, index) => (
-            <li key={index}>{change}</li>
-          ))}
-        </ul>
-        {!release && (
-          <p className="my-8 text-sm text-muted-foreground">
-            {t('releaseSheet.unavailable')}
-          </p>
-        )}
-        <Button onClick={dismiss} className="w-full">
-          {t('releaseSheet.continue')}
-        </Button>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6" data-release-notes-scroll>
+          <ul className="my-8 list-disc space-y-4 pl-5 text-sm leading-relaxed">
+            {release?.changes.map((change, index) => (
+              <li key={index}>{change}</li>
+            ))}
+          </ul>
+          {!release && (
+            <p className="my-8 text-sm text-muted-foreground">
+              {t('releaseSheet.unavailable')}
+            </p>
+          )}
+        </div>
+        <div className="shrink-0 border-t p-6">
+          <Button onClick={dismiss} className="w-full">
+            {t('releaseSheet.continue')}
+          </Button>
+        </div>
       </SheetContent>
     </Sheet>
   );

@@ -9,6 +9,8 @@ import {
 export interface ReaderKeyboardHandlers {
   nextPage?: () => void;
   prevPage?: () => void;
+  scrollDown?: () => void;
+  scrollUp?: () => void;
   nextChapter?: () => void;
   prevChapter?: () => void;
   toggleFullscreen?: () => void;
@@ -37,7 +39,7 @@ export function useReaderKeyboard(
       if (e.defaultPrevented) return;
       const target = e.target as HTMLElement | null;
       const activeTag = (target?.tagName || document.activeElement?.tagName || '').toUpperCase();
-      if (activeTag === 'INPUT' || activeTag === 'TEXTAREA' || target?.isContentEditable) return;
+      if (activeTag === 'INPUT' || activeTag === 'TEXTAREA' || activeTag === 'SELECT' || target?.isContentEditable || target?.closest('[role="slider"]')) return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
 
       const token = normalizeKeyToken(e);
@@ -48,6 +50,8 @@ export function useReaderKeyboard(
       const run: Record<ReaderKeybindAction, (() => void) | undefined> = {
         nextPage: handlers.nextPage,
         prevPage: handlers.prevPage,
+        scrollDown: handlers.scrollDown,
+        scrollUp: handlers.scrollUp,
         nextChapter: handlers.nextChapter,
         prevChapter: handlers.prevChapter,
         toggleFullscreen: handlers.toggleFullscreen,

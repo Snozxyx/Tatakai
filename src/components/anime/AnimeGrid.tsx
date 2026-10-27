@@ -1,7 +1,7 @@
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { Star, Tv } from "lucide-react";
-import { memo } from "react";
+import { memo, useMemo } from "react";
 import { MediaCardFrame } from "@/components/MediaCardFrame";
 import { splitRating } from "@/lib/mediaRating";
 import { AdultBadge } from "@/components/MediaCardBadges";
@@ -44,15 +44,16 @@ export const AnimeGrid = memo(function AnimeGrid({
     large: "grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"
   };
 
-  const uniqueAnimes = animes.filter((anime, index, list) => {
-    const mediaType = String((anime as any).mediaType || "anime").toLowerCase();
-    const key = `${mediaType}:${String(anime.id || "").trim().toLowerCase()}`;
-    return index === list.findIndex((candidate) => {
-      const candidateType = String((candidate as any).mediaType || "anime").toLowerCase();
-      const candidateKey = `${candidateType}:${String(candidate.id || "").trim().toLowerCase()}`;
-      return candidateKey === key;
+  const uniqueAnimes = useMemo(() => {
+    const seen = new Set<string>();
+    return animes.filter(anime => {
+      const mediaType = String((anime as any).mediaType || "anime").toLowerCase();
+      const key = `${mediaType}:${String(anime.id || "").trim().toLowerCase()}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
     });
-  });
+  }, [animes]);
 
   // A dead cover URL (common on AniList relation entries) otherwise sprawls its
   // `alt` text across the card instead of covering it — swap to the placeholder.

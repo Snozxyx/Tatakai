@@ -1,3 +1,4 @@
+import { randomUUID } from './uuid';
 /** A device visitor persists; a visit session expires after 30 minutes idle. */
 let memoryVisitor = '';
 let memorySession = { id: '', at: 0 };
@@ -5,12 +6,12 @@ export function getVisitorId() {
   try {
     let id = localStorage.getItem('tatakai_session_id');
     if (!id) {
-      id = crypto.randomUUID();
+      id = randomUUID();
       localStorage.setItem('tatakai_session_id', id);
     }
     return id;
   } catch {
-    return (memoryVisitor ||= crypto.randomUUID());
+    return (memoryVisitor ||= randomUUID());
   }
 }
 export function getVisitSessionId(now = Date.now()) {
@@ -27,7 +28,7 @@ export function getVisitSessionId(now = Date.now()) {
     !Number.isFinite(session.at) ||
     now - session.at > 30 * 60_000
   )
-    session = { id: crypto.randomUUID(), at: now };
+    session = { id: randomUUID(), at: now };
   session.at = now;
   memorySession = session;
   try {

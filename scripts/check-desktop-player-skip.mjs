@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
+import { mkdir } from 'node:fs/promises';
 import { chromium } from 'playwright';
 const base = process.env.MOBILE_TEST_URL || 'http://127.0.0.1:8090';
+await mkdir('artifacts/player-search', { recursive: true });
 const browser = await chromium.launch({ channel: process.platform === 'win32' ? 'msedge' : undefined, headless: true });
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
 const errors = [];
@@ -54,6 +56,17 @@ try {
   }), 'Fullscreen controls must not cover the skip button');
   await outro.click();
   assert.equal(await page.locator('video').evaluate(video => video.currentTime), 580);
+  const slider = page.getByRole('slider', { name: 'Seek video' });
+  const box = await slider.boundingBox();
+  await page.mouse.move(box.x + box.width * 0.2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.6, box.y + box.height / 2, { steps: 10 });
+  assert.equal(await page.locator('video').evaluate(video => video.currentTime), 580, 'Drag previews do not seek until released');
+  await page.mouse.up();
+  assert.ok(await page.locator('video').evaluate(video => video.currentTime > 300 && video.currentTime < 400));
+  await slider.focus(); await page.keyboard.press('Home');
+  assert.equal(await page.locator('video').evaluate(video => video.currentTime), 0);
+  await page.screenshot({ path: 'artifacts/player-search/player-desktop.png' });
   assert.deepEqual(errors, []);
   console.log('Desktop metadata fetching, source intro precedence, fallback outro seeking and fullscreen skip hit target pass in Chromium.');
 } catch (error) { console.error(errors); throw error; } finally { await browser.close(); }

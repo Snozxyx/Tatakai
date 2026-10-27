@@ -74,6 +74,7 @@ import {
 import type { MediaRelation } from "@/core/content/types";
 import { ContentEditSheet, type EditableColumns } from "@/components/admin/ContentEditSheet";
 import { MangaDownloadModal } from "@/components/manga/MangaDownloadModal";
+import { MangaSourceStatus } from '@/components/manga/MangaSourceStatus';
 import { sortMangaChapterSources } from "@/lib/reader/mangaSourceSelection";
 
 // --- Helper Component: Relation Tree ---
@@ -243,7 +244,8 @@ export default function MangaPage({ catalogId, sourceContext }: CatalogDetailPro
 
   const { data: mangaData, isLoading: loadingInfo, error } = useMangaDetail(mangaId);
   useEffect(() => { if (sourceContext && !loadingInfo && (!mangaData || error)) sourceContext.onUnavailable(); }, [sourceContext, loadingInfo, mangaData, error]);
-  const { data: chapterData, isLoading: loadingChapters } = useMangaChapters(sourceContext ? undefined : mangaId);
+  const { data: chapterData, isLoading: loadingChapters, isFetching: fetchingChapters } = useMangaChapters(sourceContext ? undefined : mangaId);
+  const fetchingMangaSources = fetchingChapters || !!chapterData?.sourcesPending;
   const refreshChapters = async () => {
     if (!mangaId || refreshingChapters) return;
     setRefreshingChapters(true);
@@ -1264,7 +1266,9 @@ export default function MangaPage({ catalogId, sourceContext }: CatalogDetailPro
             <div className="lg:col-span-2 space-y-6">
               <div>
                 <h1 className="mobile-detail-title font-display text-4xl md:text-5xl font-bold mb-4">{displayTitle}</h1>
-                <TatakaiReadingViews kind="manga" id={mangaId} anilistId={(info as any)?.anilistId} detail/>
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  <TatakaiReadingViews kind="manga" id={mangaId} anilistId={(info as any)?.anilistId} detail />
+                </div>
                 <MobileDetailQuickActions target="manga-chapters-section" label={uiI18n.t('app.chapters_034e2733')}>
                   <button
                     onClick={handleReadNow}
@@ -1626,6 +1630,7 @@ export default function MangaPage({ catalogId, sourceContext }: CatalogDetailPro
                       {uiI18n.t('app.chapters_034e2733')}
                     </h3>
                     <div className="flex flex-wrap items-center gap-2">
+                      <MangaSourceStatus count={new Set(chapters.flatMap(chapter => (chapter.sources || []).map(source => source.provider))).size} fetching={fetchingMangaSources} />
                       <Button type="button" size="sm" variant="outline" onClick={refreshChapters}
                         disabled={refreshingChapters || loadingChapters} title={uiI18n.t('app.clear_chapter_cache_and_reload_from_mangadex_5d672a5f')}
                         className="min-h-11 gap-1.5 rounded-lg text-xs font-bold" aria-label={uiI18n.t('app.refresh_chapters_5ec9f62e')}>
@@ -1862,13 +1867,15 @@ export default function MangaPage({ catalogId, sourceContext }: CatalogDetailPro
                 ) : (
                   <GlassPanel className="p-8 text-center">
                     <p className="text-muted-foreground">
-                      {sortedChapters.length === 0
+                      {sortedChapters.length === 0 && fetchingMangaSources
+                        ? uiI18n.t('app.finding_servers_6f871241')
+                        : sortedChapters.length === 0
                         ? uiI18n.t('app.no_chapters_available_yet_89eae277')
                         : hasChapterFilters
                           ? uiI18n.t('app.no_chapters_match_your_current_filters_or_search_5adc1f8d')
                           : uiI18n.t('app.no_chapters_match_the_selected_provider_language_a2fdfc68')}
                     </p>
-                    {sortedChapters.length === 0 && <ExtensionRequired kind="manga" />}
+                    {sortedChapters.length === 0 && !fetchingMangaSources && <ExtensionRequired kind="manga" />}
                   </GlassPanel>
                 )}
               </section>)}

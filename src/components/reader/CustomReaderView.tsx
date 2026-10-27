@@ -1,4 +1,6 @@
 import { readerImageStyles, readerPageIsEager } from "./readerImageStyles";
+import { ReaderPageRail } from './ReaderPageRail';
+import { useMotionPreference } from '@/hooks/ui/useMotionPreference';
 import {
   useCallback,
   useEffect,
@@ -167,6 +169,11 @@ export function CustomReaderView(props: CustomReaderViewProps) {
     },
     [total, settings.readingMode, onPage, pageContainer]
   );
+  const reducedMotion = useMotionPreference();
+  const scrollReader = (direction: number) => {
+    if (settings.autoScroll) updateSetting('autoScroll', false);
+    scrollContainer.current?.scrollBy({ top: direction * 120, behavior: reducedMotion ? 'instant' : 'smooth' });
+  };
   const nextPage = () =>
     settings.readingMode === "vertical"
       ? scrollContainer.current?.scrollBy({
@@ -190,6 +197,8 @@ export function CustomReaderView(props: CustomReaderViewProps) {
     {
       nextPage,
       prevPage: previousPage,
+      scrollDown: () => scrollReader(1),
+      scrollUp: () => scrollReader(-1),
       nextChapter: () => props.next && props.onChapter(props.next),
       prevChapter: () => props.prev && props.onChapter(props.prev),
       toggleFullscreen,
@@ -368,8 +377,9 @@ export function CustomReaderView(props: CustomReaderViewProps) {
             </span>
           </button>
           <button
-            onClick={props.onBack}
+            onClick={() => setShowNavigator(true)}
             className="flex min-h-11 min-w-0 flex-1 flex-col items-center px-1 text-center sm:px-2"
+            aria-label="Open chapter and provider navigator"
           >
             <span className="w-full truncate text-xs font-bold sm:text-sm">
               {title}
@@ -503,11 +513,14 @@ export function CustomReaderView(props: CustomReaderViewProps) {
           </>
         )}
       </ReaderToolbar>
+      <div className="relative">
+      {chromeVisible && <ReaderPageRail page={pageIndex} total={total} onPage={jumpToPage} />}
       <div
         ref={scrollContainer}
         data-reader-scroll
         className={cn(
-          "mx-auto overflow-y-auto overscroll-contain px-0 py-0 sm:px-4 sm:py-6",
+          "mx-auto overflow-y-auto overscroll-contain py-0 sm:pr-4 sm:py-6",
+          chromeVisible ? "pl-2 sm:pl-4" : "pl-0 sm:pl-4",
           settings.zoom > 100 ? "overflow-x-auto" : "overflow-x-hidden"
         )}
         style={{
@@ -666,6 +679,7 @@ export function CustomReaderView(props: CustomReaderViewProps) {
             )}
           </div>
         )}
+      </div>
       </div>
       <ReaderSettingsSheet
         open={showSettings}

@@ -1,4 +1,21 @@
 {
+  "extensionWorkspace": {
+    "workspace": "Extension workspace",
+    "browse": "Browse",
+    "library": "My library",
+    "sources": "Sources",
+    "filters": "Filters",
+    "reset": "Reset filters",
+    "explore": "Explore by category",
+    "yourExtensions": "Your extensions",
+    "libraryDescription": "Manage the extensions installed on this device.",
+    "emptyLibrary": "No catalogue extensions match these filters. Browse extensions to add more to your library.",
+    "connections": "Sources & connections",
+    "sourcesDescription": "Manage repositories, language sources, and extension servers.",
+    "loadingRemote": "Loading remote extensions…",
+    "loadingSources": "Loading source tools…",
+    "loadingInstaller": "Loading extension installer…"
+  },
   "landingHero": {
     "explore": "explore",
     "discover": "discover",
@@ -6418,6 +6435,7 @@
     "fetch_more_servers_351857c3": "Fetch more servers",
     "toggle_source_debug_46f6d2f5": "Toggle source debug",
     "adding_more_servers_0379b08f": "Adding more servers...",
+    "fetching_more_manga_sources": "Fetching more sources…",
     "finding_servers_6f871241": "Finding servers...",
     "multi_language_60d39b5b": "Multi-Language",
     "i18n_value_0_i18n_value_1_8568f691": "{{value0}} ({{value1}})",

@@ -1342,8 +1342,11 @@ export default function SearchPage() {
       {!isMobile && <Sidebar />}
 
       <main className={cn(
-        "app-page relative z-10 pr-6 py-6 max-w-[1800px] mx-auto pb-24 md:pb-6",
-        isDesktopApp ? "p-6" : "pl-6 md:pl-32"
+        "app-page relative z-10 max-w-[1800px] mx-auto",
+        "pr-[max(1.5rem,env(safe-area-inset-right))] md:pr-6",
+        "pb-24 md:pb-6",
+        "pt-[calc(1.5rem+env(safe-area-inset-top,0px))] md:pt-6",
+        isDesktopApp ? "p-6" : "pl-[max(1.5rem,env(safe-area-inset-left))] md:pl-32"
       )}>
         {/* Discover Hero when browsing — desktop only (hidden on mobile) */}
         {!hasSearchContext && !isProducerRoute && !isMobile && (

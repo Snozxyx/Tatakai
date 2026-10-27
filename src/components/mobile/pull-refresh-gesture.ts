@@ -2,6 +2,7 @@ export const REFRESH_PULL_THRESHOLD = 56;
 export class PullRefreshGesture {
   private origin: { x: number; y: number } | null = null;
   private distance = 0;
+  get active() { return this.origin !== null; }
   begin(x: number, y: number, atTop: boolean, blocked: boolean) {
     this.cancel();
     if (atTop && !blocked) this.origin = { x, y };

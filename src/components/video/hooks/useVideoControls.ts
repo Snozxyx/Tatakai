@@ -40,8 +40,9 @@ export function useVideoControls({
       if (!videoRef.current) return;
       const newVolume = Math.max(0, Math.min(1, volume + delta));
       videoRef.current.volume = newVolume;
+      videoRef.current.muted = newVolume === 0;
       setVolume(newVolume);
-      if (newVolume > 0) setIsMuted(false);
+      setIsMuted(newVolume === 0);
     },
     [videoRef, volume, setVolume, setIsMuted],
   );
@@ -51,6 +52,7 @@ export function useVideoControls({
       const newVolume = parseFloat(e.target.value);
       if (!videoRef.current) return;
       videoRef.current.volume = newVolume;
+      videoRef.current.muted = newVolume === 0;
       setVolume(newVolume);
       setIsMuted(newVolume === 0);
     },

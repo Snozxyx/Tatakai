@@ -1,4 +1,6 @@
 import uiI18n from '@/lib/uiI18n';
+import { OptionalJWPlayer } from './JWPlayer';
+import { PlayerSeekInput } from './controls/PlayerSeekInput';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { ExternalPlayerButton } from './controls/ExternalPlayerButton';
 import { uploadSubtitle, fetchSubtitle, decodeSubtitle } from '@/core/player/subtitle-service';
@@ -7,8 +9,8 @@ import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import {
   Play,
   Pause,
-  SkipBack,
-  SkipForward,
+  RotateCcw,
+  RotateCw,
   Settings,
   Subtitles,
   Loader2,
@@ -161,7 +163,11 @@ const STALL_TIMEOUT_MS = 6_000;
 export const MOBILE_PLAYER_FULLSCREEN_CLASS = 'mobile-player-fullscreen';
 export const MOBILE_PLAYER_FULLSCREEN_EVENT = 'tatakai-mobile-player-fullscreen';
 
-export function MobileVideoPlayer({
+export function MobileVideoPlayer(props: MobileVideoPlayerProps) {
+  return <OptionalJWPlayer {...props}><BuiltinMobileVideoPlayer {...props} /></OptionalJWPlayer>;
+}
+
+function BuiltinMobileVideoPlayer({
   sources,
   subtitles: providedSubtitles = [],
   headers,
@@ -300,6 +306,7 @@ export function MobileVideoPlayer({
   const [duration, setDuration] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
+  const [isScrubbing, setIsScrubbing] = useState(false);
   const [buffered, setBuffered] = useState(0);
   const [videoError, setVideoError] = useState<string | null>(null);
   const [isBuffering, setIsBuffering] = useState(false);
@@ -462,8 +469,9 @@ export function MobileVideoPlayer({
 
   // Hide controls after inactivity
   useEffect(() => {
-    if (showControls && (isPlaying || isLocked) && !showFullSettings) {
+    if (showControls && (isPlaying || isLocked) && !showFullSettings && !isScrubbing) {
       controlsTimeoutRef.current = setTimeout(() => {
+        if (!isLocked && document.activeElement?.matches(':focus-visible') && document.activeElement.closest('.mobile-player-controls')) return;
         setShowControls(false);
       }, isLocked ? 1800 : 4000);
     }
@@ -472,7 +480,7 @@ export function MobileVideoPlayer({
         clearTimeout(controlsTimeoutRef.current);
       }
     };
-  }, [showControls, isPlaying, isLocked, controlsActivity, showFullSettings]);
+  }, [showControls, isPlaying, isLocked, controlsActivity, showFullSettings, isScrubbing]);
 
   useEffect(() => {
     if (videoRef.current) {
@@ -1913,7 +1921,7 @@ export function MobileVideoPlayer({
       )}
 
       {/* Loading Overlay */}
-      {(isLoading || isBuffering) && (
+      {(isLoading || isBuffering) && (!showControls || isLocked) && (
         <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-black/30">
           <Loader2 className="w-16 h-16 text-primary animate-spin" />
         </div>
@@ -1986,8 +1994,9 @@ export function MobileVideoPlayer({
                   <h3 className="text-white text-base font-bold truncate drop-shadow-lg">
                     {animeName}
                   </h3>
-                  <p className="text-white/80 text-xs truncate">
-                    {t('header.episode', { number: episodeNumber })} {episodeTitle ? uiI18n.t('app.i18n_value_0_723b674d', { value0: episodeTitle }) : ''}
+                  <p className="mobile-player-meta text-white/80 text-xs truncate">
+                    <span className="min-w-0 truncate">{t('header.episode', { number: episodeNumber })} {episodeTitle ? uiI18n.t('app.i18n_value_0_723b674d', { value0: episodeTitle }) : ''}</span>
+                    {serverName && <span className="mobile-player-server">{serverName}</span>}
                   </p>
                 </div>
               </div>
@@ -2016,18 +2025,22 @@ export function MobileVideoPlayer({
             <button
               onClick={() => seek(currentTime - 10)}
               aria-label={t('migration.rewind')}
-              className="p-3 rounded-full bg-white/10 backdrop-blur-md active:bg-white/20 border border-white/10"
+              className="mobile-player-jump relative p-3 rounded-full bg-white/10 active:bg-white/20 border border-white/10"
             >
-              <SkipBack className="w-7 h-7 text-white drop-shadow-lg" />
+              <RotateCcw className="w-7 h-7 text-white" aria-hidden="true" />
+              <span aria-hidden="true">10</span>
             </button>
 
             {/* Play/Pause */}
             <button
               onClick={togglePlay}
               aria-label={isPlaying ? t('player.pause') : t('player.play')}
+              aria-busy={isLoading || isBuffering}
               className="p-5 rounded-full bg-primary backdrop-blur-md active:scale-95 transition-transform shadow-2xl border-2 border-white/20"
             >
-              {isPlaying ? (
+              {isLoading || isBuffering ? (
+                <Loader2 className="w-10 h-10 text-white animate-spin" aria-hidden="true" />
+              ) : isPlaying ? (
                 <Pause className="w-10 h-10 text-white" />
               ) : (
                 <Play className="w-10 h-10 text-white ml-0.5" />
@@ -2038,37 +2051,24 @@ export function MobileVideoPlayer({
             <button
               onClick={() => seek(currentTime + 10)}
               aria-label={t('migration.forward')}
-              className="p-3 rounded-full bg-white/10 backdrop-blur-md active:bg-white/20 border border-white/10"
+              className="mobile-player-jump relative p-3 rounded-full bg-white/10 active:bg-white/20 border border-white/10"
             >
-              <SkipForward className="w-7 h-7 text-white drop-shadow-lg" />
+              <RotateCw className="w-7 h-7 text-white" aria-hidden="true" />
+              <span aria-hidden="true">10</span>
             </button>
           </div>
-
-          {/* Skip Intro Button */}
-          {activeSkip && (
-            <button
-              onClick={skipIntro}
-              className="mobile-player-skip absolute right-[max(1rem,env(safe-area-inset-right))] bottom-32 px-4 py-2 bg-white/95 rounded-xl text-black font-bold text-sm shadow-lg active:scale-95 transition-transform"
-            >
-              {activeSkip.type === 'recap' ? t('player.skipRecap') : activeSkip.type === 'ed' ? t('player.skipOutro') : t('player.skipIntro')}
-            </button>
-          )}
 
           {/* Bottom Controls */}
           <div className="mobile-player-bottom absolute bottom-0 left-0 right-0 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]">
             {/* Progress Bar */}
-            <input
-              type="range"
-              aria-label={t('migration.seek')}
-              min={0}
-              max={Number.isFinite(duration) && duration > 0 ? duration : 0}
-              step={0.1}
-              value={Number.isFinite(currentTime) ? currentTime : 0}
-              onChange={event => seek(Number(event.target.value))}
-              className="mobile-player-seek relative block w-full h-8 mb-2 accent-primary touch-none"
-              style={{ '--seek-progress': `${duration > 0 ? currentTime / duration * 100 : 0}%`, '--seek-buffered': `${duration > 0 ? buffered / duration * 100 : 0}%` } as React.CSSProperties}
-              data-player-interactive="true"
-            />
+            <div className="mobile-player-timeline relative">
+              <PlayerSeekInput
+                label={t('migration.seek')}
+                currentTime={currentTime} duration={duration} buffered={buffered}
+                onSeek={seek} onScrubbingChange={setIsScrubbing}
+                className="mobile-player-seek relative block w-full h-11 accent-primary touch-none"
+              />
+            </div>
 
             {/* Time & Actions */}
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -2167,11 +2167,14 @@ export function MobileVideoPlayer({
         </div>
       )}
 
-      {/* Server Info Badge */}
-      {serverName && showControls && !isLocked && (
-        <div className="mobile-player-server pointer-events-none absolute top-20 right-3 z-40 px-3 py-1.5 bg-black/60 backdrop-blur-md rounded-full border border-white/10">
-          <span className="text-white/80 text-xs font-medium">{serverName}</span>
-        </div>
+      {/* Keep the time-sensitive skip action available when the chrome hides. */}
+      {activeSkip && !isLocked && !showFullSettings && (
+        <button
+          onClick={skipIntro}
+          className={cn('mobile-player-skip absolute z-30 right-[max(1rem,env(safe-area-inset-right))] min-h-11 px-4 py-2 bg-white/95 rounded-xl text-black font-bold text-sm shadow-lg active:bg-white', !showControls && 'is-idle')}
+        >
+          {activeSkip.type === 'recap' ? t('player.skipRecap') : activeSkip.type === 'ed' ? t('player.skipOutro') : t('player.skipIntro')}
+        </button>
       )}
 
       {/* Full settings — desktop parity (playback / video / subtitles / audio / keys) */}

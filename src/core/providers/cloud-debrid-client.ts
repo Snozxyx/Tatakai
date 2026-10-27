@@ -36,7 +36,9 @@ export class CloudDebridClient implements DebridProviderAdapter {
     const premium = this.id === 'premiumize';
     const query = new URLSearchParams(fields);
     if (premium) query.set('apikey', this.key.trim());
-    const base = premium ? 'https://www.premiumize.me/api' : 'https://api.alldebrid.com/v4';
+    // AllDebrid versions individual endpoints, not the entire API.
+    const version = endpoint === '/magnet/status' ? 'v4.1' : 'v4';
+    const base = premium ? 'https://www.premiumize.me/api' : `https://api.alldebrid.com/${version}`;
     const post = fields !== undefined;
     const result = await this.request(`${base}${endpoint}${!post && query.size ? `?${query}` : ''}`, {
       method: post ? 'POST' : 'GET',

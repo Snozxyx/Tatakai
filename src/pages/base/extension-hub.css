@@ -1,0 +1,15 @@
+/* Offscreen catalogue cards retain their measured size and full visual treatment. */
+.extension-hub .extension-catalogue > * {
+  content-visibility: auto;
+  contain-intrinsic-block-size: auto 12rem;
+}
+.extension-hub .extension-deferred-section {
+  content-visibility: auto;
+  contain-intrinsic-block-size: auto 28rem;
+}
+.extension-hub summary::marker { color: hsl(var(--muted-foreground)); }
+.extension-hub summary { min-height: 44px; }
+.extension-hub .extension-filters button { min-height: 44px; width: 100%; }
+@media (max-width: 639px) {
+  .extension-hub [role="tab"] { gap: .375rem; padding-inline: .5rem; }
+}

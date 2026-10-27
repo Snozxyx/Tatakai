@@ -31,6 +31,10 @@ const config: CapacitorConfig = {
     preferredContentMode: 'mobile'
   },
   plugins: {
+    SystemBars: {
+      insetsHandling: 'css',
+      initialViewportFitValueHint: 'cover',
+    },
     SplashScreen: {
       launchShowDuration: 2500,
       launchAutoHide: true,
@@ -52,8 +56,7 @@ const config: CapacitorConfig = {
     },
     Keyboard: {
       resize: 'body',
-      style: 'dark',
-      resizeOnFullScreen: true
+      style: 'dark'
     },
     CapacitorHttp: {
       // Keep the native client available for explicit high-value requests, but

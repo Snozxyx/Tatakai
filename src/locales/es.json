@@ -1,4 +1,21 @@
 {
+  "extensionWorkspace": {
+    "workspace": "Espacio de extensiones",
+    "browse": "Explorar",
+    "library": "Mi biblioteca",
+    "sources": "Fuentes",
+    "filters": "Filtros",
+    "reset": "Restablecer filtros",
+    "explore": "Explorar por categoría",
+    "yourExtensions": "Tus extensiones",
+    "libraryDescription": "Administra las extensiones instaladas en este dispositivo.",
+    "emptyLibrary": "Ninguna extensión del catálogo coincide con estos filtros. Explora las extensiones para añadir más a tu biblioteca.",
+    "connections": "Fuentes y conexiones",
+    "sourcesDescription": "Administra repositorios, fuentes de idiomas y servidores de extensiones.",
+    "loadingRemote": "Cargando extensiones remotas…",
+    "loadingSources": "Cargando herramientas de fuentes…",
+    "loadingInstaller": "Cargando instalador de extensiones…"
+  },
   "landingHero": {
     "explore": "exploras",
     "discover": "descubres",
@@ -6418,6 +6435,7 @@
     "fetch_more_servers_351857c3": "Traiga más servidores .",
     "toggle_source_debug_46f6d2f5": "Desarrollar el código fuente",
     "adding_more_servers_0379b08f": "Añadir más servidores...",
+    "fetching_more_manga_sources": "Buscando más fuentes…",
     "finding_servers_6f871241": "Encontrar servidores...",
     "multi_language_60d39b5b": "El idioma",
     "i18n_value_0_i18n_value_1_8568f691": "{{value0}} ({{value1}})",

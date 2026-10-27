@@ -67,7 +67,7 @@ const DEFAULT_SETTINGS: ReaderSettings = {
   clickToTurn: true,
   zoomWithWheel: true,
   keepScreenAwake: false,
-  continuousScroll: true,
+  continuousScroll: false,
   autoScroll: false,
   autoScrollSpeed: 4,
   progressIndicator: 'page',

@@ -1,0 +1,73 @@
+.reader-page-rail {
+  position: absolute;
+  z-index: 30;
+  left: env(safe-area-inset-left, 0px);
+  top: 8px;
+  bottom: max(88px, env(safe-area-inset-bottom));
+  width: 44px;
+}
+.reader-page-rail-track {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  cursor: pointer;
+  touch-action: none;
+  outline-offset: -2px;
+  border-radius: 3px;
+}
+.reader-page-rail-track:focus-visible { outline: 2px solid hsl(var(--primary)); }
+.reader-page-rail-segments {
+  position: absolute;
+  inset: 0 auto 0 4px;
+  width: 3px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow: hidden;
+  border-radius: 2px;
+  pointer-events: none;
+}
+.reader-page-rail-segments span { flex: 1; min-height: 0; }
+.reader-page-rail-marker {
+  position: absolute;
+  left: 3px;
+  width: 5px;
+  height: 4px;
+  transform: translateY(-50%);
+  background: hsl(var(--primary));
+  pointer-events: none;
+}
+.reader-page-rail-label {
+  display: none;
+  position: absolute;
+  left: 24px;
+  transform: translateY(-50%);
+  padding: 2px 5px;
+  border-radius: 3px;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.reader-page-rail-total { display: none; }
+.reader-page-rail-track:is(:focus-visible, [data-dragging]) .reader-page-rail-segments {
+  left: 8px;
+  width: 12px;
+}
+.reader-page-rail-track:is(:focus-visible, [data-dragging]) .reader-page-rail-marker {
+  left: 4px;
+  width: 20px;
+}
+.reader-page-rail-track:is(:focus-visible, [data-dragging]) .reader-page-rail-label { display: block; }
+.reader-page-rail-track:is(:focus-visible, [data-dragging]) .reader-page-rail-total { display: inline; }
+@media (hover: hover) and (pointer: fine) {
+  .reader-page-rail-track:hover .reader-page-rail-segments { left: 8px; width: 12px; }
+  .reader-page-rail-track:hover .reader-page-rail-marker { left: 4px; width: 20px; }
+  .reader-page-rail-track:hover .reader-page-rail-label { display: block; }
+  .reader-page-rail-track:hover .reader-page-rail-total { display: inline; }
+}
+@media (min-width: 640px) {
+  .reader-page-rail { width: 44px; bottom: 12px; }
+}

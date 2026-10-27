@@ -1,3 +1,4 @@
+import { randomUUID } from '../../lib/uuid';
 import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -42,7 +43,7 @@ export function useReadingViewTracker(kind:ReadingMediaKind,id?:string,ready=fal
         recorded=true;
         try{
           let session=sessionStorage.getItem('tatakai-reading-session');
-          if(!session){session=crypto.randomUUID();sessionStorage.setItem('tatakai-reading-session',session);}
+          if(!session){session=randomUUID();sessionStorage.setItem('tatakai-reading-session',session);}
           const {error}=await (supabase as any).rpc('record_reading_view',{p_kind:kind,p_media_id:id,p_session_id:session});
           if(!error)cache.invalidateQueries({queryKey:['reading-views',kind,id]});
         }catch{/* Analytics must not block reading. */}

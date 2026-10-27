@@ -367,6 +367,22 @@ function SettingsPanelBody({
         {/* ── Playback Tab ────────────────────────────── */}
         {activeTab === 'playback' && (
           <>
+            <section className="space-y-3">
+              <label htmlFor="player-engine" className="block text-sm font-medium">Video player</label>
+              <select id="player-engine" value={settings.playerEngine} onChange={event => updateSetting('playerEngine', event.target.value as VideoSettings['playerEngine'])}
+                className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">
+                <option value="builtin">Tatakai (default)</option>
+                <option value="jwplayer">JW Player (optional)</option>
+              </select>
+              {settings.playerEngine === 'jwplayer' && <>
+                <label htmlFor="jw-library" className="block text-sm font-medium">JW Player library ID</label>
+                <input id="jw-library" value={settings.jwPlayerLibraryId} onChange={event => updateSetting('jwPlayerLibraryId', event.target.value.trim())}
+                  placeholder="8-character library ID" maxLength={8} autoComplete="off" spellCheck={false}
+                  aria-describedby="jw-library-help" aria-invalid={!!settings.jwPlayerLibraryId && !/^[a-zA-Z0-9]{8}$/.test(settings.jwPlayerLibraryId)}
+                  className="h-11 w-full rounded-lg border border-border bg-background px-3 text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring" />
+                <p id="jw-library-help" className="text-sm text-muted-foreground">Use the cloud-hosted library ID from your licensed JW Player account. JW Player uses its own controls; Tatakai enhancements, torrents, streams with custom headers, and watch rooms use the built-in player.</p>
+              </>}
+            </section>
             {/* Volume Slider */}
             <section className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">

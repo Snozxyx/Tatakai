@@ -1,3 +1,4 @@
+import { randomUUID } from '../../lib/uuid';
 import { ThemedSelect } from '@/components/ui/themed-select';
 import { useEffect, useRef, useState, type MutableRefObject } from 'react';
 import { toast } from 'sonner';
@@ -40,7 +41,7 @@ export function PostDrafts<T>({ userId, scope, value, title, disabled, onRestore
   return <div className="my-3 flex flex-wrap items-center gap-2">
     <Button type="button" size="sm" variant="outline" disabled={disabled} onClick={() => {
       try {
-        const id = selected || crypto.randomUUID();
+        const id = selected || randomUUID();
         persist([{ id, title: title.trim() || 'Untitled post', savedAt: new Date().toISOString(), value }, ...drafts.filter((d) => d.id !== id)]);
         setSelected(id);
         toast.success('Draft saved on this browser.');

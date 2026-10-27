@@ -1,3 +1,5 @@
+import { randomUUID } from './uuid';
+
 /**
  * deviceInfo.ts — stable per-device identity for session recording + device-ban
  * enforcement.
@@ -20,8 +22,8 @@ export function getOrCreateDeviceId(): string {
     let id = localStorage.getItem(DEVICE_ID_KEY);
     if (!id) {
       id =
-        typeof crypto !== 'undefined' && 'randomUUID' in crypto
-          ? crypto.randomUUID()
+        typeof globalThis.crypto?.getRandomValues === 'function'
+          ? randomUUID()
           : 'dev_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
       localStorage.setItem(DEVICE_ID_KEY, id);
     }

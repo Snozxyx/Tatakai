@@ -3,6 +3,7 @@ import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { dismissMobileOverlay } from './dismiss-mobile-overlay';
 import { isCapacitor } from '@/lib/platform/platform';
 
 /**
@@ -36,11 +37,7 @@ export function MobileBackHandler() {
               void document.exitFullscreen().catch(() => undefined);
               return;
             }
-            const openDialog = document.querySelector('[role="dialog"][data-state="open"], [data-radix-popper-content-wrapper]');
-            if (openDialog) {
-              window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-              return;
-            }
+            if (dismissMobileOverlay(document)) return;
             // Locked mobile player: first back unlocks instead of leaving.
             const lockBtn = document.querySelector('[data-player-lock="locked"]');
             if (lockBtn) {
@@ -58,8 +55,9 @@ export function MobileBackHandler() {
 
           // 2. In-app history.
           const atRoot = pathRef.current === '/' || pathRef.current === '/home';
-          if (!atRoot && (canGoBack || window.history.length > 1)) {
-            navigate(-1);
+          if (!atRoot) {
+            if (canGoBack || (window.history.state?.idx ?? 0) > 0) navigate(-1);
+            else navigate('/', { replace: true });
             return;
           }
 

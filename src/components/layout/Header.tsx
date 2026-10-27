@@ -142,23 +142,6 @@ export function Header({ providerSearch, providerControls }: HeaderProps = {}) {
     return()=>{disposed=true;active?.abort();clearTimeout(initial);clearInterval(interval);document.removeEventListener('visibilitychange',checkStatus);};
   }, []);
 
-  // Keyboard shortcut Ctrl/Cmd+K
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      const isMac = navigator.platform.toLowerCase().includes("mac");
-      if ((isMac ? e.metaKey : e.ctrlKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        const ids = ["tatakai-provider-search", "tatakai-header-search", "tatakai-global-search"];
-        for (const id of ids) {
-          const el = document.getElementById(id) as HTMLInputElement | null;
-          if (el && el.getClientRects().length) { el.focus(); el.select(); return; }
-        }
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, []);
-
   const commitSearch = useCallback((term: string) => {
     const trimmed = term.trim();
     if (providerSearch) {

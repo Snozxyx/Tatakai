@@ -7,7 +7,7 @@
  *
  * Adding a new language:
  *   1. Create `src/locales/<code>.json` (copy en.json as template)
- *   2. Add the import + resource entry below
+ *   2. Add a dynamic import in localeBackend.ts and a supportedLanguages entry
  *   3. That's it — the language picker will surface it automatically
  */
 
@@ -16,8 +16,7 @@ import { initReactI18next } from 'react-i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
 
 import en from '@/locales/en.json';
-import es from '@/locales/es.json';
-import ja from '@/locales/ja.json';
+import { localeBackend } from './localeBackend';
 import { installLocaleFetchPatch, setActiveAppLanguage } from '@/lib/api/localeHeaders';
 
 export const supportedLanguages = [
@@ -37,15 +36,15 @@ export function isSupportedLanguageCode(value: unknown): value is SupportedLangu
   );
 }
 
-i18n
+export const i18nReady = i18n
+  .use(localeBackend)
   .use(LanguageDetector)
   .use(initReactI18next)
   .init({
     resources: {
       en: { translation: en },
-      es: { translation: es },
-      ja: { translation: ja },
     },
+    partialBundledLanguages: true,
     supportedLngs: ['en', 'es', 'ja'],
     // `es-419` (Latin-American Spanish, the Chromium/Electron default in much
     // of LATAM) has no dedicated catalog — map it (and any other regional

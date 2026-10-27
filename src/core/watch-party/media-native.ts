@@ -1,3 +1,4 @@
+import { randomUUID } from '../../lib/uuid';
 import { Capacitor, registerPlugin, type PluginListenerHandle } from '@capacitor/core';
 import type { WatchPartyMediaTransport } from './media';
 
@@ -70,7 +71,7 @@ export async function createNativeWatchPartyMediaBridge(transport: WatchPartyMed
     let resourceId = identifiers.get(url);
     if (!resourceId) {
       if (resources.size >= MAX_RESOURCES) throw new Error('Playlist contains too many resources');
-      resourceId = crypto.randomUUID().replace(/-/g, '');
+      resourceId = randomUUID().replace(/-/g, '');
       resources.set(resourceId, url);
       identifiers.set(url, resourceId);
     }

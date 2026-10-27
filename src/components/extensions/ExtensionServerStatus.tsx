@@ -1,5 +1,6 @@
-import { EXTENSION_PORTAL_URL } from "@/core/extensions/store-api";
+import { EXTENSION_PORTAL_URL, fetchPublishedServers, fetchStoreExtension, type StoreExtension } from "@/core/extensions/store-api";
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Server, Settings2, RefreshCw } from "lucide-react";
 import {
@@ -20,6 +21,46 @@ import {
 import { EXTENSION_INSTALLED_EVENT } from "@/core/extensions/ecosystems";
 import { formatServiceDuration } from "@/lib/betterStackStatus";
 import { useSettingsModal } from "@/contexts/SettingsModalContext";
+import { isNative } from "@/lib/platform/platform";
+
+function PublishedServers() {
+  const navigate = useNavigate();
+  const [connecting, setConnecting] = useState<string | null>(null);
+  const [error, setError] = useState('');
+  const directory = useQuery({
+    queryKey: ['published-extension-servers'],
+    queryFn: ({ signal }) => fetchPublishedServers(signal),
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
+  async function connect(server: StoreExtension) {
+    setConnecting(server.id); setError('');
+    try {
+      const detail = await fetchStoreExtension(server.id);
+      const url = new URL(detail?.sourceUrl || '');
+      if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash || url.pathname !== '/') throw Error('This server has an invalid connection address.');
+      navigate('/extensionserver/' + encodeURIComponent(url.origin));
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : 'Could not open this server. Try again.');
+    } finally { setConnecting(null); }
+  }
+  return <div className="flex flex-col gap-3">
+    <p className="text-sm text-muted-foreground">Connect a community server to use its sources.</p>
+    {directory.isPending && <p role="status" className="text-sm text-muted-foreground">Loading published servers…</p>}
+    {directory.isError && <div role="alert" className="flex flex-wrap items-center gap-3 text-sm"><span>Could not load published servers.</span><Button variant="outline" size="sm" disabled={directory.isFetching} onClick={() => void directory.refetch()}>Try again</Button></div>}
+    {directory.data?.length === 0 && <p className="text-sm text-muted-foreground">No community servers are published yet. You can add a server by URL below.</p>}
+    {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+    <div className="divide-y divide-border">
+      {directory.data?.map(server => <div key={server.id} className="flex min-w-0 flex-wrap items-center justify-between gap-4 py-4">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <ExtensionLogo name={server.name} src={server.icon} />
+          <div className="min-w-0"><h3 className="break-words font-semibold">{server.name}</h3><p className="break-words text-sm text-muted-foreground">{server.description}</p></div>
+        </div>
+        <Button variant="outline" disabled={connecting !== null} aria-label={`Connect to ${server.name}`} onClick={() => void connect(server)}>{connecting === server.id ? 'Opening…' : 'Connect'}</Button>
+      </div>)}
+    </div>
+  </div>;
+}
 
 function CommunityServer({ server }: { server: ServerConnection }) {
   const health = useQuery({
@@ -122,8 +163,9 @@ export function ExtensionServerStatus() {
             Community extension servers
           </CardTitle>
           <CardDescription>
-            Your connected community-hosted sources. Health refreshes every
-            minute; running time resets on server restart.
+            {servers.length
+              ? 'Your connected community-hosted sources. Health refreshes every minute; running time resets on server restart.'
+              : 'Browse published community servers and connect to use their sources.'}
           </CardDescription>
         </div>
         <Button variant="outline" onClick={() => openSettings("extensions")}>
@@ -145,7 +187,7 @@ export function ExtensionServerStatus() {
           servers.map((server) => (
             <CommunityServer key={server.id} server={server} />
           ))
-        ) : (
+        ) : !isNative() ? <PublishedServers /> : (
           <p className="text-sm text-muted-foreground">
             No community servers connected. Add a server in Extension Servers
             below.

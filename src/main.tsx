@@ -3,12 +3,11 @@ import { HelmetProvider } from "react-helmet-async";
 import { MotionPreferences } from '@/components/ui/MotionPreferences';
 import App from "./App.tsx";
 import "./index.css";
-import { isDeveloperModeEnabled, DEVELOPER_MODE_EVENT } from '@/lib/developerMode';
-// Load diagnostics only after the user explicitly enables Developer Mode.
-const loadExtensionDebugger = () => { if (isDeveloperModeEnabled()) void import('./utils/debug-extension'); };
+import { isDeveloperModeEnabled, DEVELOPER_MODE_EVENT } from "@/lib/developerMode";
+const loadExtensionDebugger = () => { if (isDeveloperModeEnabled()) void import("./utils/debug-extension"); };
 loadExtensionDebugger();
 window.addEventListener(DEVELOPER_MODE_EVENT, loadExtensionDebugger);
-import "@/lib/i18n"; // Must be loaded once before React renders
+import { i18nReady } from "@/lib/i18n";
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { WebappWrapper } from '@/components/WebappWrapper';
 import { initConsoleProtection, logger } from '@/lib/logger';
@@ -107,7 +106,7 @@ async function renderApp() {
   // Native source discovery must be ready before routes/nav mount. Otherwise
   // their first React Query request caches an empty extension/custom-source
   // catalogue for five minutes.
-  await Promise.all([bootstrapMobile(), initializeMediaMetadataCache()]);
+  await Promise.all([bootstrapMobile(), initializeMediaMetadataCache(), i18nReady]);
   createRoot(document.getElementById("root")!).render(
     <HelmetProvider>
       <ErrorBoundary>

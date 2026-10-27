@@ -34,11 +34,12 @@ const DialogContent = React.forwardRef<
     /** Extra classes for the overlay (e.g. raise nested dialogs above a parent dialog). */
     overlayClassName?: string;
     showCloseButton?: boolean;
+    portalContainer?: HTMLElement | null;
   }
->(({ className, overlayClassName, showCloseButton = true, children, ...props }, ref) => {
+>(({ className, overlayClassName, showCloseButton = true, portalContainer, children, ...props }, ref) => {
   const { t } = useTranslation();
   return (
-  <DialogPortal>
+  <DialogPortal container={portalContainer}>
     <DialogOverlay className={overlayClassName} />
     <DialogPrimitive.Content
       ref={ref}

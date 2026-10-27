@@ -19,11 +19,12 @@ describe('four-provider abstraction', () => {
       expect(init?.headers?.Authorization).toBe('Bearer key');
       const bodies: Record<string, unknown> = {
         '/v4/user': { user: { isPremium: true } }, '/v4/magnet/upload': { magnets: [{ id: 7 }] },
-        '/v4/magnet/status': { magnets: { id: 7, statusCode: 4, status: 'Ready' } },
+        '/v4.1/magnet/status': { magnets: { id: 7, statusCode: 4, status: 'Ready' } },
         '/v4/magnet/files': { magnets: [{ id: 7, files: [{ n: 'Pack', e: [{ n: 'Fixture - 01.mkv', s: 50, l: 'first' }, { n: 'Fixture - 02.mkv', s: 50, l: 'second' }] }] }] },
         '/v4/link/unlock': { link: 'https://cdn.test/episode2.mkv' },
       };
       if (url.endsWith('/link/unlock')) expect(init?.body).toBe('link=second');
+      if (!bodies[new URL(url).pathname]) return response({ status: 'error', error: { code: 'DISCONTINUED', message: 'This API endpoint has been discontinued' } });
       return response({ status: 'success', data: bodies[new URL(url).pathname] });
     };
     const client = new CloudDebridClient('alldebrid', 'key', request);

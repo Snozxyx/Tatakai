@@ -1,3 +1,4 @@
+import { randomUUID } from '../../lib/uuid';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { usePlaybackCoordinator } from '@/core/player/usePlaybackCoordinator';
@@ -212,7 +213,7 @@ export function NativeTorrentPlayer({
     if (streamKind === 'debrid') setMessage(uiI18n.t('app.opening_debrid_stream_f3282283'));
 
     const lease = coordinator.begin({ id: url, url, mode: streamKind, mediaId, episodeId }, initialSeekSeconds, 'native');
-    nativeSessionRef.current = crypto.randomUUID();
+    nativeSessionRef.current = randomUUID();
     unsubscribe = onNativePlayerEvent((event: any) => {
       if (cancelled) return;
       if (event.sessionId && event.sessionId !== nativeSessionRef.current) return;
@@ -300,7 +301,7 @@ export function NativeTorrentPlayer({
   }, [url, streamKind]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const retry = () => {
-    nativeSessionRef.current = crypto.randomUUID();
+    nativeSessionRef.current = randomUUID();
     openedUrlRef.current = null;
     completedRef.current = false;
     setStatus('opening');

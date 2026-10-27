@@ -1,3 +1,4 @@
+import { randomUUID } from '../../lib/uuid';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -7,7 +8,7 @@ import { useCallback, useEffect, useRef } from 'react';
 function getSessionId(): string {
   let sessionId = sessionStorage.getItem('anime_session_id');
   if (!sessionId) {
-    sessionId = crypto.randomUUID();
+    sessionId = randomUUID();
     sessionStorage.setItem('anime_session_id', sessionId);
   }
   return sessionId;

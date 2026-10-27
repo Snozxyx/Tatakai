@@ -1,8 +1,28 @@
 /// <reference types="vite/client" />
 
+// Cards, avatars and backgrounds revisit the same URLs on every React render.
+// Bound retained strings so long feeds cannot grow this cache indefinitely.
+const imageUrls = new Map<string, string>();
+const IMAGE_URL_CACHE_LIMIT = 512;
+
 /** Public display URLs only. Persist the original URL in the database. */
 export function publicImageUrl(value?: string | null, width: number | null = 1920, base?: string): string | undefined {
   if (!value) return value ?? undefined;
+  const cacheKey = value.length <= 2048 && (!base || base.length <= 2048)
+    ? JSON.stringify([value, String(width), base]) : undefined;
+  if (cacheKey) {
+    const cached = imageUrls.get(cacheKey);
+    if (cached !== undefined) return cached;
+  }
+  const result = buildPublicImageUrl(value, width, base);
+  if (cacheKey) {
+    if (imageUrls.size >= IMAGE_URL_CACHE_LIMIT) imageUrls.delete(imageUrls.keys().next().value!);
+    imageUrls.set(cacheKey, result);
+  }
+  return result;
+}
+
+function buildPublicImageUrl(value: string, width: number | null, base?: string): string {
   try {
     const url = new URL(value, base);
     const host = url.hostname.toLowerCase();

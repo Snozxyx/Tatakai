@@ -402,8 +402,10 @@ export default function FavoritesPage() {
   };
 
   const shellClass = cn(
-    'relative z-10 mx-auto max-w-[1800px] py-4 pb-24 pr-4 md:py-6 md:pb-6 md:pr-6',
-    isDesktopApp ? 'pl-4' : 'pl-4 md:pl-32',
+    'relative z-10 mx-auto max-w-[1800px] pb-24 md:pb-6',
+    'pr-[max(1rem,env(safe-area-inset-right))] md:pr-6',
+    'pt-[calc(1rem+env(safe-area-inset-top,0px))] md:pt-6',
+    isDesktopApp ? 'p-4 md:p-6' : 'pl-[max(1rem,env(safe-area-inset-left))] md:pl-32',
   );
 
   if (!user) {

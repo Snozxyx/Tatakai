@@ -428,6 +428,22 @@ export async function fetchStoreExtensions(
   return toListResult(envelope, params);
 }
 
+/** Fetch every page of the published community server directory. */
+export async function fetchPublishedServers(signal?: AbortSignal): Promise<StoreExtension[]> {
+  const servers = new Map<string, StoreExtension>();
+  let offset = 0;
+  while (true) {
+    const page = await fetchStoreExtensions({ ecosystem: 'tatakai-server', limit: 100, offset }, signal);
+    let added = 0;
+    for (const item of page.items) {
+      if (!servers.has(item.id)) { servers.set(item.id, item); added++; }
+    }
+    if (!added || page.items.length < page.limit) break;
+    offset += page.items.length;
+  }
+  return [...servers.values()];
+}
+
 /** `GET /api/extension/search/:search` — matches name, description or slug. */
 export async function searchStoreExtensions(
   search: string,

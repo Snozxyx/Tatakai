@@ -1,3 +1,4 @@
+import { randomUUID } from '../../../lib/uuid';
 import { throwCompatibilityAbort } from './abort';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { EXTENSION_INSTALLED_EVENT } from '../ecosystems';
@@ -57,12 +58,12 @@ export async function compatibilityRequest<T>(payload: Record<string, unknown>, 
 async function nativeCompatibilityRequest<T>(payload: Record<string, unknown>, signal?: AbortSignal): Promise<T> {
   throwCompatibilityAbort(signal);
   if (!(window as any).electron?.compatibilityRequest && !(Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android' && Capacitor.isPluginAvailable('TatakaiCompatibility'))) throw Error('This build does not include a local Android bytecode host');
-  const requestId = crypto.randomUUID();
+  const requestId = randomUUID();
   const desktop = (window as any).electron?.compatibilityRequest as ((payload: unknown) => Promise<Reply>) | undefined;
   const send = (body: Record<string, unknown>) => desktop ? desktop(body) : android.request({ payload: JSON.stringify(body) });
   let abort: (() => void) | undefined;
   const canceled = new Promise<never>((_, reject) => {
-    abort = () => { void send({ op: 'cancel', target: requestId, requestId: crypto.randomUUID() }).catch(() => {}); reject(signal?.reason || new DOMException('Aborted', 'AbortError')); };
+    abort = () => { void send({ op: 'cancel', target: requestId, requestId: randomUUID() }).catch(() => {}); reject(signal?.reason || new DOMException('Aborted', 'AbortError')); };
     signal?.addEventListener('abort', abort, { once: true });
   });
   try {

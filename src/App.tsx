@@ -9,6 +9,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { queryClient } from "@/lib/queryClient";
 import MainLayout from "@/layouts/MainLayout";
 import AppRoutes from "@/routes/AppRoutes";
+import { GlobalSearch } from '@/components/layout/GlobalSearch';
 import { DesktopDeepLinkBridge } from "@/components/desktop/DesktopDeepLinkBridge";
 import { MobileDeepLinkBridge } from "@/components/mobile/MobileDeepLinkBridge";
 import { LightboxProvider } from "@/components/media/ImageLightbox";
@@ -117,6 +118,7 @@ const App = () => {
             <TooltipProvider>
               <Router future={routerFutureFlags}>
                 <AutomationScheduler />
+                <GlobalSearch />
                 <DesktopDeepLinkBridge />
                 <MobileDeepLinkBridge />
                 <SettingsModalProvider>

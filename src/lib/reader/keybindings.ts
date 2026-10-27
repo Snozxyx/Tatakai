@@ -11,6 +11,8 @@
 export type ReaderKeybindAction =
   | 'nextPage'
   | 'prevPage'
+  | 'scrollDown'
+  | 'scrollUp'
   | 'nextChapter'
   | 'prevChapter'
   | 'toggleFullscreen'
@@ -28,6 +30,8 @@ export const READER_KEYBINDS_UPDATED_EVENT = 'tatakai-reader-keybinds-updated';
 export const READER_KEYBIND_ACTIONS: { action: ReaderKeybindAction; label: string; hint: string }[] = [
   { action: 'nextPage', label: 'Next Page', hint: 'Scroll / advance one page' },
   { action: 'prevPage', label: 'Previous Page', hint: 'Scroll / go back one page' },
+  { action: 'scrollDown', label: 'Scroll Down', hint: 'Scroll down within the reader' },
+  { action: 'scrollUp', label: 'Scroll Up', hint: 'Scroll up within the reader' },
   { action: 'nextChapter', label: 'Next Chapter', hint: 'Jump to the next chapter' },
   { action: 'prevChapter', label: 'Previous Chapter', hint: 'Jump to the previous chapter' },
   { action: 'toggleFullscreen', label: 'Fullscreen', hint: 'Toggle fullscreen' },
@@ -41,6 +45,8 @@ export const READER_KEYBIND_ACTIONS: { action: ReaderKeybindAction; label: strin
 export const DEFAULT_READER_KEYBINDS: ReaderKeybindMap = {
   nextPage: 'arrowright',
   prevPage: 'arrowleft',
+  scrollDown: 'arrowdown',
+  scrollUp: 'arrowup',
   nextChapter: 'n',
   prevChapter: 'p',
   toggleFullscreen: 'f',
@@ -88,7 +94,7 @@ export function normalizeReaderKeybinds(raw: unknown): ReaderKeybindMap {
   const next: ReaderKeybindMap = { ...DEFAULT_READER_KEYBINDS };
   if (!raw || typeof raw !== 'object') return next;
   for (const [action, key] of Object.entries(raw as Record<string, unknown>)) {
-    if (isReaderKeybindAction(action) && typeof key === 'string' && key.trim()) {
+    if (isReaderKeybindAction(action) && typeof key === 'string') {
       next[action] = key.trim().toLowerCase();
     }
   }

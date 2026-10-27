@@ -123,12 +123,12 @@ export function ReaderNavigationSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="bottom"
-        className="max-h-[82dvh] rounded-t-3xl border-border bg-background/95 px-0 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-xl sm:mx-auto sm:max-w-xl"
+        className="flex max-h-[82dvh] flex-col overflow-hidden rounded-t-3xl border-border bg-background/95 px-0 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-xl sm:mx-auto sm:max-w-xl"
       >
-        <SheetHeader className="px-5 text-left">
+        <SheetHeader className="shrink-0 px-5 pr-14 text-left">
           <SheetTitle>{uiI18n.t("app.reader_navigation_911835f9")}</SheetTitle>
         </SheetHeader>
-        <div className="mt-5 space-y-5 overflow-y-auto px-5 scrollbar-thin">
+        <div className="min-h-0 space-y-5 overflow-y-auto overscroll-contain px-5 scrollbar-thin">
           <section className="space-y-3 rounded-xl border border-border p-4">
             <div className="flex items-center justify-between text-sm font-medium">
               <label htmlFor="reader-page-seek">

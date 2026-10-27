@@ -2,6 +2,7 @@ import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { Play, Flame } from "lucide-react";
 import { memo } from "react";
+import { useIsMobile } from "@/hooks/ui/use-mobile";
 import { useTranslation } from "react-i18next";
 import { TrendingAnime } from "@/lib/api";
 import { Link, useNavigate } from "react-router-dom";
@@ -53,6 +54,7 @@ const getTrendingPoster = (poster: string) => {
 const TrendingCard = memo(function TrendingCard({ anime, spanClass }: { anime: TrendingAnime; spanClass: string }) {
   useUiTranslation();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const routeAnimeId = buildPreferredAnimeRouteId({
     id: anime.id,
     name: anime.name,
@@ -103,13 +105,13 @@ const TrendingCard = memo(function TrendingCard({ anime, spanClass }: { anime: T
   }, []);
 
   useEffect(() => {
-    if (!isHovering || !previewAniListId) {
-      if (!isHovering) cancelHover();
+    if (isMobile || !isHovering || !previewAniListId) {
+      if (isMobile || !isHovering) cancelHover();
       return;
     }
 
     startHover(previewAniListId, [anime.name]);
-  }, [anime.name, cancelHover, isHovering, previewAniListId, startHover]);
+  }, [anime.name, cancelHover, isHovering, isMobile, previewAniListId, startHover]);
 
   useEffect(() => {
     const streamUrl = source?.streamUrl ?? null;
@@ -134,7 +136,7 @@ const TrendingCard = memo(function TrendingCard({ anime, spanClass }: { anime: T
   }, [isHovering, loading, previewAnimeId, previewUrl, source]);
 
   useEffect(() => {
-    if (!previewUrl || !videoRef.current) return;
+    if (isMobile || !previewUrl || !videoRef.current) return;
 
     const videoEl = videoRef.current;
 
@@ -174,11 +176,11 @@ const TrendingCard = memo(function TrendingCard({ anime, spanClass }: { anime: T
         hlsRef.current = null;
       }
     };
-  }, [previewUrl, isPreviewM3U8]);
+  }, [previewUrl, isPreviewM3U8, isMobile]);
 
   useEffect(() => {
     if (videoRef.current) {
-      if (isHovering && previewUrl) {
+      if (!isMobile && isHovering && previewUrl) {
         if (hlsRef.current) {
           hlsRef.current.startLoad(-1);
         }
@@ -190,7 +192,7 @@ const TrendingCard = memo(function TrendingCard({ anime, spanClass }: { anime: T
         }
       }
     }
-  }, [isHovering, previewUrl]);
+  }, [isHovering, previewUrl, isMobile]);
 
   useEffect(() => {
     setIsLoading(Boolean(isHovering && loading && !previewUrl));
@@ -213,7 +215,7 @@ const TrendingCard = memo(function TrendingCard({ anime, spanClass }: { anime: T
       }}
       onMouseEnter={() => {
         // Hover previews are desktop-only — touch devices never hover.
-        if (typeof window !== 'undefined' && window.matchMedia?.('(hover: none)').matches) return;
+        if (isMobile || window.matchMedia?.('(hover: none)').matches) return;
         setIsHovering(true);
         if (previewError && !previewUrl) {
           setPreviewError(false);
@@ -232,11 +234,11 @@ const TrendingCard = memo(function TrendingCard({ anime, spanClass }: { anime: T
         loading="lazy"
         decoding="async"
         fetchPriority="low"
-        className={`w-full h-full object-cover md:transition-all md:duration-700 ${isHovering && previewUrl ? 'opacity-0' : 'md:group-hover:scale-110'}`}
+        className={`w-full h-full object-cover md:transition-all md:duration-700 ${!isMobile && isHovering && previewUrl ? 'opacity-0' : 'md:group-hover:scale-110'}`}
       />
 
       {/* Video Preview — desktop hover only */}
-      <video
+      {!isMobile && <video
         ref={videoRef}
         className={`absolute inset-0 hidden w-full h-full object-cover transition-opacity duration-300 md:block ${isHovering && previewUrl ? 'opacity-100' : 'opacity-0'}`}
         muted
@@ -244,7 +246,7 @@ const TrendingCard = memo(function TrendingCard({ anime, spanClass }: { anime: T
         playsInline
         preload="none"
         crossOrigin="anonymous"
-      />
+      />}
 
       {/* Loading indicator */}
       {isHovering && isLoading && (

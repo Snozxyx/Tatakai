@@ -1,4 +1,6 @@
 import { useReadingViewTracker } from '@/hooks/user/useReadingViews';
+import { ReaderPageRail } from '@/components/reader/ReaderPageRail';
+import { MangaSourceStatus } from '@/components/manga/MangaSourceStatus';
 import { readingViewId } from '@/lib/readingViewId';
 import { readerImageStyles, readerPageIsEager } from "@/components/reader/readerImageStyles";
 import { useReaderFullscreen } from "@/hooks/media/useReaderFullscreen";
@@ -138,7 +140,7 @@ export default function MangaReaderPage() {
   // offline gate) — badge it so the offline state is visible, not confusing.
   const isOfflineChapter = searchParams.get("offline") === "true";
 
-  const { data: chaptersResp } = useMangaChapters(mangaId);
+  const { data: chaptersResp, isFetching: fetchingChapterSources } = useMangaChapters(mangaId);
   const chapters = useMemo<MappedMangaChapter[]>(() => {
     const list = chaptersResp?.mappedChapters ?? [];
     return [...list].sort((a, b) => a.canonicalOrder - b.canonicalOrder);
@@ -866,14 +868,20 @@ export default function MangaReaderPage() {
     interactedRef.current = true;
     setPageIndex(next);
     if (settings.readingMode === 'vertical') {
-      const entry = scrollRef.current?.querySelector(`[data-ch="${currentIndex}"]`) ?? scrollRef.current;
+      const entry = scrollRef.current?.querySelector(`[data-ch="${navIndex}"]`) ?? scrollRef.current;
       const page = entry?.querySelectorAll<HTMLElement>('[data-page]')[next];
       if (page && scrollRef.current) {
         const root = scrollRef.current;
         root.scrollTo({ top: root.scrollTop + page.getBoundingClientRect().top - root.getBoundingClientRect().top, behavior: 'auto' });
       }
     }
-  }, [total, activeMeta?.total, currentIndex, settings.readingMode]);
+  }, [total, activeMeta?.total, navIndex, settings.readingMode]);
+
+  const scrollReader = (direction: number) => {
+    interactedRef.current = true;
+    if (settings.autoScroll) updateSetting('autoScroll', false);
+    scrollRef.current?.scrollBy({ top: direction * 120, behavior: reducedMotion ? 'instant' : 'smooth' });
+  };
 
   // Auto-scroll (vertical mode): advance the scroll position continuously.
   useEffect(() => {
@@ -931,9 +939,10 @@ export default function MangaReaderPage() {
 
   useReaderKeyboard(keybinds, {
     nextPage: goNextPage, prevPage: goPrevPage,
+    scrollDown: () => scrollReader(1), scrollUp: () => scrollReader(-1),
     nextChapter: () => navToChapter(nextChapter), prevChapter: () => navToChapter(prevChapter),
     toggleFullscreen, toggleDirection, zoomIn, zoomOut, toggleComments: isFs ? undefined : toggleComments, reload,
-  }, !showSettings && !showCommentsDrawer);
+  }, !showSettings && !showReaderNavigator && !showCommentsDrawer);
   useTVReader({ next: goNextPage, previous: goPrevPage, controls: () => setShowSettings(true) });
 
   const isCoarsePointer = useMemo(
@@ -984,7 +993,7 @@ export default function MangaReaderPage() {
   return (
     <div ref={containerRef} data-reader-fullscreen={isFs || undefined} className="relative min-h-screen text-foreground" style={{ backgroundColor: settings.backgroundColor }}>
       {chapterNotification && settings.showNotifications && <div role="status" className="pointer-events-none fixed left-1/2 top-20 z-50 max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-xl border border-border bg-background/95 px-4 py-3 text-sm shadow-lg">{chapterNotification}</div>}
-      {/* Top nav — comick layout: Prev · Manga Info · Next (compact on mobile) */}
+      {/* The title and page counter open navigation; the back arrow opens manga info. */}
       {chromeVisible && <ReaderTopbar>
         <button
           onClick={() => navigate(mangaId ? `/manga/${mangaId}` : "/manga")}
@@ -1001,9 +1010,10 @@ export default function MangaReaderPage() {
           <ChevronLeft className="h-4 w-4" /><span className="hidden min-[380px]:inline">{uiI18n.t('app.prev_e96fea52')}</span>
         </button>
         <button
-          onClick={() => navigate(`/manga/${mangaId}`)}
+          onClick={() => setShowReaderNavigator(true)}
           className="flex min-h-11 min-w-0 flex-1 flex-col items-center px-1 sm:px-2 text-center"
-          title={uiI18n.t('app.manga_info_087808bc')}
+          title={uiI18n.t('app.open_chapter_and_provider_navigator_cb69d7c3')}
+          aria-label={uiI18n.t('app.open_chapter_and_provider_navigator_cb69d7c3')}
         >
           <span className="w-full truncate text-xs sm:text-sm font-bold">
             {mangaTitle}
@@ -1056,6 +1066,8 @@ export default function MangaReaderPage() {
         </>}
       </ReaderToolbar>
 
+      <div className="relative">
+      {chromeVisible && <ReaderPageRail page={pageIndex} total={activeMeta?.total || total} onPage={jumpToPage} />}
       <div
         ref={scrollRef}
         data-reader-scroll
@@ -1079,7 +1091,7 @@ export default function MangaReaderPage() {
         onPointerUp={handleReaderPointerUp}
         onPointerCancel={handleReaderPointerCancel}
         onWheel={() => { if (settingsRef.current.autoScroll) updateRef.current('autoScroll', false); }}
-        className={`mx-auto overflow-y-auto overscroll-contain px-0 py-0 sm:px-4 sm:py-6 ${settings.zoom > 100 ? 'overflow-x-auto' : 'overflow-x-hidden'}`}
+        className={`mx-auto overflow-y-auto overscroll-contain py-0 sm:pr-4 sm:py-6 ${chromeVisible ? 'pl-2 sm:pl-4' : 'pl-0 sm:pl-4'} ${settings.zoom > 100 ? 'overflow-x-auto' : 'overflow-x-hidden'}`}
         style={{
           height: `${scrollH}px`,
           filter: settings.brightness < 100 ? `brightness(${settings.brightness / 100})` : undefined,
@@ -1255,7 +1267,7 @@ export default function MangaReaderPage() {
               className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-white/5 px-4 py-3 text-sm font-semibold hover:bg-muted"
             >
               <MessageSquare className="h-4 w-4" />
-              {showInlineComments ? uiI18n.t('app.hide_comments_ac7a3920') : uiI18n.t('app.show_comments_44811513')}
+                  {showInlineComments ? uiI18n.t('app.hide_comments_ac7a3920') : uiI18n.t('app.show_comments_44811513')}
             </button>
             {showInlineComments ? (
               <div className="mt-5 space-y-8">
@@ -1266,14 +1278,14 @@ export default function MangaReaderPage() {
                     episodeId={String(displayNumber)}
                     entityName={`${mangaTitle} · ${displayTitle}`}
                   />
-                ) : null}
-                <Comments entityType="manga" entityId={mangaId} entityName={mangaTitle} />
+                ) : <Comments entityType="manga" entityId={mangaId} entityName={mangaTitle} />}
               </div>
             ) : null}
           </div>
         ) : null}
       </div>
 
+      </div>
       {lockedProvider && unavailableChapter && (
         <div role="status" className="fixed inset-x-3 bottom-20 z-50 mx-auto flex max-w-xl flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-background p-4 text-sm shadow-lg">
           <p>No more sources available from {chapters.flatMap((c) => c.sources).find((s) => s.provider === lockedProvider)?.providerName || lockedProvider} for chapter {unavailableChapter.chapterNumber ?? unavailableChapter.canonicalOrder + 1}.</p>
@@ -1294,6 +1306,7 @@ export default function MangaReaderPage() {
             </label>
             <section>
               <h3 className="mb-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">{uiI18n.t('app.provider_7ceee3f3')}</h3>
+              <div className="mb-3"><MangaSourceStatus count={new Set(navigatorSources.map(source => source.provider)).size} fetching={fetchingChapterSources || !!chaptersResp?.sourcesPending} /></div>
               <button type="button" aria-pressed={Boolean(lockedProvider)} disabled={!displayProvider} onClick={() => {
                 const params = new URLSearchParams(searchParams);
                 if (lockedProvider) params.delete('lockedProvider');
@@ -1321,7 +1334,7 @@ export default function MangaReaderPage() {
                     <span className="font-medium">{source.providerName || source.provider}</span><span className="text-xs text-muted-foreground">{source.scanlator || uiI18n.t('app.chapter_source_8a19e6fa')}</span>
                   </button>;
                 })}
-                {!navigatorSources.length && <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">{uiI18n.t('app.no_alternative_providers_are_available_for_this__4a054308')}</p>}
+                {!navigatorSources.length && !fetchingChapterSources && !chaptersResp?.sourcesPending && <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">{uiI18n.t('app.no_alternative_providers_are_available_for_this__4a054308')}</p>}
               </div>
             </section>
             <section>
@@ -1353,12 +1366,12 @@ export default function MangaReaderPage() {
               </TabsList>
             </div>
             <TabsContent value="chapter" className="flex-1 overflow-y-auto px-4 py-3">
-              {mangaId && resolvedNumber != null ? (
+              {mangaId && displayNumber != null ? (
                 <Comments
                   entityType="manga"
                   entityId={mangaId}
-                  episodeId={String(resolvedNumber)}
-                  entityName={`${mangaTitle} · ${title}`}
+                  episodeId={String(displayNumber)}
+                  entityName={`${mangaTitle} · ${displayTitle}`}
                 />
               ) : (
                 <p className="py-8 text-center text-sm text-muted-foreground">

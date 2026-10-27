@@ -1,3 +1,4 @@
+import { randomUUID } from '../../lib/uuid';
 import { useEffect, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 
@@ -28,14 +29,14 @@ export function useClientId() {
         const prefix = Capacitor.isNativePlatform() ? 'mobile' : 'web';
         let cid = localStorage.getItem(CID_STORAGE_KEY);
         if (!cid) {
-          cid = `${prefix}-${crypto.randomUUID()}`;
+          cid = `${prefix}-${randomUUID()}`;
           localStorage.setItem(CID_STORAGE_KEY, cid);
         }
         setClientId(cid);
         setCachedClientId(cid);
       } catch (e) {
         console.warn('[CID] Failed to get/create client ID:', e);
-        const fallback = `tmp-${crypto.randomUUID()}`;
+        const fallback = `tmp-${randomUUID()}`;
         setClientId(fallback);
         setCachedClientId(fallback);
       }

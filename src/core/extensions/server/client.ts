@@ -1,3 +1,4 @@
+import { randomUUID } from '../../../lib/uuid';
 import { EXTENSION_INSTALLED_EVENT } from '../ecosystems';
 import type { WatchExtensionBatch } from '../compatibility/watch-batches';
 import type { CustomSourceEntry, CustomHomeData, CustomSearchData, CustomInfoData, CustomWatchData, CustomReadData } from '@/core/content/custom-source-runtime';
@@ -41,7 +42,7 @@ export async function connectServer(urlInput: string, password: string, code?: s
   if (health.setupRequired) throw Error('Complete setup at the server URL before connecting Tatakai.');
   const auth = await serverRequest(provisional, code ? '/auth/pair' : '/auth/login', code ? { code, label: 'Tatakai client' } : { password, role: 'viewer', label: 'Tatakai client' });
   const previous = listServers(), existing = previous.find(row => row.serverId === health.serverId && row.url === url);
-  const connection: ServerConnection = { id: existing?.id || crypto.randomUUID(), serverId: health.serverId, name: existing?.name || health.name, url, token: auth.token, enabled: true, logoUrl: health.logoUrl || undefined };
+  const connection: ServerConnection = { id: existing?.id || randomUUID(), serverId: health.serverId, name: existing?.name || health.name, url, token: auth.token, enabled: true, logoUrl: health.logoUrl || undefined };
   saveServers([...previous.filter(row => row.id !== connection.id), connection]);
   return connection;
 }
@@ -131,7 +132,10 @@ export async function serverMappedChapters(params: { anilistId?: number; title?:
         if (Array.isArray(chapter.sources) && chapter.sources.length) {
           chapters.push({ number, title: chapter.title, sources: chapter.sources.map((entry: any) => {
             const chapterId = JSON.stringify({ chapterKey: entry.chapterKey, provider: entry.provider, providerChapterId: entry.providerChapterId, anilistId: params.anilistId });
-            return { ...entry, provider, providerName: `${entry.provider || source.name} · ${source.name}`, chapterKey: `${provider}:${chapterId}`, providerChapterId: chapterId };
+            // Keep each bundled provider selectable while routing pages through
+            // the same server source (the first two pipe-separated segments).
+            const sourceProvider = entry.provider ? `${provider}|${encodeURIComponent(entry.provider)}` : provider;
+            return { ...entry, provider: sourceProvider, providerName: `${entry.providerName || entry.provider || source.name} · ${source.name}`, chapterKey: `${sourceProvider}:${chapterId}`, providerChapterId: chapterId };
           }) }); continue;
         }
         if (!id) continue;

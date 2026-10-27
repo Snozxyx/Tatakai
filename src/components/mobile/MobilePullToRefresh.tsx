@@ -8,15 +8,8 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { useIsDesktopApp, useIsMobileApp } from '@/hooks/ui/useIsNativeApp';
 import { useIsPhone } from '@/hooks/ui/use-mobile';
-import { PullRefreshGesture, REFRESH_PULL_THRESHOLD } from './pull-refresh-gesture';
-
-function atScrollTop(target: Element): boolean {
-  if ((document.scrollingElement?.scrollTop ?? 0) > 1) return false;
-  for (let element: Element | null = target; element; element = element.parentElement) {
-    if (element.scrollTop > 1) return false;
-  }
-  return true;
-}
+import { REFRESH_PULL_THRESHOLD } from './pull-refresh-gesture';
+import { installPullRefreshListeners } from './pull-refresh-listeners';
 
 /** Refresh data in place, preserving navigation and local state. */
 export function MobilePullToRefresh() {
@@ -42,34 +35,18 @@ export function MobilePullToRefresh() {
   useEffect(() => {
     setPull(0);
     if (!enabled) return;
-    const gesture = new PullRefreshGesture();
+    document.documentElement.classList.add('mobile-pull-refresh-enabled');
     let frame = 0, latest = 0;
     function display(amount: number) {
+      if (latest === amount) return;
       latest = amount;
       if (!frame) frame = requestAnimationFrame(() => { frame = 0; setPull(latest); });
     }
-    function start(event: TouchEvent) {
-      const target = event.target instanceof Element ? event.target : null;
-      if (!target || busy.current || event.touches.length !== 1) { gesture.cancel(); return; }
-      const blocked = !!target.closest('input,textarea,select,[contenteditable="true"],[role="dialog"],[role="slider"],video,iframe,canvas,[data-no-pull-refresh]') ||
-        !!document.querySelector('[role="dialog"],[data-state="open"][role="menu"],[data-state="open"][role="listbox"]');
-      gesture.begin(event.touches[0].clientX, event.touches[0].clientY, atScrollTop(target), blocked);
-    }
-    function move(event: TouchEvent) {
-      if (!event.touches[0]) return;
-      const amount = gesture.move(event.touches[0].clientX, event.touches[0].clientY, event.touches.length);
-      if (amount > 6 && event.cancelable) event.preventDefault();
-      display(amount);
-    }
-    function end() { const ready = gesture.finish(); display(0); if (ready) void refresh(); }
-    function cancel() { gesture.cancel(); display(0); }
-    window.addEventListener('touchstart', start, { passive: true });
-    window.addEventListener('touchmove', move, { passive: false });
-    window.addEventListener('touchend', end); window.addEventListener('touchcancel', cancel);
+    const removeListeners = installPullRefreshListeners(window, () => busy.current, display, () => void refresh());
     return () => {
       if (frame) cancelAnimationFrame(frame);
-      window.removeEventListener('touchstart', start); window.removeEventListener('touchmove', move);
-      window.removeEventListener('touchend', end); window.removeEventListener('touchcancel', cancel);
+      removeListeners();
+      document.documentElement.classList.remove('mobile-pull-refresh-enabled');
     };
   }, [enabled, location.pathname, location.search, client]);
 

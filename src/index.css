@@ -122,10 +122,10 @@
 
   /* Safe Area Support for Mobile Devices */
   html {
-    --sat: env(safe-area-inset-top);
-    --sar: env(safe-area-inset-right);
-    --sab: env(safe-area-inset-bottom);
-    --sal: env(safe-area-inset-left);
+    --sat: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+    --sar: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
+    --sab: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+    --sal: var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
 
     /* Smooth in-page navigation (anchor jumps, programmatic scrolls).
        Overridden to `auto` under prefers-reduced-motion / .reduce-motion. */
@@ -234,8 +234,7 @@ html.quality-animations * {
   /* Reduce repaints on scroll */
   .glass-panel {
     contain: layout paint;
-    transform: translateZ(0);
-    /* Force GUI layer */
+    /* Let the compositor allocate layers only when needed. */
   }
 }
 
@@ -986,6 +985,12 @@ html.mobile-player-fullscreen [data-mobile-nav] {
   display: none !important;
 }
 
+/* Alternate interface navigation also stays behind CSS fullscreen players. */
+.app-fullscreen .app-interface-shell,
+.mobile-player-fullscreen .app-interface-shell {
+  display: none !important;
+}
+
 /* Remove the top padding added for the titlebar. NOTE: `.app-fullscreen>div`
    never matched anything (<html>'s children are <head>/<body>), so the reset
    keys off an explicit MainLayout hook instead. */
@@ -1629,11 +1634,8 @@ body[data-theme="harvest"] .glass-panel {
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
-/* Hardware acceleration hints - apply only to non-fixed elements to avoid breaking modal centering */
-.native-app .glass-panel {
-  transform: translateZ(0);
-  will-change: transform;
-}
+/* Glass panels do not need permanent transform layers. Animated elements
+   can request their own layers while moving. */
 
 /* Don't apply transform to elements with backdrop-blur that use fixed positioning */
 /* This prevents breaking the centering of modals/dialogs */
@@ -2456,3 +2458,43 @@ html[data-reduced-motion=true] :is(.reader-topbar, .reader-tools) { transition-p
 
 /* The reader owns viewport-fixed tools; mobile GPU hints must not trap them. */
 body.manga-reader-open main { transform: none; perspective: none; backface-visibility: visible; }
+
+/* Skip offscreen home layout while retaining the last measured section height. */
+@media (max-width: 767px) {
+  [data-mobile-home] .home-reveal-section {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 320px;
+  }
+}
+
+/* Capacitor 8 can run edge-to-edge on Android. Use its injected insets,
+   falling back to WebKit/Chromium env values in the browser and on iOS. */
+.capacitor-native [data-main-layout] { padding-top: var(--sat); }
+.capacitor-native .ui-sheet:is([data-sheet-side="left"], [data-sheet-side="right"]) {
+  top: var(--sat); bottom: var(--sab); height: auto;
+  max-height: calc(100dvh - var(--sat) - var(--sab));
+}
+.capacitor-native .ui-sheet[data-sheet-side="bottom"] {
+  padding-bottom: max(1.5rem, var(--sab));
+  max-height: calc(100dvh - var(--sat));
+}
+.capacitor-native .ui-sheet[data-sheet-side="top"] { padding-top: max(1.5rem, var(--sat)); }
+.capacitor-native .ui-dialog {
+  top: calc(50% + (var(--sat) - var(--sab)) / 2);
+  max-height: calc(100dvh - var(--sat) - var(--sab) - 1.5rem);
+}
+/* Modal portals own interaction; background chrome must not cover them. */
+body:has([role="dialog"][data-state="open"]) :is([data-mobile-nav], [data-mobile-review]) {
+  visibility: hidden; pointer-events: none;
+}
+@media (max-width: 767px) {
+  .mobile-review-popup {
+    left: max(1rem, var(--sal)); right: max(1rem, var(--sar));
+    bottom: calc(5rem + var(--sab)); width: auto; max-width: 24rem;
+    max-height: calc(100dvh - var(--sat) - var(--sab) - 6rem);
+    overflow-y: auto; overscroll-behavior-y: contain;
+  }
+}
+
+/* The in-app gesture owns refresh; avoid a second browser refresh/bounce. */
+html.mobile-pull-refresh-enabled { overscroll-behavior-y: contain; }

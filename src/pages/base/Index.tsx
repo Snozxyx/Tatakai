@@ -29,7 +29,6 @@ import { HeroSkeleton, CardSkeleton } from "@/components/ui/skeleton-custom";
 import { AIRecommendationBanner } from "@/components/anime/AIRecommendationBanner";
 import { CommunitySection } from "@/components/home/CommunitySection";
 import { Reveal } from "@/components/ui/Reveal";
-import { ReviewPopup } from "@/components/ui/ReviewPopup";
 import {  ReleaseV6Banner } from "@/components/layout/MangaBanner";
 import { IndexMangaShowcase } from "@/components/manga/IndexMangaShowcase";
 import { LastReadMangaSection } from "@/components/manga/LastReadMangaSection";
@@ -38,7 +37,7 @@ import { Heart, RefreshCw, Sparkles } from "lucide-react";
 import { DiscordSection } from "@/components/home/DiscordSection";
 import { DownloadSection } from "@/components/home/DownloadSection";
 import { AppDownloadBanner } from "@/components/layout/AppDownloadBanner";
-import { useEffect, useState, type ReactNode } from "react";
+import { startTransition, useEffect, useState, type ReactNode } from "react";
 import { BecauseYouWatched } from "@/components/anime/BecauseYouWatched";
 import { FollowedAnimeEpisodes } from "@/components/anime/FollowedAnimeEpisodes";
 import { FollowedMangaUpdates } from "@/components/manga/FollowedMangaUpdates";
@@ -54,7 +53,7 @@ import { Button } from "@/components/ui/button";
  * the container's `space-y`).
  */
 const RevealSection = ({ children, delay }: { children: ReactNode; delay?: number }) => (
-  <Reveal delay={delay} className="[&>section]:!mb-0 [&>div]:!mb-0">
+  <Reveal delay={delay} className="home-reveal-section [&>section]:!mb-0 [&>div]:!mb-0">
     {children}
   </Reveal>
 );
@@ -69,7 +68,9 @@ const Index = () => {
   const [activeSpotlight, setActiveSpotlight] = useState<SpotlightAnime | null>(null);
   const isMobileApp = Capacitor.isNativePlatform();
   const showInfiniteEarly = isMobile || isMobileApp;
-  const [showDeferredSections, setShowDeferredSections] = useState(false);
+  const [deferredCount, setDeferredCount] = useState(0);
+  const homeReady = !isLoading && Boolean(data);
+  const showDeferredSections = deferredCount >= 11;
 
   // Show sidebar on desktop (web or app), but not on mobile (web or app)
   const showSidebar = !isMobile;
@@ -78,20 +79,22 @@ const Index = () => {
     setBrowsingRpc('Anime');
   }, []);
 
+  // Schedule the next section only after the previous React commit. A timeout
+  // fallback keeps Safari and a busy page progressing without a single burst.
   useEffect(() => {
-    if (isLoading || !data) {
-      setShowDeferredSections(false);
-      return;
-    }
-
-    const timer = window.setTimeout(() => {
-      setShowDeferredSections(true);
-    }, 450);
-
-    return () => {
-      window.clearTimeout(timer);
+    if (!homeReady) { setDeferredCount(0); return; }
+    if (deferredCount >= 11) return;
+    let cancelled = false;
+    const advance = () => {
+      if (!cancelled) startTransition(() => setDeferredCount(count => count + 1));
     };
-  }, [isLoading, data]);
+    if (typeof window.requestIdleCallback === 'function') {
+      const idle = window.requestIdleCallback(advance, { timeout: 500 });
+      return () => { cancelled = true; window.cancelIdleCallback(idle); };
+    }
+    const timer = window.setTimeout(advance, 80);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [homeReady, deferredCount]);
 
   if (error) {
     return (
@@ -164,52 +167,47 @@ const Index = () => {
             <RevealSection><LatestEpisodes animes={data.latestEpisodeAnimes} /></RevealSection>
             <RevealSection><TrendingGrid animes={data.trendingAnimes} /></RevealSection>
 
-            {showDeferredSections ? (
-              <>
-                {/* ── Made for you ── */}
-                <RevealSection><BecauseYouWatched /></RevealSection>
-                <RevealSection><AIRecommendationBanner /></RevealSection>
+            {/* ── Made for you ── */}
+            {deferredCount >= 1 && (<RevealSection><BecauseYouWatched /></RevealSection>)}
+            {deferredCount >= 2 && (<RevealSection><AIRecommendationBanner /></RevealSection>)}
 
-                {/* ── Rankings & curated ── */}
-                <RevealSection>
-                  <TopAnimeSection
-                    today={data.top10Animes.today}
-                    week={data.top10Animes.week}
-                    month={data.top10Animes.month}
-                  />
-                </RevealSection>
-                <RevealSection><UpcomingAnimeSection /></RevealSection>
-                <RevealSection>
-                  <AnimeGrid
-                    animes={data.mostPopularAnimes.slice(0, 6)}
-                    title={uiI18n.t('app.most_popular_385b4b23')}
-                    icon={<Heart className="w-5 h-5 text-destructive fill-destructive" />}
-                  />
-                </RevealSection>
-                <RevealSection>
-                  <AnimeGrid
-                    animes={data.mostFavoriteAnimes.slice(0, 6)}
-                    title={uiI18n.t('app.most_favorite_cbe5ea81')}
-                    icon={<Sparkles className="w-5 h-5 text-amber" />}
-                  />
-                </RevealSection>
+            {/* ── Rankings & curated ── */}
+            {deferredCount >= 3 && (<RevealSection>
+              <TopAnimeSection
+                today={data.top10Animes.today}
+                week={data.top10Animes.week}
+                month={data.top10Animes.month}
+              />
+            </RevealSection>)}
+            {deferredCount >= 4 && (<RevealSection><UpcomingAnimeSection /></RevealSection>)}
+            {deferredCount >= 5 && (<RevealSection>
+              <AnimeGrid
+                animes={data.mostPopularAnimes.slice(0, 6)}
+                title={uiI18n.t('app.most_popular_385b4b23')}
+                icon={<Heart className="w-5 h-5 text-destructive fill-destructive" />}
+              />
+            </RevealSection>)}
+            {deferredCount >= 6 && (<RevealSection>
+              <AnimeGrid
+                animes={data.mostFavoriteAnimes.slice(0, 6)}
+                title={uiI18n.t('app.most_favorite_cbe5ea81')}
+                icon={<Sparkles className="w-5 h-5 text-amber" />}
+              />
+            </RevealSection>)}
 
-                {/* ── Explore across media ── */}
-                <RevealSection><IndexMangaShowcase /></RevealSection>
-                <RevealSection><GenreCloud genres={data.genres} /></RevealSection>
+            {/* ── Explore across media ── */}
+            {deferredCount >= 7 && (<RevealSection><IndexMangaShowcase /></RevealSection>)}
+            {deferredCount >= 8 && (<RevealSection><GenreCloud genres={data.genres} /></RevealSection>)}
 
-                {/* ── Community ── */}
-                <RevealSection><CommunitySection /></RevealSection>
+            {/* ── Community ── */}
+            {deferredCount >= 9 && (<RevealSection><CommunitySection /></RevealSection>)}
 
-                {/* ── Get more out of Tatakai ── */}
-                <RevealSection><DiscordSection /></RevealSection>
+            {/* ── Get more out of Tatakai ── */}
+            {deferredCount >= 10 && (<RevealSection><DiscordSection /></RevealSection>)}
 
-                {/* Infinite genre feed */}
-                {showInfiniteEarly ? <MobileInfiniteHomeSections /> : <InfiniteHomeSections />}
-              </>
-            ) : (
-              <div className="min-h-[60vh]" aria-hidden />
-            )}
+            {/* Infinite genre feed */}
+            {deferredCount >= 11 && (showInfiniteEarly ? <MobileInfiniteHomeSections /> : <InfiniteHomeSections />)}
+            {!showDeferredSections && <div className="min-h-[60vh]" aria-hidden />}
           </div>
         ) : null}
 
@@ -217,7 +215,6 @@ const Index = () => {
         <ExtensionSlot slotId="home-bottom" />
       </main>
 
-      {showDeferredSections && data && <ReviewPopup />}
       {/* MobileNav hides itself above `md` and on auth/error routes. */}
       <MobileNav />
       {!isMobile && !isMobileApp && <AppDownloadBanner />}

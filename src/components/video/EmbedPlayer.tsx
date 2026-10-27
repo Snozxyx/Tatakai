@@ -103,9 +103,27 @@ export function EmbedPlayer({ url, poster, language, referer, onError }: EmbedPl
   const [reloadKey, setReloadKey] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const desktop = useDesktopPlayerFullscreen(containerRef, setIsFullscreen);
+  const { isDesktop: isDesktopFullscreen, toggle: toggleDesktopFullscreen } = useDesktopPlayerFullscreen(containerRef, setIsFullscreen);
   const fullscreenPendingRef = useRef(false);
   const unlockAncestorsRef = useRef<(() => void) | null>(null);
+  const fullscreenGenerationRef = useRef(0);
+  const cssFullscreenRef = useRef(false);
+
+  const releaseFullscreen = useCallback(() => {
+    fullscreenGenerationRef.current += 1;
+    cssFullscreenRef.current = false;
+    try { unlockAncestorsRef.current?.(); } catch { /* ignore */ }
+    unlockAncestorsRef.current = null;
+    containerRef.current?.classList.remove("is-player-fullscreen");
+    document.documentElement.classList.remove("app-fullscreen", "mobile-player-fullscreen");
+    document.body.classList.remove("mobile-player-fullscreen");
+    window.dispatchEvent(new CustomEvent('tatakai-mobile-player-fullscreen', { detail: { fullscreen: false } }));
+    setIsFullscreen(false);
+    if (isMobileNative()) {
+      void showStatusBar();
+      void unlockOrientation();
+    }
+  }, []);
 
   // On touch (Capacitor) there is no hover, so a hover-revealed control needs a
   // first tap just to appear and a second to activate — the "fullscreen needs
@@ -241,7 +259,7 @@ export function EmbedPlayer({ url, poster, language, referer, onError }: EmbedPl
     const node = containerRef.current;
     if (!node) return;
 
-    if (desktop.isDesktop) return desktop.toggle();
+    if (isDesktopFullscreen) return toggleDesktopFullscreen();
     if (fullscreenPendingRef.current) return;
     fullscreenPendingRef.current = true;
     try {
@@ -257,28 +275,36 @@ export function EmbedPlayer({ url, poster, language, referer, onError }: EmbedPl
         } catch { /* ignore */ }
         unlockAncestorsRef.current = lockFullscreenAncestors(node);
       };
-      const releaseAncestors = () => {
-        try {
-          unlockAncestorsRef.current?.();
-        } catch { /* ignore */ }
-        unlockAncestorsRef.current = null;
-      };
-
       if (!currentlyFull) {
         if (isMobile) {
           // Capacitor WebView: the element Fullscreen API is flaky inside the
           // WebView, so use the CSS fixed-position fullscreen and rotate the
           // device to landscape + hide the status bar (mirrors MobileVideoPlayer).
           lockAncestors();
+          cssFullscreenRef.current = true;
           node.classList.add("is-player-fullscreen");
+          // Signal before rotation: landscape crosses the desktop-nav breakpoint.
+          document.documentElement.classList.add("app-fullscreen", "mobile-player-fullscreen");
+          document.body.classList.add("mobile-player-fullscreen");
+          window.dispatchEvent(new CustomEvent('tatakai-mobile-player-fullscreen', { detail: { fullscreen: true } }));
           setIsFullscreen(true);
+          const generation = fullscreenGenerationRef.current;
           await hideStatusBar();
+          if (generation !== fullscreenGenerationRef.current) {
+            void showStatusBar();
+            return;
+          }
           await lockLandscapeOrientation();
+          if (generation !== fullscreenGenerationRef.current) {
+            void showStatusBar();
+            void unlockOrientation();
+          }
         } else {
           try {
             await node.requestFullscreen();
           } catch {
             lockAncestors();
+            cssFullscreenRef.current = true;
             node.classList.add("is-player-fullscreen");
             // Locks the document behind the player (scrollbar/wheel) while the
             // CSS fallback is active — see html.app-fullscreen in index.css.
@@ -287,55 +313,36 @@ export function EmbedPlayer({ url, poster, language, referer, onError }: EmbedPl
           }
         }
       } else {
-        releaseAncestors();
-        node.classList.remove("is-player-fullscreen");
-        document.documentElement.classList.remove("app-fullscreen");
-        setIsFullscreen(false);
-        if (isMobile) {
-          await showStatusBar();
-          await unlockOrientation();
-        } else if (document.fullscreenElement) {
+        releaseFullscreen();
+        if (!isMobile && document.fullscreenElement) {
           void document.exitFullscreen().catch(() => undefined);
         }
       }
     } finally { fullscreenPendingRef.current = false; }
-  }, [desktop.isDesktop, desktop.toggle]);
-
-  // On unmount, restore the device if we left it rotated / status bar hidden.
-  useEffect(() => {
-    return () => {
-      if (isMobileNative()) {
-        void showStatusBar();
-        void unlockOrientation();
-      }
-    };
-  }, []);
+  }, [isDesktopFullscreen, toggleDesktopFullscreen, releaseFullscreen]);
 
   useEffect(() => {
-    if (desktop.isDesktop) return;
-    const onChange = () => setIsFullscreen(document.fullscreenElement === containerRef.current);
+    if (isDesktopFullscreen) return;
+    const onChange = () => setIsFullscreen(document.fullscreenElement === containerRef.current || cssFullscreenRef.current);
     document.addEventListener("fullscreenchange", onChange);
 
     // Esc / OS chrome leaving fullscreen must clear the CSS-class fallback too.
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape" && containerRef.current?.classList.contains("is-player-fullscreen")) {
-        try { unlockAncestorsRef.current?.(); } catch { /* ignore */ }
-        unlockAncestorsRef.current = null;
-        containerRef.current.classList.remove("is-player-fullscreen");
-        document.documentElement.classList.remove("app-fullscreen");
-        setIsFullscreen(false);
+        releaseFullscreen();
       }
     };
     document.addEventListener("keydown", onKey);
     return () => {
       document.removeEventListener("fullscreenchange", onChange);
       document.removeEventListener("keydown", onKey);
-      try { unlockAncestorsRef.current?.(); } catch { /* ignore */ }
-      unlockAncestorsRef.current = null;
-      containerRef.current?.classList.remove("is-player-fullscreen");
-      document.documentElement.classList.remove("app-fullscreen");
+      releaseFullscreen();
     };
-  }, [desktop.isDesktop]);
+  }, [isDesktopFullscreen, releaseFullscreen]);
+
+  useEffect(() => {
+    if (error && !isDesktopFullscreen) releaseFullscreen();
+  }, [error, isDesktopFullscreen, releaseFullscreen]);
 
   if (error) {
     const detail = error.statusCode
@@ -395,6 +402,7 @@ export function EmbedPlayer({ url, poster, language, referer, onError }: EmbedPl
       <button
         type="button"
         onClick={toggleFullscreen}
+        data-player-fullscreen={isFullscreen ? "active" : "inactive"}
         title={isFullscreen ? t('player.exitFullscreen') : t('player.fullscreen')}
         aria-label={isFullscreen ? t('player.exitFullscreen') : t('player.fullscreen')}
         className={`absolute bottom-3 right-3 z-20 rounded-md bg-black/60 p-2 text-white transition-opacity hover:bg-black/80 focus:opacity-100 focus-visible:outline focus-visible:outline-2 group-hover:opacity-100 [div:hover>&]:opacity-100 ${isMobile ? "opacity-100" : "opacity-0"}`}

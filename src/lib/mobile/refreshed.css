@@ -1,6 +1,6 @@
 /* Phone-width presentation shared by native and web; Classic uses original rules. */
 @media (max-width: 1023px) {
-  [data-mobile-home-backdrop] { position: absolute; inset: 0 0 auto; height: 800px; overflow: hidden; pointer-events: none; }
+  [data-mobile-home-backdrop] { position: absolute; inset: 0 0 auto; height: 800px; overflow: hidden; pointer-events: none; contain: strict; content-visibility: auto; }
   [data-mobile-home-backdrop] img { width: 100%; height: 85%; object-fit: cover; filter: blur(22px); transform: scale(1.12); opacity: .65; }
   [data-mobile-home-backdrop]::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, hsl(var(--background) / .18), hsl(var(--background) / .4) 40%, hsl(var(--background)) 95%); }
   html[data-mobile-layout="refreshed"] [data-mobile-home] .cinematic-hero { background: transparent; border-color: transparent; box-shadow: none; border-radius: 0; color: hsl(var(--foreground)); }
@@ -45,11 +45,11 @@
   html[data-mobile-layout="refreshed"] [data-mobile-poster-grid] { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
   html[data-mobile-layout="refreshed"] [data-mobile-nav] button { min-width: 44px; min-height: 44px; }
   html[data-mobile-layout="refreshed"] [data-mobile-home] {
-    padding: 8px max(16px, env(safe-area-inset-right)) calc(100px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+    padding: 8px max(16px, var(--sar)) calc(100px + var(--sab)) max(16px, var(--sal));
   }
   html[data-mobile-layout="refreshed"] [data-home-sections] > :not(:first-child) { margin-top: 36px; }
   html[data-mobile-layout="refreshed"] [data-mobile-header] {
-    top: max(8px, env(safe-area-inset-top)); margin-top: env(safe-area-inset-top); margin-bottom: 16px;
+    top: max(8px, var(--sat)); margin-top: 0; margin-bottom: 16px;
     border: 1px solid hsl(var(--foreground) / .12); border-radius: 24px;
     background: hsl(var(--background) / .94);
     box-shadow: inset 0 1px 0 hsl(var(--foreground) / .1), 0 8px 28px #00000020;
@@ -98,7 +98,7 @@
   }
   .mobile-nav-dock {
     gap: 2px;
-    padding: 6px max(10px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+    padding: 6px max(10px, var(--sar)) max(6px, var(--sab)) max(10px, var(--sal));
     border-top: 1px solid hsl(var(--foreground) / .08);
     background: hsl(var(--card));
     box-shadow: 0 -4px 20px hsl(var(--background) / .12);

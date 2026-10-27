@@ -1,3 +1,4 @@
+import { randomUUID } from '../../lib/uuid';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -26,7 +27,7 @@ function getSessionId(): string {
   try {
     let id = localStorage.getItem('tatakai_session_id');
     if (!id) {
-      id = crypto.randomUUID();
+      id = randomUUID();
       localStorage.setItem('tatakai_session_id', id);
     }
     return id;

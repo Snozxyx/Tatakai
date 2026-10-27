@@ -1,4 +1,21 @@
 {
+  "extensionWorkspace": {
+    "workspace": "拡張機能の管理",
+    "browse": "探す",
+    "library": "ライブラリ",
+    "sources": "ソース",
+    "filters": "絞り込み",
+    "reset": "絞り込みをリセット",
+    "explore": "カテゴリから探す",
+    "yourExtensions": "インストール済みの拡張機能",
+    "libraryDescription": "この端末にインストールした拡張機能を管理します。",
+    "emptyLibrary": "条件に一致する拡張機能がありません。拡張機能を探してライブラリに追加できます。",
+    "connections": "ソースと接続",
+    "sourcesDescription": "リポジトリ、言語ソース、拡張機能サーバーを管理します。",
+    "loadingRemote": "リモート拡張機能を読み込み中…",
+    "loadingSources": "ソース管理ツールを読み込み中…",
+    "loadingInstaller": "拡張機能インストーラーを読み込み中…"
+  },
   "landingHero": {
     "explore": "探す",
     "discover": "発見する",
@@ -6418,6 +6435,7 @@
     "fetch_more_servers_351857c3": "サーバーを増やして",
     "toggle_source_debug_46f6d2f5": "ソースデバッグを切り替える",
     "adding_more_servers_0379b08f": "サーバーを追加する...",
+    "fetching_more_manga_sources": "さらにソースを取得中…",
     "finding_servers_6f871241": "サーバーを見つけ...",
     "multi_language_60d39b5b": "多言語",
     "i18n_value_0_i18n_value_1_8568f691": "{{value0}} ({{value1}})",

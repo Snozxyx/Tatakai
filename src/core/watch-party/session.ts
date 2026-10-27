@@ -1,3 +1,4 @@
+import { randomUUID } from '../../lib/uuid';
 import {
   ClockEstimator, PlaybackTimeline, ReadinessBarrier, getDriftCorrection,
   COMMAND_LEAD_MS, SYNC_INTERVAL_MS, type PlaybackSnapshot,
@@ -129,7 +130,7 @@ export class WatchPartySession {
     if (this.disposed || this.peers.has(this.options.state.host_id)) return;
     this.lastHello = performance.now();
     this.options.onStatus('connecting-peer');
-    await this.options.sendSignal(this.options.state.host_id, crypto.randomUUID(), 'hello', {});
+    await this.options.sendSignal(this.options.state.host_id, randomUUID(), 'hello', {});
   }
   async receive(signal: PeerSignal): Promise<void> {
     if (this.disposed || signal.recipient_id !== this.options.userId
@@ -267,7 +268,7 @@ export class WatchPartySession {
       const rebuilds = peer.rebuilds + 1;
       const id = peer.id;
       this.dropPeer(id);
-      const replacement = this.makePeer(id, crypto.randomUUID());
+      const replacement = this.makePeer(id, randomUUID());
       replacement.rebuilds = rebuilds;
       replacement.restarts = 2;
       await this.offer(replacement).catch(() => {});

@@ -1,3 +1,4 @@
+import { randomUUID } from '../../lib/uuid';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { migrateExtensionStorage } from "@/core/extensions/ecosystems";
@@ -168,7 +169,7 @@ export function useExtensions() {
       const { data, error } = await supabase
         .from('extension_manifests')
         .insert({
-          extension_id: extension.id ?? crypto.randomUUID(),
+          extension_id: extension.id ?? randomUUID(),
           name: extension.name ?? 'Untitled extension',
           version: extension.version ?? '1.0.0',
           type: extension.type ?? 'custom',

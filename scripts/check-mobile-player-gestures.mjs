@@ -1,11 +1,15 @@
 import assert from 'node:assert/strict';
+import { mkdir } from 'node:fs/promises';
 import { chromium } from 'playwright';
 
 const base = process.env.MOBILE_TEST_URL || 'http://127.0.0.1:8090';
+await mkdir('artifacts/player-search', { recursive: true });
 const browser = await chromium.launch({ channel: process.platform === 'win32' ? 'msedge' : undefined, headless: true });
 const page = await browser.newPage({ viewport: { width: 393, height: 852 }, hasTouch: true });
 const errors = [];
 page.on('pageerror', error => errors.push(error.message));
+// Isolate guest playback from Vite's timestamped AuthContext module instances.
+await page.route('**/src/contexts/AuthContext.tsx*', route => route.fulfill({ contentType: 'application/javascript', body: `export function useAuth(){return {user:null,profile:null}} export function AuthProvider({children}){return children}` }));
 await page.route('**/__player-gestures', route => route.fulfill({ contentType: 'text/html', body: `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><script type="module">import RefreshRuntime from '/@react-refresh'; RefreshRuntime.injectIntoGlobalHook(window); window.$RefreshReg$=()=>{}; window.$RefreshSig$=()=>(type)=>type; window.__vite_plugin_react_preamble_installed__=true; import '/src/index.css';</script><style>body{margin:0;background:#141414}</style></head><body><div id="test-root"></div></body></html>` }));
 await page.route('**/__video.mp4', route => route.fulfill({ status: 200, body: '' }));
 try {
@@ -43,8 +47,13 @@ try {
   const tap = async (x, y = 150) => { await touch('touchstart', [[x, y]]); await touch('touchend', [], [[x, y]]); };
   const time = () => page.locator('video').evaluate(video => video.currentTime);
   await page.evaluate(() => { const video = document.querySelector('video'); video.currentTime = 110; video.dispatchEvent(new Event('timeupdate')); });
+  await tap(190);
+  await page.waitForTimeout(350);
+  assert.equal(await page.locator('.mobile-player-controls').count(), 0);
   await page.getByRole('button', { name: 'Skip Intro', exact: true }).click();
   assert.equal(await time(), 120);
+  await tap(190);
+  await page.waitForTimeout(350);
   await page.evaluate(() => { const video = document.querySelector('video'); video.currentTime = 200; video.dispatchEvent(new Event('timeupdate')); });
   await page.getByRole('button', { name: 'Lock player', exact: true }).click();
   await page.getByRole('button', { name: 'Unlock player', exact: true }).waitFor({ state: 'hidden' });
@@ -67,6 +76,15 @@ try {
   await page.getByRole('slider', { name: 'Seek video' }).focus();
   await page.keyboard.press('ArrowRight');
   assert.ok(await time() > 190, 'Seek slider supports keyboard input');
+  const slider = await page.getByRole('slider', { name: 'Seek video' }).boundingBox();
+  const input = await page.context().newCDPSession(page);
+  const point = fraction => ({ x: slider.x + slider.width * fraction, y: slider.y + slider.height / 2 });
+  await input.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point(0.3)] });
+  await input.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [point(0.5)] });
+  await input.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [point(0.75)] });
+  await input.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await input.detach();
+  assert.ok(await time() > 400, 'Touch dragging commits the previewed seek position');
   for (const width of [320, 393, 480]) {
     await page.setViewportSize({ width, height: 852 });
     const boxes = await page.locator('.mobile-player-controls button, .mobile-player-seek').evaluateAll(buttons => buttons.map(button => {
@@ -80,6 +98,22 @@ try {
     }
   }
   await page.screenshot({ path: '.artifacts/mobile-player-controls.png' });
+  await page.getByRole('button', { name: 'Enter fullscreen', exact: true }).click();
+  for (const size of [{ width: 568, height: 320 }, { width: 852, height: 393 }, { width: 393, height: 852 }]) {
+    await page.setViewportSize(size);
+    const boxes = await page.locator('.mobile-player-controls button, .mobile-player-seek').evaluateAll(controls => controls.map(control => {
+      const { x, y, right, bottom } = control.getBoundingClientRect();
+      return { label: control.getAttribute('aria-label'), x, y, right, bottom };
+    }));
+    for (const box of boxes) assert.ok(box.x >= 0 && box.y >= 0 && box.right <= size.width && box.bottom <= size.height, JSON.stringify(box));
+    for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+      const a = boxes[i], b = boxes[j];
+      assert.ok(!(a.x < b.right && a.right > b.x && a.y < b.bottom && a.bottom > b.y), `Fullscreen controls overlap: ${JSON.stringify([a, b])}`);
+    }
+    if (size.width === 852) await page.screenshot({ path: 'artifacts/player-search/player-mobile-landscape.png' });
+  }
+  await page.getByRole('button', { name: 'Exit fullscreen', exact: true }).click();
+  await page.setViewportSize({ width: 393, height: 852 });
   // A real decoded MediaStream frame exercises the ambient canvas without an external server.
   await page.evaluate(async () => {
     const source = document.createElement('canvas');
@@ -98,5 +132,10 @@ try {
   });
   await page.evaluate(() => { document.querySelector('video').pause(); window.ambientTestStream.getTracks().forEach(track => track.stop()); });
   assert.deepEqual(errors, []);
-  console.log('Mobile control spacing, lock auto-hide, locked seeking, same-side double tap, pinch zoom/reset, accessible scrubbing and ambient frame rendering pass in Chromium.');
+  await page.screenshot({ path: 'artifacts/player-search/player-mobile.png' });
+  console.log('Mobile control spacing, portrait/landscape fullscreen, skip with hidden controls, lock auto-hide, locked seeking, same-side double tap, pinch zoom/reset, accessible scrubbing and ambient frame rendering pass in Chromium.');
+} catch (error) {
+  console.error('Player browser errors:', errors);
+  console.error('Player page:', await page.locator('body').innerText());
+  throw error;
 } finally { await browser.close(); }

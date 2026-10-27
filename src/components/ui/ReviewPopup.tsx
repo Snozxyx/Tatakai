@@ -1,6 +1,8 @@
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { reviewPromptDelay, markReviewPromptDismissed } from '@/lib/mobile/review-prompt';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GlassPanel } from './GlassPanel';
 import { Button } from './button';
@@ -26,26 +28,38 @@ export function ReviewPopup({ isOpen: propIsOpen, onClose, animeId, animeName, u
     const isOpen = propIsOpen !== undefined ? propIsOpen : internalIsOpen;
 
     // Use prop onClose if available, otherwise fallback to internal dismiss
-    const handleClose = onClose || (() => {
+    const handleClose = useCallback(() => {
+        if (onClose) { onClose(); return; }
         setInternalIsOpen(false);
-        localStorage.setItem('tatakai_review_shown', 'true');
-    });
+        markReviewPromptDismissed();
+    }, [onClose]);
     const [step, setStep] = useState<'invite' | 'rating' | 'feedback' | 'thanks'>('invite');
     const [rating, setRating] = useState(0);
     const [feedback, setFeedback] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
-        // Show popup after 3 minutes if not shown before for logged in users
-        const hasShown = localStorage.getItem('tatakai_review_shown');
-        if (hasShown || propIsOpen !== undefined || !authUser) return;
-
-        const timer = setTimeout(() => {
-            setInternalIsOpen(true);
-        }, 180000); // 3 minutes
-
+        if (propIsOpen !== undefined) return;
+        const delay = reviewPromptDelay({
+            getItem: key => localStorage.getItem(key),
+            setItem: (key, value) => localStorage.setItem(key, value),
+        });
+        if (delay === null) return;
+        const timer = setTimeout(() => setInternalIsOpen(true), delay);
         return () => clearTimeout(timer);
-    }, [propIsOpen, authUser]);
+    }, [propIsOpen]);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        const escape = (event: KeyboardEvent) => {
+            if (event.key === 'Escape' && !document.querySelector('[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"], [data-radix-popper-content-wrapper]')) {
+                event.preventDefault();
+                handleClose();
+            }
+        };
+        document.addEventListener('keydown', escape);
+        return () => document.removeEventListener('keydown', escape);
+    }, [isOpen, handleClose]);
 
     const handleSubmit = async () => {
         setIsSubmitting(true);
@@ -72,7 +86,7 @@ export function ReviewPopup({ isOpen: propIsOpen, onClose, animeId, animeName, u
             });
 
             setStep('thanks');
-            localStorage.setItem('tatakai_review_shown', 'true');
+            markReviewPromptDismissed();
             toast.success(uiI18n.t('app.thank_you_for_your_feedback_71fa63b4'));
         } catch (error) {
             toast.error(uiI18n.t('app.failed_to_submit_review_dec0f44b'));
@@ -83,18 +97,20 @@ export function ReviewPopup({ isOpen: propIsOpen, onClose, animeId, animeName, u
     };
 
     return (
-        <AnimatePresence>
+        createPortal(<AnimatePresence>
             {isOpen && (
                 <motion.div
                     initial={{ opacity: 0, y: 50, scale: 0.9 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 50, scale: 0.9 }}
-                    className="fixed bottom-6 right-6 z-[100] w-full max-w-sm"
+                    data-mobile-review
+                    className="mobile-review-popup fixed bottom-6 right-6 z-[100] w-full max-w-sm"
                 >
                     <GlassPanel className="p-6 shadow-2xl border-primary/20 bg-card/95 backdrop-blur-2xl">
                         <button
                             onClick={handleClose}
-                            className="absolute top-4 right-4 text-muted-foreground hover:text-white transition-colors"
+                            aria-label={uiI18n.t('common.close')}
+                            className="absolute top-2 right-2 z-10 flex min-h-11 min-w-11 items-center justify-center text-muted-foreground hover:text-white transition-colors"
                         >
                             <X className="w-4 h-4" />
                         </button>
@@ -170,6 +186,6 @@ export function ReviewPopup({ isOpen: propIsOpen, onClose, animeId, animeName, u
                     </GlassPanel>
                 </motion.div>
             )}
-        </AnimatePresence>
+        </AnimatePresence>, document.body)
     );
 }

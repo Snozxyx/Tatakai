@@ -1020,13 +1020,8 @@ export function useTheme() {
 
   useEffect(() => {
     applyTheme(theme);
-  }, [theme, applyTheme]);
-
-  // Re-apply once a late-registering extension theme becomes available.
-  useEffect(() => {
-    applyTheme(theme);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [themesVersion]);
+    // Include late-registering extension themes without a second mount effect.
+  }, [theme, applyTheme, themesVersion]);
 
   /** Sync active palette to Electron `userData/theme.json` for the native splash + OS surfaces. */
   useEffect(() => {

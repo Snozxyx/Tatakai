@@ -1,4 +1,5 @@
 import { isTV } from "@/core/tv/device";
+import { OptionalJWPlayer } from './JWPlayer';
 import { TVPlaybackOverlay } from "@/components/tv/TVPlaybackOverlay";
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
@@ -22,6 +23,7 @@ import { getSubtitleSelectionKey } from "@/core/player/subtitle-utils";
 import { getProxiedImageUrl, getProxiedSubtitleUrl } from "@/lib/api";
 import { formatTime } from "@/core/player/time-utils";
 import { Seekbar } from "./controls/Seekbar";
+import { PlayerSeekInput } from './controls/PlayerSeekInput';
 import { TorrentStatusPanel } from "@/components/torrent/TorrentStatusPanel";
 
 // Hooks
@@ -112,7 +114,12 @@ const CURSOR_IDLE_MS = 6000;
 // Component
 // ---------------------------------------------------------------------------
 
-export function VideoPlayer({
+export function VideoPlayer(props: VideoPlayerProps & VideoPlayerExtendedProps) {
+  if (isTV()) return <BuiltinVideoPlayer {...props} />;
+  return <OptionalJWPlayer {...props}><BuiltinVideoPlayer {...props} /></OptionalJWPlayer>;
+}
+
+function BuiltinVideoPlayer({
   sources,
   subtitles = [],
   headers,
@@ -1369,7 +1376,7 @@ export function VideoPlayer({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "?") {
+      if (e.key === "?" && !e.defaultPrevented && !document.activeElement?.closest('input, textarea, select, [contenteditable="true"], [role="dialog"]')) {
         e.preventDefault();
         setShowShortcuts((prev) => !prev);
       }
@@ -1520,8 +1527,8 @@ export function VideoPlayer({
       onMouseMove={!isMobile ? handleContainerMouseMove : undefined}
       onMouseLeave={() => !isMobile && isPlaying && setControlsVisible(false)}
       onTouchStart={showControlsTemporarily}
-      onFocusCapture={isTV() ? showControlsTemporarily : undefined}
-      onKeyDownCapture={isTV() ? showControlsTemporarily : undefined}
+      onFocusCapture={showControlsTemporarily}
+      onKeyDownCapture={showControlsTemporarily}
     >
       {/* Double-click fullscreen discovery hint (desktop only, one-time).
           Non-interactive so it never swallows clicks. */}
@@ -1733,16 +1740,18 @@ export function VideoPlayer({
         {/* Progress Bar */}
         {!timelineUiHidden && (
           <div
-            className={`relative h-1 md:h-1.5 bg-white/20 rounded-full group/progress mb-4 md:mb-5 video-progress-track ${isLive
+            className={`relative h-1 md:h-1.5 bg-white/20 rounded-full group/progress mb-4 md:mb-5 video-progress-track focus-within:outline focus-within:outline-2 focus-within:outline-offset-8 focus-within:outline-primary ${isLive
                 ? "cursor-default pointer-events-none"
                 : timelineSeekingLocked
                   ? "cursor-not-allowed opacity-85"
                   : "cursor-pointer"}`}
-            onClick={!isLive ? (timelineSeekingLocked ? showTimelineLockHint : handleSeek) : undefined}
-            onTouchMove={!isLive && !timelineSeekingLocked ? handleSeek : undefined}
+            onClick={!isLive && timelineSeekingLocked ? showTimelineLockHint : undefined}
             onMouseMove={!isLive && !timelineSeekingLocked ? handleProgressBarHover : undefined}
             onMouseLeave={!isLive ? handleProgressBarLeave : undefined}
           >
+            {!isLive && !timelineSeekingLocked && <PlayerSeekInput currentTime={currentTime} duration={duration} buffered={buffered}
+              label="Seek video" onSeek={handleSeek} onScrubbingChange={showControlsTemporarily}
+              className="absolute left-0 top-1/2 z-40 h-11 w-full -translate-y-1/2 touch-none cursor-pointer opacity-0 accent-primary" />}
             {/* Hover Time Tooltip */}
             {showHoverTime && !isLive && !timelineSeekingLocked && (
               <div

@@ -17,7 +17,7 @@ import { useIsMobileApp } from "@/hooks/ui/useIsNativeApp";
 import { cn } from "@/lib/utils";
 import { useSettingsModal } from "@/contexts/SettingsModalContext";
 import { useMobileDownload } from "@/hooks/media/useMobileDownload";
-import { useState, useCallback, useEffect, type ComponentType } from "react";
+import { memo, useState, useCallback, useEffect, type ComponentType } from "react";
 import { useTranslation } from "react-i18next";
 import { createPortal } from "react-dom";
 import {
@@ -67,7 +67,7 @@ function isHiddenRoute(pathname: string) {
   return HIDDEN_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`) || pathname.startsWith(p));
 }
 
-function MobileNavButton({
+const MobileNavButton = memo(function MobileNavButton({
   icon: Icon,
   label,
   active,
@@ -121,6 +121,17 @@ function MobileNavButton({
       </span>
     </button>
   );
+});
+
+// Keep high-frequency monitor updates inside the native Downloads tab.
+function MobileDownloadsButton({ active, onClick }: { active: boolean; onClick: () => void }) {
+  const { t } = useTranslation();
+  const { activeDownloads } = useMobileDownload();
+  const count = activeDownloads.length;
+  const progress = count > 0
+    ? Math.round(activeDownloads.reduce((sum, item) => sum + Math.max(0, Math.min(100, item.progress ?? 0)), 0) / count)
+    : undefined;
+  return <MobileNavButton icon={Download} label={t('comments.savedTab')} active={active} onClick={onClick} badge={count} progress={progress} />;
 }
 
 export function MobileNav() {
@@ -211,13 +222,11 @@ export function MobileNav() {
     openSettings();
   }, [impact, openSettings]);
 
-  // Live active-download count for the Saved tab badge (anime + manga).
-  // NOTE: hooks must stay above the early return below (rules-of-hooks).
-  const { activeDownloads } = useMobileDownload();
-  const activeDownloadCount = isMobileApp ? activeDownloads.length : 0;
-  const activeDownloadProgress = activeDownloadCount > 0
-    ? activeDownloads.reduce((sum, item) => sum + Math.max(0, Math.min(100, item.progress ?? 0)), 0) / activeDownloadCount
-    : undefined;
+  const goHome = useCallback(() => hapticNavigate('/'), [hapticNavigate]);
+  const goSearch = useCallback(() => hapticNavigate('/search'), [hapticNavigate]);
+  const goCustom = useCallback(() => hapticNavigate('/custom-providers'), [hapticNavigate]);
+  const goSocial = useCallback(() => hapticNavigate('/community'), [hapticNavigate]);
+  const goDownloads = useCallback(() => hapticNavigate('/downloads'), [hapticNavigate]);
 
   // Hide where there is no need: auth/onboarding/error flows, when a takeover
   // popup is active, while the settings sheet is open (so the sheet owns
@@ -240,8 +249,8 @@ export function MobileNav() {
     >
       {/* Solid, edge-to-edge chrome with safe-area padding for thumb reach. */}
       <div className="mobile-nav-dock relative flex items-center">
-        <MobileNavButton icon={LayoutGrid} label={t('nav.home')} active={isActive('/')} onClick={() => hapticNavigate('/')} />
-        <MobileNavButton icon={Search} label={t('nav.search')} active={isActive('/search')} onClick={() => hapticNavigate('/search')} />
+        <MobileNavButton icon={LayoutGrid} label={t('nav.home')} active={isActive('/')} onClick={goHome} />
+        <MobileNavButton icon={Search} label={t('nav.search')} active={isActive('/search')} onClick={goSearch} />
 
         {/* Favorites/Trending Dropdown */}
         <DropdownMenu>
@@ -276,19 +285,12 @@ export function MobileNav() {
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <MobileNavButton icon={Plus} label={t('nav.customSources')} active={customActive} onClick={() => hapticNavigate('/custom-providers')} />
+        <MobileNavButton icon={Plus} label={t('nav.customSources')} active={customActive} onClick={goCustom} />
 
-        <MobileNavButton icon={Users} label={t('migration.social')} active={isActive('/community')} onClick={() => hapticNavigate('/community')} />
+        <MobileNavButton icon={Users} label={t('migration.social')} active={isActive('/community')} onClick={goSocial} />
 
         {isMobileApp && (
-          <MobileNavButton
-            icon={Download}
-            label={t('comments.savedTab')}
-            active={isActive('/downloads')}
-            onClick={() => hapticNavigate('/downloads')}
-            badge={activeDownloadCount}
-            progress={activeDownloadProgress}
-          />
+          <MobileDownloadsButton active={isActive('/downloads')} onClick={goDownloads} />
         )}
 
         <MobileNavButton icon={Settings} label={t('nav.settings')} onClick={hapticOpenSettings} />

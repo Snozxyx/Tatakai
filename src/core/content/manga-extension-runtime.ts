@@ -857,7 +857,9 @@ export function mergeChaptersWithExtensions(
   if (!extensionPayload.chapters.length) {
     return {
       ...base,
-      providersAvailable: [...(base as any).providersAvailable || [], "tatakai_media"],
+      partial: base.partial || extensionPayload.failedProviders.length > 0 || !!extensionPayload.pending,
+      sourcesPending: !!extensionPayload.pending,
+      providersAvailable: [...new Set([...(base.providersAvailable || []), ...extensionPayload.providersAvailable, "tatakai_media"])],
       failedProviders: [...new Set([...base.failedProviders, ...extensionPayload.failedProviders])],
     } as MangaChapterResponse;
   }
