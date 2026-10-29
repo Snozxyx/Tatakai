@@ -1,6 +1,6 @@
 // Tagged releases use their own draft assets rather than duplicate multi-GB
 // installers in Actions artifact storage. The final job publishes the draft.
-import { readFileSync, readdirSync, writeFileSync, mkdtempSync, rmSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync, writeFileSync, mkdtempSync, rmSync, statSync, existsSync, copyFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -52,6 +52,13 @@ if (!await gh(['release', 'view', tag, '--repo', repo], { optional: true, retrie
 }
 
 const component = process.argv[2];
+if (component === 'prepare') { console.log(`Prepared native release ${tag}`); process.exit(0); }
+if (component === 'desktop' && version.includes('-beta.')) {
+  for (const name of readdirSync('dist_electron').filter(n => /^latest(?:-[a-z]+)?\.yml$/.test(n))) {
+    const destination = join('dist_electron', name.replace(/^latest/, 'beta'));
+    if (!existsSync(destination)) copyFileSync(join('dist_electron', name), destination);
+  }
+}
 const files = component === 'desktop'
   ? readdirSync('dist_electron').filter(n => /\.(exe|dmg|zip|AppImage|deb|blockmap)$/.test(n) || /^(?:latest|beta)(?:-[a-z]+)?\.yml$/.test(n)).map(n => 'dist_electron/' + n)
   : readdirSync('.').filter(n => n.startsWith(`Tatakai-v${version}-`) && (component === 'android' ? /-android(?:-tv)?\.apk$/.test(n) : /-ios-unsigned\.ipa$/.test(n)));

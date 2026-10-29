@@ -16,6 +16,10 @@ on:
         default: false
         type: boolean
 
+concurrency:
+  group: native-release-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: write
 
@@ -69,8 +73,22 @@ jobs:
   #  Publishes latest.yml / latest-mac.yml / latest-linux.yml
   #  which electron-updater reads to detect new versions
   # ──────────────────────────────────────────────────────
-  build-desktop:
+  prepare-release:
     needs: [quality-gates]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Prepare one shared draft before parallel uploads
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: node scripts/publish-native-assets.mjs prepare
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-desktop:
+    needs: [quality-gates, prepare-release]
     strategy:
       fail-fast: false
       matrix:
@@ -271,7 +289,7 @@ jobs:
   #  Android — Capacitor APK (self-signed developer build)
   # ──────────────────────────────────────────────────────
   build-android:
-    needs: [quality-gates]
+    needs: [quality-gates, prepare-release]
     runs-on: ubuntu-latest
 
     steps:
@@ -398,7 +416,7 @@ jobs:
   #  iOS — unsigned .ipa archive (no Apple signing identity, same as macOS)
   # ──────────────────────────────────────────────────────
   build-ios-unsigned:
-    needs: [quality-gates]
+    needs: [quality-gates, prepare-release]
     runs-on: macos-latest
 
     steps:
@@ -490,92 +508,13 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Collect staged native release assets
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          mkdir -p desktop-artifacts/{windows,macos,linux} mobile-artifacts/{android,ios}
-          CHANNEL=latest
-          if [[ "$GITHUB_REF_NAME" == *-beta* ]]; then CHANNEL=beta; fi
-          gh release download "$GITHUB_REF_NAME" -D desktop-artifacts/windows -p '*win*.exe' -p '*win*.blockmap' -p "$CHANNEL.yml"
-          gh release download "$GITHUB_REF_NAME" -D desktop-artifacts/macos -p '*mac*.dmg' -p '*mac*.zip' -p '*mac*.blockmap' -p "$CHANNEL-mac.yml"
-          gh release download "$GITHUB_REF_NAME" -D desktop-artifacts/linux -p '*.AppImage' -p '*.deb' -p "$CHANNEL-linux.yml"
-          gh release download "$GITHUB_REF_NAME" -D mobile-artifacts/android -p '*-android*.apk'
-          gh release download "$GITHUB_REF_NAME" -D mobile-artifacts/ios -p '*-ios-unsigned.ipa'
-
-      # Regenerate the AltStore/SideStore/StikStore source with the real IPA
-      # byte size (the committed file ships size 0 as a placeholder). The
-      # script auto-detects mobile-artifacts/ios/*.ipa. This copy is attached
-      # to the release as a fallback; the canonical hosted source is
-      # public/altstore/apps.json served at https://tatakai.me/altstore/apps.json
-      # (updated whenever the version bump commit lands + Vercel deploys).
-      - name: Setup Node.js (release job)
+      - name: Setup Node.js for release finalization
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-
-      - name: Regenerate AltStore source with real IPA size
-        shell: bash
-        run: |
-          set -e
-          node scripts/generate-altstore-source.mjs --out altstore-apps.json
-          node -e "JSON.parse(require('fs').readFileSync('altstore-apps.json','utf8')); console.log('apps.json is valid JSON')"
-          ls -la altstore-apps.json mobile-artifacts/ios/
-
-      - name: Upload all artifacts to GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: altstore-apps.json
-          draft: false
-          prerelease: ${{ contains(github.ref_name, '-beta') }}
-          append_body: true
-          body: |
-            ## Downloads
-
-            ### Desktop
-            | Platform | Installer | Portable / alt |
-            |----------|-----------|----------------|
-            | Windows (x64) | `.exe` | `.zip` (portable) |
-            | macOS Apple Silicon (M1/M2/M3, arm64) | `Tatakai-*-mac-arm64.dmg` | `Tatakai-*-mac-arm64.zip` |
-            | macOS Intel (x64) | `Tatakai-*-mac-x64.dmg` | `Tatakai-*-mac-x64.zip` |
-            | Linux (x64) | `.AppImage` | `.deb` |
-
-            > Windows + Linux update automatically via electron-updater.
-            > Each device is identified by a unique Client ID (CID) sent with update checks.
-
-            ### macOS — certificate-less manual install
-            > Mac builds are ad-hoc signed for bundle integrity, but are not Developer
-            > ID signed or notarized. Pick `mac-arm64` for Apple Silicon or `mac-x64`
-            > for Intel, drag Tatakai into Applications, and approve the first launch
-            > with System Settings → Privacy & Security → Open Anyway.
-            > You can alternatively run:
-            > ```bash
-            > xattr -cr /Applications/Tatakai.app
-            > ```
-            > macOS updates remain manual: download the latest DMG and replace the app.
-
-            ### Mobile — developer-signed manual install
-            - Android: download `Tatakai-*-android.apk` and install it directly. It is
-              signed with the developer key, not a Play Store distribution key, so
-              Play Protect flags the first install — allow it.
-            - iOS: download `Tatakai-*-ios-unsigned.ipa`, then sign and sideload it
-              with your own Apple account/tool (AltStore / SideStore / TrollStore).
-              iOS cannot install an unsigned IPA directly.
-            - Mobile update checks open this release page; the app never self-installs.
-
-            ### Sideload stores & open-source clients
-            - iOS (AltStore / SideStore / StikStore): add the official source
-              `https://tatakai.me/altstore/apps.json` (Sources tab → + → paste URL),
-              or use the `altstore-apps.json` file attached to this release.
-              TrollStore users can open the unsigned `.ipa` directly — no Apple ID refresh needed.
-            - Android (Obtainium / Droid-ify / Neo Store): track
-              `github.com/snozxyx/tatakai` in your client to get update notices for
-              the APK above. F-Droid listing is in preparation — note its builds will
-              be F-Droid-signed and cannot update over this developer-signed APK.
-
-            ### Web
-            - Visit [tatakai.me](https://tatakai.me)
+      - name: Finalize the verified existing release by ID
+        run: node scripts/finalize-native-release.mjs
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_BUILD_RUN_ID: ${{ github.run_id }}
