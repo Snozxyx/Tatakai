@@ -6,7 +6,6 @@ import { Check, ExternalLink, RefreshCw } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { GlassPanel } from '@/components/ui/GlassPanel';
-import { fetchJsonWithFallback } from '@/lib/api/proxy-utils';
 
 const DISCORD_INVITE = 'https://dsc.gg/tatakai';
 
@@ -17,18 +16,8 @@ const PERKS = [
 ];
 
 type Character = { url: string; source: string };
-type Source = { name: string; fetchUrl: () => Promise<string | undefined> };
-
-// nekos.best sends CORS * so direct-first avoids the shared-IP rate limit on the proxy.
-const CHARACTER_SOURCES: Source[] = [
-  {
-    name: 'nekos.best',
-    fetchUrl: () =>
-      fetchJsonWithFallback('https://nekos.best/api/v2/neko', { signal: AbortSignal.timeout(8000) })
-        .then((r) => { if (!r.ok) throw new Error('Character artwork unavailable'); return r.json(); })
-        .then((d) => d?.results?.[0]?.url),
-  },
-];
+// Bundled Tatakai art keeps the community panel independent of third-party CORS/rate limits.
+const CHARACTER_ART = ['yay','shy','sleepy'].map(name => `/assets/mascots/previews/${name}.webp`);
 
 // Decode off-screen first so the swap is a clean crossfade, never a pop-in.
 function preload(url: string) {
@@ -41,17 +30,8 @@ function preload(url: string) {
 }
 
 async function fetchCharacterImage(): Promise<Character | null> {
-  // Shuffle a copy (never mutate the module-level const) and try each source.
-  const shuffled = [...CHARACTER_SOURCES].sort(() => Math.random() - 0.5);
-  for (const source of shuffled) {
-    try {
-      const url = await source.fetchUrl();
-      if (url && typeof url === 'string' && (await preload(url))) {
-        return { url, source: source.name };
-      }
-    } catch {
-      /* try next */
-    }
+  for (const url of [...CHARACTER_ART].sort(() => Math.random() - 0.5)) {
+    if (await preload(url)) return { url, source: 'Tatakai' };
   }
   return null;
 }
@@ -187,7 +167,7 @@ export function DiscordSection() {
                 <img
                   src={character.url}
                   alt={t('home.discordArtAlt')}
-                  className="h-full w-full object-cover object-top"
+                  className="h-full w-full object-contain p-6"
                   onError={() => setCharacter(null)}
                 />
               </motion.div>
