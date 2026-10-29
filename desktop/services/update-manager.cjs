@@ -84,9 +84,10 @@ function createUpdateManager({ ipcMain, autoUpdater, logger, app, appCID, supaba
     activeChannel = channel
     autoUpdater.setFeedURL({ provider: 'github', owner: GH_OWNER, repo: GH_REPO })
     autoUpdater.allowPrerelease = channel === 'beta'
-    // Stable builds must never downgrade silently after leaving beta.
-    autoUpdater.allowDowngrade = false
     autoUpdater.channel = channel === 'beta' ? 'beta' : 'latest'
+    // electron-updater's channel setter enables downgrades. Override it AFTER
+    // selecting the channel, including when a beta user switches to stable.
+    autoUpdater.allowDowngrade = false
     require('node:fs').mkdirSync(require('node:path').dirname(channelFile), { recursive: true })
     require('node:fs').writeFileSync(channelFile, JSON.stringify({ channel }), { mode: 0o600 })
     return channel
@@ -433,6 +434,7 @@ function createUpdateManager({ ipcMain, autoUpdater, logger, app, appCID, supaba
     if (policy.deviceScoped) {
       autoUpdater.setFeedURL({ provider: 'generic', url: `https://github.com/${GH_OWNER}/${GH_REPO}/releases/download/v${policy.targetVersion}` })
       autoUpdater.channel = policy.targetVersion.includes('-beta') ? 'beta' : 'latest'
+      autoUpdater.allowDowngrade = false
     }
 
     // All remaining types need to know if there is actually a newer version available

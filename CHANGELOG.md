@@ -4,6 +4,12 @@ All notable changes to Tatakai are documented here.
 
 ---
 
+## [6.4.3-beta.2] - 2026-10-29
+
+- Prevent automatic downgrades from 6.4.3 beta to 6.4.2 when checking for updates, switching release channels or applying device-specific update policies.
+- Preserve normal upgrades to newer betas and production releases.
+- Make native release publication idempotent and include beta-channel update manifests.
+
 ## [6.4.3-beta.1] - 2026-10-29
 
 - Add device-specific Production and Beta update channels, including guest opt-in, a Beta Tester badge, staged rollout controls and update analytics.

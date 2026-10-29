@@ -36,8 +36,8 @@ android {
         applicationId = "app.tatakai.me"
         minSdk = rootProject.ext.minSdkVersion
         targetSdk = rootProject.ext.targetSdkVersion
-        versionCode = 6040301
-        versionName = "6.4.3-beta.1"
+        versionCode = 6040302
+        versionName = "6.4.3-beta.2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

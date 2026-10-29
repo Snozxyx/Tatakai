@@ -13,6 +13,14 @@ export interface ChangelogRelease {
 }
 
 export const CHANGELOG: ChangelogRelease[] = [
+  {
+    version: "6.4.3-beta.2",
+    date: "2026-10-29",
+    changes: [
+      "Prevent automatic downgrades from 6.4.3 beta to 6.4.2, including when switching channels or using device-specific update policies.",
+      "Keep genuine upgrades available and make beta release publication and update manifests reliable."
+    ]
+  },
 {
   "version": "6.4.3-beta.1",
   "date": "2026-10-29",
