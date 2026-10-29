@@ -40,7 +40,7 @@ import {
 
 // Update policies require a strict X.Y.Z version; a tag like "v6.0.0-beta" can be
 // browsed and downloaded here but cannot seed a policy.
-const SEMVER_RE = /^\d+\.\d+\.\d+$/;
+const SEMVER_RE = /^\d+\.\d+\.\d+(?:-beta(?:\.\d+)?)?$/;
 
 const PLATFORM_ICON: Record<PlatformKey, LucideIcon> = {
   windows: Monitor,

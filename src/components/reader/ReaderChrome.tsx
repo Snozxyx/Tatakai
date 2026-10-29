@@ -11,6 +11,7 @@ import {
 import { ReaderPanel } from "@/components/settings/panels/ReaderPanel";
 import { ThemedSelect } from "@/components/ui/themed-select";
 import type { ReaderSettings } from "@/hooks/media/useReaderSettings";
+import './reader-chrome.css';
 
 export function ReaderToolButton({
   label,
@@ -43,7 +44,7 @@ export function ReaderToolButton({
 }
 export function ReaderTopbar({ children }: { children: ReactNode }) {
   return (
-    <div className="reader-topbar sticky top-0 z-40 flex items-center gap-1.5 border-b border-border bg-background/95 px-2 py-2 pt-[max(0.5rem,env(safe-area-inset-top))] backdrop-blur sm:gap-2 sm:px-3">
+    <div className="reader-topbar sticky top-0 z-40 flex items-center gap-1.5 border-b border-border bg-background/95 px-2 py-2 pt-[max(0.5rem,var(--sat))] backdrop-blur sm:gap-2 sm:px-3">
       {children}
     </div>
   );
@@ -58,7 +59,7 @@ export function ReaderToolbar({
   return (
     <div
       className={cn(
-        "reader-tools fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-1/2 z-40 flex max-w-[calc(100vw-1rem)] -translate-x-1/2 items-center gap-1 overflow-x-auto rounded-2xl border border-border bg-background/95 p-1.5 shadow-lg backdrop-blur-xl transition-opacity duration-200 sm:bottom-auto sm:left-auto sm:right-3 sm:top-1/2 sm:-translate-x-0 sm:-translate-y-1/2 sm:flex-col sm:gap-2",
+        "reader-tools fixed bottom-[calc(0.75rem+var(--sab))] left-1/2 z-40 flex max-w-[calc(100vw-1rem-var(--sal)-var(--sar))] -translate-x-1/2 items-center gap-1 overflow-auto rounded-2xl border border-border bg-background/95 p-1.5 shadow-lg backdrop-blur-xl transition-opacity duration-200 sm:bottom-auto sm:left-auto sm:right-[calc(0.75rem+var(--sar))] sm:top-1/2 sm:-translate-x-0 sm:-translate-y-1/2 sm:flex-col sm:gap-2",
         visible ? "opacity-100" : "pointer-events-none opacity-0"
       )}
     >

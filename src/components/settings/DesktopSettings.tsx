@@ -1,3 +1,5 @@
+import { policyChannel } from '@/core/update/release-channel';
+import { BetaChannelSettings } from './BetaChannelSettings';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { normalizeUpdateState } from '@/core/update/normalized-update';
@@ -274,7 +276,7 @@ export function DesktopSettings() {
         try {
             const result = await (
                 window as any
-            ).electron.updateCheck('stable');
+            ).electron.updateCheck(policyChannel());
 
             if (result?.error) {
                 setIsCheckingUpdate(false);
@@ -384,6 +386,7 @@ export function DesktopSettings() {
 
     return (
         <div className="space-y-8 min-w-0">
+            <BetaChannelSettings />
             {/* GENERAL */}
             <SettingsSection title={uiI18n.t('app.general_9239ee2c')} bodyClassName="space-y-1">
                 {(window as any).electron?.setAutoLaunch && (

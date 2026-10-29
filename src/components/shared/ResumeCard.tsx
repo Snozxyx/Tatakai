@@ -81,8 +81,8 @@ export function ResumeCard({
       : undefined;
 
   const shell = cn(
-    'tk-pressable group relative flex w-full items-stretch gap-4 overflow-hidden rounded-2xl border border-white/[0.07] bg-white/[0.02] p-4 text-left transition-all duration-300',
-    'hover:border-primary/40 hover:bg-white/[0.04] hover:shadow-[0_0_28px_-10px_hsl(var(--primary)/0.5)]',
+    'tk-pressable group relative flex w-full items-stretch gap-4 overflow-hidden rounded-2xl border border-border bg-card p-4 text-left transition-all duration-300',
+    'hover:border-primary/40 hover:bg-accent',
     'focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-primary',
     dimmed && 'opacity-60 grayscale hover:opacity-100 hover:grayscale-0',
     className,
@@ -90,7 +90,7 @@ export function ResumeCard({
 
   const body = (
     <>
-      <div className="relative h-28 w-20 shrink-0 overflow-hidden rounded-xl border border-white/[0.07] bg-white/[0.04]">
+      <div className="pointer-events-none relative h-28 w-20 shrink-0 overflow-hidden rounded-xl border border-border bg-muted">
         {poster ? (
           <img
             src={poster}
@@ -103,7 +103,7 @@ export function ResumeCard({
           />
         ) : null}
         {!poster && FallbackIcon ? (
-          <FallbackIcon className="absolute inset-0 m-auto h-6 w-6 text-white/20" />
+          <FallbackIcon className="absolute inset-0 m-auto h-6 w-6 text-muted-foreground" />
         ) : null}
 
         {busy ? (
@@ -119,17 +119,17 @@ export function ResumeCard({
         )}
       </div>
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="pointer-events-none flex min-w-0 flex-1 flex-col">
         {titleHref ? (
           <Link
             to={titleHref}
             onClick={(event) => event.stopPropagation()}
-            className="relative z-10 line-clamp-2 self-start text-sm font-bold leading-snug text-white/90 transition-colors hover:text-primary"
+            className="pointer-events-auto relative z-10 line-clamp-2 self-start text-sm font-bold leading-snug text-foreground transition-colors hover:text-primary"
           >
             {title}
           </Link>
         ) : (
-          <p className="line-clamp-2 text-sm font-bold leading-snug text-white/90 transition-colors group-hover:text-primary">
+          <p className="line-clamp-2 text-sm font-bold leading-snug text-foreground transition-colors group-hover:text-primary">
             {title}
           </p>
         )}
@@ -140,17 +140,17 @@ export function ResumeCard({
           </p>
         ) : null}
         {secondaryMeta ? (
-          <p className="mt-1 line-clamp-1 text-xs font-medium text-white/40">{secondaryMeta}</p>
+          <p className="mt-1 line-clamp-1 text-xs font-medium text-muted-foreground">{secondaryMeta}</p>
         ) : null}
 
         <div className="mt-auto pt-3">
           {percent !== undefined ? (
             <>
-              <div className="mb-1.5 flex items-center justify-between text-[11px] font-bold text-white/40">
+              <div className="mb-1.5 flex items-center justify-between text-[11px] font-bold text-muted-foreground">
                 <span>{percent}%</span>
                 {progressNote ? <span>{progressNote}</span> : null}
               </div>
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/[0.06]">
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-primary to-secondary transition-[width] duration-500"
                   style={{ width: `${percent}%` }}
@@ -213,7 +213,7 @@ export function ResumeCard({
 export function ResumeCardSkeleton() {
   useUiTranslation();
   return (
-    <div className="flex gap-4 rounded-2xl border border-white/[0.07] bg-white/[0.02] p-4">
+    <div className="flex gap-4 rounded-2xl border border-border bg-card p-4">
       <div className="h-28 w-20 shrink-0 animate-pulse rounded-xl bg-white/[0.05]" />
       <div className="flex-1 space-y-2 py-1">
         <div className="h-4 w-3/4 animate-pulse rounded bg-white/[0.05]" />

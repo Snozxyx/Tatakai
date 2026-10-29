@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { ANIME4K_QUALITY, normalizeVideoEnhancement, type VideoEnhancementEngine, type VideoEnhancementQuality } from '@/lib/video/enhancement-settings';
 import {
   readGuestSettingsFromCookie,
   readProfileAppSettings,
@@ -9,13 +10,17 @@ import {
 
 export type Anime4KPreset =
   | 'off'
-  | 'light' // Restore CNN S + Upscale CNN x2 S — cheap sharpen/upscale
-  | 'standard' // Restore CNN M + Upscale CNN x2 M
-  | 'high'; // Denoise + Restore CNN M + Upscale CNN x2 M
+  | 'light' // Restore CNN S at the original resolution
+  | 'standard' // Restore CNN M + Upscale CNN x2 S
+  | 'high'
+  | 'upscale'
+  | 'restore';
 
 export type SleepTimerOption = 'off' | '15' | '30' | '45' | '60' | 'end-of-episode';
 
 export interface VideoSettings {
+  videoEnhancementEngine: VideoEnhancementEngine;
+  videoEnhancementQuality: VideoEnhancementQuality;
   playerEngine: 'builtin' | 'jwplayer';
   jwPlayerLibraryId: string;
   audioLanguage: string;
@@ -69,6 +74,8 @@ export interface VideoSettings {
 }
 
 const DEFAULT_SETTINGS: VideoSettings = {
+  videoEnhancementEngine: 'off',
+  videoEnhancementQuality: 'balanced',
   playerEngine: 'builtin',
   jwPlayerLibraryId: '',
   audioLanguage: 'auto',
@@ -100,7 +107,7 @@ const DEFAULT_SETTINGS: VideoSettings = {
 const STORAGE_KEY = 'video-player-settings';
 const UPDATE_EVENT = 'tatakai-video-settings-updated';
 const VALID_DEFAULT_QUALITIES = new Set(['auto', '1080p', '720p', '480p', '360p']);
-const VALID_ANIME4K_PRESETS = new Set<Anime4KPreset>(['off', 'light', 'standard', 'high']);
+const VALID_ANIME4K_PRESETS = new Set<Anime4KPreset>(['off', 'light', 'standard', 'high', 'upscale', 'restore']);
 const VALID_SLEEP_TIMERS = new Set<SleepTimerOption>(['off', '15', '30', '45', '60', 'end-of-episode']);
 const VALID_SUBTITLE_LANGUAGES = new Set([
   'off',
@@ -141,6 +148,7 @@ const normalizeSettings = (raw: Partial<VideoSettings> & { autoPlayNext?: boolea
   return {
     ...DEFAULT_SETTINGS,
     ...raw,
+    ...normalizeVideoEnhancement(raw),
     playerEngine: raw?.playerEngine === 'jwplayer' ? 'jwplayer' : 'builtin',
     jwPlayerLibraryId: typeof raw?.jwPlayerLibraryId === 'string' ? raw.jwPlayerLibraryId.trim() : '',
     audioLanguage: typeof raw?.audioLanguage === 'string' && /^(auto|[a-z]{2,3})$/.test(raw.audioLanguage) ? raw.audioLanguage : 'auto',
@@ -306,6 +314,9 @@ export function useVideoSettings() {
   ) => {
     setSettings((prev) => {
       const next = { ...prev, [key]: value };
+      if (key === 'anime4kPreset') next.videoEnhancementEngine = value === 'off' ? 'off' : 'anime4k';
+      if (key === 'videoEnhancementQuality') next.anime4kPreset = ANIME4K_QUALITY[value as VideoEnhancementQuality];
+      if (key === 'videoEnhancementEngine' && value === 'anime4k' && next.anime4kPreset === 'off') next.anime4kPreset = ANIME4K_QUALITY[next.videoEnhancementQuality];
       if (user?.id) {
         void saveAccountSettingsPatch(user.id, {
           video: next as unknown as Record<string, unknown>,

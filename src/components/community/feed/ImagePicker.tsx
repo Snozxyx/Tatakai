@@ -14,6 +14,7 @@ import { listUserMedia, deleteUserMedia, type UserMediaFile } from '@/lib/userMe
 import { isAllowedImageUrl, ALLOWED_IMAGE_HOSTS_HINT } from '@/lib/imageHosts';
 
 export interface PickedImage {
+  storagePath?: string;
   url: string;
   width?: number;
   height?: number;

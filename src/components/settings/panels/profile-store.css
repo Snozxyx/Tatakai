@@ -46,3 +46,11 @@
 @media(prefers-reduced-motion:reduce){.theme-launch-slider{overflow-x:auto;scrollbar-width:thin;scrollbar-color:hsl(var(--primary)) transparent}.theme-launch-track{animation:none}.theme-launch-slide-group[aria-hidden=true]{display:none}}
 
 .theme-launch-slider[data-reduced-motion=true]{overflow-x:auto;scrollbar-width:thin}.theme-launch-slider[data-reduced-motion=true] .theme-launch-track{animation:none}.theme-launch-slider[data-reduced-motion=true] .theme-launch-slide-group[aria-hidden=true]{display:none}
+
+.profile-store-custom-theme{display:flex;align-items:center;flex-wrap:wrap;gap:18px;padding:22px;border:1px solid hsl(var(--primary)/.3);border-radius:14px;background:hsl(var(--primary)/.04)}.profile-store-custom-symbol{height:58px;width:58px;border-radius:14px;display:flex;align-items:center;justify-content:center;background:hsl(var(--primary)/.1);color:hsl(var(--primary));flex-shrink:0}.profile-store-custom-theme>div:nth-child(2){flex:1;min-width:200px}.profile-store-custom-theme span{font-size:10px;color:hsl(var(--primary));font-weight:600}.profile-store-custom-theme h4{font-size:19px;font-weight:700;letter-spacing:-.02em;margin:5px 0}.profile-store-custom-theme p{font-size:12px;line-height:1.7;color:hsl(var(--muted-foreground));max-width:60ch;margin:0}.profile-store-custom-actions{display:flex;flex-wrap:wrap;gap:8px}.profile-store-custom-actions .ui-button{font-size:11px}
+
+.profile-store-preview-sakura-letter{background:#fff3f8 url('/assets/profile-themes/sakura-letter/kaoruko-hq.jpg') 95% 22%/auto 220% no-repeat;color:#d87299}.profile-store-preview-cloud-notebook{background:#e8eef5 url('/assets/profile-themes/cloud-notebook/jinhsi.webp') 90% 20%/auto 170% no-repeat;color:#65799d}
+
+.profile-store-preview-eyes-toward-heaven{background:#dcebf4 url('/assets/profile-themes/eyes-toward-heaven/poster.webp') 65% center/cover no-repeat;color:#294a64}.profile-store-preview-eyes-toward-heaven:before{background:linear-gradient(90deg,#eaf3fbe0,transparent)}
+
+.profile-store-preview-frosted-blast{background:#e2edf2;color:#365f80}.profile-store-preview-frosted-blast .profile-store-mini-card{background:#ffffffa8;backdrop-filter:blur(8px);border-radius:18px}

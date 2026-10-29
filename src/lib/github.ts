@@ -1,3 +1,5 @@
+import { getReleaseChannel, useReleaseChannel } from '@/core/update/release-channel';
+import { compareAppVersions } from '@/core/update/version';
 // GitHub Releases + repo stats integration for Tatakai download/landing pages.
 // Client-side, unauthenticated (60 req/hr per IP) with sessionStorage caching.
 import { useEffect, useState } from "react";
@@ -64,11 +66,14 @@ async function ghFetch<T>(url: string, cacheKey: string, force = false): Promise
 export const fetchRepoStats = () =>
   ghFetch<GitHubRepoStats>(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}`, "gh:tatakai:repo");
 
-export const fetchLatestRelease = () =>
-  ghFetch<GitHubRelease>(
-    `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`,
-    "gh:tatakai:latest",
-  );
+export const fetchLatestRelease = async (): Promise<GitHubRelease | null> => {
+  if (getReleaseChannel() === 'beta') {
+    const releases = await fetchAllReleases();
+    return releases?.filter(r => !r.draft && (!r.prerelease || /-beta(?:[.-]|$)/i.test(r.tag_name)))
+      .sort((a,b) => compareAppVersions(b.tag_name,a.tag_name))[0] ?? null;
+  }
+  return ghFetch<GitHubRelease>(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`, 'gh:tatakai:latest');
+};
 
 export function applicationReleases(releases: GitHubRelease[]): GitHubRelease[] {
   return releases.filter((release) => /^v\d+\.\d+\.\d+(?:-|$)/.test(release.tag_name) && !release.draft);
@@ -182,6 +187,7 @@ export function useGitHubRepo(): GitHubRepoStats | null {
 }
 
 export function useLatestRelease(): GitHubRelease | null {
+  const channel = useReleaseChannel();
   const [rel, setRel] = useState<GitHubRelease | null>(null);
   useEffect(() => {
     let cancelled = false;
@@ -189,7 +195,7 @@ export function useLatestRelease(): GitHubRelease | null {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [channel]);
   return rel;
 }
 

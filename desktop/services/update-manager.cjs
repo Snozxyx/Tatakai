@@ -68,10 +68,29 @@ const GH_REPO  = 'Tatakai'
  */
 function createUpdateManager({ ipcMain, autoUpdater, logger, app, appCID, supabaseUrl, supabaseKey }) {
   let activeChannel = 'stable'
+  let updateTransferActive = false
   // Certificate-less macOS builds check for updates, but never download or
   // install them through electron-updater. Users replace the app manually.
   const manualUpdates = process.platform === 'darwin'
   const manualUpdateMessage = 'macOS updates must be installed manually. Download the latest DMG from GitHub Releases.'
+
+  // Persist a device preference even for signed-out users.
+  const channelFile = require('node:path').join(app.getPath('userData'), 'release-channel.json')
+  function readChannel() { try { return JSON.parse(require('node:fs').readFileSync(channelFile, 'utf8')).channel === 'beta' ? 'beta' : 'stable' } catch { return 'stable' } }
+  function configureChannel(value) {
+    const channel = value === 'production' ? 'stable' : value || readChannel()
+    if (!['stable','beta'].includes(channel)) throw new Error('Unknown update channel')
+    if (updateTransferActive && activeChannel !== channel) throw new Error('Finish the current update before switching channels')
+    activeChannel = channel
+    autoUpdater.setFeedURL({ provider: 'github', owner: GH_OWNER, repo: GH_REPO })
+    autoUpdater.allowPrerelease = channel === 'beta'
+    // Stable builds must never downgrade silently after leaving beta.
+    autoUpdater.allowDowngrade = false
+    autoUpdater.channel = channel === 'beta' ? 'beta' : 'latest'
+    require('node:fs').mkdirSync(require('node:path').dirname(channelFile), { recursive: true })
+    require('node:fs').writeFileSync(channelFile, JSON.stringify({ channel }), { mode: 0o600 })
+    return channel
+  }
 
   // ── Internal log helpers ──────────────────────────────────────────────────
 
@@ -147,13 +166,8 @@ function createUpdateManager({ ipcMain, autoUpdater, logger, app, appCID, supaba
     if (!client) return null
 
     try {
-      const { data, error } = await client
-        .from(POLICIES_TABLE)
-        .select('*')
-        .eq('channel', channel)
-        .eq('active', true)
-        .limit(1)
-        .single()
+      const platform = process.platform === 'win32' ? 'windows' : process.platform === 'darwin' ? 'macos' : 'linux'
+      const { data, error } = await client.rpc('get_device_update_policy', { p_channel: channel, p_platform: platform, p_device: appCID || 'desktop' })
 
       if (error) {
         // PGRST116 = "no rows returned" — not an error, just no active policy
@@ -169,6 +183,8 @@ function createUpdateManager({ ipcMain, autoUpdater, logger, app, appCID, supaba
       // Map Supabase row (snake_case) → UpdatePolicy interface (camelCase)
       /** @type {import('./_types.cjs').UpdatePolicy} */
       const policy = {
+        eligible:            data.eligible !== false,
+        deviceScoped:        typeof data.platform === 'string',
         type:                data.type,
         targetVersion:       data.target_version,
         channel:             data.channel,
@@ -343,7 +359,7 @@ function createUpdateManager({ ipcMain, autoUpdater, logger, app, appCID, supaba
    * @returns {Promise<void>}
    */
   async function checkOnStartup(channel) {
-    activeChannel = channel || 'stable'
+    channel = configureChannel(channel)
     // Dev-mode bypass (Req 5.17) — fetchPolicy already guards, but be explicit here too.
     if (!app.isPackaged) {
       _debug('[UpdateManager] Skipping checkOnStartup — dev mode')
@@ -352,12 +368,19 @@ function createUpdateManager({ ipcMain, autoUpdater, logger, app, appCID, supaba
 
     _broadcast({ type: 'checking' })
 
+    const policy = await fetchPolicy(channel)
+
+    if (policy && policy.eligible === false) { _broadcast({ type: 'not-available' }); return }
     if (manualUpdates) {
-      await autoUpdater.checkForUpdates()
+      if (policy && policy.deviceScoped && semver.valid(policy.targetVersion)) {
+        const current = app.getVersion()
+        const rollback = policy.type === 'rollback' && (!policy.rollbackFromVersion || policy.rollbackFromVersion === current)
+        if (semver.gt(policy.targetVersion, current) || rollback) _broadcast({ type: 'available', manual: true, info: { version: policy.targetVersion, releaseNotes: policy.notes || '' } })
+        else _broadcast({ type: 'not-available' })
+      } else await autoUpdater.checkForUpdates()
       return
     }
 
-    const policy = await fetchPolicy(channel)
 
     if (policy === null) {
       // Supabase unreachable or no active policy — fall back to standard check (Req 5.13)
@@ -401,6 +424,15 @@ function createUpdateManager({ ipcMain, autoUpdater, logger, app, appCID, supaba
       _info('[UpdateManager] Rollback policy detected', { targetVersion: policy.targetVersion })
       await rollbackTo(policy.targetVersion)
       return
+    }
+
+    if (!semver.valid(policy.targetVersion) || (channel === 'stable' && semver.prerelease(policy.targetVersion))) {
+      _broadcast({ type: 'error', message: 'The update policy version does not match this channel' }); return
+    }
+    // Pin this check to the exact admin-selected GitHub release; the next check resets the feed.
+    if (policy.deviceScoped) {
+      autoUpdater.setFeedURL({ provider: 'generic', url: `https://github.com/${GH_OWNER}/${GH_REPO}/releases/download/v${policy.targetVersion}` })
+      autoUpdater.channel = policy.targetVersion.includes('-beta') ? 'beta' : 'latest'
     }
 
     // All remaining types need to know if there is actually a newer version available
@@ -681,6 +713,7 @@ function createUpdateManager({ ipcMain, autoUpdater, logger, app, appCID, supaba
     // ── update:check ────────────────────────────────────────────────────
     ipcMain.handle('update:check', async (_event, channel) => {
       try {
+        channel = configureChannel(channel)
         if (!app.isPackaged) {
           // Dev: bypass the Supabase-policy flow and hit the feed directly so
           // the button is testable. autoUpdater events (wired below) drive the
@@ -769,14 +802,17 @@ function createUpdateManager({ ipcMain, autoUpdater, logger, app, appCID, supaba
     })
 
     autoUpdater.on('download-progress', (progress) => {
+      updateTransferActive = true
       _broadcast({ type: 'downloading', progress })
     })
 
     autoUpdater.on('update-downloaded', (info) => {
+      updateTransferActive = false
       _broadcast({ type: 'downloaded', info })
     })
 
     autoUpdater.on('error', (err) => {
+      updateTransferActive = false
       _broadcast({ type: 'error', message: err && err.message ? err.message : String(err) })
     })
 

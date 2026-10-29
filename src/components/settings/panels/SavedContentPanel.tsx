@@ -23,8 +23,7 @@ import { useUserTierLists } from '@/hooks/user/useTierLists';
 import { useBookmarkedPosts } from '@/hooks/community/usePostSocial';
 import { PostCard } from '@/components/community/feed/PostCard';
 import { listUserMedia, deleteUserMedia, type UserMediaFile } from '@/lib/userMedia';
-import { useStorageUsage } from '@/hooks/user/useStorageUsage';
-import { formatBytes } from '@/components/extensions/store/extensionVisuals';
+import { StorageUsageBar } from '@/components/media/StorageUsageBar';
 import { SettingsEmptyState } from '@/components/settings/SettingsPrimitives';
 
 type SavedTab = 'bookmarks' | 'tierlists' | 'playlists' | 'media';
@@ -41,32 +40,6 @@ function Loading() {
   return (
     <div className="flex items-center justify-center py-16 text-muted-foreground">
       <Loader2 className="w-5 h-5 animate-spin" />
-    </div>
-  );
-}
-
-/** "X of Y used" media-storage meter shown atop Saved Content. */
-function StorageUsageBar() {
-  useUiTranslation();
-  const { data, isLoading } = useStorageUsage();
-  if (isLoading || !data) return null;
-  const { usedBytes, quotaBytes } = data;
-  const pct = quotaBytes > 0 ? Math.min(100, Math.round((usedBytes / quotaBytes) * 100)) : 0;
-  const near = pct >= 90;
-  return (
-    <div className="rounded-xl bg-muted/30 border border-white/10 p-3.5">
-      <div className="flex items-center justify-between text-sm">
-        <span className="font-medium">{uiI18n.t('app.storage_9e092dda')}</span>
-        <span className="text-muted-foreground tabular-nums">
-          {formatBytes(usedBytes) ?? '0 B'} {uiI18n.t('app.of_de04fa0e')} {formatBytes(quotaBytes) ?? uiI18n.t('app.25_mb_1e1747c4')} {uiI18n.t('app.used_192a5675')}
-        </span>
-      </div>
-      <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-white/10">
-        <div
-          className={'h-full rounded-full transition-all ' + (near ? 'bg-destructive' : 'bg-primary')}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
     </div>
   );
 }
@@ -90,8 +63,8 @@ export function SavedContentPanel({ section }: { section?: string }) {
   const tierLists = useUserTierLists();
   const playlists = usePlaylists();
   const media = useQuery({
-    queryKey: ['user-media', user?.id],
-    queryFn: () => listUserMedia(user!.id),
+    queryKey: ['user-media', user?.id, 'include-private'],
+    queryFn: () => listUserMedia(user!.id, true),
     enabled: !!user && tab === 'media',
   });
 
@@ -120,9 +93,10 @@ export function SavedContentPanel({ section }: { section?: string }) {
   const handleDeleteMedia = async (file: { bucket: string; path: string }) => {
     try {
       await deleteUserMedia(file);
-      queryClient.setQueryData<any[]>(['user-media', user.id], (prev) =>
+      queryClient.setQueryData<any[]>(['user-media', user.id, 'include-private'], (prev) =>
         (prev || []).filter((f) => !(f.bucket === file.bucket && f.path === file.path)),
       );
+      void queryClient.invalidateQueries({ queryKey: ['storage-usage', user.id] });
       toast.success(uiI18n.t('app.deleted_441bda6c'));
     } catch (err: any) {
       toast.error(err?.message || uiI18n.t('app.failed_to_delete_file_860d5b28'));
@@ -277,6 +251,7 @@ function PlaylistsSection({
 }
 
 const CATEGORY_LABEL: Record<string, string> = {
+  private_chat: 'Private chat',
   comment: 'Comment',
   forum_image: 'Forum',
   other: 'Other',

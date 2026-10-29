@@ -1,8 +1,13 @@
+import { useCustomProfileTheme } from '@/hooks/user/useCustomProfileTheme';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { DEFAULT_CUSTOM_THEME } from '@/lib/profileTemplate';
+import { ProfileCodeEditor } from '@/components/profile/ProfileCustomCode';
 import { ThemeLaunchOffer } from '@/components/profile/themes/ThemeLaunchOffer';
 import { useOwnedProfileThemes } from '@/hooks/user/useProfileThemeClaims';
 import { Suspense, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ArrowUpRight, Check, Crown, LayoutGrid, Lock, Palette, Sparkles } from 'lucide-react';
+import { ArrowLeft, ArrowUpRight, Check, Crown, LayoutGrid, Lock, Palette, Sparkles, Code2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSettingsModal } from '@/contexts/SettingsModalContext';
@@ -27,6 +32,13 @@ import './profile-store.css';
 
 export function ProfileStorePanel({ section }: { section?: string }) {
   const { profile } = useAuth();
+  const customTheme = useCustomProfileTheme(profile?.user_id);
+  const cache = useQueryClient();
+  const equipCustom = useMutation({ mutationFn: async () => {
+    const code = customTheme.data ?? DEFAULT_CUSTOM_THEME;
+    const { error } = await supabase.rpc('save_profile_custom_theme' as never, { p_name: code.theme_name, p_html: code.html, p_css: code.css, p_enabled: true } as never);
+    if (error) throw new Error(error.message);
+  }, onSuccess: () => { void cache.invalidateQueries({ queryKey: ['profile-custom-code'] }); toast.success('Custom profile theme equipped.'); }, onError: error => toast.error(error.message) });
   const { closeSettings } = useSettingsModal();
   const navigate = useNavigate();
   const badges = useUserBadges(profile?.user_id);
@@ -37,7 +49,8 @@ export function ProfileStorePanel({ section }: { section?: string }) {
   const [editingTheme, setEditingTheme] = useState('sekaipop');
   const [dirty, setDirty] = useState(false);
   const [error, setError] = useState('');
-  const [tab, setTab] = useState('themes');
+  const [tab, setTab] = useState(section === 'html-css' ? 'html-css' : 'themes');
+  useEffect(() => { if (section === 'html-css') setTab('html-css'); }, [section]);
   useEffect(() => { if (section === 'music') { setEditingTheme(preferences.selected === 'midnight-lofi' ? 'midnight-lofi' : 'sekaipop'); setTab('customize'); } }, [section, preferences.selected]);
   useEffect(() => { if (!dirty) setPreferences(readThemePreferences(profile?.app_settings)); }, [profile?.app_settings, dirty]);
   const definition = PROFILE_THEMES.find(t => t.id === editingTheme)!;
@@ -57,13 +70,13 @@ export function ProfileStorePanel({ section }: { section?: string }) {
     catch (e) { toast.error(e instanceof Error ? e.message : 'Could not equip cosmetic.'); }
   };
   return <div className="profile-store space-y-6">
-    {tab !== 'customize' && <header className="profile-store-hero">
+    {tab !== 'customize' && tab !== 'html-css' && <header className="profile-store-hero">
       <div className="profile-store-hero-copy"><span className="profile-store-eyebrow"><Sparkles size={13} />TATAKAI · PROFILE SHOP</span><h3>A little more <em>you.</em></h3><p>Build a world around your personality. Discover profile themes, collect the finishing touches, and make every hello yours.</p><div className="profile-store-hero-actions"><Button onClick={() => setTab('cosmetics')}>Explore the collection <ArrowUpRight size={15} /></Button><span><Crown size={13} />{premium ? 'Your collection is unlocked' : 'Discover free & premium looks.'}</span></div></div>
       <div className="profile-store-hero-art" aria-hidden="true"><span className="profile-store-art-star">✦</span><div className="profile-store-identity-card"><ProfileCosmeticEffect effect={cosmetics.profileEffect === 'none' ? 'constellation' : cosmetics.profileEffect} animated={false} /><div className="profile-store-identity-cover" /><span className="profile-store-portrait">{profile?.avatar_url ? <img src={profile.avatar_url} alt="" /> : (profile?.display_name || 'T')[0]}<AvatarDecoration decoration={cosmetics.avatarDecoration === 'none' ? 'celestial' : cosmetics.avatarDecoration} /></span><ProfileNameplate nameplate={cosmetics.nameplate === 'none' ? 'moonstone' : cosmetics.nameplate}><strong>{profile?.display_name || profile?.username || 'Your next look'}</strong></ProfileNameplate><span className="profile-store-art-caption">A world with your name on it.</span></div><span className="profile-store-art-sticker">YOUR NEXT ERA</span></div>
     </header>}
     {tab === 'customize' ?       <section className="profile-store-page space-y-4" aria-label={`${definition.label} customization`}>
         <Button variant="ghost" className="gap-2" onClick={() => setTab('themes')}><ArrowLeft size={15} />Back to themes</Button>
-        <div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="font-bold">{definition.label} collection</h3><p className="text-sm text-muted-foreground">{editingTheme === 'default' ? 'Choose an accent and background scene for your original profile.' : editingTheme === 'midnight-lofi' ? 'Set your soundtrack, moonlit accent, and atmosphere.' : editingTheme === 'gothic-empress' ? 'Set the motion and ember intensity of your crimson court.' : 'Arrange widgets, write sticky notes, and choose a wallpaper for your world.'}</p></div>{editingTheme === 'sekaipop' && <Button variant="outline" disabled={!entitled} onClick={() => { closeSettings(); navigate('/profile?customize=1'); }}>Open canvas editor</Button>}</div>
+        <div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="font-bold">{definition.label} collection</h3><p className="text-sm text-muted-foreground">{editingTheme === 'default' ? 'Choose an accent and background scene for your original profile.' : editingTheme === 'midnight-lofi' ? 'Set your soundtrack, moonlit accent, and atmosphere.' : editingTheme === 'frosted-blast' ? 'Upload your own background and automatically match the colors of your profile.' : editingTheme === 'eyes-toward-heaven' ? 'Choose your sky palette, surface, motion and scene framing.' : ['sakura-letter','cloud-notebook'].includes(editingTheme) ? 'Personalize your introduction, notebook and soundtrack. Gallery photos use your shared storage.' : editingTheme === 'gothic-empress' ? 'Set the motion and ember intensity of your crimson court.' : 'Arrange widgets, write sticky notes, and choose a wallpaper for your world.'}</p></div>{editingTheme === 'sekaipop' && <Button variant="outline" disabled={!entitled} onClick={() => { closeSettings(); navigate('/profile?customize=1'); }}>Open canvas editor</Button>}</div>
         {editingTheme === 'default' ? <DefaultProfileAppearance custom={cosmetics} entitled={premium} loading={badges.isLoading || saveCosmetics.isPending} onChange={patch => void equip(patch)} /> : entitled && Editor ? <>
           <div className={editingTheme === 'sekaipop' ? 'sp-profile sp-store-editor' : 'profile-store-custom-editor'} data-mode="light" data-motion="true" style={{ '--sp-ink': '#43285f', '--sp-outline': '#43285f', '--sp-a': '#c08cf2', '--sp-b': '#f4b6da', '--sp-paper': '#fbf7ff', '--sp-ring': '#fffdf5', '--sp-board': '#f1e7f6', '--sp-radius': '13px', '--sp-shadow': '4px' } as React.CSSProperties}>
             <Suspense fallback={<p role="status">Opening collection…</p>}><Editor initialSection={section === 'music' ? 'Music' : undefined} configuration={configuration} preferences={preferences} onChange={next => updatePreferences({ ...preferences, configurations: { ...preferences.configurations, [editingTheme]: next } })} onPresets={presets => updatePreferences({ ...preferences, presets })} /></Suspense>
@@ -75,15 +88,18 @@ export function ProfileStorePanel({ section }: { section?: string }) {
       <TabsList className="profile-store-navigation">
         <TabsTrigger value="themes" className="gap-2"><LayoutGrid size={15} />Profile themes</TabsTrigger>
         <TabsTrigger value="cosmetics" className="gap-2"><Palette size={15} />The collection</TabsTrigger>
+        <TabsTrigger value="html-css" className="gap-2"><Code2 size={15} />HTML & CSS</TabsTrigger>
       </TabsList>
+      <TabsContent value="html-css" className="profile-store-page pt-3"><ProfileCodeEditor /></TabsContent>
       <TabsContent value="themes" className="profile-store-page space-y-4 pt-3">
         <ThemeLaunchOffer />
         <div className="profile-store-section-heading"><div><span className="profile-store-eyebrow">CHANGE THE WHOLE SCENE</span><h4>Find your world</h4><p>Every theme is a new way to tell your story.</p></div><span className="profile-store-access-note"><Crown size={14} />Owned themes or Booster / Pro / Ultra / Admin</span></div>
+        <article className="profile-store-custom-theme"><div className="profile-store-custom-symbol"><Code2 size={26} /></div><div><span>Your own design · Free</span><h4>{customTheme.data?.theme_name || 'Create a profile theme'}</h4><p>Write the whole layout in HTML and CSS. Profile tags bring in your name, stats, collections, and working buttons.</p></div><div className="profile-store-custom-actions"><Button size="sm" onClick={() => setTab('html-css')}>Open theme builder</Button><Button size="sm" variant="outline" disabled={customTheme.isLoading || equipCustom.isPending || customTheme.data?.enabled} onClick={() => equipCustom.mutate()}>{customTheme.data?.enabled ? 'Equipped' : 'Use custom theme'}</Button></div></article>
         <div className="grid gap-4 lg:grid-cols-2">{PROFILE_THEMES.map(theme => {
           const locked = !badges.isSuccess || !canUseProfileTheme(theme, profile, badges.data ?? [], owned.data);
-          const active = readThemePreferences(profile?.app_settings).selected === theme.id;
+          const active = !customTheme.data?.enabled && readThemePreferences(profile?.app_settings).selected === theme.id;
           return <article key={theme.id} className={cn('profile-store-theme-card', active ? 'border-primary/60' : 'border-border')}>
-            <div className={`profile-store-preview profile-store-preview-${theme.id}`} aria-hidden="true"><span className="profile-store-theme-tag">{theme.id === 'default' ? 'THE ORIGINAL' : theme.id === 'gothic-empress' ? 'THE CRIMSON COURT' : theme.id === 'uchiha' ? 'CRIMSON MOON' : theme.id === 'midnight-lofi' ? 'AFTER HOURS' : theme.id === 'komorebi' ? 'IN THE SUNLIGHT' : 'SCRAPBOOK COLLECTION'}</span><div className="profile-store-mini-avatar" /><div className="profile-store-mini-card"><span /><span /><span /></div><div className="profile-store-mini-note" /><span className="profile-store-preview-title">{theme.label}</span></div>
+            <div className={`profile-store-preview profile-store-preview-${theme.id}`} aria-hidden="true"><span className="profile-store-theme-tag">{theme.id === 'default' ? 'THE ORIGINAL' : theme.id === 'gothic-empress' ? 'THE CRIMSON COURT' : theme.id === 'uchiha' ? 'CRIMSON MOON' : theme.id === 'midnight-lofi' ? 'AFTER HOURS' : theme.id === 'komorebi' ? 'IN THE SUNLIGHT' : theme.id === 'sakura-letter' ? 'A LETTER FOR YOU' : theme.id === 'frosted-blast' ? 'YOUR COLORS, YOUR WORLD' : theme.id === 'eyes-toward-heaven' ? 'ROOM TO BREATHE' : theme.id === 'cloud-notebook' ? 'YOUR CLOUD NOTEBOOK' : 'SCRAPBOOK COLLECTION'}</span><div className="profile-store-mini-avatar" /><div className="profile-store-mini-card"><span /><span /><span /></div><div className="profile-store-mini-note" /><span className="profile-store-preview-title">{theme.label}</span></div>
             <div className="profile-store-theme-details space-y-3"><div className="flex items-center justify-between gap-2"><h4 className="font-bold">{theme.label}</h4>{owned.data?.includes(theme.id) && <span className="profile-store-equipped">Owned forever</span>}{active && <span className="profile-store-equipped"><Check size={13} />Active</span>}{locked && theme.id !== 'default' && <Lock size={14} className="text-muted-foreground" />}</div><p className="min-h-10 text-sm text-muted-foreground">{theme.description}</p><div className="flex flex-wrap gap-2">
               <Button size="sm" disabled={save.isPending || active || (theme.id !== 'default' && locked)} onClick={() => void persist({ ...preferences, selected: theme.id, configurations: theme.id === 'default' ? preferences.configurations : { ...preferences.configurations, [theme.id]: theme.parse(preferences.configurations[theme.id]) ?? theme.defaults() } })}>{active ? 'Equipped' : theme.id !== 'default' && locked ? 'Locked' : 'Equip theme'}</Button>
               {(theme.Editor || theme.id === 'default') && <Button size="sm" variant="outline" disabled={locked} onClick={() => { setEditingTheme(theme.id); setTab('customize'); }}>Customize</Button>}

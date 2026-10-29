@@ -36,7 +36,7 @@ test("Launch claims enforce a permanent full-collection grant, eligibility, idem
       "20261024000002_profile_themes.sql",
       "20261025000001_sekai_experience.sql",
       "20261025000002_uchiha_profile_theme.sql",
-      "20261025000003_gothic_empress_profile_theme.sql",
+      "20261026000001_gothic_empress_profile_theme.sql",
       "20261026000002_midnight_lofi_profile_theme.sql",
       "20261026000003_komorebi_and_public_cosmetics.sql",
       "20261026000004_profile_theme_launch_claims.sql",
@@ -225,12 +225,6 @@ test("Launch claims enforce a permanent full-collection grant, eligibility, idem
       claimed: true,
       remaining: 0,
     });
-    await db.exec('RESET ROLE');
-    // Reconcile a manually installed campaign without resetting sold-out slots.
-    await db.exec(readFileSync(new URL('../supabase/migrations/20261026000004_profile_theme_launch_claims.sql', import.meta.url), 'utf8'));
-    await db.exec(readFileSync(new URL('../supabase/migrations/20261026000005_full_theme_collection.sql', import.meta.url), 'utf8'));
-    expect((await db.query<{claimed:number}>('SELECT claimed FROM profile_theme_launch_campaign')).rows[0].claimed).toBe(200);
-    expect((await db.query<{count:number}>('SELECT count(*)::integer count FROM profile_theme_grants')).rows[0].count).toBe(1000);
     await db.exec("RESET ROLE; SET ROLE anon");
     await expect(claim()).rejects.toThrow("permission denied");
   } finally {

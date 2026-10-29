@@ -29,7 +29,7 @@ import { ugcErrorMessage } from "@/lib/ugcErrors";
 interface ReportModalProps {
     isOpen: boolean;
     onClose: () => void;
-    targetType: 'comment' | 'anime' | 'server' | 'user' | 'post' | 'tierlist' | 'playlist';
+    targetType: 'comment' | 'anime' | 'server' | 'user' | 'post' | 'tierlist' | 'playlist' | 'direct_message';
     targetId: string;
     targetName?: string;
 }
@@ -72,7 +72,9 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName 
                 }
             }
 
-            const { error } = await supabase.from('reports').insert({
+            const { error } = targetType === 'direct_message'
+              ? await (supabase as any).rpc('report_direct_message', { p_message: targetId, p_reason: `${reason}: ${details}` })
+              : await supabase.from('reports').insert({
                 reporter_id: user.id,
                 target_type: targetType,
                 target_id: targetId,
@@ -101,6 +103,7 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName 
 
     const getReasons = () => {
         switch (targetType) {
+            case 'direct_message':
             case 'comment':
             case 'post':
             case 'tierlist':

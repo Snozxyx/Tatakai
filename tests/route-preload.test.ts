@@ -4,6 +4,8 @@ import { routePreloadKey } from '../src/hooks/ui/useRoutePreload';
 test('preloads the matching media detail page while keeping browse routes separate', () => {
   expect(routePreloadKey('/')).toBe('home');
   expect(routePreloadKey('/browse')).toBe('browse');
+  expect(routePreloadKey('/manga/read/123')).toBe('manga-reader');
+  expect(routePreloadKey('/novel/read/mangabaka:531343')).toBe('novel-reader');
   expect(routePreloadKey('/manga/123')).toBe('manga-detail');
   expect(routePreloadKey('/novel/123')).toBe('novel-detail');
   expect(routePreloadKey('/manga/discover')).toBe('manga');

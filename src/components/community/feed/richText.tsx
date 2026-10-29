@@ -1,3 +1,4 @@
+import { CustomEmojiImage } from '@/components/comments/CustomEmojiImage';
 import { Link } from 'react-router-dom';
 import { createElement, Fragment, type ReactNode } from 'react';
 import DOMPurify from 'dompurify';
@@ -6,7 +7,7 @@ import { ProfileWidgetCard } from '@/components/profile/ProfileWidgetCard';
 import { SpoilerSpan } from '@/components/community/SpoilerSpan';
 import { ExternalLinkEmbeds } from '@/components/community/ExternalLinkEmbeds';
 
-const TOKEN = /(@[a-zA-Z0-9_]{2,30}|#[a-zA-Z0-9_]{1,50})/g;
+const TOKEN = /(:tatakai-[a-z0-9-]+:|@[a-zA-Z0-9_]{2,30}|#[a-zA-Z0-9_]{1,50})/g;
 
 /** Extract lowercased hashtags from post content (no leading #). */
 export function extractHashtags(text: string): string[] {
@@ -32,6 +33,7 @@ export function RichText({ text }: { text: string }) {
   return (
     <>
       {parts.map((part, i) => {
+        if (part.startsWith(':tatakai-')) return <CustomEmojiImage key={i} token={part} />;
         if (part.startsWith('@')) {
           const name = part.slice(1);
           return (
@@ -82,7 +84,7 @@ function maybeDecodeEntities(value: string): string {
 }
 
 function nodeToReact(node: ChildNode, key: string): ReactNode {
-  if (node.nodeType === 3) return node.textContent; // text
+  if (node.nodeType === 3) return <RichText key={key} text={node.textContent || ''} />; // text
   if (node.nodeType !== 1) return null; // non-element
   const el = node as HTMLElement;
   const tag = el.tagName.toLowerCase();

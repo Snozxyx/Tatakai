@@ -1,4 +1,5 @@
 import uiI18n from '@/lib/uiI18n';
+import { VideoEnhancementSettings } from '@/components/settings/VideoEnhancementSettings';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -13,7 +14,6 @@ import {
   Video,
   Keyboard,
   Palette,
-  Sparkles,
   Moon,
   Timer,
   Repeat,
@@ -26,7 +26,6 @@ import { Sheet, SheetContent, SheetTitle, SheetDescription } from '@/components/
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useIsMobile } from '@/hooks/ui/use-mobile';
 import { useVideoSettings, VideoSettings } from '@/hooks/media/useVideoSettings';
-import { isMobileNative } from '@/lib/platform/platform';
 import { useKeybinds } from '@/hooks/media/useKeybinds';
 import { setTranslationConfig } from '@/lib/translation/config';
 import { TRANSLATION_LANGUAGES } from '@/lib/translation/languages';
@@ -95,13 +94,6 @@ const QUALITY_OPTIONS: { value: VideoSettings['defaultQuality']; label: string }
   { value: '720p', label: '720p' },
   { value: '480p', label: '480p' },
   { value: '360p', label: '360p' },
-];
-
-const ANIME4K_OPTIONS: { value: VideoSettings['anime4kPreset']; label: string }[] = [
-  { value: 'off', get label() { return uiI18n.t('app.off_e3de5ab0'); } },
-  { value: 'light', get label() { return uiI18n.t('app.light_a36ef8ab'); } },
-  { value: 'standard', get label() { return uiI18n.t('app.standard_2dfa6607'); } },
-  { value: 'high', get label() { return uiI18n.t('app.high_b1a5954a'); } },
 ];
 
 const SLEEP_OPTIONS: { value: VideoSettings['sleepTimer']; label: string }[] = [
@@ -493,36 +485,7 @@ function SettingsPanelBody({
               </div>
             </section>
 
-            {/* Anime4K Upscaling */}
-            <section className="space-y-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <Sparkles className="w-4 h-4 text-primary" />
-                <h3 className="text-sm font-medium">{uiI18n.t('app.anime4k_upscaling_103f8463')}</h3>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {ANIME4K_OPTIONS
-                  // On the mobile app the player clamps upscaling to the cheapest
-                  // ("light") mode, so only offer Off/Light there — Standard/High
-                  // would silently behave like Light.
-                  .filter((option) =>
-                    isMobileNative() ? option.value === 'off' || option.value === 'light' : true,
-                  )
-                  .map((option) => (
-                    <button
-                      key={option.value}
-                      onClick={() => updateSetting('anime4kPreset', option.value)}
-                      className={pill(settings.anime4kPreset === option.value)}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {isMobileNative()
-                  ? uiI18n.t('app.gpu_upscaling_for_anime_on_mobile_this_uses_the__1d3249a0')
-                  : uiI18n.t('app.gpu_upscaling_for_anime_higher_presets_need_a_st_c99015ce')}
-              </p>
-            </section>
+            <VideoEnhancementSettings />
 
             {/* Playback modes */}
             <section className="space-y-3">

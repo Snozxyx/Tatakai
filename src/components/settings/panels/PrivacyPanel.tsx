@@ -1,3 +1,4 @@
+import { SocialPrivacyControls } from './SocialPrivacyControls';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
@@ -147,6 +148,7 @@ export function PrivacyPanel({ section }: { section?: string }) {
   return (
     <div className="space-y-6">
       {matureControls(true)}
+      <SocialPrivacyControls />
 
       <SettingsSection
         icon={isPublic ? Globe : EyeOff}

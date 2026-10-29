@@ -1,3 +1,4 @@
+import { BADGE_EARN_RULES } from './badgeEarnRules';
 /**
  * Badge registry v2 — now with per-badge leveling & named art.
  *
@@ -86,6 +87,7 @@ const ROLE_BADGES: BadgeDef[] = [
 
 // ── Collectible family (tiered progression badges) ──────────────────────────
 const COLLECTIBLE_BADGES: BadgeDef[] = [
+  { key: 'beta-tester', family: 'collectible', label: 'Beta Tester', rarity: 'rare', image: '/assets/badge/beta-tester.svg', award: 'auto', description: 'Help shape the next Tatakai release.', rule: 'Opt into beta updates while signed in' },
   {
     key: 'og',
     family: 'collectible',
@@ -104,7 +106,7 @@ const COLLECTIBLE_BADGES: BadgeDef[] = [
     image: chikra('centurion'),
     award: 'auto',
     description: 'Watched 100+ episodes.',
-    rule: 'Auto: 100+ episodes watched',
+    rule: "Auto: 100+ episodes",
     metricKey: 'episodes',
     tiers: [
       { name: 'Initiate', threshold: 0, description: 'Your journey begins.' },
@@ -122,7 +124,7 @@ const COLLECTIBLE_BADGES: BadgeDef[] = [
     award: 'auto',
     description: 'Watched 1000+ episodes.',
     animated: true,
-    rule: 'Auto: 1000+ episodes watched',
+    rule: "Auto: 1000+ episodes",
     metricKey: 'episodes',
     tiers: [
       { name: 'Veteran', threshold: 0, description: 'A thousand episodes deep.' },
@@ -139,7 +141,7 @@ const COLLECTIBLE_BADGES: BadgeDef[] = [
     image: chikra('explorer'),
     award: 'auto',
     description: 'Explored 50+ different series.',
-    rule: 'Auto: 50+ distinct anime',
+    rule: "Auto: 50+ distinct anime",
     metricKey: 'distinct_anime',
     tiers: [
       { name: 'Wanderer', threshold: 0, description: 'Exploring new worlds.' },
@@ -154,9 +156,9 @@ const COLLECTIBLE_BADGES: BadgeDef[] = [
     label: 'Reputation',
     rarity: 'epic',
     image: chikra('gold'),
-    award: 'manual',
-    description: 'Earn reputation with quality comments.',
-    rule: 'Analytics: high reputation score',
+    award: 'auto',
+    description: 'Earn appreciation for your comments and community posts.',
+    rule: "Auto: 20+ community likes",
     metricKey: 'reputation',
     tiers: [
       { name: 'Awakened', threshold: 0, description: 'Your voice is heard.' },
@@ -175,9 +177,9 @@ const COLLECTIBLE_BADGES: BadgeDef[] = [
     label: 'Harem King',
     rarity: 'rare',
     image: chikra('harem'),
-    award: 'manual',
+    award: 'auto',
     description: 'Devoted to the harem genre.',
-    rule: 'Analytics: top genre = Harem',
+    rule: "Auto: 5+ harem across anime, manga and novels",
   },
   {
     key: 'action',
@@ -185,9 +187,9 @@ const COLLECTIBLE_BADGES: BadgeDef[] = [
     label: 'Action Junkie',
     rarity: 'rare',
     image: chikra('action'),
-    award: 'manual',
+    award: 'auto',
     description: 'Lives for action-packed shows.',
-    rule: 'Analytics: top genre = Action',
+    rule: "Auto: 5+ action across anime, manga and novels",
   },
   {
     key: 'isekai',
@@ -195,9 +197,9 @@ const COLLECTIBLE_BADGES: BadgeDef[] = [
     label: 'Isekai Voyager',
     rarity: 'rare',
     image: chikra('isekai'),
-    award: 'manual',
+    award: 'auto',
     description: 'Reincarnated one too many times.',
-    rule: 'Analytics: top genre = Isekai',
+    rule: "Auto: 5+ isekai across anime, manga and novels",
   },
   {
     key: 'romance',
@@ -205,9 +207,9 @@ const COLLECTIBLE_BADGES: BadgeDef[] = [
     label: 'Hopeless Romantic',
     rarity: 'rare',
     image: chikra('romance'),
-    award: 'manual',
+    award: 'auto',
     description: 'Here for the romance.',
-    rule: 'Analytics: top genre = Romance',
+    rule: "Auto: 5+ romance across anime, manga and novels",
   },
   {
     key: 'omniscient',
@@ -215,10 +217,10 @@ const COLLECTIBLE_BADGES: BadgeDef[] = [
     label: 'Omniscient',
     rarity: 'mythic',
     image: chikra('omniscient'),
-    award: 'manual',
+    award: 'auto',
     description: 'Watches across every genre.',
     animated: true,
-    rule: 'Analytics: broad genre coverage',
+    rule: "Auto: 10+ genres",
   },
   {
     key: 'night-owl',
@@ -226,9 +228,9 @@ const COLLECTIBLE_BADGES: BadgeDef[] = [
     label: 'Night Owl',
     rarity: 'common',
     image: chikra('night-owl'),
-    award: 'manual',
+    award: 'auto',
     description: 'Watches deep into the night.',
-    rule: 'Analytics: late-night viewing',
+    rule: "Auto: 20+ night episodes",
   },
   {
     key: 'binge-lord',
@@ -236,9 +238,9 @@ const COLLECTIBLE_BADGES: BadgeDef[] = [
     label: 'Binge Lord',
     rarity: 'epic',
     image: chikra('binge-lord'),
-    award: 'manual',
-    description: 'Marathons entire seasons at once.',
-    rule: 'Analytics: long sessions',
+    award: 'auto',
+    description: 'Watch six episodes in one day (Asia/Kolkata).',
+    rule: "Auto: 6+ daily episodes",
   },
   {
     key: 'critic',
@@ -246,9 +248,9 @@ const COLLECTIBLE_BADGES: BadgeDef[] = [
     label: 'Critic',
     rarity: 'rare',
     image: chikra('critic'),
-    award: 'manual',
+    award: 'auto',
     description: 'Rates everything they watch.',
-    rule: 'Analytics: many ratings',
+    rule: "Auto: 50+ ratings",
     metricKey: 'ratings',
     tiers: [
       { name: 'Reviewer', threshold: 0, description: 'You rate what you watch.' },
@@ -263,9 +265,9 @@ const COLLECTIBLE_BADGES: BadgeDef[] = [
     label: 'Commentator',
     rarity: 'common',
     image: chikra('commentator'),
-    award: 'manual',
+    award: 'auto',
     description: 'A pillar of the comment section.',
-    rule: 'Analytics: many comments',
+    rule: "Auto: 25+ comments",
     metricKey: 'comments',
     tiers: [
       { name: 'Lurker', threshold: 0, description: 'Starting to speak up.' },
@@ -280,9 +282,9 @@ const COLLECTIBLE_BADGES: BadgeDef[] = [
     label: 'Tastemaker',
     rarity: 'epic',
     image: chikra('tastemaker'),
-    award: 'manual',
-    description: 'Their tier lists shape opinions.',
-    rule: 'Analytics: popular tier lists',
+    award: 'auto',
+    description: 'Publish five public tier lists for the community.',
+    rule: "Auto: 5+ published tierlists",
   },
   {
     key: 'manga-sage',
@@ -290,9 +292,9 @@ const COLLECTIBLE_BADGES: BadgeDef[] = [
     label: 'Manga Sage',
     rarity: 'epic',
     image: chikra('manga-sage'),
-    award: 'manual',
+    award: 'auto',
     description: 'Read 500+ manga chapters.',
-    rule: 'Analytics: 500+ chapters read',
+    rule: "Auto: 500+ manga chapters",
     metricKey: 'manga_chapters',
     tiers: [
       { name: 'Reader', threshold: 0, description: 'Your manga journey begins.' },
@@ -308,16 +310,10 @@ const COLLECTIBLE_BADGES: BadgeDef[] = [
     label: 'Doomer',
     rarity: 'rare',
     image: chikra('phosphorus'),
-    award: 'manual',
+    award: 'auto',
     description: 'Read titles that end badly for everyone.',
-    rule: 'Analytics: tragedy/dark-ending genre affinity',
-    metricKey: 'manga_chapters',
-    tiers: [
-      { name: 'Rainy Day', threshold: 0, description: 'A bit gloomy.' },
-      { name: 'Melancholy', threshold: 35, description: 'Read 35 dark titles.' },
-      { name: 'Jaded', threshold: 75, description: 'Read 75 dark titles.', effectClass: 'rn-3' },
-      { name: 'Nihilist', threshold: 170, description: 'Read 170 dark titles.', effectClass: 'rn-5' },
-    ],
+    rule: "Auto: 5+ dark titles across anime, manga and novels",
+
   },
   {
     key: 'completionist',
@@ -325,10 +321,10 @@ const COLLECTIBLE_BADGES: BadgeDef[] = [
     label: 'Completionist',
     rarity: 'legendary',
     image: chikra('completionist'),
-    award: 'manual',
+    award: 'auto',
     description: 'Finishes what they start.',
     animated: true,
-    rule: 'Analytics: high completion rate',
+    rule: "Auto: 25+ completed titles",
   },
   {
     key: 'trendsetter',
@@ -336,9 +332,9 @@ const COLLECTIBLE_BADGES: BadgeDef[] = [
     label: 'Trendsetter',
     rarity: 'epic',
     image: chikra('trendsetter'),
-    award: 'manual',
-    description: "First to watch the season's hits.",
-    rule: 'Analytics: early adopter',
+    award: 'auto',
+    description: "Explore five titles released this year or last year.",
+    rule: "Auto: 5+ recent titles",
   },
   {
     key: 'legend',
@@ -379,9 +375,9 @@ const COLLECTIBLE_BADGES: BadgeDef[] = [
     label: 'Guild Coin',
     rarity: 'rare',
     image: chikra('guildCoin'),
-    award: 'manual',
+    award: 'auto',
     description: 'A valued guild member.',
-    rule: 'Participation in community events',
+    rule: "Auto: 10+ posts",
   },
   {
     key: 'hero-coin',
@@ -399,9 +395,9 @@ const COLLECTIBLE_BADGES: BadgeDef[] = [
     label: 'Dream Token',
     rarity: 'rare',
     image: chikra('dreamToken'),
-    award: 'manual',
+    award: 'auto',
     description: 'Chasing the dream.',
-    rule: 'Analytics: aspirational viewing patterns',
+    rule: "Auto: 25+ planned titles",
   },
   {
     key: 'lucky-medal',
@@ -409,9 +405,9 @@ const COLLECTIBLE_BADGES: BadgeDef[] = [
     label: 'Lucky Medal',
     rarity: 'common',
     image: chikra('luckyMedal'),
-    award: 'manual',
-    description: 'Fortune smiles upon you.',
-    rule: 'Random event drops',
+    award: 'auto',
+    description: 'Return to watch or read on seven different days.',
+    rule: "Auto: 7+ active days",
   },
   {
     key: 'challenger-coin',
@@ -419,9 +415,9 @@ const COLLECTIBLE_BADGES: BadgeDef[] = [
     label: 'Challenger Coin',
     rarity: 'rare',
     image: chikra('challengerCoin'),
-    award: 'manual',
-    description: 'Completed a community challenge.',
-    rule: 'Event participation',
+    award: 'auto',
+    description: 'Watch or read on thirty different days.',
+    rule: "Auto: 30+ active days",
   },
   {
     key: 'gold-sheaf-ticket',
@@ -429,9 +425,9 @@ const COLLECTIBLE_BADGES: BadgeDef[] = [
     label: 'Gold Sheaf Ticket',
     rarity: 'rare',
     image: chikra('goldSheafTicket'),
-    award: 'manual',
-    description: 'Redeemed through a special Tatakai event.',
-    rule: 'Event reward',
+    award: 'auto',
+    description: 'Rate one hundred titles.',
+    rule: "Auto: 100+ ratings",
   },
   {
     key: 'labyrinth-token',
@@ -439,9 +435,9 @@ const COLLECTIBLE_BADGES: BadgeDef[] = [
     label: 'Labyrinth Token',
     rarity: 'epic',
     image: chikra('labyrinthToken'),
-    award: 'manual',
-    description: 'Found a way through the deepest catalogue.',
-    rule: 'Discovery event reward',
+    award: 'auto',
+    description: 'Explore one hundred catalog titles.',
+    rule: "Auto: 100+ distinct titles",
   },
   {
     key: 'tide-shells',
@@ -449,9 +445,9 @@ const COLLECTIBLE_BADGES: BadgeDef[] = [
     label: 'Tide Shells',
     rarity: 'common',
     image: chikra('tideShells'),
-    award: 'manual',
-    description: 'A token from seasonal community events.',
-    rule: 'Seasonal event reward',
+    award: 'auto',
+    description: 'Watch or read in three different calendar months.',
+    rule: "Auto: 3+ active months",
   },
   {
     key: 'dragonbone-stamps',
@@ -459,9 +455,9 @@ const COLLECTIBLE_BADGES: BadgeDef[] = [
     label: 'Dragonbone Stamps',
     rarity: 'epic',
     image: chikra('dragonboneStamps'),
-    award: 'manual',
-    description: 'A veteran collector’s proof of passage.',
-    rule: 'Collection milestone',
+    award: 'auto',
+    description: 'Explore two hundred and fifty catalog titles.',
+    rule: "Auto: 250+ distinct titles",
   },
   {
     key: 'dragon-crystal-abyssal',
@@ -469,10 +465,10 @@ const COLLECTIBLE_BADGES: BadgeDef[] = [
     label: 'Dragon Crystal: Abyssal',
     rarity: 'legendary',
     image: chikra('dragonCrystalAbyssal'),
-    award: 'manual',
+    award: 'auto',
     animated: true,
-    description: 'A crystal recovered from the abyss.',
-    rule: 'Legendary event reward',
+    description: 'Watch two thousand and five hundred episodes.',
+    rule: "Auto: 2500+ episodes",
   },
   {
     key: 'bound-dragon-crystal-abyssal',
@@ -480,10 +476,10 @@ const COLLECTIBLE_BADGES: BadgeDef[] = [
     label: 'Bound Dragon Crystal: Abyssal',
     rarity: 'mythic',
     image: chikra('boundDragonCrystalAbyssal'),
-    award: 'manual',
+    award: 'auto',
     animated: true,
-    description: 'The abyssal dragon’s power, bound to its bearer.',
-    rule: 'Mythic event reward',
+    description: 'Watch five thousand episodes.',
+    rule: "Auto: 5000+ episodes",
   },
   {
     key: 'badge-of-valor-temporal-rift',
@@ -491,11 +487,19 @@ const COLLECTIBLE_BADGES: BadgeDef[] = [
     label: 'Badge of Valor: Temporal Rift',
     rarity: 'legendary',
     image: chikra('badgeOfValorTemporalRift'),
-    award: 'manual',
+    award: 'auto',
     animated: true,
-    description: 'Held steady when time itself fractured.',
-    rule: 'Legendary event reward',
+    description: 'Watch or read on three hundred and sixty-five days.',
+    rule: "Auto: 365+ active days",
   },
+    { key: "first-episode", family: 'collectible', label: "First Spark", rarity: 'common', image: "/assets/badge/stars/122514-shinystar.png", award: 'auto', description: "Complete your first qualifying episode.", rule: "Auto: 1+ episodes" },
+  { key: "first-manga", family: 'collectible', label: "Manga Spark", rarity: 'common', image: "/assets/badge/stars/130474-shinystar.png", award: 'auto', description: "Reach your first manga chapter.", rule: "Auto: 1+ manga chapters" },
+  { key: "first-novel", family: 'collectible', label: "Novel Spark", rarity: 'common', image: "/assets/badge/stars/165532-shinystar.png", award: 'auto', description: "Reach your first novel chapter.", rule: "Auto: 1+ novel chapters" },
+  { key: "genre-star", family: 'collectible', label: "Genre Constellation", rarity: 'rare', image: "/assets/badge/stars/179510-shinystar.png", award: 'auto', description: "Earned through 5 genres.", rule: "Auto: 5+ genres" },
+  { key: "discussion-star", family: 'collectible', label: "Community Star", rarity: 'rare', image: "/assets/badge/stars/201179-shinystar.png", award: 'auto', description: "Earned through 100 comments.", rule: "Auto: 100+ comments" },
+  { key: "watch-star", family: 'collectible', label: "Shooting Star", rarity: 'epic', image: "/assets/badge/stars/344966-shinystar.png", award: 'auto', description: "Earned through 500 episodes.", rule: "Auto: 500+ episodes" },
+  { key: "reading-star", family: 'collectible', label: "Reading Supernova", rarity: 'legendary', image: "/assets/badge/stars/622341-shinystar.png", award: 'auto', description: "Earned through 1000 reading chapters.", rule: "Auto: 1000+ reading chapters" },
+  { key: "catalog-star", family: 'collectible', label: "Catalog Constellation", rarity: 'mythic', image: "/assets/badge/stars/660953-shinystar.png", award: 'auto', description: "Earned through 500 distinct titles.", rule: "Auto: 500+ distinct titles" },
   // ── Novel pilgrimage (tiered reading ladder, ranked Chikra art) ──────────
   {
     key: 'chapter-pilgrim',
@@ -505,7 +509,7 @@ const COLLECTIBLE_BADGES: BadgeDef[] = [
     image: chikra('74488-ranked-bronze'),
     award: 'auto',
     description: 'Read your first novel chapters.',
-    rule: 'Auto: 10+ novel chapters read',
+    rule: "Auto: 10+ novel chapters",
     metricKey: 'novel_chapters',
     tiers: [
       { name: 'First Page', threshold: 0, description: 'The pilgrimage begins.' },
@@ -522,7 +526,7 @@ const COLLECTIBLE_BADGES: BadgeDef[] = [
     image: chikra('11539-ranked-silver'),
     award: 'auto',
     description: 'Keeps every scroll within reach.',
-    rule: 'Auto: 50+ novel chapters read',
+    rule: "Auto: 50+ novel chapters",
     metricKey: 'novel_chapters',
     tiers: [
       { name: 'Apprentice', threshold: 0, description: 'Learning the shelves.' },
@@ -539,7 +543,7 @@ const COLLECTIBLE_BADGES: BadgeDef[] = [
     image: chikra('42769-ranked-gold'),
     award: 'auto',
     description: 'Bound to ink and endless nights.',
-    rule: 'Auto: 100+ novel chapters read',
+    rule: "Auto: 100+ novel chapters",
     metricKey: 'novel_chapters',
     tiers: [
       { name: 'Reader', threshold: 0, description: 'Ink on fingers.' },
@@ -556,7 +560,7 @@ const COLLECTIBLE_BADGES: BadgeDef[] = [
     image: chikra('37118-ranked-grandmaster'),
     award: 'auto',
     description: 'The archive bends to your memory.',
-    rule: 'Auto: 250+ novel chapters read',
+    rule: "Auto: 250+ novel chapters",
     metricKey: 'novel_chapters',
     tiers: [
       { name: 'Attendant', threshold: 0, description: 'Among the stacks.' },
@@ -574,7 +578,7 @@ const COLLECTIBLE_BADGES: BadgeDef[] = [
     award: 'auto',
     animated: true,
     description: 'Writes among the stars.',
-    rule: 'Auto: 500+ novel chapters read',
+    rule: "Auto: 500+ novel chapters",
     metricKey: 'novel_chapters',
     tiers: [
       { name: 'Stargazer', threshold: 0, description: 'Looking up.' },
@@ -585,20 +589,10 @@ const COLLECTIBLE_BADGES: BadgeDef[] = [
   },
 ];
 
-// Every collectible participates in the same visual progression contract. A
-// handful have bespoke metric ladders above (Reputation, reading, comments,
-// ratings); honour, genre, and event badges use this four-stage track until a
-// dedicated analytics signal is available. This avoids a mixed system where
-// some earned badges feel unfinished while keeping the data model extensible.
-const DEFAULT_COLLECTIBLE_TIERS: BadgeTier[] = [
-  { name: 'Awakened', threshold: 0, description: 'The badge has been awakened.', effectClass: 'rn-1' },
-  { name: 'Ascended', threshold: 1, description: 'Your achievement is recognized.', effectClass: 'rn-3' },
-  { name: 'Transcended', threshold: 2, description: 'A rare mark of dedication.', effectClass: 'rn-6' },
-  { name: 'Empyrean', threshold: 3, description: 'Its full effect is unlocked.', effectClass: 'rn-10' },
-];
-
+// Flat badges show their earned title; only real tracked metrics have progress ladders.
 for (const badge of COLLECTIBLE_BADGES) {
-  if (!badge.tiers) badge.tiers = DEFAULT_COLLECTIBLE_TIERS;
+  if (badge.key in BADGE_EARN_RULES) badge.award = 'auto';
+  if (!badge.tiers) badge.tiers = [{ name: badge.label, threshold: 0, description: badge.description }];
 }
 
 export const BADGES: BadgeDef[] = [...ROLE_BADGES, ...COLLECTIBLE_BADGES];

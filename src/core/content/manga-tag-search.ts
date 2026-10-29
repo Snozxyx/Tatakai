@@ -75,7 +75,7 @@ export async function searchMangaTags(query: string, page: number, limit: number
     const tags = await getMangaTagOptions('anilist');
     source = names.every(name => tags.some(tag => normalize(tag.name) === normalize(name))) ? 'anilist' : 'mangabaka';
   }
-  const taxonomy = await getMangaTagOptions(source);
+  const taxonomy = names.length ? await getMangaTagOptions(source) : [];
   const tags = names.map(name => {
     const tag = taxonomy.find(entry => normalize(entry.name) === normalize(name));
     if (!tag) throw new Error(`“${name}” is not a ${source === 'anilist' ? 'AniList' : 'MangaBaka'} tag. Choose tags from one catalog.`);
@@ -109,7 +109,7 @@ export async function searchMangaTags(query: string, page: number, limit: number
     return { ...base, results, total: data.Page.pageInfo.total, totalIsApproximate: true,
       hasNextPage: data.Page.pageInfo.hasNextPage && page * limit < 5000, resultWindow: 5000 };
   }
-  const params = new URLSearchParams({ page: String(page), limit: String(limit), tag_mode: 'and', sort_by: 'popularity_asc' });
+  const params = new URLSearchParams({ page: String(page), limit: String(limit), tag_mode: 'and', sort_by: query.trim() ? 'relevance_desc' : 'popularity_asc' });
   tags.forEach(tag => params.append('tag', String(tag.id)));
   if (query) params.set('q', query);
   if (options.genre) params.append('genre', options.genre);
@@ -123,10 +123,11 @@ export async function searchMangaTags(query: string, page: number, limit: number
     const anilistId = Number(media.source?.anilist?.id) || undefined;
     const malId = Number(media.source?.my_anime_list?.id) || undefined;
     return {
-      id: anilistId ? String(anilistId) : malId ? `mal:${malId}` : `mangabaka:${media.id}`,
-      // Keep unmapped titles in the results; their source page is the available detail view.
-      href: !anilistId && !malId ? `https://mangabaka.org/${media.id}` : undefined,
+      id: anilistId ? String(anilistId) : media.type === 'novel' ? `mangabaka:${media.id}` : malId ? `mal:${malId}` : `mangabaka:${media.id}`,
+      // Novels have local MangaBaka detail support; unmapped comics use their source page.
+      href: media.type !== 'novel' && !anilistId && !malId ? `https://mangabaka.org/${media.id}` : undefined,
       mediaType: media.type === 'manhwa' ? 'manhwa' : media.type === 'manhua' ? 'manhua' : 'manga',
+      format: media.type === 'novel' ? 'NOVEL' : 'MANGA',
       anilistId, malId, canonicalTitle: media.title,
       title: { english: media.title, romaji: media.romanized_title, native: media.native_title },
       poster: media.cover?.x250?.x1 || media.cover?.raw?.url || null,

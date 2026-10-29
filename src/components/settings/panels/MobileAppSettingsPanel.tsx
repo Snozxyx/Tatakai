@@ -1,3 +1,4 @@
+import { BetaChannelSettings } from '../BetaChannelSettings';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { normalizeUpdateState } from '@/core/update/normalized-update';
@@ -401,6 +402,7 @@ export function MobileAppSettingsPanel(_props: { section?: string }) {
 
   return (
     <div className="min-w-0 space-y-6">
+      <BetaChannelSettings />
       {!isCapacitor() && (
         <p className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm text-muted-foreground">
           {uiI18n.t('app.you_apos_re_viewing_these_on_a_non_mobile_build__73428cbe')}

@@ -1,3 +1,4 @@
+import { usePublishSocialActivity } from '@/hooks/community/useSocialActivity';
 import { useReadingViewTracker } from '@/hooks/user/useReadingViews';
 import { readingViewId } from '@/lib/readingViewId';
 import uiI18n from '@/lib/uiI18n';
@@ -154,6 +155,8 @@ export default function NovelReaderPage() {
     const fromData = data?.data?.chapter?.number;
     return typeof fromData === 'number' && Number.isFinite(fromData) ? fromData : null;
   }, [chapterNumberParam, data]);
+
+  usePublishSocialActivity(data && !isLoading && !error && detail ? { kind: 'novel', title: novelTitle, href: `/novel/${encodeURIComponent(novelId || '')}`, image: novelPoster, detail: resolvedNumber != null ? `Chapter ${resolvedNumber}` : null } : null);
 
   // Discord RPC — update whenever the chapter or title changes.
   useEffect(() => {

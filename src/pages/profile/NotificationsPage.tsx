@@ -1,3 +1,5 @@
+import { messageNotificationConversation } from '@/lib/messageNotifications';
+import { useChatDock } from '@/contexts/ChatDockContext';
 import { NotificationSoundToggle } from '@/components/community/NotificationSoundToggle';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
@@ -24,6 +26,8 @@ import {
   Megaphone,
   Heart,
   CalendarClock,
+  MessageCircle,
+  UserPlus,
 } from 'lucide-react';
 import { Background } from '@/components/layout/Background';
 import { Sidebar } from '@/components/layout/Sidebar';
@@ -37,6 +41,10 @@ import { cn } from '@/lib/utils';
 
 function typeIcon(n: Notification) {
   switch (n.data?.type) {
+    case 'direct_message':
+      return <MessageCircle className="h-4 w-4 text-primary" />;
+    case 'message_request':
+      return <UserPlus className="h-4 w-4 text-primary" />;
     case 'mention':
       return <AtSign className="h-4 w-4 text-primary" />;
     case 'reply':
@@ -54,6 +62,7 @@ export default function NotificationsPage() {
   useUiTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { openChat } = useChatDock();
   const isDesktopApp = useIsDesktopApp();
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
 
@@ -72,8 +81,11 @@ export default function NotificationsPage() {
 
   const openNotification = (n: Notification) => {
     if (!n.read) markAsRead.mutate(n.id);
+    const conversation = messageNotificationConversation(n.data);
+    if (conversation) { openChat(conversation); return; }
     const link = n.data?.link;
-    if (typeof link === 'string' && link.startsWith('/')) navigate(link);
+    if (typeof link !== 'string' || !link.startsWith('/')) return;
+    navigate(link);
   };
 
   return (

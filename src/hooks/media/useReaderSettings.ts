@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import type { EnhancementQuality, UpscalerEngine } from '@/lib/upscaling';
+import type { Anime4KMode } from '@/lib/video/anime4k/Anime4KRenderer';
 import {
   readGuestSettingsFromCookie,
   readProfileAppSettings,
@@ -22,6 +24,10 @@ export type ReaderDirection = 'ltr' | 'rtl';
 export type ReaderPageFit = 'width' | 'height' | 'both' | 'original';
 
 export interface ReaderSettings {
+  upscaler: UpscalerEngine;
+  upscalePreset: Anime4KMode;
+  upscaleScale: 2 | 4;
+  upscaleQuality: EnhancementQuality;
   readingMode: ReaderReadingMode; // vertical = infinite webtoon scroll; paged = one page at a time
   readingDirection: ReaderDirection; // paged tap-zone / spread direction (rtl = manga)
   widthPercent: number; // 30..100, page width within the reader column
@@ -54,6 +60,10 @@ export interface ReaderSettings {
 }
 
 const DEFAULT_SETTINGS: ReaderSettings = {
+  upscaler: 'off',
+  upscalePreset: 'standard',
+  upscaleScale: 2,
+  upscaleQuality: 'balanced',
   readingMode: 'vertical',
   readingDirection: 'ltr',
   widthPercent: 70,
@@ -107,6 +117,10 @@ const asNum = (value: unknown, fallback: number) =>
 const normalizeSettings = (raw: Partial<ReaderSettings> | null | undefined): ReaderSettings => ({
   ...DEFAULT_SETTINGS,
   ...raw,
+  upscaler: ['off', 'anime4k', 'realesrgan', 'manga'].includes(raw?.upscaler) ? raw.upscaler : 'off',
+  upscalePreset: ['light', 'standard', 'high', 'upscale', 'restore'].includes(raw?.upscalePreset) ? raw.upscalePreset : 'standard',
+  upscaleScale: raw?.upscaleScale === 4 ? 4 : 2,
+  upscaleQuality: ['light', 'balanced', 'high'].includes(raw?.upscaleQuality) ? raw.upscaleQuality : 'balanced',
   readingMode: VALID_MODES.has(raw?.readingMode as ReaderReadingMode)
     ? (raw!.readingMode as ReaderReadingMode)
     : DEFAULT_SETTINGS.readingMode,

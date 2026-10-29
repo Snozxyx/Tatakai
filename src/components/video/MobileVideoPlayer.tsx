@@ -6,6 +6,7 @@ import { ExternalPlayerButton } from './controls/ExternalPlayerButton';
 import { uploadSubtitle, fetchSubtitle, decodeSubtitle } from '@/core/player/subtitle-service';
 import { usePlaybackCoordinator } from '@/core/player/usePlaybackCoordinator';
 import { useMobileCloudProxy } from './hooks/useMobileCloudProxy';
+import { createPlaybackWatchdog } from '@/core/player/playback-watchdog';
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import {
   Play,
@@ -321,7 +322,6 @@ function BuiltinMobileVideoPlayer({
   const recoveringRef = useRef(false);
   const recoverRef = useRef<(() => void) | null>(null);
   const metadataAutoplayCleanup = useRef<(() => void) | null>(null);
-  const stallTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [currentSubtitle, setCurrentSubtitle] = useState<string>(settings.subtitleLanguage);
   const [settingsTab, setSettingsTab] = useState<'playback' | 'subtitles'>('playback');
   const [showFullSettings, setShowFullSettings] = useState(false);
@@ -392,7 +392,7 @@ function BuiltinMobileVideoPlayer({
   const subtitlesRef = useRef(subtitles);
   subtitlesRef.current = subtitles;
   const sourceTypeKey = (currentSource as any)?.sourceType === 'dash' || /\.mpd(?:$|[?#])/i.test((currentSource as any)?.originalUrl || currentSource?.url || '') ? 'dash'
-    : currentSource?.isM3U8 || (currentSource as any)?.sourceType === 'hls' || /\.m3u8(?:$|[?#/])/i.test(currentSource?.url || '') ? 'm3u8' : 'file';
+    : currentSource?.isM3U8 || (currentSource as any)?.sourceType === 'hls' || /\.m3u8(?:$|[?#/])/i.test((currentSource as any)?.originalUrl || currentSource?.url || '') ? 'm3u8' : 'file';
   const sourceHeaders = (currentSource as any)?.headers as Record<string, string> | undefined;
   const playbackReferer = sourceHeaders?.Referer || sourceHeaders?.referer || headers?.Referer || '';
   const playbackUserAgent = sourceHeaders?.["User-Agent"] || sourceHeaders?.['user-agent'] || headers?.["User-Agent"] || '';
@@ -694,7 +694,7 @@ function BuiltinMobileVideoPlayer({
     // Opaque proxy tokens are supported by the custom HLS loader, but a direct
     // MP4/WebM cannot be mounted as a `mobile-proxy://` media src. An older
     // shell without the loopback plugin uses its upstream URL device-direct.
-    const sourceLooksHls = source.isM3U8 ||
+    const sourceLooksHls = sourceTypeKey === 'm3u8' || source.isM3U8 ||
       (source as any).sourceType === 'hls' ||
       /\.m3u8(?:$|[?#/])/i.test(activeSourceUrl);
     const isDebridOrigin = (source as any)?.sourceType === 'debrid' || (source as any)?.mode === 'debrid';
@@ -780,6 +780,34 @@ function BuiltinMobileVideoPlayer({
     let terminalFailure = false;
     let dashPlayer: import('dashjs').MediaPlayerClass | null = null;
     let dashAttempt: AbortController | undefined;
+    let resumePosition = startPosition || 0;
+    let resumePlayback = shouldAutoplayVideo(settings.autoplay);
+    const watchdog = createPlaybackWatchdog({
+      video,
+      stallTimeoutMs: STALL_TIMEOUT_MS,
+      recover,
+      onProgress: () => {
+        mediaRetryRef.current = 0;
+        retryCountRef.current = 0;
+        setIsBuffering(false);
+      },
+    });
+    const watchdogInterval = setInterval(() => {
+      if (mounted && !disposed && !terminalFailure) watchdog.tick();
+    }, 1000);
+
+    function playWhenReady(): void {
+      if (!resumePlayback) return;
+      void video.play().catch(error => {
+        if (disposed || terminalFailure) return;
+        // Autoplay rejection needs a visible play button, not a loading loop.
+        if (error?.name === 'NotAllowedError') {
+          resumePlayback = false;
+          setIsPlaying(false);
+          setIsBuffering(false);
+        }
+      });
+    }
 
     // Shared recovery ladder, reachable from both the hls.js error handler and
     // the media-element stall watchdog (the "server works but the video froze"
@@ -789,7 +817,7 @@ function BuiltinMobileVideoPlayer({
       if (recoveringRef.current) return;
       recoveringRef.current = true;
       try {
-        if (mediaRetryRef.current < MAX_MEDIA_RECOVERIES && hlsRef.current) {
+        if (mediaRetryRef.current < MAX_MEDIA_RECOVERIES && hlsRef.current?.levels.length) {
           mediaRetryRef.current += 1;
           if (mediaRetryRef.current > 1) {
             // hls.js's documented escalation for a buffer append that keeps
@@ -807,7 +835,8 @@ function BuiltinMobileVideoPlayer({
             if (!hlsRef.current.levels.length) { mountAt(candidateIndexRef.current); return; }
             try { hlsRef.current.startLoad(); return; } catch { /* fall through */ }
           }
-          try { video.load(); return; } catch { /* fall through */ }
+          mountAt(candidateIndexRef.current);
+          return;
         }
 
         if (candidateIndexRef.current < candidates.length - 1) {
@@ -828,7 +857,12 @@ function BuiltinMobileVideoPlayer({
 
     function mountAt(index: number): void {
       if (disposed) return;
+      if (mounted) {
+        resumePosition = video.currentTime || resumePosition;
+        resumePlayback = !video.paused || resumePlayback;
+      }
       mounted = true;
+      metadataAutoplayCleanup.current?.();
       const finalUrlResolved = candidates[Math.min(Math.max(index, 0), candidates.length - 1)];
       dashAttempt?.abort(); dashPlayer?.reset(); dashPlayer = null;
 
@@ -847,6 +881,7 @@ function BuiltinMobileVideoPlayer({
       } catch {
         /* element may already be detached */
       }
+      watchdog.reset();
 
       let metadataAutoplayHandler: (() => void) | null = null;
       metadataAutoplayCleanup.current = () => {
@@ -859,7 +894,7 @@ function BuiltinMobileVideoPlayer({
       if (sourceTypeKey === 'dash') {
         const controller = new AbortController(); dashAttempt = controller;
         void import('@/core/player/DashAdapter').then(({ attachDashTransport }) => attachDashTransport({
-          videoElement: video, signal: controller.signal, autoPlay: shouldAutoplayVideo(settings.autoplay), startTime: startPosition || 0,
+          videoElement: video, signal: controller.signal, autoPlay: resumePlayback, startTime: resumePosition,
           source: { id: 'mobile-dash', mode: 'dash', url: finalUrlResolved, originalUrl: (source as any).originalUrl || source.url,
             headers: { ...replayHeaders, ...(playbackReferer ? { Referer: playbackReferer } : {}), ...(playbackUserAgent ? { 'User-Agent': playbackUserAgent } : {}) } },
         }, () => { if (!disposed && !controller.signal.aborted) recover(); })).then(player => {
@@ -948,24 +983,18 @@ function BuiltinMobileVideoPlayer({
             const preferred = hls.audioTracks.findIndex(track => String(track.lang || '').toLowerCase().split('-')[0] === preferredAudioRef.current);
             if (preferred >= 0) { hls.audioTrack = preferred; setCurrentHlsAudioTrack(preferred); }
           }
-          if (startPosition && startPosition > 0) {
-            video.currentTime = startPosition;
+          if (resumePosition > 0) {
+            video.currentTime = resumePosition;
           }
-          if (shouldAutoplayVideo(settings.autoplay)) {
-            video.play().catch(console.error);
-          }
+          playWhenReady();
         });
         hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, syncAudioTracks);
         hls.on(Hls.Events.AUDIO_TRACK_SWITCHED, (_: unknown, data: { id?: number }) => {
           if (typeof data?.id === 'number') setCurrentHlsAudioTrack(data.id);
         });
 
-        // A buffered fragment means this candidate genuinely works, so the
-        // budget resets for whatever breaks later in the stream.
-        hls.on(Hls.Events.FRAG_BUFFERED, () => {
-          mediaRetryRef.current = 0;
-          retryCountRef.current = 0;
-        });
+        // Retry budgets reset only when the watchdog observes playback moving.
+        // Buffered fragments alone can still leave the decoder frozen.
 
         hls.on(Hls.Events.ERROR, (_, data) => {
           if (disposed || terminalFailure || hlsRef.current !== hls) return;
@@ -1012,18 +1041,18 @@ function BuiltinMobileVideoPlayer({
         // Safari native HLS support (iOS has no hls.js MSE path — the native
         // element fetches segments itself, so it needs a network URL).
         video.src = finalUrlResolved;
-        if (startPosition && startPosition > 0) {
-          video.currentTime = startPosition;
+        if (resumePosition > 0) {
+          video.currentTime = resumePosition;
         }
 
-        if (shouldAutoplayVideo(settings.autoplay)) {
+        if (resumePlayback) {
           metadataAutoplayHandler = () => {
-            video.play().catch(console.error);
+            playWhenReady();
             video.removeEventListener('loadedmetadata', metadataAutoplayHandler!);
           };
 
           if (video.readyState >= 1) {
-            video.play().catch(console.error);
+            playWhenReady();
           } else {
             video.addEventListener('loadedmetadata', metadataAutoplayHandler);
           }
@@ -1035,18 +1064,18 @@ function BuiltinMobileVideoPlayer({
         // torrent engine and offline files.
         setIsBuffering(false);
         video.src = finalUrlResolved;
-        if (startPosition && startPosition > 0) {
-          video.currentTime = startPosition;
+        if (resumePosition > 0) {
+          video.currentTime = resumePosition;
         }
 
-        if (shouldAutoplayVideo(settings.autoplay)) {
+        if (resumePlayback) {
           metadataAutoplayHandler = () => {
-            video.play().catch(console.error);
+            playWhenReady();
             video.removeEventListener('loadedmetadata', metadataAutoplayHandler!);
           };
 
           if (video.readyState >= 1) {
-            video.play().catch(console.error);
+            playWhenReady();
           } else {
             video.addEventListener('loadedmetadata', metadataAutoplayHandler);
           }
@@ -1091,6 +1120,8 @@ function BuiltinMobileVideoPlayer({
 
     return () => {
       disposed = true;
+      clearInterval(watchdogInterval);
+      recoverRef.current = null;
       dashAttempt?.abort(); dashPlayer?.reset(); dashPlayer = null;
       if (metadataAutoplayCleanup.current) {
         metadataAutoplayCleanup.current();
@@ -1286,19 +1317,7 @@ function BuiltinMobileVideoPlayer({
       if (video.currentTime > 0 && !video.seeking && !video.paused) bufferingStarted ??= performance.now();
       setIsBuffering(true);
 
-      // Stall watchdog: without this, a stream that stops delivering keeps the
-      // spinner forever — the exact "even if the server works the video
-      // froze" symptom. If playback doesn't resume within STALL_TIMEOUT_MS we
-      // run the same recovery ladder hls.js errors use.
-      if (stallTimeoutRef.current) clearTimeout(stallTimeoutRef.current);
-      stallTimeoutRef.current = setTimeout(() => {
-        stallTimeoutRef.current = null;
-        if (!videoRef.current || videoRef.current.ended) return;
-        const stuck = !videoRef.current.seeking && !videoRef.current.paused;
-        if (!stuck) return;
-        console.warn('[MobileVideoPlayer] stall timeout — recovering');
-        recoverRef.current?.();
-      }, STALL_TIMEOUT_MS);
+
     };
     const handlePlaying = () => {
       if (bufferingStarted != null) {
@@ -1309,10 +1328,7 @@ function BuiltinMobileVideoPlayer({
         bufferingStarted = null;
       }
       setIsBuffering(false);
-      if (stallTimeoutRef.current) {
-        clearTimeout(stallTimeoutRef.current);
-        stallTimeoutRef.current = null;
-      }
+
     };
     const handleProgress = () => {
       if (video.buffered.length > 0) {
@@ -1931,10 +1947,10 @@ function BuiltinMobileVideoPlayer({
       {activeCueLines.length > 0 && currentSubtitle !== 'off' && (
         <div
           className="pointer-events-none absolute inset-x-0 z-20 flex flex-col items-center gap-1 px-4 text-center"
-          style={{ bottom: `${40 + settings.subtitlePosition * 6 + (showControls ? 64 : 0)}px` }}
+          style={{ bottom: `${12 + Math.min(settings.subtitlePosition * 3, 60) + (showControls ? 48 : 0)}px` }}
           aria-live="polite"
         >
-          {activeCueLines.map((line, idx) => (
+          {displayCueLines.map((line, idx) => (
             <span key={`${idx}-${line}`} style={customCueStyle}>
               {line}
             </span>

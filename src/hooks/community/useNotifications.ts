@@ -1,3 +1,4 @@
+import { isMessageNotification } from '@/lib/messageNotifications';
 import { notificationSoundEnabled, playNotificationSound } from '@/lib/notificationSound';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
@@ -109,6 +110,10 @@ export function useNotifications() {
                 filter: `user_id=eq.${user.id}`
             }, (payload) => {
                 queryClient.invalidateQueries({ queryKey: ['notifications', user.id] });
+                if (isMessageNotification(payload.new?.data?.type)) {
+                    void queryClient.invalidateQueries({ queryKey: ['direct-unread', user.id] });
+                    void queryClient.invalidateQueries({ queryKey: ['direct-conversations', user.id] });
+                }
                 
                 // Show native notification on mobile (Capacitor) and desktop (Electron)
                 if (payload.new && !presentedNotifications.has(payload.new.id)) {

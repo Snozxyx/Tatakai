@@ -50,7 +50,7 @@ import { usePlaylists } from '@/hooks/user/usePlaylist';
 import { useUserTierLists } from '@/hooks/user/useTierLists';
 import { MediaPicker, type SelectedMedia } from '@/components/community/feed/MediaPicker';
 
-interface ComposerPayload {
+export interface ComposerPayload {
   content: string;
   attachments: CommentAttachment[];
   isSpoiler: boolean;
@@ -68,6 +68,12 @@ const POLL_DURATION = {
 
 interface RichCommentComposerProps {
   generalCommunity?: boolean;
+  uploadMedia?: (file: File) => Promise<CommentAttachment>;
+  allowMedia?: boolean;
+  allowPolls?: boolean;
+  allowMentions?: boolean;
+  onContentChange?: (content: string) => void;
+  maxLength?: number;
   onSubmit: (payload: ComposerPayload) => Promise<unknown> | unknown;
   submitting?: boolean;
   placeholder?: string;
@@ -127,6 +133,7 @@ export function RichCommentComposer({
   allowEmbeds = false,
   initialEmbeds,
   generalCommunity = false,
+  uploadMedia, allowMedia = true, allowPolls = true, allowMentions = true, onContentChange, maxLength,
 }: RichCommentComposerProps) {
   useUiTranslation();
   const { t } = useTranslation();
@@ -138,6 +145,7 @@ export function RichCommentComposer({
   const draftPrefix = user && draftKey ? `tatakai_comment_draft:${user.id}:${draftKey}` : null;
   const fieldKey = (field: string) => draftPrefix ? `${draftPrefix}:${field}` : null;
   const [content, setContent] = usePersistentState(fieldKey('content'), initialContent);
+  useEffect(() => { onContentChange?.(content); }, [content, onContentChange]);
   const lastQuote = useRef<string | null>(null);
   useEffect(() => {
     if (!quoteDraft) return;
@@ -211,7 +219,7 @@ export function RichCommentComposer({
       if (error) throw error;
       return (data ?? []) as MentionCandidate[];
     },
-    enabled: mentionQuery !== null && mentionQuery.length > 0,
+    enabled: allowMentions && mentionQuery !== null && mentionQuery.length > 0,
     staleTime: 30 * 1000,
   });
 
@@ -224,7 +232,7 @@ export function RichCommentComposer({
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
     setContent(value);
-    detectMention(value, e.target.selectionStart ?? value.length);
+    if (allowMentions) detectMention(value, e.target.selectionStart ?? value.length);
   };
 
   const insertMention = (candidate: MentionCandidate) => {
@@ -297,7 +305,7 @@ export function RichCommentComposer({
       toast.error(t('migration.attachmentLimit'));
       return;
     }
-    setAttachments((prev) => [...prev, { type: 'image', url: img.url, width: img.width, height: img.height }]);
+    setAttachments((prev) => [...prev, { type: 'image', url: img.url, width: img.width, height: img.height, ...(img.storagePath ? { storagePath: img.storagePath } : {}) }]);
   };
 
   const addGif = (attachment: CommentAttachment) => {
@@ -311,15 +319,16 @@ export function RichCommentComposer({
   // Shared path for images arriving by drag-drop or clipboard paste — validates,
   // uploads to the comment bucket, then attaches (same result as the picker).
   const intakeImageFile = async (file: File) => {
+    if (!allowMedia) return;
     if (!user) { toast.error(t('migration.signInImages')); return; }
     if (attachments.length >= 4) { toast.error(t('migration.attachmentLimit')); return; }
     const err = validateImageFile(file);
     if (err) { toast.error(err); return; }
     setIntakeBusy(true);
     try {
-      const a = await uploadCommentMedia(file, user.id);
+      const a = await (uploadMedia ? uploadMedia(file) : uploadCommentMedia(file, user.id));
       setAttachments((prev) =>
-        prev.length >= 4 ? prev : [...prev, { type: 'image', url: a.url, width: a.width, height: a.height }],
+        prev.length >= 4 ? prev : [...prev, a],
       );
     } catch (e) {
       toast.error(t('migration.uploadFailed'), { description: e instanceof Error ? e.message : undefined });
@@ -463,7 +472,7 @@ export function RichCommentComposer({
             </button>
           }
         />
-        <GifPicker
+        {allowMedia && <GifPicker
           onSelect={addGif}
           trigger={
             <button
@@ -475,14 +484,14 @@ export function RichCommentComposer({
               {uiI18n.t('app.gif_758f6c93')}
             </button>
           }
-        />
-        <ImagePicker
+        />}
+        {allowMedia && <ImagePicker
           userId={user?.id}
           align="start"
           uploadFile={async (f) => {
             if (!user) throw new Error(t('migration.signInUpload'));
-            const a = await uploadCommentMedia(f, user.id);
-            return { url: a.url, width: a.width, height: a.height };
+            const a = await (uploadMedia ? uploadMedia(f) : uploadCommentMedia(f, user.id));
+            return { url: a.url, width: a.width, height: a.height, storagePath: a.storagePath };
           }}
           onSelect={addImageAttachment}
           trigger={
@@ -495,7 +504,7 @@ export function RichCommentComposer({
               <ImagePlus className="h-4 w-4" />
             </button>
           }
-        />
+        />}
         {allowTimestamp && (
           <>
             <span className="mx-1 h-5 w-px bg-border/60" />
@@ -505,7 +514,7 @@ export function RichCommentComposer({
         {allowEmbeds && (
           <>
             <span className="mx-1 h-5 w-px bg-border/60" />
-            {toolbarButton(<ListChecks className="h-4 w-4" />, t('migration.addPoll'), togglePoll)}
+            {allowPolls && toolbarButton(<ListChecks className="h-4 w-4" />, t('migration.addPoll'), togglePoll)}
             <MediaPicker
               onSelect={setMedia}
               trigger={
@@ -548,6 +557,7 @@ export function RichCommentComposer({
       {/* Textarea + mention dropdown */}
       <div className="relative">
         <Textarea
+          maxLength={maxLength}
           ref={textareaRef}
           value={content}
           onChange={handleChange}

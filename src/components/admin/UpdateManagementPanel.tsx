@@ -1,3 +1,5 @@
+import { UpdateAnalytics, UPDATE_COMPATIBILITY } from './UpdateAnalytics';
+import { Input } from '@/components/ui/input';
 import { ThemedSelect } from '@/components/ui/themed-select';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
@@ -24,12 +26,14 @@ import { GitHubReleasesPanel } from './GitHubReleasesPanel';
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-const SEMVER_RE = /^\d+\.\d+\.\d+$/;
-const DUPLICATE_ACTIVE_CONSTRAINT = 'update_policies_one_active_per_channel';
+const SEMVER_RE = /^\d+\.\d+\.\d+(?:-beta(?:\.\d+)?)?$/;
+const DUPLICATE_ACTIVE_CONSTRAINT = 'update_device_policies_active';
 
 const INITIAL_FORM: CreatePolicyForm = {
   channel: 'stable',
-  type: 'mandatory',
+  type: 'recommended',
+  platform: 'all',
+  rollout_percentage: 100,
   target_version: '',
   rollback_from_version: '',
   notes: '',
@@ -73,6 +77,9 @@ const TypeIcon = ({ type }: { type: UpdatePolicy['type'] }) => {
 // ---------------------------------------------------------------------------
 function isFormValid(form: CreatePolicyForm): boolean {
   if (!SEMVER_RE.test(form.target_version)) return false;
+  if (form.channel === 'stable' && form.target_version.includes('-')) return false;
+  if (form.type === 'rollback' && ['android','android-tv','ios','web','all'].includes(form.platform || 'all')) return false;
+  if (!Number.isInteger(form.rollout_percentage ?? 100)) return false;
   if (form.type === 'rollback' && !SEMVER_RE.test(form.rollback_from_version ?? '')) return false;
   return true;
 }
@@ -98,13 +105,12 @@ export function UpdateManagementPanel() {
   } = useQuery({
     queryKey: QUERY_KEY,
     queryFn: async (): Promise<UpdatePolicy[]> => {
-      const { data, error } = await supabase
-        .from('update_policies')
-        .select('*')
-        .order('published_at', { ascending: false })
-        .limit(200);
-      if (error) throw error;
-      return (data ?? []) as UpdatePolicy[];
+      const [legacy, device] = await Promise.all([
+        supabase.from('update_policies').select('*').order('published_at',{ ascending:false }).limit(100),
+        supabase.from('update_device_policies' as never).select('*').order('published_at',{ ascending:false }).limit(100),
+      ]);
+      if (legacy.error || device.error) throw legacy.error || device.error;
+      return [...(legacy.data ?? []).map(p => ({ ...p, platform:'all',rollout_percentage:100,source:'legacy' })), ...(device.data ?? []).map((p: any) => ({ ...p,source:'device' }))].sort((a,b) => new Date(b.published_at).getTime()-new Date(a.published_at).getTime()) as UpdatePolicy[];
     },
   });
 
@@ -113,14 +119,16 @@ export function UpdateManagementPanel() {
   // ------------------------------------------------------------------
   const createMutation = useMutation({
     mutationFn: async (payload: CreatePolicyForm) => {
-      const { error } = await supabase.from('update_policies').insert({
+      const { error } = await supabase.from('update_device_policies' as never).insert({
+        platform: payload.platform || 'all',
+        rollout_percentage: payload.rollout_percentage ?? 100,
         channel: payload.channel,
         type: payload.type,
         target_version: payload.target_version,
         rollback_from_version: payload.type === 'rollback' ? payload.rollback_from_version : null,
         notes: payload.notes || null,
         active: true,
-      });
+      } as never);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -132,7 +140,7 @@ export function UpdateManagementPanel() {
     onError: (error: unknown) => {
       const msg = error instanceof Error ? error.message : String(error);
       if (msg.includes(DUPLICATE_ACTIVE_CONSTRAINT) || msg.includes('unique') || msg.includes('duplicate')) {
-        setFormError('A channel can only have one active policy at a time. Deactivate the existing policy first.');
+        setFormError('This channel and device already have an active policy. Deactivate it first.');
       } else {
         toast.error(uiI18n.t('app.failed_to_create_policy_i18n_value_0_6fbe5c20', { value0: msg }));
       }
@@ -155,7 +163,7 @@ export function UpdateManagementPanel() {
    * it, so an admin picks a published version instead of typing one blind.
    */
   const startPolicyForVersion = (version: string) => {
-    setForm({ ...INITIAL_FORM, target_version: version });
+    setForm({ ...INITIAL_FORM, target_version: version, channel: version.includes('-beta') ? 'beta' : 'stable' });
     setFormError(null);
     setShowForm(true);
     // Bring the form (top of the panel) into view on smaller screens.
@@ -168,8 +176,8 @@ export function UpdateManagementPanel() {
   const deactivateMutation = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
-        .from('update_policies')
-        .update({ active: false })
+        .from((policies?.find(p => p.id === id)?.source === 'legacy' ? 'update_policies' : 'update_device_policies') as never)
+        .update({ active: false } as never)
         .eq('id', id);
       if (error) throw error;
     },
@@ -209,12 +217,14 @@ export function UpdateManagementPanel() {
               onChange={e => handleFormChange('channel', e.target.value)}
               className="w-full bg-white/5 border border-white/10 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary"
             >
-              <option value="stable">{uiI18n.t('app.stable_4fbacc2f')}</option>
+              <option value="stable">Production</option>
               <option value="beta">{uiI18n.t('app.beta_a295e0bd')}</option>
-              <option value="experimental">{uiI18n.t('app.experimental_2216470a')}</option>
+
             </ThemedSelect>
           </div>
 
+          <div className="flex flex-col gap-2"><label htmlFor="policy-platform" className="text-xs font-medium">Target device</label><ThemedSelect id="policy-platform" value={form.platform || 'all'} onChange={e => setForm({ ...form, platform:e.target.value })}><option value="all">All devices</option>{UPDATE_COMPATIBILITY.map(([id,name]) => <option key={id} value={id}>{name}</option>)}</ThemedSelect></div>
+          <div className="flex flex-col gap-2"><label htmlFor="policy-rollout" className="text-xs font-medium">Rollout percentage</label><Input id="policy-rollout" type="number" min={0} max={100} value={form.rollout_percentage ?? 100} onChange={e => setForm({ ...form,rollout_percentage:Math.max(0,Math.min(100,Number(e.target.value))) })} /><p className="text-xs text-muted-foreground">0 pauses this offer; devices receive a stable cohort assignment. Android/iOS require a newer signed build for recovery.</p></div>
           {/* Type */}
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground font-medium uppercase tracking-wide">{uiI18n.t('app.type_3deb7456')}</label>
@@ -225,7 +235,7 @@ export function UpdateManagementPanel() {
             >
               <option value="mandatory">{uiI18n.t('app.mandatory_cd357c16')}</option>
               <option value="recommended">{uiI18n.t('app.recommended_13941e19')}</option>
-              <option value="experimental">{uiI18n.t('app.experimental_2216470a')}</option>
+
               <option value="rollback">{uiI18n.t('app.rollback_ff3a6f3b')}</option>
             </ThemedSelect>
           </div>
@@ -348,12 +358,13 @@ export function UpdateManagementPanel() {
       <div className="flex flex-col sm:flex-row sm:items-start gap-4">
         {/* Left: badges + versions */}
         <div className="flex-1 min-w-0 space-y-2">
+          <p className="text-xs text-muted-foreground">{policy.platform || 'all'} · {policy.rollout_percentage ?? 100}% rollout{policy.source === 'legacy' ? ' · Legacy global policy' : ''}</p>
           {/* Channel + Type badges */}
           <div className="flex flex-wrap items-center gap-2">
             <span
               className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold border ${CHANNEL_COLOURS[policy.channel]}`}
             >
-              {policy.channel}
+              {policy.channel === 'stable' ? 'production' : policy.channel}
             </span>
             <span
               className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold border ${TYPE_COLOURS[policy.type]}`}
@@ -444,6 +455,7 @@ export function UpdateManagementPanel() {
   // ------------------------------------------------------------------
   return (
     <div className="space-y-6">
+      <UpdateAnalytics />
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold flex items-center gap-2">

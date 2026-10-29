@@ -1,0 +1,25 @@
+/* MainLayout already clears the native status bar. Fullscreen takes over
+   that layout, so it retains its own safe-area clearance. */
+.capacitor-native [data-main-layout] [data-reader-chrome]:not([data-reader-fullscreen="true"]) .reader-topbar {
+  padding-top: 0.5rem;
+}
+
+.reader-tools {
+  max-height: calc(100dvh - var(--sat) - var(--sab) - 1.5rem);
+  overscroll-behavior: contain;
+}
+
+@media (max-width: 639px) {
+  .reader-topbar {
+    padding-left: max(0.5rem, var(--sal));
+    padding-right: max(0.5rem, var(--sar));
+  }
+  .reader-tools {
+    left: calc(50% + (var(--sal) - var(--sar)) / 2);
+  }
+  /* Let the final panel scroll completely above the floating controls. */
+  [data-reader-chrome="true"] [data-reader-scroll] {
+    padding-bottom: calc(5.5rem + var(--sab));
+    scroll-padding-bottom: calc(5.5rem + var(--sab));
+  }
+}

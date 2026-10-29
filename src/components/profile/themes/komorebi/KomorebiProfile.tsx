@@ -1,3 +1,6 @@
+import ProfileThemeDetails from '../ProfileThemeDetails';
+import { ProfilePresence } from '@/components/profile/ProfilePresence';
+import { ProfileSocialActions } from '@/components/profile/ProfileSocialActions';
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -43,7 +46,7 @@ function Shelf({ items, empty }: { items: ThemeMediaItem[]; empty: string }) {
     <p className="km-empty">{empty}</p>
   );
 }
-export default function KomorebiProfile({ data, onBack }: ThemeRendererProps) {
+export default function KomorebiProfile({ data, onBack, configuration }: ThemeRendererProps) {
   const { openSettings } = useSettingsModal();
   const [section, setSection] = useState("overview");
   const name = data.owner.display_name || data.owner.username || "Wanderer";
@@ -82,7 +85,7 @@ export default function KomorebiProfile({ data, onBack }: ThemeRendererProps) {
           <Link to="/" className="km-brand">
             TATAKAI <span lang="ja">木漏れ日</span>
           </Link>
-          {data.isOwner ? (
+          <div className="km-owner-actions">{data.isOwner ? (
             <button
               type="button"
               aria-label="Open profile store"
@@ -93,7 +96,7 @@ export default function KomorebiProfile({ data, onBack }: ThemeRendererProps) {
             </button>
           ) : (
             <span />
-          )}
+          )}{data.isOwner && <ProfileSocialActions userId={data.owner.user_id} />}</div>
         </header>
         <section className="km-hero" aria-label={`${name}'s profile`}>
           <img
@@ -109,6 +112,7 @@ export default function KomorebiProfile({ data, onBack }: ThemeRendererProps) {
               <CosmeticName userId={data.owner.user_id}>{name}</CosmeticName>
             </h1>
             <p className="km-handle">@{data.owner.username || "wanderer"}</p>
+            <ProfilePresence userId={data.owner.user_id} />
             <p className="km-bio">
               {data.owner.bio || "A little space for the stories I love."}
             </p>
@@ -126,7 +130,7 @@ export default function KomorebiProfile({ data, onBack }: ThemeRendererProps) {
               </div>
             </div>
             {!data.isOwner && (
-              <button
+              <div className="km-relationship-actions"><button
                 className="km-follow"
                 type="button"
                 disabled={data.followPending}
@@ -143,7 +147,7 @@ export default function KomorebiProfile({ data, onBack }: ThemeRendererProps) {
                   ? "Following"
                   : "Follow"}
                 <ArrowUpRight size={17} />
-              </button>
+              </button><ProfileSocialActions userId={data.owner.user_id} /></div>
             )}
           </div>
           <div className="km-kanji" lang="ja" aria-hidden="true">
@@ -290,6 +294,6 @@ export default function KomorebiProfile({ data, onBack }: ThemeRendererProps) {
           </div>
         )}
       </div>
-    </main>
+    <ProfileThemeDetails data={data} themeId={'komorebi'} configuration={configuration} /></main>
   );
 }

@@ -63,6 +63,13 @@ crashService.start({
 const _loggerEarly = createLogService({ app, maxFileSizeMB: 10, maxFiles: 5 });
 app.commandLine.appendSwitch('enable-webgl');
 app.commandLine.appendSwitch('enable-accelerated-2d-canvas');
+// RTX output textures must be consumed on the same adapter. Opt-in only: keep
+// the system GPU preference for installs that have never enabled RTX Video.
+if (process.platform === 'win32') {
+    try {
+        if (JSON.parse(fs.readFileSync(path.join(app.getPath('userData'), 'rtx-video-gpu.json'), 'utf8')).enabled === true) app.commandLine.appendSwitch('force_high_performance_gpu');
+    } catch { /* No RTX-specific GPU preference yet. */ }
+}
 // Bound the HTTP disk cache so a long-lived install can't let Chromium's cache
 // grow without limit (it defaults to a large fraction of free disk). 300 MB is
 // ample for posters/thumbnails/HLS segments and keeps the on-disk footprint
@@ -421,7 +428,7 @@ app.on('ready', () => {
         // ── Post-window production services ──────────────────────────────────
         // These need the main window to exist so crash IPC push can reach the renderer.
         crashService.checkPreviousCrashes(winState.mainWindow, logger)
-        updateManager.checkOnStartup('stable').catch((err) => {
+        updateManager.checkOnStartup().catch((err) => {
             logger.error('[main] updateManager.checkOnStartup failed', { err: String(err) });
         });
 

@@ -2,14 +2,16 @@ import type { ComponentType, LazyExoticComponent, ReactNode } from 'react';
 import type { StaffRoleSource } from '@/lib/roles';
 import type { ThemePreferences } from '@/lib/profileThemes';
 
-export interface ThemeMediaItem { id: string; title: string; image: string; href: string; detail?: string; status?: string }
+export interface ThemeMediaItem { id: string; title: string; image: string; href: string; detail?: string; status?: string; kind?: string }
 export interface ProfileThemeData {
   owner: StaffRoleSource & { user_id: string; username?: string | null; display_name?: string | null; avatar_url?: string | null; banner_url?: string | null; bio?: string | null };
   isOwner: boolean; canViewLibrary: boolean; canViewHistory: boolean; canViewCalendar: boolean;
   badges: { key: string; label: string; image: string }[];
   library: ThemeMediaItem[]; activity: ThemeMediaItem[]; favorites: ThemeMediaItem[];
   links: { label: string; url: string }[];
-  stats: { anime: number; manga: number; episodes: number; hours: number; completed: number; streak: number; longestStreak: number };
+  stats: { anime: number; manga: number; novels?: number; episodes: number; hours: number; completed: number; streak: number; longestStreak: number };
+  followingCount?: number;
+  statistics?: {manhwa?:number;comics?:number;watching:number;planned:number;chapters:number;novelChapters?:number;activeDays:number;comments:number;posts:number;upvotes:number;reputation:number};
   following: boolean; followPending: boolean; followers: number; onFollow: () => void;
   loading: boolean; error: boolean;
   tabs?: { id: string; label: string; summary: string }[];

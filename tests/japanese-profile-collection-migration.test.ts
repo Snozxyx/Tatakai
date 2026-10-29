@@ -28,7 +28,7 @@ test("Komorebi and public cosmetics enforce access and preserve public equipment
       "20261024000002_profile_themes.sql",
       "20261025000001_sekai_experience.sql",
       "20261025000002_uchiha_profile_theme.sql",
-      "20261025000003_gothic_empress_profile_theme.sql",
+      "20261026000001_gothic_empress_profile_theme.sql",
       "20261026000002_midnight_lofi_profile_theme.sql",
       "20261026000003_komorebi_and_public_cosmetics.sql",
     ]) {

@@ -131,6 +131,8 @@ export function ProfileSettingsSheet({ trigger, overlayClassName, contentClassNa
             <p className="text-xs leading-relaxed text-muted-foreground">Choose themes, avatar frames, profile effects, nameplates, and colors in the Profile Store. Click below to open your collection.</p>
             <Button type="button" variant="outline" className="gap-2" onClick={() => { setOpen(false); openSettings('profile-store'); }}>Open Profile Store<ArrowUpRight size={14} /></Button>
           </section>
+          <Button type="button" variant="outline" onClick={() => { setOpen(false); openSettings('profile-store', 'html-css'); }}>Edit profile HTML & CSS</Button>
+          <Button type="button" variant="ghost" onClick={() => { setOpen(false); openSettings('privacy', 'social-activity'); }}>Online status & activity privacy</Button>
           {/* Identity */}
           <section className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5 space-y-4">
             <h3 className="flex items-center gap-2 text-sm font-bold text-white">

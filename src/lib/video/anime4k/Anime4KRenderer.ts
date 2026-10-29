@@ -21,13 +21,15 @@ import restoreCnnM from "./shaders/Anime4K_Restore_CNN_M.glsl?raw";
 import upscaleCnnX2S from "./shaders/Anime4K_Upscale_CNN_x2_S.glsl?raw";
 import upscaleCnnX2M from "./shaders/Anime4K_Upscale_CNN_x2_M.glsl?raw";
 
-export type Anime4KMode = "off" | "light" | "standard" | "high";
+export type Anime4KMode = "off" | "light" | "standard" | "high" | "upscale" | "restore";
 
 /** Preset -> ordered list of shader-file sources whose passes are concatenated. */
 const PRESET_SOURCES: Record<Exclude<Anime4KMode, "off">, readonly string[]> = {
   light: [restoreCnnS],
   standard: [restoreCnnM, upscaleCnnX2S],
   high: [restoreCnnM, upscaleCnnX2M],
+  upscale: [upscaleCnnX2M],
+  restore: [restoreCnnM],
 };
 
 const MAIN = "MAIN";
@@ -79,7 +81,7 @@ void main() {
 `;
 
 export class Anime4KRenderer {
-  private readonly video: HTMLVideoElement;
+  private readonly video: HTMLVideoElement | HTMLImageElement;
   private readonly canvas: HTMLCanvasElement;
   private readonly gl: WebGL2RenderingContext | null;
 
@@ -117,7 +119,7 @@ export class Anime4KRenderer {
   private rvfcId = 0;
   private useRvfc = false;
 
-  constructor(video: HTMLVideoElement, canvas: HTMLCanvasElement) {
+  constructor(video: HTMLVideoElement | HTMLImageElement, canvas: HTMLCanvasElement) {
     this.video = video;
     this.canvas = canvas;
     let gl: WebGL2RenderingContext | null = null;
@@ -154,7 +156,9 @@ export class Anime4KRenderer {
       const c = document.createElement("canvas");
       const gl = c.getContext("webgl2");
       if (!gl) return false;
-      return gl.getExtension("EXT_color_buffer_float") !== null;
+      const supported = gl.getExtension("EXT_color_buffer_float") !== null;
+      gl.getExtension('WEBGL_lose_context')?.loseContext();
+      return supported;
     } catch {
       return false;
     }
@@ -213,6 +217,12 @@ export class Anime4KRenderer {
     }
   }
 
+  /** Render a decoded still image once, without starting a video frame loop. */
+  renderStill(): void {
+    this.renderFrame();
+    if (this.disabled || this.buildFailed) throw new Error(this.disabledReason || 'This device could not run the Anime4K shaders.');
+  }
+
   /** Begin the render loop (requestVideoFrameCallback when available, else rAF). */
   start(): void {
     if (this.running || !this.gl) return;
@@ -254,6 +264,7 @@ export class Anime4KRenderer {
       gl.deleteProgram(this.passthroughProgram);
       this.passthroughProgram = null;
     }
+    if (this.video instanceof HTMLImageElement) gl.getExtension('WEBGL_lose_context')?.loseContext();
   }
 
   // --- internal: pass-list assembly ---------------------------------------
@@ -330,9 +341,10 @@ export class Anime4KRenderer {
     const gl = this.gl;
     if (!gl || this.disabled) return;
 
-    const vw = this.video.videoWidth;
-    const vh = this.video.videoHeight;
-    if (vw === 0 || vh === 0 || this.video.readyState < 2) return;
+    const image = this.video instanceof HTMLImageElement;
+    const vw = image ? this.video.naturalWidth : (this.video as HTMLVideoElement).videoWidth;
+    const vh = image ? this.video.naturalHeight : (this.video as HTMLVideoElement).videoHeight;
+    if (vw === 0 || vh === 0 || (!image && (this.video as HTMLVideoElement).readyState < 2)) return;
 
     this.uploadFrame(vw, vh);
     if (this.disabled) return; // uploadFrame hit a fatal (tainted) frame

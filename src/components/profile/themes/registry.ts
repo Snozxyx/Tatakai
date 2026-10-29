@@ -1,3 +1,7 @@
+import { DefaultArrival, SakuraLetterArrival, CloudNotebookArrival, HeavenArrival, FrostedArrival, UchihaArrival, KomorebiArrival } from './ThemeArrival';
+import { frostedDefaults, readFrostedConfig } from './frosted-blast/config';
+import { heavenDefaults, readHeavenConfig } from './eyes-toward-heaven/config';
+import { defaultReferenceWorld, readReferenceWorld } from './reference-worlds/config';
 import { lazy } from 'react';
 import { defaultSekaiConfig, hasCustomProfileAccess, readSekaiConfig, type ThemePreferences } from '@/lib/profileThemes';
 import type { ProfileThemeDefinition } from './types';
@@ -13,8 +17,15 @@ const loadMidnightLofiProfile = () => import('./midnight-lofi/MidnightLofiProfil
 
 /** Add new themes here; the resolver, selector and persistence use this contract. */
 export const PROFILE_THEMES: readonly ProfileThemeDefinition[] = [
-  { id: 'default', label: 'Default', description: 'The original Tatakai profile.', version: 1,
+  { id: 'default', Loading: DefaultArrival, label: 'Default', description: 'The original Tatakai profile.', version: 1,
     entitled: () => true, defaults: () => ({}), parse: () => ({}) },
+  { id: 'sakura-letter', Loading: SakuraLetterArrival, label: 'Sakura Letter', description: 'A blush-pink social scrapbook with character artwork, floating music cards and a gallery of your stories.', version: 1, accessBadges: ['booster','premium-pro','premium-ultra','admin','beta-tester'], entitled: (owner, badges) => hasCustomProfileAccess(owner, badges) || badges.some(b => b.key === 'beta-tester'), defaults: defaultReferenceWorld, parse: readReferenceWorld, Renderer: lazy(() => import('./reference-worlds/ReferenceWorldProfile')), Preview: lazy(() => import('./reference-worlds/ReferenceWorldPreview')), Editor: lazy(() => import('./reference-worlds/ReferenceWorldEditor')) },
+  { id: 'cloud-notebook', Loading: CloudNotebookArrival, label: 'Cloud Notebook', description: 'A cool-blue anime dashboard with a vertical rail, soft notebook panels and your collection at its heart.', version: 1, accessBadges: ['booster','premium-pro','premium-ultra','admin','beta-tester'], entitled: (owner, badges) => hasCustomProfileAccess(owner, badges) || badges.some(b => b.key === 'beta-tester'), defaults: defaultReferenceWorld, parse: readReferenceWorld, Renderer: lazy(() => import('./reference-worlds/ReferenceWorldProfile')), Preview: lazy(() => import('./reference-worlds/ReferenceWorldPreview')), Editor: lazy(() => import('./reference-worlds/ReferenceWorldEditor')) },
+  { id:'frosted-blast',Loading:FrostedArrival,label:'Frosted Blast',description:'Your own background, automatically matched tonal colors, frosted surfaces and a personal collection.',version:1,entitled:()=>true,defaults:frostedDefaults,parse:readFrostedConfig,Renderer:lazy(()=>import('./eyes-toward-heaven/HeavenProfile')),Editor:lazy(()=>import('./frosted-blast/FrostedEditor')),Preview:lazy(()=>import('./frosted-blast/FrostedPreview')) },
+  { id: 'eyes-toward-heaven', Loading: HeavenArrival, label: 'Eyes Toward Heaven', description: 'An open sky, a living scene and a quiet Material 3-inspired space for your collection. Choose your palette, glass and motion.', version: 1,
+    accessBadges: ['booster', 'premium-pro', 'premium-ultra', 'admin'], entitled: hasCustomProfileAccess,
+    defaults: heavenDefaults, parse: readHeavenConfig,
+    Renderer: lazy(() => import('./eyes-toward-heaven/HeavenProfile')), Editor: lazy(() => import('./eyes-toward-heaven/HeavenEditor')), Preview: lazy(() => import('./eyes-toward-heaven/HeavenPreview')) },
   { id: 'gothic-empress', label: 'Gothic Empress', description: 'An obsidian court, a crimson gaze. A live wallpaper, interactive Three.js sigil, and a collection made for your reign.', version: 1,
     accessBadges: ['booster', 'premium-pro', 'premium-ultra', 'admin'],
     entitled: hasCustomProfileAccess, defaults: defaultEmpressConfig, parse: readEmpressConfig,
@@ -22,7 +33,7 @@ export const PROFILE_THEMES: readonly ProfileThemeDefinition[] = [
     Renderer: lazy(loadEmpressProfile),
     Preview: lazy(() => import('./gothic-empress/EmpressProfilePreview')),
     Editor: lazy(() => import('./gothic-empress/EmpressEditor')) },
-  { id: 'uchiha', label: 'Uchiha', description: 'Itachi, ravens, and a quiet charcoal layout. A dark profile with its own character.', version: 1,
+  { id: 'uchiha', Loading: UchihaArrival, label: 'Uchiha', description: 'Itachi, ravens, and a quiet charcoal layout. A dark profile with its own character.', version: 1,
     accessBadges: ['booster', 'premium-pro', 'premium-ultra', 'admin'],
     entitled: hasCustomProfileAccess, defaults: () => ({ version: 1 }),
     parse: value => value && typeof value === 'object' && !Array.isArray(value) && (value as { version?: unknown }).version === 1 ? { version: 1 } : null,
@@ -36,7 +47,7 @@ export const PROFILE_THEMES: readonly ProfileThemeDefinition[] = [
     Renderer: lazy(loadSekaiProfile),
     Preview: lazy(() => import('./sekaipop/SekaiProfilePreview')),
     Editor: lazy(() => import('./sekaipop/SekaiEditor')) },
-  { id: 'komorebi', label: 'Komorebi', description: 'Sunlight through the leaves. Ivory glass, honey gold, and a Japanese garden for the stories you love.', version: 1,
+  { id: 'komorebi', Loading: KomorebiArrival, label: 'Komorebi', description: 'Sunlight through the leaves. Ivory glass, honey gold, and a Japanese garden for the stories you love.', version: 1,
     accessBadges: ['booster', 'premium-pro', 'premium-ultra', 'admin'], entitled: hasCustomProfileAccess,
     defaults: () => ({ version: 1 }), parse: value => value && typeof value === 'object' && !Array.isArray(value) && (value as { version?: unknown }).version === 1 ? { version: 1 } : null,
     Renderer: lazy(() => import('./komorebi/KomorebiProfile')), Preview: lazy(() => import('./komorebi/KomorebiPreview')) },

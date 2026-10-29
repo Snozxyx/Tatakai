@@ -1,3 +1,4 @@
+import { CustomEmojiNode } from './CustomEmojiNode';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { forwardRef, useImperativeHandle, useEffect, useState } from 'react';
@@ -279,6 +280,7 @@ export const RichEditor = forwardRef<RichEditorHandle, RichEditorProps>(function
     editable,
     autofocus,
     extensions: [
+      CustomEmojiNode,
       StarterKit.configure({ heading: { levels: [2, 3] } }),
       Placeholder.configure({ placeholder }),
       MentionUser,

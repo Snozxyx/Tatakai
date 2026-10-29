@@ -1,3 +1,4 @@
+import { MangaWhatsNew } from '@/components/manga/MangaUpdatesDiscovery';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMemo, useState } from "react";
@@ -212,6 +213,7 @@ export default function MangaHomePage() {
             )}
 
             <LastReadMangaSection />
+            <MangaWhatsNew />
 
             <FollowedMangaUpdates />
 

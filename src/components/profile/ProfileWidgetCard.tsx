@@ -1,3 +1,9 @@
+import { useCustomProfileTheme } from '@/hooks/user/useCustomProfileTheme';
+import { CustomProfileThemeFrame } from '@/components/profile/CustomProfileThemeFrame';
+import { profileThemeConversation } from '@/lib/profileThemeConversation';
+import type { ProfileTemplateData } from '@/lib/profileTemplate';
+import { ProfileSocialActions } from '@/components/profile/ProfileSocialActions';
+import { ProfilePresence } from '@/components/profile/ProfilePresence';
 import { useOwnedProfileThemes } from '@/hooks/user/useProfileThemeClaims';
 import { isTV } from "@/core/tv/device";
 import uiI18n from '@/lib/uiI18n';
@@ -197,6 +203,9 @@ export function ProfileWidgetCard({
 
   // Gate the fetches on `open` so nothing runs until the user actually opens it.
   const activeId = open ? userId ?? undefined : undefined;
+  const customTheme = useCustomProfileTheme(userId, open);
+  const [customHidden, setCustomHidden] = useState(false);
+  useEffect(() => { if (!open) setCustomHidden(false); }, [open]);
   const { data: badges, isPending: pendingBadges, isSuccess: verifiedBadges } = useUserBadges(activeId);
   const { isFollowing, checkingFollow, followStats, follow, unfollow, isFollowingLoading } = useFollow(activeId);
   const { data: fetched, isPending: pendingProfile } = useWidgetProfile(userId, open);
@@ -248,10 +257,19 @@ export function ProfileWidgetCard({
   const widgetPreferences = readThemePreferences(fetched?.app_settings);
   const widgetTheme = resolveProfileTheme(widgetPreferences, fetched, badges ?? [], verifiedBadges, ownedThemes.data);
   const Preview = widgetTheme.Preview;
-  const resolvingWidget = open && (pendingProfile || pendingBadges || ownedThemes.isLoading);
-  if (resolvingWidget || (Preview && fetched)) {
+  const resolvingWidget = open && (pendingProfile || pendingBadges || ownedThemes.isLoading || customTheme.isLoading);
+  const customActive = !!customTheme.data?.enabled && !customHidden && !!fetched;
+  if (resolvingWidget || (Preview && fetched) || customActive) {
     const loadingCard = <div className="profile-widget-resolving" role="status"><Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" />Opening profile card…</div>;
-    const themedBody = resolvingWidget ? loadingCard : Preview && fetched ? <Suspense fallback={loadingCard}><Preview
+    const customData: ProfileTemplateData = { owner: { ...fetched, user_id: userId || '' }, isOwner: isSelf,
+      canViewLibrary: isSelf || (fetched?.is_public === true && fetched.show_watchlist !== false), canViewHistory: isSelf || (fetched?.is_public === true && fetched.show_history !== false), canViewCalendar: false,
+      badges: badges ?? [], library: [], activity: [], favorites: [], links: [], stats: { episodes: stats?.episodes, hours: stats ? Math.floor(stats.watchTimeSeconds / 3600) : undefined },
+      following: !!isFollowing, followPending: checkingFollow || isFollowingLoading, followers: followStats?.followers ?? 0, onFollow: () => isFollowing ? unfollow() : follow(), loading: false, error: false, summaryOnly: true };
+    const themedBody = resolvingWidget ? loadingCard : customActive && customTheme.data ? <div className="custom-theme-widget" style={profileThemeConversation('custom-html', customTheme.data.css).style}>
+      <button type="button" className="custom-theme-widget-close" aria-label="Close profile card" onClick={close}><X size={16} /></button>
+      <CustomProfileThemeFrame code={customTheme.data} data={customData} followingCount={followStats?.following} compact onBack={close} onOriginal={() => setCustomHidden(true)} onMessageOpened={close} />
+      <div className="custom-theme-widget-footer"><Button size="sm" variant="outline" onClick={goToProfile}>View full profile</Button></div>
+    </div> : Preview && fetched ? <Suspense fallback={loadingCard}><Preview
       userId={userId ?? undefined} configuration={widgetPreferences.configurations[widgetTheme.id]} name={name} username={handle} avatar={avatar} banner={banner} bio={bio}
       badges={badges ?? []} followers={followStats?.followers} following={followStats?.following} episodes={stats?.episodes} watchTimeSeconds={stats?.watchTimeSeconds}
       privateProfile={!fetched.is_public && !isSelf} canViewHistory={isSelf || (fetched.is_public && fetched.show_history !== false)}
@@ -273,6 +291,7 @@ export function ProfileWidgetCard({
             <div><DialogTitle><ProfileNameplate nameplate={nameplate}>{name}</ProfileNameplate></DialogTitle><p>@{handle || 'user'}</p><RankBadge score={rankScore} size="sm" /></div>
           </div>
           <UserBadges badges={badges} size={28} max={5} />
+          <ProfilePresence userId={userId} enabled={open} /><ProfileSocialActions userId={userId} onMessageOpened={() => setOpen(false)} />
           {bio && <p className="tv-profile-widget-bio">{bio}</p>}
           {fetched && !fetched.is_public && !isSelf && <p>This profile is private.</p>}
           <dl className="tv-profile-widget-stats"><div><dt>Followers</dt><dd>{followStats?.followers ?? '—'}</dd></div><div><dt>Following</dt><dd>{followStats?.following ?? '—'}</dd></div>{(isSelf || (fetched?.is_public && fetched.show_history !== false)) && <><div><dt>Episodes watched</dt><dd>{stats?.episodes ?? '—'}</dd></div><div><dt>Watch time</dt><dd>{stats ? formatWatchTime(stats.watchTimeSeconds) : '—'}</dd></div></>}</dl>
@@ -366,6 +385,7 @@ export function ProfileWidgetCard({
                   />
                 </div>
                 {handle && <p className="truncate text-xs text-muted-foreground/70">@{handle}</p>}
+                <ProfilePresence userId={userId} enabled={open} />
               </div>
             </div>
 
@@ -375,13 +395,13 @@ export function ProfileWidgetCard({
 
             {/* Follow / Unfollow — hidden on your own card and when signed out */}
             {canFollow && (
-              <div className="px-4 pb-3">
+              <div className="flex items-center gap-2 px-4 pb-3">
                 <Button
                   size="sm"
                   variant={isFollowing ? 'outline' : 'default'}
                   onClick={() => (isFollowing ? unfollow() : follow())}
                   disabled={checkingFollow || isFollowingLoading}
-                  className="h-8 w-full gap-1.5 text-xs font-semibold"
+                  className="h-8 flex-1 gap-1.5 text-xs font-semibold"
                 >
                   {isFollowingLoading ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -392,10 +412,12 @@ export function ProfileWidgetCard({
                   )}
                   {isFollowing ? uiI18n.t('app.following_90eeb100') : uiI18n.t('app.follow_66587a7a')}
                 </Button>
+                <ProfileSocialActions userId={userId} onMessageOpened={() => setOpen(false)} />
               </div>
             )}
 
             {/* Bio (only for public profiles) */}
+            {isSelf && <div className="px-4 pb-3"><ProfileSocialActions userId={userId} onMessageOpened={() => setOpen(false)} /></div>}
             {bio && <p className="px-4 pb-3 text-xs leading-relaxed text-muted-foreground line-clamp-3">{bio}</p>}
 
             {/* Complete profile snapshot */}

@@ -1,3 +1,4 @@
+import { usePublishSocialActivity } from '@/hooks/community/useSocialActivity';
 import { watchMainClass, WATCH_GRID_CLASS, watchPlayerColumnClass, watchPlayerFrameClass, WATCH_EPISODE_PANEL_CLASS } from "@/components/watch/watchLayout";
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
@@ -973,6 +974,7 @@ export default function WatchPage() {
   // Load data - skip if it's a generic torrent or local offline episode to avoid unnecessary API calls
   const { data: animeData } = useAnimeInfo(!skipApiCalls ? animeId : '');
   const { data: episodesData } = useEpisodes(!skipApiCalls ? animeId : '');
+  usePublishSocialActivity(animeData?.info?.name ? { kind: 'watching', title: animeData.info.name, href: `/anime/${encodeURIComponent(animeId)}`, image: animeData.info.poster } : null);
 
   // Update torrent session history
   useEffect(() => {

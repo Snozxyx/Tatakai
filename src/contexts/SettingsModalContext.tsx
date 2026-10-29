@@ -33,6 +33,7 @@ const DEFAULT_CATEGORY: SettingsCategoryId = 'account';
 
 /** Legacy `?tab=` values that don't match a category id 1:1. */
 const TAB_ALIASES: Record<string, SettingsCategoryId> = {
+  'profile-code': 'profile-store',
   desktop: 'app',
   appsettings: 'app',
   mobileapp: 'mobile',
@@ -82,7 +83,7 @@ export function SettingsModalProvider({ children }: { children: ReactNode }) {
 
   const openSettings = useCallback((next?: string, nextSection?: string) => {
     setCategoryState(normalizeSettingsCategory(next));
-    setSection(nextSection);
+    setSection(next === 'profile-code' ? 'html-css' : nextSection);
     setOpen(true);
   }, []);
 

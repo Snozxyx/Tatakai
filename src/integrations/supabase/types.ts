@@ -18,6 +18,180 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      social_privacy: {
+        Row: {
+          user_id: string;
+          show_online: boolean;
+          show_last_seen: boolean;
+          share_watching: boolean;
+          share_reading: boolean;
+        };
+        Insert: {
+          user_id?: string;
+          show_online?: boolean;
+          show_last_seen?: boolean;
+          share_watching?: boolean;
+          share_reading?: boolean;
+        };
+        Update: {
+          user_id?: string;
+          show_online?: boolean;
+          show_last_seen?: boolean;
+          share_watching?: boolean;
+          share_reading?: boolean;
+        };
+        Relationships: [];
+      };
+      social_activity: {
+        Row: {
+          user_id: string;
+          seen_at: string | null;
+          active_until: string;
+          kind: string | null;
+          title: string | null;
+          href: string | null;
+          image: string | null;
+          detail: string | null;
+        };
+        Insert: {
+          user_id?: string;
+          seen_at?: string | null;
+          active_until?: string;
+          kind?: string | null;
+          title?: string | null;
+          href?: string | null;
+          image?: string | null;
+          detail?: string | null;
+        };
+        Update: {
+          user_id?: string;
+          seen_at?: string | null;
+          active_until?: string;
+          kind?: string | null;
+          title?: string | null;
+          href?: string | null;
+          image?: string | null;
+          detail?: string | null;
+        };
+        Relationships: [];
+      };
+      direct_conversations: {
+        Row: {
+          id: string;
+          user_a: string;
+          user_b: string;
+          requested_by: string;
+          status: string;
+          read_a: number;
+          read_b: number;
+          typing_a_until: string | null;
+          typing_b_until: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_a?: string;
+          user_b?: string;
+          requested_by?: string;
+          status?: string;
+          read_a?: number;
+          read_b?: number;
+          typing_a_until?: string | null;
+          typing_b_until?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_a?: string;
+          user_b?: string;
+          requested_by?: string;
+          status?: string;
+          read_a?: number;
+          read_b?: number;
+          typing_a_until?: string | null;
+          typing_b_until?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      direct_messages: {
+        Row: {
+          id: string;
+          seq: number;
+          conversation_id: string;
+          sender_id: string;
+          content: string;
+          attachments: Json;
+          embeds: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          seq?: number;
+          conversation_id?: string;
+          sender_id?: string;
+          content?: string;
+          attachments?: Json;
+          embeds?: Json;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          seq?: number;
+          conversation_id?: string;
+          sender_id?: string;
+          content?: string;
+          attachments?: Json;
+          embeds?: Json;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      user_blocks: {
+        Row: {
+          blocker_id: string;
+          blocked_id: string;
+        };
+        Insert: {
+          blocker_id?: string;
+          blocked_id?: string;
+        };
+        Update: {
+          blocker_id?: string;
+          blocked_id?: string;
+        };
+        Relationships: [];
+      };
+      profile_custom_code: {
+        Row: {
+          user_id: string;
+          version: number;
+          theme_name: string;
+          enabled: boolean;
+          html: string;
+          css: string;
+          placement: string;
+        };
+        Insert: {
+          user_id?: string;
+          version?: number;
+          theme_name?: string;
+          enabled?: boolean;
+          html?: string;
+          css?: string;
+          placement?: string;
+        };
+        Update: {
+          user_id?: string;
+          version?: number;
+          theme_name?: string;
+          enabled?: boolean;
+          html?: string;
+          css?: string;
+          placement?: string;
+        };
+        Relationships: [];
+      };
       admin_home_config: {
         Row: {
           id: string;
@@ -5765,6 +5939,19 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      save_profile_custom_theme: { Args: { p_name: string; p_html: string; p_css: string; p_enabled: boolean }; Returns: undefined };
+      equip_profile_theme: { Args: { p_preferences: Json }; Returns: undefined };
+      get_social_presence: { Args: { p_user_ids?: string[]; p_friends?: boolean }; Returns: { user_id: string; username: string | null; display_name: string | null; avatar_url: string | null; online: boolean; last_seen: string | null; kind: string | null; title: string | null; href: string | null; image: string | null; detail: string | null }[]; };
+      set_social_privacy: { Args: { p_online: boolean; p_last_seen: boolean; p_watching: boolean; p_reading: boolean }; Returns: undefined; };
+      heartbeat_social_activity: { Args: { p_kind?: string; p_title?: string; p_href?: string; p_image?: string; p_detail?: string; p_active?: boolean }; Returns: undefined; };
+      start_direct_conversation: { Args: { p_recipient: string }; Returns: string; };
+      respond_direct_conversation: { Args: { p_conversation: string; p_accept: boolean }; Returns: undefined; };
+      send_direct_message: { Args: { p_conversation: string; p_id: string; p_content: string; p_attachments?: Json; p_embeds?: Json }; Returns: string; };
+      update_direct_presence: { Args: { p_conversation: string; p_read_seq?: number; p_typing?: boolean }; Returns: undefined; };
+      report_direct_message: { Args: { p_message: string; p_reason: string }; Returns: undefined; };
+      get_direct_unread: { Args: Record<string, never>; Returns: number; };
+      list_direct_media: { Args: Record<string, never>; Returns: { path: string; size: number; created_at: string }[]; };
+      can_use_direct_media: { Args: { p_name: string; p_write?: boolean }; Returns: boolean; };
       ban_user: {
         Args: Record<string, unknown>;
         Returns: any;

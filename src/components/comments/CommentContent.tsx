@@ -1,3 +1,4 @@
+import { CustomEmojiImage } from './CustomEmojiImage';
 import { Fragment, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -97,6 +98,7 @@ function TimestampToken({ token, seconds, target }: { token: string; seconds: nu
 }
 
 function inlineNode(token: string, key: string, timestampTarget: TimestampTarget): ReactNode {
+  if (token.startsWith(':tatakai-')) return <CustomEmojiImage key={key} token={token} />;
   // Timestamp first — before the generic fallthrough — but only when it parses.
   if (TIMESTAMP_RE.test(token)) {
     const seconds = parseTimestamp(token);

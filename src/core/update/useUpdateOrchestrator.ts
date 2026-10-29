@@ -1,3 +1,5 @@
+import { getUpdateSnapshot } from './update-monitor';
+import { getReleaseChannel } from './release-channel';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import uiI18n from '@/lib/uiI18n';
 import { useEffect } from 'react';
@@ -34,7 +36,8 @@ interface ElectronUpdaterBridge {
 export const LATEST_RELEASE_URL = 'https://github.com/snozxyx/Tatakai/releases/latest';
 
 export function openManualUpdateDownload(): void {
-  void bridge()?.openExternal?.(LATEST_RELEASE_URL);
+  const version = getUpdateSnapshot().version;
+  void bridge()?.openExternal?.(version ? `https://github.com/Snozxyx/Tatakai/releases/tag/v${encodeURIComponent(version)}` : getReleaseChannel() === 'beta' ? 'https://github.com/Snozxyx/Tatakai/releases' : LATEST_RELEASE_URL);
 }
 
 function bridge(): ElectronUpdaterBridge | null {

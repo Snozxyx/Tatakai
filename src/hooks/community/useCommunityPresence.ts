@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { useSocialPresence } from './useSocialActivity';
 import { useOnlinePresence } from '@/hooks/api/usePresence';
 export interface PresenceUser {
   user_id: string;
@@ -22,28 +21,8 @@ export function useCommunityPresence() {
       ].sort(),
     [entries]
   );
-  const key = ids.join(',');
-  const onlineUserIds = useMemo(() => new Set(ids), [ids]);
-  const { data = [] } = useQuery({
-    queryKey: ['online-member-profiles', key],
-    enabled: ids.length > 0,
-    staleTime: 60_000,
-    queryFn: async () => {
-      const result: PresenceUser[] = [];
-      for (let offset = 0; offset < ids.length; offset += 100) {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('user_id,username,display_name,avatar_url')
-          .in('user_id', ids.slice(offset, offset + 100));
-        if (error) throw error;
-        result.push(...(data || []));
-      }
-      return result;
-    },
-  });
-  return {
-    onlineUsers: ids.length ? data : [],
-    onlineUserIds,
-    onlineCount: onlineUserIds.size,
-  };
+  const { data = [] } = useSocialPresence(ids);
+  const onlineUsers = data.filter(person => person.online);
+  const onlineUserIds = new Set(onlineUsers.map(person => person.user_id));
+  return { onlineUsers, onlineUserIds, onlineCount: onlineUserIds.size };
 }

@@ -595,7 +595,7 @@ export function Comments({ entityType, entityId, episodeId, entityName, sourceKi
                                 showName={false}
                               />
 
-                              <UserBadges badges={userBadges} size={14} />
+                              <UserBadges badges={userBadges} size={14} max={3} />
 
                               {comment.is_pinned && (
                                 <Badge className="h-4 text-[10px] gap-0.5 px-1.5 bg-amber/15 text-amber border-amber/20">

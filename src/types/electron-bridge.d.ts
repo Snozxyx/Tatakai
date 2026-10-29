@@ -14,6 +14,8 @@ export interface ElectronThemePersistPayload {
 }
 
 export interface ElectronBridge {
+  upscaler?: import('@/lib/upscaling').UpscalerBridge;
+  rtxVideo?: import('@/lib/video/rtx-video').RtxVideoBridge;
   pickExtensionPackage?: () => Promise<{ name: string; bytes: Uint8Array } | null>;
   translate?: import('@/core/translate/types').TranslationBridge;
   getPlatform?: () => Promise<string>;

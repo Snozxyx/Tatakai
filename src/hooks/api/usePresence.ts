@@ -1,3 +1,4 @@
+import { useSocialPrivacy } from '@/hooks/community/useSocialActivity';
 import { randomUUID } from '../../lib/uuid';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
@@ -38,10 +39,12 @@ function getSessionId(): string {
 
 /** Track this browser tab as online (mount once per app, e.g. MainLayout). */
 export function useClientPresence(enabled: boolean = true) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const { data: privacy } = useSocialPrivacy();
+  const shareOnline = !user || (privacy?.show_online === true && profile?.is_public === true);
 
   useEffect(() => {
-    if (!enabled || typeof window === 'undefined') return;
+    if (!enabled || !shareOnline || typeof window === 'undefined') return;
 
     let channel: ReturnType<typeof supabase.channel> | null = null;
     let timer: ReturnType<typeof setInterval> | null = null;
@@ -51,7 +54,7 @@ export function useClientPresence(enabled: boolean = true) {
     const payload = (): PresenceEntry => ({
       session_id: sessionId,
       user_id: user?.id ?? null,
-      page_path: window.location.pathname,
+      page_path: '/', // Public presence must never reveal private routes or activity.
       online_at: new Date().toISOString(),
     });
 
@@ -102,7 +105,7 @@ export function useClientPresence(enabled: boolean = true) {
         // ignore
       }
     };
-  }, [enabled, user?.id]);
+  }, [enabled, user?.id, shareOnline]);
 }
 
 /** Subscribe to live online users (admin dashboards). Instant, no polling. */

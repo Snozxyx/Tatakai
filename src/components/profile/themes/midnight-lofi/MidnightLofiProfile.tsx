@@ -1,3 +1,6 @@
+import ProfileThemeDetails from '../ProfileThemeDetails';
+import { ProfilePresence } from '@/components/profile/ProfilePresence';
+import { ProfileSocialActions } from '@/components/profile/ProfileSocialActions';
 import { lazy, Suspense, type CSSProperties } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
@@ -210,6 +213,7 @@ export default function MidnightLofiProfile({ data, configuration, onBack }: The
               <span>Themes & Store</span>
             </Button>
           )}
+          {data.isOwner && <ProfileSocialActions userId={data.owner.user_id} />}
         </div>
       </header>
 
@@ -261,6 +265,7 @@ export default function MidnightLofiProfile({ data, configuration, onBack }: The
               <LofiNameDisplay userId={data.owner.user_id} name={name} />
             </h2>
             <p className="ml-identity-handle">@{data.owner.username || 'wanderer'}</p>
+            <ProfilePresence userId={data.owner.user_id} />
 
             {data.owner.bio && <p className="ml-identity-bio">{data.owner.bio}</p>}
 
@@ -275,9 +280,9 @@ export default function MidnightLofiProfile({ data, configuration, onBack }: The
 
             {/* Follow Button (Image 2 style solid white/gold or frosted) */}
             {!data.isOwner && (
-              <button
+              <div className="ml-relationship-actions"><button
                 type="button"
-                className="mt-6 w-full rounded-full bg-white text-slate-950 hover:bg-slate-100 font-bold text-xs py-3 px-5 transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2"
+                className="flex-1 rounded-full bg-white text-slate-950 hover:bg-slate-100 font-bold text-xs py-3 px-5 transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2"
                 disabled={data.followPending}
                 onClick={data.onFollow}
               >
@@ -292,7 +297,7 @@ export default function MidnightLofiProfile({ data, configuration, onBack }: The
                     <span>Follow</span>
                   </>
                 )}
-              </button>
+              </button><ProfileSocialActions userId={data.owner.user_id} /></div>
             )}
 
             {/* Social Links */}
@@ -412,6 +417,6 @@ export default function MidnightLofiProfile({ data, configuration, onBack }: The
           </div>
         </div>
       </div>
-    </main>
+    <ProfileThemeDetails data={data} themeId={'midnight-lofi'} configuration={configuration} /></main>
   );
 }

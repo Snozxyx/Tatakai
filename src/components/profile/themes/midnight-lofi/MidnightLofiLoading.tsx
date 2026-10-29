@@ -1,13 +1,15 @@
+import { useMotionPreference } from '@/hooks/ui/useMotionPreference';
 import { MIDNIGHT_LOFI_ROOM } from './config';
 import type { ThemeLoadingProps } from '../types';
 import './midnight-lofi.css';
 
 export function MidnightLofiLoading({ owner }: ThemeLoadingProps) {
+  const reducedMotion=useMotionPreference();
   const name = owner?.display_name || owner?.username || 'user';
   return (
     <div
       className="ml-profile flex flex-col items-center justify-center min-h-screen text-center px-4 relative overflow-hidden"
-      role="status"
+      role="status" aria-busy="true" data-motion={!reducedMotion}
       aria-live="polite"
     >
       <div

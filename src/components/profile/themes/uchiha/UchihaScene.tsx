@@ -1,4 +1,3 @@
-import { isNative } from '@/lib/platform/platform';
 import { useEffect, useRef, useState } from 'react';
 import { useMotionPreference } from '@/hooks/ui/useMotionPreference';
 
@@ -31,7 +30,7 @@ export function UchihaScene({ compact = false, paused = false }: { compact?: boo
     const av1 = video.current?.canPlayType('video/mp4; codecs="av01.0.12M.08"');
     const file = compact ? 'itachi-rain-widget.mp4'
       : window.innerWidth < 768 ? 'itachi-rain-mobile.mp4'
-      : !isNative() && window.innerWidth >= 1600 && av1 ? 'itachi-rain-4k.mp4' : 'itachi-rain.mp4';
+      : window.innerWidth >= 1600 && av1 ? 'itachi-rain-4k.mp4' : 'itachi-rain.mp4';
     setSource(MEDIA_ROOT + file);
   }, [compact, hidden, paused, reduce, source, visible]);
 

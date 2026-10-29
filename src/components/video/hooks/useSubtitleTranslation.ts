@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslationConfig, } from '@/hooks/translation/useTranslationConfig';
 import { resolveTargetLanguage } from '@/lib/translation/config';
 import { translateTexts } from '@/lib/translation/translate';
@@ -22,7 +22,10 @@ export function cacheKey(text: string, target: string) {
 
 /** Insert into the shared cue cache with FIFO eviction. */
 export function rememberCue(text: string, target: string, translated: string) {
-  if (cueCache.size >= CUE_CACHE_MAX) {
+  const key = cacheKey(text, target);
+  // A late batch returning unchanged input must not erase a translated cue.
+  if (translated === text && cueCache.has(key) && cueCache.get(key) !== text) return;
+  if (cueCache.size >= CUE_CACHE_MAX && !cueCache.has(key)) {
     const first = cueCache.keys().next().value;
     if (first !== undefined) cueCache.delete(first);
   }
@@ -37,45 +40,27 @@ export function useSubtitleTranslation(activeCueLines: string[]): {
   const enabled = config.enabled && config.subtitleTranslate;
   const target = resolveTargetLanguage(config.subtitleTargetLanguage || undefined);
   const key = activeCueLines.join('\u0000');
-  const [state, setState] = useState<{ lines: string[] | null; translating: boolean }>({
-    lines: null,
-    translating: false,
-  });
-  const requestRef = useRef(0);
-
+  const identity = `${target}\u0001${key}`;
+  const [state, setState] = useState<{ identity: string; lines: string[] | null; translating: boolean }>({ identity: '', lines: null, translating: false });
   useEffect(() => {
-    const request = ++requestRef.current;
-    if (!enabled || !activeCueLines.length || !activeCueLines.some((line) => line.trim())) {
-      setState((prev) => (prev.lines === null && !prev.translating ? prev : { lines: null, translating: false }));
-      return;
-    }
+    if (!enabled || !key.trim()) return;
+    const controller = new AbortController();
+    const lines = key.split('\u0000');
+    if (lines.every(line => cueCache.has(cacheKey(line, target)))) return;
+    setState({ identity, lines: null, translating: true });
+    void translateTexts(lines, { target, timeoutMs: 15_000, signal: controller.signal }).then(result => {
+      if (controller.signal.aborted) return;
+      if (result.texts.length !== lines.length) throw new Error('Subtitle translation line mismatch');
+      result.texts.forEach((text, index) => rememberCue(lines[index], target, text));
+      setState({ identity, lines: result.texts, translating: false });
+    }).catch(() => {
+      if (!controller.signal.aborted) setState({ identity, lines: null, translating: false });
+    });
+    return () => controller.abort();
+  }, [enabled, target, key, identity]);
 
-    const cached = activeCueLines.map((line) => cueCache.get(cacheKey(line, target)));
-    if (cached.every((value) => value !== undefined)) {
-      setState({ lines: cached as string[], translating: false });
-      return;
-    }
-
-    setState((prev) => ({ lines: null, translating: true }));
-    void (async () => {
-      try {
-        const result = await translateTexts(activeCueLines, { target, timeoutMs: 15_000 });
-        result.texts.forEach((translated, index) => {
-          const original = activeCueLines[index];
-          if (typeof translated === 'string' && typeof original === 'string') {
-            rememberCue(original, target, translated);
-          }
-        });
-        if (requestRef.current !== request) return;
-        setState({ lines: result.texts, translating: false });
-      } catch {
-        // Keep the original cues visible; the next cuechange retries uncached lines.
-        if (requestRef.current !== request) return;
-        setState((prev) => ({ lines: null, translating: false }));
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, target, key]);
-
-  return state;
+  if (!enabled || !activeCueLines.length) return { lines: null, translating: false };
+  const cached = activeCueLines.map(line => cueCache.get(cacheKey(line, target)));
+  if (cached.every(line => line !== undefined)) return { lines: cached as string[], translating: false };
+  return state.identity === identity ? { lines: state.lines, translating: state.translating } : { lines: null, translating: true };
 }

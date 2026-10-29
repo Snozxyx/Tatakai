@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - 'main'
+      - 'production'
+      - 'beta'
     tags:
       - 'v*'
   workflow_dispatch:
@@ -495,9 +497,11 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p desktop-artifacts/{windows,macos,linux} mobile-artifacts/{android,ios}
-          gh release download "$GITHUB_REF_NAME" -D desktop-artifacts/windows -p '*win*.exe' -p '*win*.blockmap' -p 'latest.yml'
-          gh release download "$GITHUB_REF_NAME" -D desktop-artifacts/macos -p '*mac*.dmg' -p '*mac*.zip' -p '*mac*.blockmap' -p 'latest-mac.yml'
-          gh release download "$GITHUB_REF_NAME" -D desktop-artifacts/linux -p '*.AppImage' -p '*.deb' -p 'latest-linux.yml'
+          CHANNEL=latest
+          if [[ "$GITHUB_REF_NAME" == *-beta* ]]; then CHANNEL=beta; fi
+          gh release download "$GITHUB_REF_NAME" -D desktop-artifacts/windows -p '*win*.exe' -p '*win*.blockmap' -p "$CHANNEL.yml"
+          gh release download "$GITHUB_REF_NAME" -D desktop-artifacts/macos -p '*mac*.dmg' -p '*mac*.zip' -p '*mac*.blockmap' -p "$CHANNEL-mac.yml"
+          gh release download "$GITHUB_REF_NAME" -D desktop-artifacts/linux -p '*.AppImage' -p '*.deb' -p "$CHANNEL-linux.yml"
           gh release download "$GITHUB_REF_NAME" -D mobile-artifacts/android -p '*-android*.apk'
           gh release download "$GITHUB_REF_NAME" -D mobile-artifacts/ios -p '*-ios-unsigned.ipa'
 
@@ -525,7 +529,7 @@ jobs:
         with:
           files: altstore-apps.json
           draft: false
-          prerelease: false
+          prerelease: ${{ contains(github.ref_name, '-beta') }}
           append_body: true
           body: |
             ## Downloads

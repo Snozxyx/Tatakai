@@ -1,3 +1,5 @@
+import { MangaReleaseCalendar } from '@/components/manga/MangaUpdatesDiscovery';
+import { useTranslation } from 'react-i18next';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
@@ -234,6 +236,8 @@ function DaySkeleton({ rows }: { rows: number }) {
 /* ------------------------------------------------------------------ */
 
 export default function CalendarPage() {
+  const { t } = useTranslation();
+  const [mediaTab, setMediaTab] = useState<'anime' | 'manga'>('anime');
   useUiTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -473,7 +477,7 @@ export default function CalendarPage() {
             </div>
 
             {/* Stats */}
-            <div className="hidden items-center gap-2 lg:flex">
+            {mediaTab === 'anime' && <div className="hidden items-center gap-2 lg:flex">
               <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-2">
                 <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                   {uiI18n.t('app.episodes_49d641ba')}
@@ -493,11 +497,11 @@ export default function CalendarPage() {
                   </div>
                 </div>
               )}
-            </div>
+            </div>}
 
             {/* Controls */}
             <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-              {user && (
+              {user && mediaTab === 'anime' && (
                 <Button
                   variant={mineOnly ? 'default' : 'outline'}
                   size="sm"
@@ -571,6 +575,11 @@ export default function CalendarPage() {
           </div>
         </section>
 
+        <div className="mb-5 flex gap-2" aria-label={t('discovery.calendarType')}>
+          <Button variant={mediaTab === 'anime' ? 'default' : 'outline'} aria-pressed={mediaTab === 'anime'} onClick={() => setMediaTab('anime')}>{t('discovery.anime')}</Button>
+          <Button variant={mediaTab === 'manga' ? 'default' : 'outline'} aria-pressed={mediaTab === 'manga'} onClick={() => setMediaTab('manga')}>{t('discovery.mangaReleases')}</Button>
+        </div>
+        {mediaTab === 'manga' ? <MangaReleaseCalendar weekStart={weekStart} /> : <>
         {/* ---------------------------------------------------------- */}
         {/* Mobile day picker                                          */}
         {/* ---------------------------------------------------------- */}
@@ -677,8 +686,10 @@ export default function CalendarPage() {
           </>
         )}
 
+        </>}
+
         {/* Sign-in nudge */}
-        {!user && (
+        {!user && mediaTab === 'anime' && (
           <div className="mt-6 flex items-center justify-center gap-2 rounded-xl border border-primary/15 bg-primary/5 px-4 py-3 text-sm text-muted-foreground">
             <Star className="h-4 w-4 shrink-0 text-primary" />
             <p>

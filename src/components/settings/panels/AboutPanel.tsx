@@ -1,3 +1,4 @@
+import { BetaChannelSettings } from '../BetaChannelSettings';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { DiagnosticsSettings } from '../DiagnosticsSettings';
@@ -59,6 +60,7 @@ export function AboutPanel() {
         />
       </SettingsSection>
 
+      <BetaChannelSettings />
       <DiagnosticsSettings />
 
       <SettingsSection icon={Scale} eyebrow="Legal" title={uiI18n.t('app.legal_policies_69a80df0')}>

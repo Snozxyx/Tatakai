@@ -149,3 +149,5 @@ coverage/
 /research/
 /.playwright-mcp/
 /agent.md
+/resources/bin/rtx-video/
+**/__pycache__/

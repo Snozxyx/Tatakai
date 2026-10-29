@@ -16,7 +16,7 @@ export function preparePostTranslation(title: string, content: string) {
   const slots: Text[] = [];
   const texts: string[] = [];
   const protectedPattern =
-    /(https?:\/\/[^\s]+|@[a-zA-Z0-9_]{2,30}|#[\p{L}\p{N}_]+)/gu;
+    /(:tatakai-[a-z0-9-]+:|https?:\/\/[^\s]+|@[a-zA-Z0-9_]{2,30}|#[\p{L}\p{N}_]+)/gu;
   const walker = doc.createTreeWalker(doc.body, 4 /* SHOW_TEXT */);
   const nodes: Text[] = [];
   while (walker.nextNode()) nodes.push(walker.currentNode as Text);
@@ -30,7 +30,7 @@ export function preparePostTranslation(title: string, content: string) {
     const fragment = doc.createDocumentFragment();
     for (const part of (node.textContent || '').split(protectedPattern)) {
       const protectedText =
-        /^https?:\/\/|^@|^#/u.test(part) || !/[\p{L}]/u.test(part);
+        /^:tatakai-|^https?:\/\/|^@|^#/u.test(part) || !/[\p{L}]/u.test(part);
       if (!isHtml && /^[@#]/u.test(part)) {
         const token = doc.createElement('span');
         token.setAttribute(

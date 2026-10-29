@@ -1,16 +1,16 @@
 -- First 200 eligible accounts can claim the Japanese theme collection permanently.
 BEGIN;
-CREATE TABLE IF NOT EXISTS public.profile_theme_launch_campaign (
+CREATE TABLE public.profile_theme_launch_campaign (
   id text PRIMARY KEY CHECK (id = 'japanese-launch'),
   claimed integer NOT NULL DEFAULT 0 CHECK (claimed BETWEEN 0 AND 200)
 );
-INSERT INTO public.profile_theme_launch_campaign(id) VALUES ('japanese-launch') ON CONFLICT (id) DO NOTHING;
-CREATE TABLE IF NOT EXISTS public.profile_theme_launch_claims (
+INSERT INTO public.profile_theme_launch_campaign(id) VALUES ('japanese-launch');
+CREATE TABLE public.profile_theme_launch_claims (
   user_id uuid PRIMARY KEY REFERENCES public.profiles(user_id) ON DELETE CASCADE,
   slot integer NOT NULL UNIQUE CHECK (slot BETWEEN 1 AND 200),
   claimed_at timestamptz NOT NULL DEFAULT now()
 );
-CREATE TABLE IF NOT EXISTS public.profile_theme_grants (
+CREATE TABLE public.profile_theme_grants (
   user_id uuid NOT NULL REFERENCES public.profiles(user_id) ON DELETE CASCADE,
   theme_id text NOT NULL CHECK (theme_id IN ('midnight-lofi','komorebi')),
   source text NOT NULL DEFAULT 'japanese-launch',
@@ -22,23 +22,22 @@ ALTER TABLE public.profile_theme_launch_claims ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.profile_theme_grants ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.profile_theme_launch_campaign, public.profile_theme_launch_claims, public.profile_theme_grants FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON public.profile_theme_grants TO anon, authenticated;
-DROP POLICY IF EXISTS theme_grants_visible ON public.profile_theme_grants;
 CREATE POLICY theme_grants_visible ON public.profile_theme_grants FOR SELECT USING (true);
 
-CREATE OR REPLACE FUNCTION public.owns_profile_theme(p_user_id uuid,p_theme_id text)
+CREATE FUNCTION public.owns_profile_theme(p_user_id uuid,p_theme_id text)
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $$
  SELECT EXISTS(SELECT 1 FROM public.profile_theme_grants WHERE user_id=p_user_id AND theme_id=p_theme_id);
 $$;
 REVOKE ALL ON FUNCTION public.owns_profile_theme(uuid,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.profile_theme_launch_eligible(p_user_id uuid)
+CREATE FUNCTION public.profile_theme_launch_eligible(p_user_id uuid)
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $$
  SELECT EXISTS(SELECT 1 FROM public.profiles WHERE user_id=p_user_id AND NOT COALESCE(is_admin,false) AND COALESCE(role,'') <> 'admin')
  AND NOT EXISTS(SELECT 1 FROM public.user_badges WHERE user_id=p_user_id AND badge_key IN ('booster','premium-go','premium-pro','premium-ultra'));
 $$;
 REVOKE ALL ON FUNCTION public.profile_theme_launch_eligible(uuid) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.profile_theme_launch_status()
+CREATE FUNCTION public.profile_theme_launch_status()
 RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $$
  SELECT jsonb_build_object('remaining',200-claimed,'limit',200,
   'claimed',EXISTS(SELECT 1 FROM public.profile_theme_launch_claims WHERE user_id=auth.uid()),
@@ -48,7 +47,7 @@ $$;
 REVOKE ALL ON FUNCTION public.profile_theme_launch_status() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.profile_theme_launch_status() TO authenticated;
 
-CREATE OR REPLACE FUNCTION public.claim_profile_theme_launch()
+CREATE FUNCTION public.claim_profile_theme_launch()
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
 DECLARE uid uuid := auth.uid(); used integer;
 BEGIN

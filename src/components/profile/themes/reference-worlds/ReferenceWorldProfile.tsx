@@ -1,0 +1,61 @@
+import ProfileThemeDetails from '../ProfileThemeDetails';
+import { useTranslation } from 'react-i18next';
+import { ProfileGallery } from './ProfileGallery';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useMotionPreference } from '@/hooks/ui/useMotionPreference';
+import { ArrowLeft, ArrowUpRight, Bell, BookOpen, Grid3X3, Heart, Home, Mail, Menu, Pause, Play, Plus, Search, Settings2, SkipBack, SkipForward, Sparkles, Star } from 'lucide-react';
+import { useSettingsModal } from '@/contexts/SettingsModalContext';
+import { CosmeticAvatar, CosmeticName } from '@/components/profile/IdentityCosmetics';
+import { AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { ProfilePresence } from '@/components/profile/ProfilePresence';
+import { ProfileSocialActions } from '@/components/profile/ProfileSocialActions';
+import type { ThemeMediaItem, ThemeRendererProps } from '../types';
+import { defaultReferenceWorld, readReferenceWorld } from './config';
+import './reference-worlds.css';
+
+function Covers({ items, empty }: { items: ThemeMediaItem[]; empty: string }) {
+  return items.length ? <div className="rw-covers">{items.map(item => <Link key={item.id} to={item.href} title={item.title}>{item.image ? <img src={item.image} alt={item.title} loading="lazy" /> : <BookOpen aria-hidden="true" />}<span>{item.title}</span></Link>)}</div> : <p className="rw-empty">{empty}</p>;
+}
+export default function ReferenceWorldProfile({ data, configuration, preferences, onBack }: ThemeRendererProps) {
+  const { t } = useTranslation();
+  const blue = preferences.selected === 'cloud-notebook';
+  const config = readReferenceWorld(configuration) ?? defaultReferenceWorld();
+  const { openSettings } = useSettingsModal();
+  const [section, setSection] = useState('home');
+  const contentPanel = useRef<HTMLElement>(null); const navigate = useNavigate(); const reduced = useMotionPreference();
+  useEffect(() => { if (section !== 'home') contentPanel.current?.scrollIntoView({ behavior:reduced ? 'auto' : 'smooth',block:'start' }); }, [section,reduced]);
+  const [playing, setPlaying] = useState(false); const [time, setTime] = useState(0); const [duration, setDuration] = useState(0);
+  const [audioError, setAudioError] = useState(''); const audio = useRef<HTMLAudioElement>(null);
+  const [query, setQuery] = useState('');
+  const name = data.owner.display_name || data.owner.username || 'Tatakai traveler';
+  const avatar = <CosmeticAvatar userId={data.owner.user_id} className="size-14"><AvatarImage src={data.owner.avatar_url || undefined} alt={name} /><AvatarFallback>{name[0]}</AvatarFallback></CosmeticAvatar>;
+  const privateView = section === 'history' ? !data.canViewHistory : section === 'novels' ? !data.canViewLibrary : ['library','manga'].includes(section) ? !data.canViewLibrary : false;
+  const shelves: Record<string, ThemeMediaItem[]> = { gallery: data.favorites, library: data.canViewLibrary ? data.sections?.watchlist ?? data.library : [], manga: data.canViewLibrary ? data.sections?.manga ?? [] : [], novels: data.canViewLibrary ? data.sections?.novels ?? [] : [], history: data.canViewHistory ? [...data.activity, ...(data.sections?.readingHistory ?? [])] : [] };
+  const gallery = data.favorites.slice(0,3);
+  const birthday = config.birthday ? new Date(`${config.birthday}T12:00:00`) : null;
+  const music = (small = false) => <article className={`rw-card rw-player ${small ? 'rw-mini-player' : ''}`}>
+    <div className="rw-record">{gallery[0]?.image ? <img src={gallery[0].image} alt="" /> : <span>♪</span>}<i /></div>
+    <div><strong>{config.musicTitle || 'Your soundtrack'}</strong><p>{config.musicArtist || (config.musicUrl ? 'Profile music' : 'Add music in Customize')}</p></div>
+    <div className="rw-player-controls"><button type="button" disabled={!config.musicUrl} aria-label="Back ten seconds" onClick={() => { if (audio.current) audio.current.currentTime = Math.max(0,time-10); }}><SkipBack size={16} /></button><button type="button" className="rw-play" disabled={!config.musicUrl} aria-label={playing ? 'Pause music' : 'Play music'} onClick={() => { if (!audio.current) return; if (playing) audio.current.pause(); else void audio.current.play().catch(() => setAudioError('This audio could not play. Try another HTTPS audio URL.')); }}>{playing ? <Pause size={19} /> : <Play size={19} />}</button><button type="button" disabled={!config.musicUrl} aria-label="Forward ten seconds" onClick={() => { if (audio.current) audio.current.currentTime = Math.min(duration,time+10); }}><SkipForward size={16} /></button></div>
+    <input type="range" aria-label="Music position" disabled={!duration} min={0} max={duration || 1} step={0.1} value={Math.min(time,duration || 1)} onChange={e => { if (audio.current) audio.current.currentTime = Number(e.target.value); }} />
+  </article>;
+  return <main className={`rw-world ${blue ? 'rw-cloud' : 'rw-sakura'}`}>
+    <header className="rw-header"><button type="button" className="rw-back" onClick={onBack} aria-label={t('heaven.back')}><ArrowLeft size={18} /><span>{t('heaven.back')}</span></button><Link to="/" className="rw-brand"><Grid3X3 size={19} /><span>TATAKAI</span></Link><nav aria-label="Profile sections">{[['home','Home'],['profile','Profile'],['gallery','Gallery'],['library','Library']].map(([id,label]) => <button key={id} type="button" aria-current={section === id ? 'page' : undefined} onClick={() => setSection(id)}>{label}</button>)}</nav><div className="rw-header-actions">{avatar}<Link to="/notifications" aria-label="Notifications"><Bell size={19} /></Link>{data.isOwner ? <button type="button" className="rw-round" aria-label="Customize profile" onClick={() => openSettings('profile-store')}><Plus size={23} /></button> : <button type="button" className="rw-round" onClick={data.onFollow} disabled={data.followPending} aria-label={data.following ? 'Unfollow' : 'Follow'}><Heart size={19} /></button>}<button type="button" aria-label="View history" onClick={() => setSection('history')}><Menu size={23} /></button></div></header>
+    <div className="rw-body"><aside className="rw-side"><div className="rw-side-brand">Interface <Sparkles size={13} /></div>{[['home','Dashboard'],['gallery','Favorites'],['library','Anime'],['manga','Manga'],['novels','Novels'],['history','History']].map(([id,label]) => <button key={id} type="button" aria-current={section === id ? 'page' : undefined} onClick={() => setSection(id)}>{id === 'home' ? <Home size={16} /> : id === 'gallery' ? <Heart size={16} /> : <BookOpen size={16} />}<span>{label}</span></button>)}{data.isOwner && <button type="button" onClick={() => openSettings('profile-store')}><Settings2 size={16} /><span>Customize</span></button>}<div className="rw-side-foot">One home.<br />Every story.<Star size={40} /></div></aside>
+    <div className="rw-main"><section className="rw-stage">
+      <img className="rw-character" src={`/assets/profile-themes/${blue ? 'cloud-notebook/jinhsi.webp' : 'sakura-letter/kaoruko-hq.jpg'}`} alt="" />
+      <span className="rw-decor rw-decor-one" aria-hidden="true">+</span><span className="rw-decor rw-decor-two" aria-hidden="true">+</span><span className="rw-decor rw-decor-three" aria-hidden="true">✧</span>
+      <article className="rw-card rw-birthday"><div><span>{birthday ? 'Birthday' : 'Episodes watched'}</span><strong>{birthday ? birthday.getDate().toString().padStart(2,'0') : data.stats.episodes}</strong><p>{birthday ? birthday.toLocaleDateString(undefined,{ month:'long',year:'numeric' }) : `${data.stats.hours.toFixed(1)} hours of stories`}</p></div><div className="rw-personality"><span>Personality</span><p>{config.personality}</p><span>Role</span><p>{config.role}</p></div><div className="rw-rule" /></article>
+      <div className="rw-hello"><span>{blue ? 'WELCOME TO YOUR WORLD' : 'MY LITTLE CORNER'}</span><h1>{blue ? `Hello ${name}` : config.headline}</h1><p>{blue ? config.note : <CosmeticName userId={data.owner.user_id}>{name}</CosmeticName>}</p><button type="button" onClick={() => setSection('profile')}>{blue ? 'Your profile' : 'Welcome, traveler'}<ArrowUpRight size={16} /></button></div>
+      <div className="rw-top-player">{music()}</div>
+      <article className="rw-card rw-identity"><span>✦ {blue ? 'New history' : 'A story worth sharing'} ✦</span><h2><CosmeticName userId={data.owner.user_id}>{name}</CosmeticName></h2><p>{data.owner.bio || config.note}</p><div className="rw-identity-actions"><button type="button" onClick={() => setSection('profile')}>View profile</button><ProfileSocialActions userId={data.owner.user_id} /></div></article>
+      <div className="rw-edge"><span>01.</span> My Profile <Heart size={14} /></div>
+      {blue && <article className="rw-card rw-progress"><span>YOUR COLLECTION</span><div className="rw-progress-ring"><strong>{data.stats.completed}</strong></div><span>Completed stories</span></article>}
+    </section>
+    <section className="rw-bottom"><article className="rw-card rw-about"><h3>About me</h3><p>{data.owner.bio || config.note}</p><div className="rw-tags">{[['library','Anime'],['manga','Manga'],['novels','Novels'],['gallery','Favorites']].map(([id,label]) => <button key={id} type="button" onClick={() => setSection(id)}>{label}</button>)}</div></article><article className="rw-card rw-media"><div className="rw-card-title"><h3>Gallery</h3><button type="button" onClick={() => setSection('gallery')}>{data.isOwner ? 'Manage photos' : 'See all'} <ArrowUpRight size={12} /></button></div><ProfileGallery userId={data.owner.user_id} isOwner={data.isOwner} preview /></article>{music(true)}</section>
+    <footer className="rw-card rw-footer"><div><ProfilePresence userId={data.owner.user_id} /><span>{data.followers} followers</span></div><div><span>Stories collected</span><strong>{data.stats.anime + data.stats.manga + (data.stats.novels || 0)}</strong></div><form onSubmit={event => { event.preventDefault(); navigate(`/search?q=${encodeURIComponent(query.trim())}`); }}><label className="sr-only" htmlFor="rw-search">Find your next story</label><input id="rw-search" name="q" value={query} onChange={e => setQuery(e.target.value)} placeholder="find your favorite" /><button type="submit" aria-label="Search"><Search size={18} /></button></form><Link className="rw-round" to="/messages" aria-label="Messages"><Mail size={22} /></Link></footer>
+    {section !== 'home' && <section ref={contentPanel} className="rw-card rw-section" aria-live="polite"><div className="rw-card-title"><h2>{({ profile:'Profile',gallery:'Gallery',library:'Anime library',manga:'Manga library',novels:'Novel library',history:'Recent history' } as Record<string,string>)[section]}</h2><button type="button" onClick={() => setSection('home')}>Back to home</button></div>{section === 'profile' ? <><p>{data.owner.bio || config.note}</p><p>{data.stats.episodes} episodes · {data.stats.hours.toFixed(1)} hours · {data.followers} followers</p><div className="rw-badges">{data.badges.map(b => <img key={b.key} src={b.image} alt={b.label} title={b.label} />)}</div>{!data.isOwner && <button type="button" disabled={data.followPending} onClick={data.onFollow}>{data.following ? 'Following' : 'Follow'}</button>}{data.links.map(link => <a key={link.url} href={link.url} target="_blank" rel="noreferrer">{link.label}</a>)}</> : section === 'gallery' ? <ProfileGallery userId={data.owner.user_id} isOwner={data.isOwner} /> : privateView ? <p>This collection is private.</p> : <Covers items={shelves[section] ?? []} empty={data.loading ? 'Loading stories…' : data.error ? 'Profile data could not load. Try refreshing.' : 'No stories in this collection yet.'} />}</section>}
+    {audioError && <p role="alert">{audioError}</p>}
+    </div></div><audio ref={audio} src={config.musicUrl || undefined} preload="none" onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => setPlaying(false)} onTimeUpdate={e => setTime(e.currentTarget.currentTime)} onLoadedMetadata={e => setDuration(Number.isFinite(e.currentTarget.duration) ? e.currentTarget.duration : 0)} onError={() => setAudioError('Profile audio is unavailable.')} /><ProfileThemeDetails data={data} themeId={blue ? 'cloud-notebook' : 'sakura-letter'} configuration={configuration} /></main>;
+}

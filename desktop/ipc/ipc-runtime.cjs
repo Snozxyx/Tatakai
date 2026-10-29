@@ -31,6 +31,8 @@ const { createShareTunnel } = require('../runtime/share-tunnel/share-tunnel.cjs'
 const TATAKAI_API_BASE = (process.env.VITE_BACKEND_ORIGIN || 'https://api.tatakai.me') + '/api/v3';
 
 module.exports = function registerRuntimeHandlers(ipcMain, app, fs, path, logger, getMainWindow) {
+    require('../runtime/upscaler/index.cjs')(ipcMain, app);
+    require('../runtime/rtx-video/index.cjs')(ipcMain, app, require('electron'));
     const emitRuntimeEvent = (event) => {
         const win = getMainWindow();
         if (win && !win.isDestroyed()) {

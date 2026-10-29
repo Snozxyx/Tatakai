@@ -43,7 +43,7 @@ if (!await gh(['release', 'view', tag, '--repo', repo], { optional: true, retrie
     const end = changelog.indexOf('\n## [', start + 1);
     if (start < 0) throw new Error('Release changelog missing');
     writeFileSync(notes, changelog.slice(start, end < 0 ? undefined : end));
-    if (!await gh(['release', 'create', tag, '--repo', repo, '--draft', '--target', process.env.GITHUB_SHA, '--title', `Tatakai ${version}`, '--notes-file', notes], { optional: true, retries: 3, backoffMs: 3000 })) {
+    if (!await gh(['release', 'create', tag, '--repo', repo, '--draft', ...(version.includes('-beta') ? ['--prerelease'] : []), '--target', process.env.GITHUB_SHA, '--title', `Tatakai ${version}`, '--notes-file', notes], { optional: true, retries: 3, backoffMs: 3000 })) {
       await gh(['release', 'view', tag, '--repo', repo], { retries: 5, backoffMs: 2000 });
     }
   } finally {
@@ -53,7 +53,7 @@ if (!await gh(['release', 'view', tag, '--repo', repo], { optional: true, retrie
 
 const component = process.argv[2];
 const files = component === 'desktop'
-  ? readdirSync('dist_electron').filter(n => /\.(exe|dmg|zip|AppImage|deb|blockmap)$/.test(n) || /^latest(?:-[a-z]+)?\.yml$/.test(n)).map(n => 'dist_electron/' + n)
+  ? readdirSync('dist_electron').filter(n => /\.(exe|dmg|zip|AppImage|deb|blockmap)$/.test(n) || /^(?:latest|beta)(?:-[a-z]+)?\.yml$/.test(n)).map(n => 'dist_electron/' + n)
   : readdirSync('.').filter(n => n.startsWith(`Tatakai-v${version}-`) && (component === 'android' ? /-android(?:-tv)?\.apk$/.test(n) : /-ios-unsigned\.ipa$/.test(n)));
 
 if (!files.length) throw new Error('No native release files');

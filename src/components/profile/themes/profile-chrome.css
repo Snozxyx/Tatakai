@@ -1,0 +1,1 @@
+html[data-profile-chrome]:not(.mac-app) [data-titlebar]{background:var(--profile-chrome-bg)!important;color:var(--profile-chrome-ink)!important;border-color:var(--profile-chrome-border)!important}

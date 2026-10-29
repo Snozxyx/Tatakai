@@ -1,3 +1,4 @@
+import { reportUpdateEvent } from './update-telemetry';
 import { normalizeReleaseNotes, normalizeRolloutPercentage } from './release-details';
 import { useSyncExternalStore } from 'react';
 
@@ -86,6 +87,8 @@ export interface UpdaterEvent {
  * Dynamic Island and the Settings panel read one source of truth.
  */
 export function ingestUpdaterEvent(event: UpdaterEvent): void {
+  const kind = ({ checking: 'checked', available: 'offered', downloading: 'download_started', downloaded: 'downloaded', error: 'failed' } as Record<string,string>)[event.type];
+  if (kind) reportUpdateEvent(kind, event.type === 'checking' ? __APP_VERSION__ : event.info?.version || state.version || __APP_VERSION__, event.channel === 'beta' ? 'beta' : 'production');
   if (event.channel) set({ channel: event.channel });
   if (event.info || event.type === 'not-available' || event.type === 'error') {
     set({ checkedAt: Date.now(), ...(event.info ? { releaseNotes: normalizeReleaseNotes(event.info.releaseNotes), stagingPercentage: normalizeRolloutPercentage(event.info.stagingPercentage), channel: event.info.channel || event.channel || state.channel } : {}) });
@@ -180,3 +183,5 @@ function getSnapshot() {
 export function useUpdateState(): UpdateState {
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
+
+export const getUpdateSnapshot = (): UpdateState => state;

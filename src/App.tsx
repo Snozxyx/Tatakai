@@ -1,3 +1,4 @@
+import { BetaSubscriptionSync } from '@/components/settings/BetaChannelSettings';
 import { AutomationScheduler } from '@/core/download/AutomationScheduler';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, HashRouter } from "react-router-dom";
@@ -117,6 +118,7 @@ const App = () => {
         <AuthProvider>
             <TooltipProvider>
               <Router future={routerFutureFlags}>
+                <BetaSubscriptionSync />
                 <AutomationScheduler />
                 <GlobalSearch />
                 <DesktopDeepLinkBridge />

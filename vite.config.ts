@@ -121,6 +121,7 @@ export default defineConfig(({ mode }) => {
       // Webapp specific build config
       rollupOptions: {
         output: {
+          onlyExplicitManualChunks: true,
           ...(isWebMode ? {
             // Don't generate service worker for webapp
             entryFileNames: 'assets/[name].[hash].js',

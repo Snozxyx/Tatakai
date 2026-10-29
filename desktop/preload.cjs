@@ -1,6 +1,82 @@
 const { contextBridge, ipcRenderer } = require('electron');
+const { sharedTexture } = require('electron');
+const rtxTargets = new Map();
+const rtxCaptureBuffers = new Map();
+if (sharedTexture?.setSharedTextureReceiver) sharedTexture.setSharedTextureReceiver(async ({ importedSharedTexture }, metadata) => {
+    let frame;
+    try {
+        const rtxTarget = rtxTargets.get(metadata.session);
+        if (!rtxTarget || rtxTarget.generation !== metadata.generation) return;
+        const canvas = document.getElementById(rtxTarget.id);
+        if (!canvas || canvas.tagName !== 'CANVAS') return;
+        const video = canvas.closest('.player-media-stack')?.querySelector('video');
+        if (video && (video.seeking || Math.abs(video.currentTime - metadata.timestamp) > 0.1)) { canvas.style.display = 'none'; canvas.width = canvas.height = 1; delete canvas.dataset.rtxPresentedTimestamp; return; }
+        frame = importedSharedTexture.getVideoFrame();
+        canvas.width = metadata.width; canvas.height = metadata.height;
+        const bitmapContext = canvas.getContext('bitmaprenderer');
+        if (bitmapContext) {
+            const bitmap = await createImageBitmap(frame);
+            bitmapContext.transferFromImageBitmap(bitmap);
+        } else {
+            const context = canvas.getContext('2d');
+            if (!context) return;
+            context.drawImage(frame, 0, 0);
+        }
+        canvas.dataset.rtxPresentedTimestamp = String(metadata.timestamp);
+        canvas.style.display = '';
+    } finally { frame?.close(); importedSharedTexture.release(); }
+});
 
 contextBridge.exposeInMainWorld('electron', {
+    rtxVideo: {
+        capability: () => sharedTexture?.setSharedTextureReceiver ? ipcRenderer.invoke('rtx-video:capability') : Promise.resolve({ available: false, reason: 'This desktop build cannot receive shared GPU textures.', maxOutputHeight: 1080 }),
+        start: (config) => ipcRenderer.invoke('rtx-video:start', config),
+        configure: (session, config) => ipcRenderer.invoke('rtx-video:configure', session, config),
+        frame: (frame) => ipcRenderer.invoke('rtx-video:frame', frame),
+        captureFrame: async (metadata) => {
+            const target = rtxTargets.get(metadata.session);
+            if (!target || target.generation !== metadata.generation) throw new Error('RTX capture is no longer current.');
+            const canvas = document.getElementById(target.id);
+            const video = canvas?.closest('.player-media-stack')?.querySelector('video');
+            if (!video || video.seeking || video.readyState < 2) throw new Error('The video frame is not ready.');
+            let frame;
+            try {
+                frame = new VideoFrame(video, { timestamp: Math.round(metadata.timestamp * 1e6) });
+                const size = frame.allocationSize({ format: 'BGRA' });
+                let bytes = rtxCaptureBuffers.get(metadata.session);
+                if (!bytes || bytes.byteLength !== size) { bytes = new Uint8Array(size); rtxCaptureBuffers.set(metadata.session, bytes); }
+                await frame.copyTo(bytes, { format: 'BGRA' });
+                if (rtxTargets.get(metadata.session)?.generation !== metadata.generation) throw new Error('RTX capture is no longer current.');
+                return await ipcRenderer.invoke('rtx-video:frame', { ...metadata, width: video.videoWidth, height: video.videoHeight, bytes });
+            } finally { frame?.close(); }
+        },
+        stop: (session) => { rtxCaptureBuffers.delete(session); rtxTargets.delete(session); return ipcRenderer.invoke('rtx-video:stop', session); },
+        restartWithGpuPreference: (enabled) => ipcRenderer.invoke('rtx-video:restart-gpu', enabled),
+        setTarget: (target) => {
+            if (target === null) { rtxTargets.clear(); return; }
+            if (typeof target?.session !== 'string' || !Number.isSafeInteger(target.generation)) return;
+            if (target.id === null) { rtxTargets.delete(target.session); return; }
+            if (typeof target.id === 'string' && /^[a-zA-Z0-9-]{1,100}$/.test(target.id)) rtxTargets.set(target.session, target);
+        },
+        onStatus: (callback) => {
+            const handler = (_event, message) => callback(message);
+            ipcRenderer.on('rtx-video:status', handler);
+            return () => ipcRenderer.removeListener('rtx-video:status', handler);
+        },
+    },
+    upscaler: {
+        status: () => ipcRenderer.invoke('upscaler:status'),
+        install: (engine) => ipcRenderer.invoke('upscaler:install', engine),
+        enhance: (payload) => ipcRenderer.invoke('upscaler:enhance', payload),
+        cancel: (id) => ipcRenderer.invoke('upscaler:cancel', id),
+        cancelSetup: () => ipcRenderer.invoke('upscaler:cancel-setup'),
+        clearCache: () => ipcRenderer.invoke('upscaler:clear-cache'),
+        onProgress: (callback) => {
+            const handler = (_event, message) => callback(message);
+            ipcRenderer.on('upscaler:event', handler);
+            return () => ipcRenderer.removeListener('upscaler:event', handler);
+        },
+    },
     translate: {
         request: (command, args) => ipcRenderer.invoke('translate:request', { command, args }),
         importPages: (args) => ipcRenderer.invoke('translate:import', args),

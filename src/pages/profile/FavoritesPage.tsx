@@ -1,3 +1,4 @@
+import { ReadingCollections } from '@/components/profile/ReadingCollections';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
@@ -805,6 +806,7 @@ export default function FavoritesPage() {
 
         {/* Fed by the same genre weights as the "Your genres" chips above, so the
             row is about what this visitor finishes rather than a global chart. */}
+        <ReadingCollections />
         <MangaPicksSection
           className="mt-14"
           genres={(genrePrefs ?? []).map((preference) => preference.genre)}

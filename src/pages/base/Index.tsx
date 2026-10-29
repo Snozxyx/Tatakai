@@ -1,3 +1,4 @@
+import { FriendsActivity } from '@/components/home/FriendsActivity';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useHomeData } from "@/hooks/api/useAnimeData";
@@ -157,6 +158,7 @@ const Index = () => {
             <TorrentSessionBanner />
             <LastReadMangaSection />
             <LastReadNovelSection />
+            <FriendsActivity />
 
             {/* ── New from what you follow — exact EP/CH deep-links ── */}
             <RevealSection><FollowedAnimeEpisodes /></RevealSection>

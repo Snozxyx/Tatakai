@@ -2499,3 +2499,10 @@ body:has([role="dialog"][data-state="open"]) :is([data-mobile-nav], [data-mobile
 
 /* The in-app gesture owns refresh; avoid a second browser refresh/bounce. */
 html.mobile-pull-refresh-enabled { overscroll-behavior-y: contain; }
+
+/* Original mascot artwork keeps its aspect ratio and natural size, bounded by the post. */
+.tatakai-custom-emoji { display: inline-block; width: 1.75em; height: 1.75em; object-fit: contain; vertical-align: middle; }
+.tatakai-mascot-sticker { display: inline-block; width: auto; height: auto; max-width: 100%; object-fit: contain; vertical-align: middle; }
+
+/* Compact stickers: preserve artwork proportions without filling the feed. */
+.tatakai-mascot-sticker { width: auto; height: auto; max-width: min(140px, 100%); max-height: 140px; object-fit: contain; }

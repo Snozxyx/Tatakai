@@ -1,6 +1,6 @@
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -119,6 +119,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // admin on a cold load.
   const [rolesResolved, setRolesResolved] = useState(false);
   const queryClient = useQueryClient();
+  const previousSocialUser = useRef<string | null>(null);
+  useEffect(() => {
+    const nextId = user?.id ?? null;
+    if (previousSocialUser.current && previousSocialUser.current !== nextId) {
+      const sensitive = (query: { queryKey: readonly unknown[] }) => {
+        const key = String(query.queryKey[0]);
+        return key.startsWith('direct-') || key.startsWith('social-') || key === 'profile-custom-code' || key === 'conversation-theme-profile';
+      };
+      void queryClient.cancelQueries({ predicate: sensitive });
+      queryClient.removeQueries({ predicate: sensitive });
+    }
+    previousSocialUser.current = nextId;
+  }, [user?.id, queryClient]);
+
 
   const fetchProfile = async (userId: string) => {
     // Skip fetching profile when offline

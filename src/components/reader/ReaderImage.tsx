@@ -1,6 +1,6 @@
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { Loader2, RefreshCw } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
@@ -14,6 +14,9 @@ import {
 import { triggerHaptic } from "@/lib/haptics";
 import { shouldUseReaderHeaderBlob } from "@/lib/reader/imageLifecycle";
 import { useTranslation } from "react-i18next";
+import { useMobileConfig } from '@/hooks/ui/useMobileConfig';
+import { buildMobileCloudImageProxyUrl } from '@/core/player/mobile-cloud-proxy';
+import { usePageUpscaling, type PageUpscalingSettings } from '@/hooks/media/usePageUpscaling';
 
 /** Minimal page shape the reader image needs. `MangaPage` and the custom-source
  *  `CustomReadPage` are both structurally compatible with this. */
@@ -44,21 +47,27 @@ export interface ReaderPageImage {
  * Shared by the manga reader (`MangaReaderPage`) and custom-source read pages so
  * the blob/proxy subtlety lives in one place.
  */
-export function ReaderImage({ page, mode, style, eager, onRetryChapter }: {
+export function ReaderImage({ page, mode, style, eager, onRetryChapter, upscaling }: {
   page: ReaderPageImage;
   mode: "native" | "blob";
   style: CSSProperties;
   eager: boolean;
   onRetryChapter?: () => void;
+  upscaling?: PageUpscalingSettings;
 }) {
   useUiTranslation();
-  const src = page.proxiedImageUrl || page.imageUrl;
+  const { config } = useMobileConfig();
+  const cloudUrl = Capacitor.isNativePlatform() && config.cloudProxyByDefault
+    ? buildMobileCloudImageProxyUrl(page) : null;
+  const [failedCloudUrl, setFailedCloudUrl] = useState<string | null>(null);
+  const useCloud = Boolean(cloudUrl && failedCloudUrl !== cloudUrl);
+  const src = useCloud ? cloudUrl! : page.proxiedImageUrl || page.imageUrl;
   const { t } = useTranslation();
   // Native loopback (`http://127.0.0.1:<port>/stream/…`) loads directly in
   // `<img>` like desktop — headers are replayed server-side, CORS is `*`.
   const isNativeLoopback = isNativeProxyUrl(src);
   const isProxy = !isNativeLoopback && isMobileProxyUrl(src);
-  const headerCount = Object.keys(normalizeMobileHeaders(page.headers)).length;
+  const headerCount = useCloud ? 0 : Object.keys(normalizeMobileHeaders(page.headers)).length;
   // Header-gated plain URL: bare <img> will 403 → must go through blob path
   // even when the user picked "native" loading. Native loopback URLs are
   // already header-aware server-side and must stay on the direct <img> path.
@@ -85,6 +94,11 @@ export function ReaderImage({ page, mode, style, eager, onRetryChapter }: {
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
   const [nonce, setNonce] = useState(0);
+  // Cloud image errors (including a 200 HTML challenge) fall back once to the
+  // original local/header-aware transport. Each new page gets its own attempt.
+  useEffect(() => {
+    if (failed && useCloud) setFailedCloudUrl(cloudUrl);
+  }, [failed, useCloud, cloudUrl]);
   const mountedRef = useRef(true);
   const retryOwnedBlobRef = useRef<string | null>(null);
   useEffect(() => {
@@ -107,7 +121,7 @@ export function ReaderImage({ page, mode, style, eager, onRetryChapter }: {
   // bit when React reuses this component (paged mode and old page-number keys
   // are especially prone to it), otherwise a failed page from chapter N keeps
   // chapter N+1 in the retry UI without ever assigning its new `src`.
-  useEffect(() => {
+  useLayoutEffect(() => {
     setBlobUrl(null);
     setLoaded(false);
     setFailed(false);
@@ -280,12 +294,14 @@ export function ReaderImage({ page, mode, style, eager, onRetryChapter }: {
   // resolves, hold the placeholder (never hand the opaque token URL to `<img>`).
   const imgSrc = isProxy || needsHeaderBlob ? blobUrl ?? undefined : mode === "blob" ? blobUrl ?? src : src;
   const showImg = Boolean(imgSrc) && !failed;
+  const enhancement = usePageUpscaling(imgSrc, loaded && !failed, upscaling);
 
   const retry = () => {
     void triggerHaptic("reader-toggle");
     setFailed(false);
     setLoaded(false);
     setBlobUrl(null);
+    setFailedCloudUrl(null);
     setNonce((n) => n + 1);
     // Signed page URLs can expire. Refresh the chapter response (or fail over
     // its provider) as well as recreating this image.
@@ -312,7 +328,7 @@ export function ReaderImage({ page, mode, style, eager, onRetryChapter }: {
   }
 
   return (
-    <div className="relative mx-auto" style={style}>
+    <div ref={enhancement.ref} className="relative mx-auto" style={style}>
       {!loaded && showImg && (
         <div
           className="mx-auto flex items-center justify-center rounded-none bg-white/[0.03]"
@@ -325,8 +341,9 @@ export function ReaderImage({ page, mode, style, eager, onRetryChapter }: {
       {showImg ? (
         <img
           data-image-original
+          data-original-src={imgSrc}
           data-page={page.pageNumber}
-          src={imgSrc}
+          src={enhancement.enhanced || imgSrc}
           alt={t('reader.pageNumber', { number: page.pageNumber })}
           className="mx-auto block h-auto rounded-none bg-black/30"
           style={{ ...style, ...reserve }}
@@ -346,6 +363,10 @@ export function ReaderImage({ page, mode, style, eager, onRetryChapter }: {
           }}
         />
       ) : null}
+      {enhancement.state && <div className="flex flex-wrap items-center justify-center gap-2 px-2 py-1 text-xs text-muted-foreground">
+        <span role="status">{enhancement.state}</span>
+        {enhancement.state.startsWith('Showing original.') && <button type="button" className="underline underline-offset-2" onClick={enhancement.retry}>Retry enhancement</button>}
+      </div>}
       {/* Direct <img> fallback failed but headers exist → offer headered reload */}
       {!showImg && !useBlobPath && headerCount > 0 && (
         <div

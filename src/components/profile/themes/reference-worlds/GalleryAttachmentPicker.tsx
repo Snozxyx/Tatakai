@@ -1,0 +1,16 @@
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { listUserMedia } from '@/lib/userMedia';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+export type GalleryReference={bucket:string;path:string};
+export function GalleryAttachmentPicker({userId,selected,onSaved}:{userId:string;selected:GalleryReference[];onSaved:()=>Promise<void>}){
+ const {t}=useTranslation();const [open,setOpen]=useState(false);const [busy,setBusy]=useState(false);const [picked,setPicked]=useState<Set<string>>(new Set());
+ const query=useQuery({queryKey:['public-gallery-candidates',userId],enabled:open,queryFn:async()=>(await listUserMedia(userId,false)).filter(f=>['comment','forum_image'].includes(f.category)&&/\.(png|jpe?g|gif|webp|avif)$/i.test(f.path))});
+ const key=(file:GalleryReference)=>`${file.bucket}:${file.path}`;
+ return <><Button variant="outline" onClick={()=>{setPicked(new Set(selected.map(key)));setOpen(true);}}>{t('profileExtras.chooseAttachments')}</Button><Dialog open={open} onOpenChange={value=>{if(!busy)setOpen(value);}}><DialogContent className="max-w-2xl"><DialogHeader><DialogTitle>{t('profileExtras.chooseAttachments')}</DialogTitle><DialogDescription>{t('profileExtras.galleryChoiceHint')}</DialogDescription></DialogHeader><div className="max-h-[55dvh] overflow-auto">{query.isLoading?<p role="status">{t('profileExtras.loading')}</p>:query.isError?<p role="alert">{t('profileExtras.loadError')}</p>:<div className="grid grid-cols-3 gap-3 sm:grid-cols-4">{query.data?.map(file=><label key={key(file)} className="relative flex cursor-pointer flex-col gap-2 rounded-xl border border-border p-2"><img className="aspect-square w-full rounded-lg object-cover" src={file.url} alt="" loading="lazy"/><span className="flex items-center gap-2 text-xs"><Checkbox checked={picked.has(key(file))} aria-label={file.name} onCheckedChange={checked=>setPicked(current=>{const next=new Set(current);if(checked===true)next.add(key(file));else next.delete(key(file));return next;})}/><span className="truncate">{file.name}</span></span></label>)}</div>}{query.isSuccess&&!query.data.length&&<p>{t('profileExtras.noAttachments')}</p>}</div><DialogFooter><span className="mr-auto text-xs text-muted-foreground">{picked.size}/100</span><Button variant="outline" disabled={busy} onClick={()=>setOpen(false)}>{t('profileExtras.cancel')}</Button><Button disabled={busy||query.isLoading||query.isError||picked.size>100} onClick={async()=>{setBusy(true);try{const references=[...selected,...(query.data??[])];const unique=new Map(references.filter(file=>picked.has(key(file))).map(file=>[key(file),{bucket:file.bucket,path:file.path}]));const {error}=await supabase.rpc('set_profile_gallery_attachments' as never,{p_items:[...unique.values()]} as never);if(error)throw error;await onSaved();setOpen(false);}catch{toast.error(t('profileExtras.gallerySaveError'));}finally{setBusy(false);}}}>{t('profileExtras.saveGallery')}</Button></DialogFooter></DialogContent></Dialog></>;
+}

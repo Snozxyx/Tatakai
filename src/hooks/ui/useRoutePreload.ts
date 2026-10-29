@@ -19,6 +19,7 @@ const destinations: Record<string, () => Promise<unknown>> = {
 export function routePreloadKey(pathname: string): string | undefined {
   if (pathname === '/') return 'home';
   const [, section, detail, child] = pathname.split('/');
+  if (detail === 'read' && child && (section === 'manga' || section === 'novel')) return `${section}-reader`;
   if (!child && detail && !['discover', 'genre', 'comingsoon'].includes(detail)) {
     if (section === 'manga') return 'manga-detail';
     if (section === 'novel') return 'novel-detail';
@@ -28,6 +29,8 @@ export function routePreloadKey(pathname: string): string | undefined {
 
 const loaders: Record<string, () => Promise<unknown>> = {
   ...destinations,
+  'manga-reader': () => import('@/pages/manga/MangaReaderPage'),
+  'novel-reader': () => import('@/pages/novel/NovelReaderPage'),
   'manga-detail': () => import('@/pages/manga/MangaPage'),
   'novel-detail': () => import('@/pages/novel/NovelPage'),
 };

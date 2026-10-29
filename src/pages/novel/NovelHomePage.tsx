@@ -1,3 +1,4 @@
+import { WebNovelDiscovery } from '@/components/novel/WebNovelDiscovery';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMemo, useState } from "react";
@@ -199,6 +200,7 @@ export default function NovelHomePage() {
             )}
 
             <LastReadNovelSection />
+            <WebNovelDiscovery />
 
             <FollowedNovelUpdates />
 

@@ -9,6 +9,7 @@ export const TIMESTAMP_RE = /\b(?:(\d{1,2}):)?([0-5]?\d):([0-5]\d)\b/;
 
 export const COMMENT_INLINE_TOKEN_RE = new RegExp(
   [
+    ':tatakai-[a-z0-9-]+:',
     '\\|\\|[^|]+\\|\\|',
     '`[^`]+`',
     '\\*\\*[^*]+\\*\\*',

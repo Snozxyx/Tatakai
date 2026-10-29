@@ -1,3 +1,5 @@
+import { ProfilePresence } from '@/components/profile/ProfilePresence';
+import { ProfileSocialActions } from '@/components/profile/ProfileSocialActions';
 import { X, ArrowUpRight } from "lucide-react";
 import type { ThemePreviewProps } from "../types";
 import { CosmeticName } from "@/components/profile/IdentityCosmetics";
@@ -18,7 +20,7 @@ export default function KomorebiPreview(p: ThemePreviewProps) {
         <h2>
           <CosmeticName userId={p.userId}>{p.name}</CosmeticName>
         </h2>
-        <p>@{p.username}</p>
+        <p>@{p.username}</p><ProfilePresence userId={p.userId} />
         <p>{p.privateProfile ? "Private profile" : p.bio}</p>
         <span>{p.followers ?? 0} followers</span>
         {p.canViewHistory && <span> · {p.episodes ?? 0} episodes</span>}
@@ -31,6 +33,7 @@ export default function KomorebiPreview(p: ThemePreviewProps) {
             {p.isFollowing ? "Following" : "Follow"}
           </button>
         )}
+        <ProfileSocialActions userId={p.userId} onMessageOpened={p.onClose} />
         {p.moderation}
       </div>
     </section>

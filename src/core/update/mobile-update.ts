@@ -1,3 +1,6 @@
+import { getReleaseChannel, policyChannel } from './release-channel';
+import { reportUpdateEvent, updateDeviceId, updatePlatform } from './update-telemetry';
+import { supabase } from '@/integrations/supabase/client';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { isTV } from '@/core/tv/device';
 import uiI18n from '@/lib/uiI18n';
@@ -93,7 +96,12 @@ let checkInFlight: Promise<MobileUpdateState> | null = null;
 const listeners = new Set<() => void>();
 
 function publish(patch: Partial<MobileUpdateState>): MobileUpdateState {
+  const previousPhase = state.phase;
   state = { ...state, ...patch };
+  if (patch.phase && patch.phase !== previousPhase) {
+    const event = ({ checking: 'checked', available: 'offered', downloading: 'download_started', downloaded: 'downloaded', error: 'failed' } as Record<string,string>)[patch.phase];
+    if (event) reportUpdateEvent(event, patch.phase === 'checking' ? state.currentVersion || __APP_VERSION__ : state.latestVersion || __APP_VERSION__);
+  }
   for (const listener of listeners) listener();
   return state;
 }
@@ -117,14 +125,19 @@ export async function checkMobileUpdate(
   options: CheckOptions = {},
 ): Promise<MobileUpdateState> {
   if (checkInFlight) return checkInFlight;
+  const selectedChannel = getReleaseChannel();
 
   checkInFlight = (async () => {
     publish({ phase: 'checking', message: undefined });
     try {
       const app = await App.getInfo();
       const currentVersion = String(app.version || '').replace(/^v/i, '');
+      const { data: policy } = await supabase.rpc('get_device_update_policy' as never, { p_channel: policyChannel(), p_platform: updatePlatform(), p_device: updateDeviceId() } as never);
+      const directive = policy as { target_version?: string; type?: string; platform?: string; eligible?: boolean; rollout_percentage?: number } | null;
+      if (directive?.eligible === false) return publish({ phase: 'current', currentVersion, channel: selectedChannel, eligibility: 'not-offered', checkedAt: Date.now(), latestVersion: undefined, downloadUrl: undefined });
+      const pinned = directive?.platform && directive.type !== 'rollback' ? directive.target_version : undefined;
       const response = await CapacitorHttp.get({
-        url: LATEST_RELEASE_API,
+        url: pinned ? `https://api.github.com/repos/Snozxyx/Tatakai/releases/tags/v${encodeURIComponent(pinned)}` : selectedChannel === 'beta' ? 'https://api.github.com/repos/Snozxyx/Tatakai/releases?per_page=30' : LATEST_RELEASE_API,
         headers: {
           Accept: 'application/vnd.github+json',
           'X-GitHub-Api-Version': '2022-11-28',
@@ -134,15 +147,18 @@ export async function checkMobileUpdate(
         throw new Error(`GitHub release check returned HTTP ${response.status}`);
       }
 
-      const latestVersion = String(response.data?.tag_name || '').replace(/^v/i, '');
+      const release = Array.isArray(response.data) ? response.data.filter((r: any) => !r.draft && /^v\d+\.\d+\.\d+(?:-beta(?:[.-]|$)|$)/i.test(r.tag_name) && (!r.prerelease || /-beta(?:[.-]|$)/i.test(r.tag_name))).sort((a: any,b: any) => compareAppVersions(b.tag_name,a.tag_name))[0] : response.data;
+      if (!release || release.draft || (selectedChannel === 'production' && release.prerelease)) throw new Error('No compatible release is published in this channel');
+      const latestVersion = String(release.tag_name || '').replace(/^v/i, '');
       if (!latestVersion) throw new Error('Latest release did not include a version tag');
-      const releaseUrl = String(response.data?.html_url || MOBILE_RELEASES_URL);
-      const downloadUrl = pickAndroidApkUrl(response.data?.assets, latestVersion);
+      const releaseUrl = String(release.html_url || MOBILE_RELEASES_URL);
+      const downloadUrl = pickAndroidApkUrl(release.assets, latestVersion);
       const available = compareAppVersions(latestVersion, currentVersion) > 0;
+      if (selectedChannel !== getReleaseChannel()) return state;
       const next = publish({
         phase: available ? 'available' : 'current',
-        releaseNotes: normalizeReleaseNotes(response.data?.body),
-        channel: 'stable', stagingPercentage: undefined, eligibility: available ? 'offered' : 'not-offered',
+        releaseNotes: normalizeReleaseNotes(release.body),
+        channel: selectedChannel, stagingPercentage: directive?.rollout_percentage, eligibility: available ? 'offered' : 'not-offered',
         currentVersion,
         latestVersion,
         releaseUrl,

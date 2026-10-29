@@ -1,3 +1,6 @@
+import { ProfileSocialActions } from '@/components/profile/ProfileSocialActions';
+import { ProfilePresence } from '@/components/profile/ProfilePresence';
+import { ProfileCustomSurface } from '@/components/profile/ProfileCustomCode';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useParams, useNavigate, Link } from 'react-router-dom';
@@ -88,7 +91,7 @@ export default function PublicProfilePage() {
   const publicTierLists = tierLists.filter(tl => tl.is_public);
 
   return (
-    <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
+    <ProfileCustomSurface userId={profile.user_id}><div className="min-h-screen bg-background text-foreground overflow-x-hidden">
       <Background />
       <Sidebar />
 
@@ -177,8 +180,10 @@ export default function PublicProfilePage() {
                 </div>
               </div>
 
+              <ProfilePresence userId={profile.user_id} />
               {!isOwnProfile && currentUser && (
                 <div className="flex gap-2">
+                  <ProfileSocialActions userId={profile.user_id} />
                   <Button
                     onClick={() => isFollowing ? unfollow() : follow()}
                     disabled={isFollowingLoading || checkingFollow}
@@ -379,7 +384,7 @@ export default function PublicProfilePage() {
       </main>
 
       <MobileNav />
-    </div>
+    </div></ProfileCustomSurface>
   );
 }
 

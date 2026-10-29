@@ -1,0 +1,20 @@
+[
+  {
+    "asset": "sakura-letter/kaoruko.png",
+    "source": "https://kaoruhana-anime.com/assets/img/chara/img_main_chara_2.png",
+    "page": "https://kaoruhana-anime.com/character/",
+    "credit": "The Fragrant Flower Blooms with Dignity official anime character artwork"
+  },
+  {
+    "asset": "cloud-notebook/jinhsi.webp",
+    "page": "https://wutheringwaves.fandom.com/wiki/Jinhsi/Gallery",
+    "credit": "Wuthering Waves / Kuro Games, Jinhsi full sprite (via community wiki)"
+  },
+  {
+    "asset": "sakura-letter/kaoruko-hq.jpg",
+    "source": "https://motionbgs.com/media/8092/kaoruko-waguri-dreaming-silence.3840x2160.jpg",
+    "page": "https://motionbgs.com/mobile/kaoruko-waguri-dreaming-silence",
+    "credit": "Kaoruko Waguri Dreaming Silence fan artwork, via MotionBgs",
+    "dimensions": "3840x2160"
+  }
+]

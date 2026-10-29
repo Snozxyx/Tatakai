@@ -5,6 +5,8 @@ const browser = await chromium.launch({ channel: process.platform === 'win32' ? 
 const page = await browser.newPage({ viewport: { width: 393, height: 852 }, hasTouch: true });
 const errors = [];
 page.on('pageerror', error => errors.push(error.message));
+// Keep dynamically imported fixtures on one auth context during Vite HMR.
+await page.route('**/src/contexts/AuthContext.tsx*', route => route.fulfill({ contentType: 'application/javascript', body: 'export function useAuth(){return {user:null,profile:null}} export function AuthProvider({children}){return children}' }));
 await page.route('**/src/hooks/api/useMangaData.ts*', route => route.fulfill({ contentType: 'application/javascript', body: `const chapters={mappedChapters:[{canonicalOrder:0,chapterNumber:1,sources:[]}]};const detail={detail:{title:{english:'Reader fixture'},canonicalTitle:'Reader fixture'}};export const useMangaChapters=()=>({data:chapters});export const useMangaDetail=()=>({data:detail});` }));
 await page.route('**/__reader/fixture*', route => route.fulfill({ contentType: 'text/html', body: `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><script type="module">import RefreshRuntime from '/@react-refresh'; RefreshRuntime.injectIntoGlobalHook(window); window.$RefreshReg$=()=>{}; window.$RefreshSig$=()=>(type)=>type; window.__vite_plugin_react_preamble_installed__=true; import '/src/index.css';</script><style>body{margin:0}</style></head><body><div id="root"></div></body></html>` }));
 try {
@@ -25,6 +27,41 @@ try {
     client.setQueryData(['manga-read', 'fixture', 'ch1', '', '', '', 0], { success: true, data: { pages: Array.from({ length: 5 }, (_, pageNumber) => ({ pageNumber, imageUrl: svg, width: 400, height: 700 })), chapter: { number: 1, chapterKey: 'ch1', provider: '', title: 'Chapter 1' } } });
     createRoot(document.getElementById('root')).render(React.createElement(BrowserRouter, null, React.createElement(QueryClientProvider, { client }, React.createElement(AuthProvider, null, React.createElement(Routes, null, React.createElement(Route, { path: '/__reader/:mangaId', element: React.createElement(Reader) }))))));
   });
+  await page.getByRole('button', { name: 'Reading tools', exact: true }).waitFor();
+  // Capacitor's injected insets may be nonzero even when browser env() is 0.
+  await page.evaluate(() => {
+    document.documentElement.classList.add('capacitor-native');
+    for (const [side, value] of Object.entries({ top: 28, bottom: 34, left: 16, right: 0 })) {
+      document.documentElement.style.setProperty(`--safe-area-inset-${side}`, `${value}px`);
+    }
+    document.getElementById('root').setAttribute('data-main-layout', '');
+    window.dispatchEvent(new Event('resize'));
+  });
+  for (const viewport of [{ width: 320, height: 640 }, { width: 393, height: 852 }, { width: 844, height: 390 }]) {
+    await page.setViewportSize(viewport);
+    await page.waitForTimeout(100);
+    const bounds = await page.locator('.reader-tools').boundingBox();
+    assert(bounds.x >= 16 && bounds.x + bounds.width <= viewport.width, 'toolbar clears the side inset');
+    assert(bounds.y >= 28 && bounds.y + bounds.height <= viewport.height - 34, 'toolbar clears status and gesture areas');
+    assert.equal(await page.locator('.reader-topbar').evaluate(el => getComputedStyle(el).paddingTop), '8px', 'status-bar inset is applied once');
+    await page.locator('.reader-tools button').last().evaluate(el => el.blur());
+    await page.locator('.reader-tools button').last().focus();
+    await page.waitForTimeout(200);
+    const last = await page.locator('.reader-tools button').last().boundingBox();
+    assert(last.x >= bounds.x && last.x + last.width <= bounds.x + bounds.width + 1 && last.y + last.height <= bounds.y + bounds.height + 1, `overflowing toolbar actions remain reachable: ${JSON.stringify({ viewport, bounds, last })}`);
+    if (viewport.width < 640) {
+      await page.locator('[data-reader-scroll]').evaluate(el => { el.scrollTop = el.scrollHeight; });
+      const panel = await page.locator('[data-page]').last().boundingBox();
+      assert(panel.y + panel.height <= bounds.y + 1, 'last panel can scroll clear of the toolbar');
+    }
+  }
+  await page.evaluate(() => {
+    document.documentElement.classList.remove('capacitor-native');
+    for (const side of ['top', 'bottom', 'left', 'right']) document.documentElement.style.removeProperty(`--safe-area-inset-${side}`);
+    document.getElementById('root').removeAttribute('data-main-layout');
+    document.querySelector('[data-reader-scroll]').scrollTop = 0;
+  });
+  await page.setViewportSize({ width: 393, height: 852 });
   await page.getByRole('button', { name: 'Reading tools', exact: true }).click();
   await page.getByRole('slider', { name: 'Jump to page' }).fill('3');
   await page.waitForFunction(() => document.querySelector('[data-reader-scroll]').scrollTop > 500);

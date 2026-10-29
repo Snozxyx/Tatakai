@@ -17,7 +17,7 @@ test('Gothic Empress saves through the owner RPC, validates settings, and falls 
       GRANT SELECT ON profiles TO authenticated; GRANT UPDATE(app_settings) ON profiles TO authenticated;
       INSERT INTO profiles(user_id,app_settings) VALUES ('${owner}','{"player":{"quality":"best"}}');
       INSERT INTO user_badges VALUES ('${owner}','booster');`);
-    for (const file of ['20261024000002_profile_themes.sql', '20261025000001_sekai_experience.sql', '20261025000002_uchiha_profile_theme.sql', '20261025000003_gothic_empress_profile_theme.sql']) {
+    for (const file of ['20261024000002_profile_themes.sql', '20261025000001_sekai_experience.sql', '20261025000002_uchiha_profile_theme.sql', '20261026000001_gothic_empress_profile_theme.sql']) {
       await db.exec(readFileSync(new URL(`../supabase/migrations/${file}`, import.meta.url), 'utf8'));
     }
     await db.exec(`SELECT set_config('request.jwt.claim.sub','${owner}',false); SET ROLE authenticated;`);

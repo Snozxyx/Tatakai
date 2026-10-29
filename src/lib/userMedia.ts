@@ -24,7 +24,7 @@ const LEGACY: Partial<Record<UserMediaCategory, { bucket: string; prefix: (uid: 
   forum_image: { bucket: 'forum', prefix: () => 'forum_images' },
 };
 
-export type UserMediaCategory = 'comment' | 'forum_image' | 'avatar' | 'banner';
+export type UserMediaCategory = 'comment' | 'forum_image' | 'avatar' | 'banner' | 'gallery';
 
 
 export interface UploadedMedia {
@@ -38,7 +38,7 @@ export interface UserMediaFile {
   url: string;
   path: string;
   bucket: string;
-  category: UserMediaCategory | 'other';
+  category: UserMediaCategory | 'other' | 'private_chat';
   size: number | null;
   createdAt: string | null;
 }
@@ -83,7 +83,7 @@ export async function uploadUserMedia(
   userId: string,
   category: UserMediaCategory,
 ): Promise<UploadedMedia> {
-  if (category === 'avatar' || category === 'banner') {
+  if (category === 'avatar' || category === 'banner' || category === 'gallery') {
     return uploadProfileImage(supabase, file, userId, category);
   }
   const filename = randomName(file);
@@ -120,14 +120,15 @@ async function listFolder(
   bucket: string,
   folder: string,
   category: UserMediaFile['category'],
+  filenamePrefix?: string,
 ): Promise<UserMediaFile[]> {
   const { data, error } = await supabase.storage
     .from(bucket)
-    .list(folder, { limit: 100, sortBy: { column: 'created_at', order: 'desc' } });
+    .list(folder, { limit: 100, ...(filenamePrefix ? {search:filenamePrefix} : {}), sortBy: { column: 'created_at', order: 'desc' } });
   if (error || !data) return [];
   return data
     // Sub-folders come back with a null id; keep files only.
-    .filter((entry) => entry.id && !entry.name.startsWith('.'))
+    .filter((entry) => entry.id && !entry.name.startsWith('.') && (!filenamePrefix || entry.name.startsWith(filenamePrefix)))
     .map((entry) => {
       const path = `${folder}/${entry.name}`;
       const { data: pub } = supabase.storage.from(bucket).getPublicUrl(path);
@@ -149,14 +150,26 @@ async function listFolder(
  * bucket is a flat, non-per-user prefix so it cannot be listed per user; only
  * new-bucket forum uploads surface here.
  */
-export async function listUserMedia(userId: string): Promise<UserMediaFile[]> {
+export async function listUserMedia(userId: string, includePrivate = false): Promise<UserMediaFile[]> {
   const groups = await Promise.all([
     listFolder(USER_MEDIA_BUCKET, `${userId}/comment`, 'comment'),
     listFolder(USER_MEDIA_BUCKET, `${userId}/forum_image`, 'forum_image'),
     listFolder(USER_MEDIA_BUCKET, `${userId}/avatar`, 'avatar'),
     listFolder(USER_MEDIA_BUCKET, `${userId}/banner`, 'banner'),
+    listFolder(USER_MEDIA_BUCKET, `${userId}/gallery`, 'gallery'),
     listFolder('comment-media', `comments/${userId}`, 'comment'),
+    listFolder('forum', 'forum_images', 'forum_image', `${userId}-`),
   ]);
+  if (includePrivate) {
+    const { data, error } = await (supabase as any).rpc('list_direct_media');
+    if (error) throw error;
+    const privateFiles = await Promise.all((data ?? []).map(async (file: { path: string; size: number; created_at: string }) => {
+      const signed = await supabase.storage.from('direct-media').createSignedUrl(file.path, 3600);
+      return { name: file.path.split('/').pop() || 'Chat image', url: signed.data?.signedUrl || '', path: file.path,
+        bucket: 'direct-media', category: 'private_chat' as const, size: file.size, createdAt: file.created_at };
+    }));
+    groups.push(privateFiles);
+  }
   const seen = new Set<string>();
   return groups
     .flat()

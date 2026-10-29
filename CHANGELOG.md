@@ -4,6 +4,19 @@ All notable changes to Tatakai are documented here.
 
 ---
 
+## [6.4.3-beta.1] - 2026-10-29
+
+- Add device-specific Production and Beta update channels, including guest opt-in, a Beta Tester badge, staged rollout controls and update analytics.
+- Add Sakura Letter, Cloud Notebook, Eyes Toward Heaven and free Frosted Blast profiles, with matching loading screens, title bars and themed follower lists. Keep the app sidebar hidden on themed profiles.
+- Unify themed profile statistics and searchable saved anime, manga, novels and favorite characters. Add an opt-in public gallery using the shared storage allowance.
+- Add private messaging, full-page mobile conversations, social activity privacy controls and customizable profile HTML/CSS.
+- Add custom emoji and mascot stickers, automatic genre/activity badges and compact searchable badge collections in profiles, posts and comments.
+- Improve comment-feed identity and spoiler presentation, hide guest notification controls, and suppress chat popups during fullscreen playback and reading.
+- Improve subtitle sizing on phones and keep translated subtitle lines stable across asynchronous translation results.
+- Add manga release-feed browsing, strengthen playback recovery and improve media enhancement and reader controls while retaining cloud-proxy consent.
+- Fix the null-profile social-links crash and profile collection layout gaps. Preserve the 6.4.2 playback and safe-area fixes.
+- Use ordered native beta/stable version codes so a production release can replace an earlier beta without requiring an app uninstall.
+
 ## [6.4.2] - 2026-10-27
 
 - Remove duplicate mobile status-bar and header safe-area spacing.

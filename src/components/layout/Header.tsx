@@ -1,3 +1,4 @@
+import { HeaderSocialActions } from '@/components/layout/HeaderSocialActions';
 import { CosmeticAvatar, CosmeticName } from '@/components/profile/IdentityCosmetics';
 import { fetchBetterStackStatus, type BetterStackHealth } from '@/lib/betterStackStatus';
 import uiI18n from '@/lib/uiI18n';
@@ -12,7 +13,6 @@ import { useTitlebarHidden } from "@/hooks/ui/useTitlebarHidden";
 import { useMobileAppearance } from '@/hooks/ui/useMobileAppearance';
 
 import { AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { NotificationBell } from "@/components/ui/NotificationBell";
 import { HeaderSearchSuggestions } from "@/components/layout/HeaderSearchSuggestions";
 import {
   DropdownMenu,
@@ -302,9 +302,7 @@ export function Header({ providerSearch, providerControls }: HeaderProps = {}) {
               Never render a dead empty box here — it reads as a blank button
               over scrolled content and swallows no action. */}
           {user && !isBanned ? (
-            <div className="relative z-10 h-11 w-11">
-              <div className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] shadow-sm"><NotificationBell /></div>
-            </div>
+            <div className="relative z-10 shrink-0"><HeaderSocialActions /></div>
           ) : (
             <button
               type="button"
@@ -487,9 +485,7 @@ export function Header({ providerSearch, providerControls }: HeaderProps = {}) {
             />}
           </div>
 
-          <div className="hidden sm:block">
-            <NotificationBell />
-          </div>
+          <div className="hidden shrink-0 sm:flex"><HeaderSocialActions /></div>
 
           {isLoading ? (
             <div className="w-10 h-10 rounded-full bg-muted animate-pulse" />

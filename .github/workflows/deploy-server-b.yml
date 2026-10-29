@@ -1,7 +1,7 @@
 name: Build Tatakai website for Server B
 on:
   push:
-    branches: [main]
+    branches: [main, production]
   workflow_dispatch:
     inputs:
       preserve_release:

@@ -8,6 +8,9 @@
 
 export interface UpdatePolicy {
   id: string;
+  platform?: string;
+  rollout_percentage?: number;
+  source?: 'legacy' | 'device';
   channel: 'stable' | 'beta' | 'experimental';
   type: 'mandatory' | 'recommended' | 'experimental' | 'rollback';
   target_version: string;            // semver \d+\.\d+\.\d+
@@ -18,6 +21,8 @@ export interface UpdatePolicy {
 }
 
 export interface CreatePolicyForm {
+  platform?: string;
+  rollout_percentage?: number;
   channel: UpdatePolicy['channel'];
   type: UpdatePolicy['type'];
   target_version: string;

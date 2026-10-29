@@ -1,3 +1,10 @@
+import { readThemePreferences } from '@/lib/profileThemes';
+import { resolveProfileTheme } from '@/components/profile/themes/registry';
+import { useUserBadges } from '@/hooks/community/useUserBadges';
+import { useOwnedProfileThemes } from '@/hooks/user/useProfileThemeClaims';
+import { paletteFromSeed, paletteStyles, profilePalettes } from '@/components/profile/themes/theme-palette';
+import { readFrostedConfig } from '@/components/profile/themes/frosted-blast/config';
+import { useProfileChrome } from '@/components/profile/themes/profile-chrome';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
@@ -38,7 +45,7 @@ export default function FollowConnectionsPage() {
       if (!cleanUsername) return null;
       const { data, error } = await supabase
         .from('profiles')
-        .select('user_id, username, display_name, avatar_url')
+        .select('user_id, username, display_name, avatar_url, app_settings, is_admin, role')
         .eq('username', cleanUsername)
         .maybeSingle();
       if (error) throw error;
@@ -47,6 +54,11 @@ export default function FollowConnectionsPage() {
     enabled: !!cleanUsername,
   });
 
+  const badges=useUserBadges(profile?.user_id);const owned=useOwnedProfileThemes(profile?.user_id);
+  const preferences=readThemePreferences(profile?.app_settings);const theme=resolveProfileTheme(preferences,profile,badges.data??[],badges.isSuccess,owned.data);
+  const custom=theme.id==='frosted-blast'?readFrostedConfig(preferences.configurations[theme.id]):null;
+  const palette=custom?paletteFromSeed(custom.seed):profilePalettes[theme.id]||profilePalettes['eyes-toward-heaven'];
+  useProfileChrome(palette,theme.id);
   const { data: list = [], isLoading: loadingList } = useFollowList(profile?.user_id, tab);
 
   const shellClass = useMemo(
@@ -61,8 +73,8 @@ export default function FollowConnectionsPage() {
   const setTab = (t: Tab) => setSearchParams(t === 'followers' ? {} : { tab: 'following' });
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-background text-foreground">
-      <Background />
+    <div className="pt-follow-page min-h-screen overflow-x-hidden" style={theme.id!=='default'?{...paletteStyles(palette),background:palette.background,color:palette.ink}:undefined}>
+      {theme.id==='default' && <Background />}
       <Sidebar />
 
       <main className={shellClass}>

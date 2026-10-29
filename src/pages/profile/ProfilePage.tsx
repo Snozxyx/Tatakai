@@ -1,3 +1,7 @@
+import { useCustomProfileTheme } from '@/hooks/user/useCustomProfileTheme';
+import { ProfileSocialActions } from '@/components/profile/ProfileSocialActions';
+import { ProfilePresence } from '@/components/profile/ProfilePresence';
+import { ProfileCustomSurface } from '@/components/profile/ProfileCustomCode';
 import { useOwnedProfileThemes } from '@/hooks/user/useProfileThemeClaims';
 import { isTV } from "@/core/tv/device";
 import uiI18n from '@/lib/uiI18n';
@@ -134,6 +138,7 @@ export default function ProfilePage({ username: providedUsername }: { username?:
   const { data: publicProfile, isLoading: loadingPublicProfile, error: publicProfileError } = usePublicProfile(viewingUsername || '');
 
   const profile = isViewingOther ? publicProfile : ownProfile;
+  const customTheme = useCustomProfileTheme(profile?.user_id);
   const { data: profileBadges = [], isSuccess: verifiedProfileBadges, isPending: loadingProfileBadges } = useUserBadges(profile?.user_id);
   const ownedThemes = useOwnedProfileThemes(profile?.user_id);
   const arrivalPreferences = readThemePreferences(profile?.app_settings);
@@ -205,10 +210,11 @@ export default function ProfilePage({ username: providedUsername }: { username?:
   const { data: tasteProfile = null, isLoading: loadingTasteProfile } = useTasteProfile(!isViewingOther);
   const { data: userRank = null } = useUserRank('active', profile?.user_id);
 
+  const profileNovels = isViewingOther ? publicMangaReadlist.filter(item=>item.format==='novel') : ownNovelReadlist;
   const watchlist = isViewingOther ? publicWatchlist : ownWatchlist;
   const history = isViewingOther ? publicHistory : ownHistory;
   const { data: mangaReadlist, isLoading: loadingMangaMetadata } = useResolvedMangaReadlist(
-    isViewingOther ? publicMangaReadlist : ownMangaReadlist,
+    isViewingOther ? publicMangaReadlist.filter(item=>item.format!=='novel') : ownMangaReadlist,
   );
   const mangaHistorySource = isViewingOther ? publicMangaReadingHistory : ownMangaReadingHistory;
   const loadingWatchlist = isViewingOther ? loadingPublicWatchlist : loadingOwnWatchlist;
@@ -507,58 +513,65 @@ export default function ProfilePage({ username: providedUsername }: { username?:
   const themePreferences = readThemePreferences(profile?.app_settings);
   const selectedTheme = resolveProfileTheme(themePreferences, profile, profileBadges, verifiedProfileBadges, ownedThemes.data);
   const isUchiha = selectedTheme.id === 'uchiha';
+  const needsThemeData = !!selectedTheme.Renderer || customTheme.data?.enabled;
+  const visibleLibrary: ThemeMediaItem[] = showWatchlistTab && needsThemeData ? [
+    ...(watchlist ?? []).map(item => ({ id: item.id, title: item.anime_name, image: item.anime_poster || '', href: `/anime/${encodeURIComponent(item.anime_id)}`, detail: item.status.replace(/_/g, ' ') })),
+    ...(mangaReadlist ?? []).map(item => ({ id: item.id, title: item.manga_title, image: item.manga_poster || '', href: `/manga/${encodeURIComponent(item.manga_id)}`, detail: item.status.replace(/_/g, ' ') })),
+  ] : [];
+  const socialLinks = (profile as { social_links?: Record<string, unknown> } | null)?.social_links;
+  const data: ProfileThemeData = {
+    owner: profile, isOwner: !isViewingOther,
+    canViewLibrary: Boolean(showWatchlistTab), canViewHistory: Boolean(showHistoryTab),
+    canViewCalendar: !isViewingOther || (publicProfile?.is_public === true && publicProfile?.show_calendar !== false),
+    badges: profileBadges,
+    library: visibleLibrary,
+    activity: showHistoryTab && needsThemeData ? (history ?? []).map(item => ({ id: item.id, title: item.anime_name, image: item.anime_poster || '', href: `/anime/${encodeURIComponent(item.anime_id)}`, detail: `Episode ${item.episode_number}` })) : [],
+    favorites: needsThemeData ? [
+      ...favoriteCharacters.map(item => ({ id: item.id, kind:'characters', title: item.character_name, image: item.character_image || '', href: `/character/${encodeURIComponent(item.character_id)}` })),
+      ...visibleLibrary.map(item => ({...item,kind:item.href.startsWith('/manga/')?'manga':'anime'})),
+      ...(showWatchlistTab ? profileNovels.map(item=>({id:item.id,kind:'novels',title:item.manga_title,image:item.manga_poster||'',href:`/novel/${encodeURIComponent(item.manga_id)}`,status:item.status})) : []),
+    ] : [],
+    links: Object.entries(socialLinks ?? {}).flatMap(([label, url]) => {
+      if (typeof url !== 'string') return [];
+      try { const parsed = new URL(url); return parsed.protocol === 'https:' ? [{ label, url: parsed.href }] : []; } catch { return []; }
+    }),
+    followingCount:followStats?.following || 0,
+    statistics:{manhwa:mangaCounts.manhwa,comics:mangaCounts.comics,watching:stats.watching,planned:stats.plan_to_watch,chapters:showHistoryTab?mangaCounts.totalChapters:0,novelChapters:!isViewingOther&&showHistoryTab?novelChaptersRead:undefined,activeDays:viewedStreak?.totalDaysWatched||0,comments:commentsCount,posts:forumPosts?.length||0,upvotes:forumUpvotes,reputation:reputationRate},
+    stats: { novels:showWatchlistTab?profileNovels.length:undefined, anime: showWatchlistTab ? watchlist?.length || 0 : 0, manga: showWatchlistTab && needsThemeData ? mangaReadlist?.length || 0 : 0,
+      episodes: showHistoryTab ? effectiveEpisodeCount : 0, hours: showHistoryTab ? computedWatchTimeSeconds / 3600 : 0,
+      completed: showWatchlistTab ? stats.completed : 0, streak: showHistoryTab ? viewedStreak?.currentStreak || 0 : 0,
+      longestStreak: showHistoryTab ? viewedStreak?.longestStreak || 0 : 0 },
+    sections: {
+      watchlist: showWatchlistTab && needsThemeData ? (watchlist ?? []).map(item => ({ id: item.id, title: item.anime_name, image: item.anime_poster || '', href: `/anime/${encodeURIComponent(item.anime_id)}`, status: item.status })) : [],
+      manga: showWatchlistTab && needsThemeData ? (mangaReadlist ?? []).map(item => ({ id: item.id, title: item.manga_title, image: item.manga_poster || '', href: `/manga/${encodeURIComponent(item.manga_id)}`, status: item.status })) : [],
+      novels: showWatchlistTab && needsThemeData ? profileNovels.map(item => ({ id: item.id, title: item.manga_title, image: item.manga_poster || '', href: `/novel/${encodeURIComponent(item.manga_id)}`, status: item.status })) : [],
+      readingHistory: showHistoryTab && needsThemeData ? [...mangaHistoryEntries, ...novelHistoryEntries].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()).map(item => ({ id: item.id, title: item.manga_title, image: item.manga_poster || '', href: readingHistoryHref(item), detail: item.last_chapter_title || `Chapter ${item.last_chapter_number || ''}` })) : [],
+    },
+    achievements: showHistoryTab ? achievements : [],
+    tabs: [
+      { id: 'overview', label: 'Overview', summary: 'Statistics, favorites, calendar, and profile insights.' },
+      ...(showWatchlistTab && needsThemeData ? [
+        { id: 'watchlist', label: 'Watchlist', summary: `${watchlist?.length || 0} anime in this library.` },
+        { id: 'manga-readlist', label: 'Manga Readlist', summary: `${mangaReadlist?.length || 0} manga in this collection.` },
+      ] : []),
+      ...(!isViewingOther && showWatchlistTab && needsThemeData ? [{ id: 'novel-readlist', label: 'Novel Readlist', summary: `${ownNovelReadlist.length} novels in your collection.` }] : []),
+      ...(showHistoryTab ? [
+        { id: 'history', label: 'History', summary: `${history?.length || 0} episodes and your recent reading.` },
+        { id: 'streaks', label: 'Streaks', summary: 'Watch streaks and achievements.' },
+      ] : []),
+      { id: 'vault', label: 'Vault', summary: 'Posts, comments, playlists, and tier lists.' },
+    ],
+    following: Boolean(isFollowing), followPending: checkingFollow || isFollowingLoading,
+    followers: followStats?.followers || 0, onFollow: () => { if (isFollowing) unfollow(); else follow(); },
+    loading: loadingWatchlist || loadingHistory || loadingFavoriteCharacters, error: false,
+  };
   if (selectedTheme.Renderer && profile) {
     const Renderer = selectedTheme.Renderer;
-    const visibleLibrary: ThemeMediaItem[] = showWatchlistTab ? [
-      ...(watchlist ?? []).map(item => ({ id: item.id, title: item.anime_name, image: item.anime_poster || '', href: `/anime/${encodeURIComponent(item.anime_id)}`, detail: item.status.replace(/_/g, ' ') })),
-      ...(mangaReadlist ?? []).map(item => ({ id: item.id, title: item.manga_title, image: item.manga_poster || '', href: `/manga/${encodeURIComponent(item.manga_id)}`, detail: item.status.replace(/_/g, ' ') })),
-    ] : [];
-    const socialLinks = (profile as { social_links?: Record<string, unknown> }).social_links;
-    const data: ProfileThemeData = {
-      owner: profile, isOwner: !isViewingOther,
-      canViewLibrary: Boolean(showWatchlistTab), canViewHistory: Boolean(showHistoryTab),
-      canViewCalendar: !isViewingOther || (publicProfile?.is_public === true && publicProfile?.show_calendar !== false),
-      badges: profileBadges,
-      library: visibleLibrary,
-      activity: showHistoryTab ? (history ?? []).map(item => ({ id: item.id, title: item.anime_name, image: item.anime_poster || '', href: `/anime/${encodeURIComponent(item.anime_id)}`, detail: `Episode ${item.episode_number}` })) : [],
-      favorites: favoriteCharacters.map(item => ({ id: item.id, title: item.character_name, image: item.character_image || '', href: `/character/${encodeURIComponent(item.character_id)}` })),
-      links: Object.entries(socialLinks ?? {}).flatMap(([label, url]) => {
-        if (typeof url !== 'string') return [];
-        try { const parsed = new URL(url); return parsed.protocol === 'https:' ? [{ label, url: parsed.href }] : []; } catch { return []; }
-      }),
-      stats: { anime: showWatchlistTab ? watchlist?.length || 0 : 0, manga: showWatchlistTab ? mangaReadlist?.length || 0 : 0,
-        episodes: showHistoryTab ? effectiveEpisodeCount : 0, hours: showHistoryTab ? Math.floor(computedWatchTimeSeconds / 3600) : 0,
-        completed: showWatchlistTab ? stats.completed : 0, streak: showHistoryTab ? viewedStreak?.currentStreak || 0 : 0,
-        longestStreak: showHistoryTab ? viewedStreak?.longestStreak || 0 : 0 },
-      sections: {
-        watchlist: showWatchlistTab ? (watchlist ?? []).map(item => ({ id: item.id, title: item.anime_name, image: item.anime_poster || '', href: `/anime/${encodeURIComponent(item.anime_id)}`, status: item.status })) : [],
-        manga: showWatchlistTab ? (mangaReadlist ?? []).map(item => ({ id: item.id, title: item.manga_title, image: item.manga_poster || '', href: `/manga/${encodeURIComponent(item.manga_id)}`, status: item.status })) : [],
-        novels: !isViewingOther ? ownNovelReadlist.map(item => ({ id: item.id, title: item.manga_title, image: item.manga_poster || '', href: `/novel/${encodeURIComponent(item.manga_id)}`, status: item.status })) : [],
-        readingHistory: showHistoryTab ? [...mangaHistoryEntries, ...novelHistoryEntries].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()).map(item => ({ id: item.id, title: item.manga_title, image: item.manga_poster || '', href: readingHistoryHref(item), detail: item.last_chapter_title || `Chapter ${item.last_chapter_number || ''}` })) : [],
-      },
-      achievements: showHistoryTab ? achievements : [],
-      tabs: [
-        { id: 'overview', label: 'Overview', summary: 'Statistics, favorites, calendar, and profile insights.' },
-        ...(showWatchlistTab ? [
-          { id: 'watchlist', label: 'Watchlist', summary: `${watchlist?.length || 0} anime in this library.` },
-          { id: 'manga-readlist', label: 'Manga Readlist', summary: `${mangaReadlist?.length || 0} manga in this collection.` },
-        ] : []),
-        ...(!isViewingOther && showWatchlistTab ? [{ id: 'novel-readlist', label: 'Novel Readlist', summary: `${ownNovelReadlist.length} novels in your collection.` }] : []),
-        ...(showHistoryTab ? [
-          { id: 'history', label: 'History', summary: `${history?.length || 0} episodes and your recent reading.` },
-          { id: 'streaks', label: 'Streaks', summary: 'Watch streaks and achievements.' },
-        ] : []),
-        { id: 'vault', label: 'Vault', summary: 'Posts, comments, playlists, and tier lists.' },
-      ],
-      following: Boolean(isFollowing), followPending: checkingFollow || isFollowingLoading,
-      followers: followStats?.followers || 0, onFollow: () => { if (isFollowing) unfollow(); else follow(); },
-      loading: loadingWatchlist || loadingHistory || loadingFavoriteCharacters, error: false,
-    };
-    return <FullPageProfileSurface><Suspense fallback={<ProfileThemeLoading profile={profile} />}><Renderer key={profile.user_id} data={data} configuration={themePreferences.configurations[selectedTheme.id]} preferences={themePreferences} onBack={() => { if (window.history.state?.idx > 0) navigate(-1); else navigate('/'); }} /></Suspense></FullPageProfileSurface>;
+    return <FullPageProfileSurface><ProfileCustomSurface userId={profile.user_id} data={data} followingCount={followStats?.following || 0}><Suspense fallback={<ProfileThemeLoading profile={profile} />}><Renderer key={profile.user_id} data={data} configuration={themePreferences.configurations[selectedTheme.id]} preferences={themePreferences} onBack={() => { if (window.history.state?.idx > 0) navigate(-1); else navigate('/'); }} /></Suspense></ProfileCustomSurface></FullPageProfileSurface>;
   }
 
   return (
-    <div
+    <ProfileCustomSurface userId={profile?.user_id} data={data} followingCount={followStats?.following || 0}><div
       data-tv-profile={tv || undefined}
       className={cn('min-h-screen bg-background text-foreground relative isolate', isUchiha ? 'uchiha-profile' : 'overflow-x-hidden')}
       style={isUchiha ? undefined : profileSurfaceStyle(customization)}
@@ -708,6 +721,7 @@ export default function ProfilePage({ username: providedUsername }: { username?:
                   
                   <UserBadges
                     className="profile-identity-badges"
+                    max={isMobile ? 4 : 8}
                     badges={profileBadges}
                     size={22}
                     userStats={{
@@ -731,8 +745,10 @@ export default function ProfilePage({ username: providedUsername }: { username?:
                   <RankBadge score={profileRankScore} size="sm" />
                 </div>
 
+                <div className="mb-4 flex justify-center md:justify-start"><ProfilePresence userId={profile?.user_id} /></div>
                 {/* Sleek Action Buttons */}
                 <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 w-full">
+                  <ProfileSocialActions userId={profile?.user_id} />
                   {isViewingOther ? (
                     <>
                       {user && (
@@ -832,9 +848,9 @@ export default function ProfilePage({ username: providedUsername }: { username?:
                   {profile.bio}
                 </p>
               )}
-              {profile?.social_links && (
+              {socialLinks && (
                 <div>
-                  <SocialLinksDisplay links={profile.social_links as SocialLinks} />
+                  <SocialLinksDisplay links={socialLinks as SocialLinks} />
                 </div>
               )}
             </div>
@@ -988,6 +1004,6 @@ export default function ProfilePage({ username: providedUsername }: { username?:
       </main>
 
       {!tv && <MobileNav />}
-    </div>
+    </div></ProfileCustomSurface>
   );
 }

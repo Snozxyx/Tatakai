@@ -43,6 +43,7 @@ import { useSubtitlePretranslation } from "./hooks/useSubtitlePretranslation";
 import { useStableVolume, useSleepTimer, useAmbientMode } from "./hooks/usePlayerEnhancements";
 import { SubtitleOverlay } from "./overlays/SubtitleOverlay";
 import { Anime4KRenderer, type Anime4KMode } from "@/lib/video/anime4k/Anime4KRenderer";
+import { useRtxVideo } from './hooks/useRtxVideo';
 import { isDesktop, isMobileNative } from "@/lib/platform/platform";
 import { ensureCustomSubtitleFontLoaded } from "@/lib/video/customSubtitleFont";
 import { selectPreferredSource } from "@/lib/video/preferredSource";
@@ -794,7 +795,9 @@ function BuiltinVideoPlayer({
     isMobileApp && settings.anime4kPreset !== "off"
       ? ("light" as Anime4KMode)
       : (settings.anime4kPreset as Anime4KMode);
-  const anime4kActive = anime4kAllowed && settings.anime4kPreset !== "off";
+  const anime4kActive = settings.videoEnhancementEngine === 'anime4k' && anime4kAllowed && settings.anime4kPreset !== "off";
+  const rtxEnabled = settings.videoEnhancementEngine === 'rtx';
+  const rtx = useRtxVideo(videoRef, rtxEnabled, settings.videoEnhancementQuality, currentSource?.url);
 
   useEffect(() => {
     // Off, unsupported, or disallowed on this surface → tear down and bail.
@@ -1547,6 +1550,8 @@ function BuiltinVideoPlayer({
           later in DOM order. Without this the video (z-1) sat on top of the
           controls and swallowed every click. */}
       <div className="player-media-stack absolute inset-0 z-0">
+        {rtxEnabled && <canvas id={rtx.canvasId} ref={rtx.canvasRef} className="player-anime4k-canvas" aria-hidden="true" style={{ display: 'none' }} />}
+        {rtxEnabled && <span className="sr-only" aria-live="polite">{rtx.status.startsWith('Showing original.') ? rtx.status : ''}</span>}
         {/* Ambient glow — blurred low-res copy of the frame behind the video */}
         {settings.ambientMode && !isMobile ? (
           <canvas ref={ambientCanvasRef} className="player-ambient-glow" aria-hidden="true" />

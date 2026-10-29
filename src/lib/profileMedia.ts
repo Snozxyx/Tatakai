@@ -12,7 +12,7 @@ export async function uploadProfileImage(
   client: Pick<SupabaseClient, 'storage'>,
   file: File,
   userId: string,
-  category: 'avatar' | 'banner',
+  category: 'avatar' | 'banner' | 'gallery',
 ) {
   validateProfileImage(file);
   const ext = file.type === 'image/jpeg' ? 'jpg' : file.type.slice('image/'.length);

@@ -1,3 +1,5 @@
+import { findCustomEmoji, stripCustomEmojiTokens } from '@/lib/customEmoji';
+import { EmojiPicker, EmojiIcon } from '@/components/comments/EmojiPicker';
 import { CosmeticAvatar } from '@/components/profile/IdentityCosmetics';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { PostDrafts } from '@/components/community/PostDrafts';
@@ -61,7 +63,7 @@ const DURATION = {
 const MAX_IMAGES = 4;
 
 function deriveTitle(content: string, fallback: string): string {
-  const firstLine = content.trim().split('\n')[0] || '';
+  const firstLine = stripCustomEmojiTokens(content).split('\n')[0] || '';
   return firstLine ? firstLine.slice(0, 120) : fallback;
 }
 
@@ -470,6 +472,7 @@ export function PostComposer({ onPosted, defaultCommunityId, defaultMedia }: { o
                 onSelect={(img) => handleImagePick(img.url)}
                 trigger={<span><ToolbarIcon icon={ImageIcon} label={uiI18n.t('app.image_50e19fda')} active={imageUrls.length > 0} onClick={() => {}} /></span>}
               />
+              <EmojiPicker onSelect={emoji => { const item = findCustomEmoji(emoji); editorRef.current?.editor?.chain().focus().insertContent(item ? { type: 'customEmoji', attrs: { key: item.key } } : { type: 'text', text: emoji }).run(); }} trigger={<span><ToolbarIcon icon={EmojiIcon} label={uiI18n.t('comments.emojiStandard')} active={false} onClick={() => {}} /></span>} />
               <GifPicker onSelect={(att) => { setImageUrls([]); setGifUrl(att.url); }} trigger={<span><ToolbarIcon icon={Film} label={uiI18n.t('app.gif_758f6c93')} active={!!gifUrl} onClick={() => {}} /></span>} />
               <ToolbarIcon icon={ListChecks} label={uiI18n.t('app.poll_dafe1d3d')} active={!!poll} onClick={togglePoll} />
               <PickerPopover icon={Music2} label={uiI18n.t('app.playlist_cd95b41f')} active={!!playlistId} items={playlists.map((p) => ({ id: p.id, label: p.name }))} empty="You have no playlists yet." onPick={setPlaylistId} />
@@ -491,7 +494,7 @@ export function PostComposer({ onPosted, defaultCommunityId, defaultMedia }: { o
       <Dialog open={preview} onOpenChange={setPreview}>
         <DialogContent>
           <DialogHeader><DialogTitle>Review your post</DialogTitle><DialogDescription>Preview your post, save a draft, or publish when ready.</DialogDescription></DialogHeader>
-          <PostDrafts userId={user.id} scope={`feed:${defaultCommunityId ?? 'main'}`} title={title || content.replace(/<[^>]*>/g, ' ').slice(0, 60)}
+          <PostDrafts userId={user.id} scope={`feed:${defaultCommunityId ?? 'main'}`} title={stripCustomEmojiTokens(title || content.replace(/<[^>]*>/g, ' ')).slice(0, 60) || 'Post'}
             disabled={submitting || intakeBusy} publishRef={draftPublishRef} selectedId={draftId} onSelectedIdChange={setDraftId}
             value={{ content, title, poll, gifUrl, imageUrls, playlistId, tierlistId, watchRoomId, communityId, media, isSpoiler }}
             onRestore={(draft) => {

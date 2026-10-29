@@ -353,6 +353,7 @@ export function CustomReaderView(props: CustomReaderViewProps) {
     <div
       ref={container}
       data-reader-fullscreen={isFs || undefined}
+      data-reader-chrome={chromeVisible}
       className="relative min-h-screen text-foreground"
       style={{ backgroundColor: settings.backgroundColor }}
     >
@@ -597,7 +598,7 @@ export function CustomReaderView(props: CustomReaderViewProps) {
               >
                 <ReaderImage
                   page={page}
-                  mode={settings.loadingMethod}
+                  mode={settings.loadingMethod} upscaling={settings}
                   style={imageStyle}
                   eager={eagerFor(index)}
                   onRetryChapter={props.onReload}
@@ -635,7 +636,7 @@ export function CustomReaderView(props: CustomReaderViewProps) {
                 <ReaderImage
                   key={readerPageRenderKey(chapterId, page)}
                   page={page}
-                  mode={settings.loadingMethod}
+                  mode={settings.loadingMethod} upscaling={settings}
                   style={imageStyle}
                   eager
                   onRetryChapter={props.onReload}

@@ -1,3 +1,4 @@
+import { stripCustomEmojiTokens } from '@/lib/customEmoji';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Languages, Loader2 } from 'lucide-react';
@@ -56,7 +57,7 @@ export function TranslatedPostContent({
 
   const deviceMode = config.provider === 'on-device';
   const target = resolveTargetLanguage();
-  const uniqueTitle = title && title !== content ? title : '';
+  const uniqueTitle = title && title !== content ? stripCustomEmojiTokens(title) : '';
   const key = JSON.stringify([uniqueTitle, content || '', target]);
 
   // Reset per-post request state when the post changes or the target moves.

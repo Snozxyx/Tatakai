@@ -46,9 +46,11 @@ function aspectRatioFor(a: CommentAttachment): number {
 export function CommentAttachments({
   attachments,
   className,
+  allowBookmark = true,
 }: {
   attachments: CommentAttachment[] | undefined;
   className?: string;
+  allowBookmark?: boolean;
 }) {
   useUiTranslation();
   const { data: saved = [] } = useGifBookmarks();
@@ -102,7 +104,7 @@ export function CommentAttachments({
             />
             {/* Favorite toggle: always shown once saved, on hover otherwise. Stops
                 propagation so it doesn't also open the lightbox. */}
-            <button
+            {allowBookmark && <button
               type="button"
               onClick={(e) => { e.stopPropagation(); toggle.mutate({ gif: toGiphy(a), bookmarked: isSaved }); }}
               disabled={toggle.isPending}
@@ -114,7 +116,7 @@ export function CommentAttachments({
               )}
             >
               <Heart className={cn('h-3.5 w-3.5', isSaved ? 'fill-rose-500 text-rose-500' : 'text-white')} />
-            </button>
+            </button>}
             {a.type === 'gif' && (
               <span className="absolute bottom-1.5 left-1.5 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-bold text-white">
                 {uiI18n.t('app.gif_758f6c93')}

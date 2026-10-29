@@ -7,6 +7,7 @@ import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SettingRow, SettingsSection } from '@/components/settings/SettingsPrimitives';
 import { useReaderSettings } from '@/hooks/media/useReaderSettings';
+import { ReaderUpscaling } from '@/components/settings/ReaderUpscaling';
 import { useReaderKeybinds } from '@/hooks/media/useReaderKeybinds';
 import {
   READER_KEYBIND_ACTIONS,
@@ -48,6 +49,7 @@ export function ReaderPanel() {
 
   return (
     <div className="space-y-6">
+      <ReaderUpscaling />
       <SettingsSection title={uiI18n.t('app.reading_layout_cfae87b0')} description={uiI18n.t('app.how_pages_are_laid_out_and_sized_in_the_reader_c2e71668')}>
         <div className="flex flex-col">
           <SettingRow

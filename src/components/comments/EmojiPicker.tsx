@@ -1,4 +1,7 @@
-import uiI18n from '@/lib/uiI18n';
+import { useState } from 'react';
+import { CUSTOM_EMOJI, customEmojiToken } from '@/lib/customEmoji';
+import { Input } from '@/components/ui/input';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useTranslation } from 'react-i18next';
@@ -41,13 +44,21 @@ interface EmojiPickerProps {
 export function EmojiPicker({ onSelect, trigger }: EmojiPickerProps) {
   useUiTranslation();
   const { t } = useTranslation();
+  const [category, setCategory] = useState<'unicode' | 'custom' | 'mascots'>('unicode');
+  const [search, setSearch] = useState('');
   return (
     <Popover>
       <PopoverTrigger asChild>{trigger}</PopoverTrigger>
       <PopoverContent className="w-72 p-0" align="start">
+        <div className="flex flex-col gap-2 p-2">
+          <ToggleGroup type="single" value={category} onValueChange={value => { if (value === 'unicode' || value === 'custom' || value === 'mascots') setCategory(value); }} aria-label={t('comments.emojiCategories')} className="w-full">
+            {(['unicode', 'custom', 'mascots'] as const).map(value => <ToggleGroupItem key={value} value={value} size="sm" className="flex-1">{t(`comments.emoji${value === 'unicode' ? 'Standard' : value === 'custom' ? 'Custom' : 'Mascots'}`)}</ToggleGroupItem>)}
+          </ToggleGroup>
+          {category !== 'unicode' && <Input value={search} onChange={event => setSearch(event.target.value)} placeholder={t('comments.emojiSearch')} aria-label={t('comments.emojiSearch')} />}
+        </div>
         <ScrollArea className="h-64">
-          <div className="p-3 space-y-3">
-            {EMOJI_GROUPS.map((group) => (
+          <div className="flex flex-col gap-3 p-3">
+            {category === 'unicode' && EMOJI_GROUPS.map((group) => (
               <div key={group.labelKey}>
                 <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                   {t(group.labelKey)}
@@ -66,6 +77,12 @@ export function EmojiPicker({ onSelect, trigger }: EmojiPickerProps) {
                 </div>
               </div>
             ))}
+            {category !== 'unicode' && <div className={category === 'mascots' ? 'grid grid-cols-2 gap-2' : 'grid grid-cols-5 gap-1'}>
+              {CUSTOM_EMOJI.filter(item => item.group === category && item.name.toLowerCase().includes(search.toLowerCase())).map(item => <button type="button" key={item.key} title={item.name} aria-label={item.name} onClick={() => onSelect(customEmojiToken(item))} className="flex min-h-11 items-center justify-center rounded-md p-1 hover:bg-accent focus-visible:outline focus-visible:outline-primary">
+                <img src={item.src} alt="" loading="lazy" decoding="async" className={category === 'mascots' ? 'h-auto max-h-28 max-w-full object-contain' : 'size-9 object-contain'} />
+              </button>)}
+              {!CUSTOM_EMOJI.some(item => item.group === category && item.name.toLowerCase().includes(search.toLowerCase())) && <p className="col-span-full text-sm text-muted-foreground">{t('comments.emojiEmpty')}</p>}
+            </div>}
           </div>
         </ScrollArea>
       </PopoverContent>

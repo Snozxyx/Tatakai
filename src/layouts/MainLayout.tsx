@@ -1,3 +1,6 @@
+import { ChatDockProvider } from '@/contexts/ChatDockContext';
+import { ChatDock } from '@/components/community/messages/ChatDock';
+import { useSocialPresencePublisher } from '@/hooks/community/useSocialActivity';
 import { ReviewPopup } from '@/components/ui/ReviewPopup';
 import { useDeveloperMode } from '@/hooks/ui/useDeveloperMode';
 import { useProfilePresentation } from '@/contexts/ProfilePresentationContext';
@@ -64,6 +67,7 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
   const [deferredStartupReady, setDeferredStartupReady] = useState(false);
   usePageTracking(deferredStartupReady);
   useClientPresence(deferredStartupReady);
+  useSocialPresencePublisher(deferredStartupReady);
   useEngagementTracking(deferredStartupReady);
   useActiveSession(deferredStartupReady);
   const restoredTorrentSessionsRef = useRef(false);
@@ -237,6 +241,7 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <ConfirmProvider>
+    <ChatDockProvider>
     <CommunityRulesGateProvider>
     <IdleReclaimProvider />
     <div
@@ -304,7 +309,9 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
           </>
       </OfflineGate>
     </div>
+    <ChatDock />
     </CommunityRulesGateProvider>
+    </ChatDockProvider>
     </ConfirmProvider>
   );
 };

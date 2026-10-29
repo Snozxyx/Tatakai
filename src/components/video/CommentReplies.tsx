@@ -236,7 +236,7 @@ function ReplyRow({
             <CosmeticName userId={reply.user_id}>{reply.profile?.display_name || uiI18n.t('app.user_9f8a2389')}</CosmeticName>
           </span>
           <RankBadge score={reply.profile?.total_episodes || 0} size="xs" showName={false} />
-          <UserBadges badges={badges} size={12} />
+          <UserBadges badges={badges} size={12} max={3} />
           <span className="ml-auto text-xs text-muted-foreground">
             {formatDistanceToNow(new Date(reply.created_at), { addSuffix: true })}
           </span>

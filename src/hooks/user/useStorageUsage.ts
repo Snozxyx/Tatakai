@@ -47,7 +47,7 @@ export function useStorageUsage() {
       }
 
       // Fallback: sum the sizes of everything the user has uploaded.
-      const files = await listUserMedia(uid);
+      const files = await listUserMedia(uid, true);
       const summed = files.reduce((n, f) => n + (f.size || 0), 0);
       return {
         usedBytes: usedBytes ?? summed,

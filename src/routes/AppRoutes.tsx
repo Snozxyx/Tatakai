@@ -78,6 +78,7 @@ const { PlaylistViewPage } = { PlaylistViewPage: lazy(() => import("../pages/pro
 const PublicPlaylistPage = lazy(() => import("../pages/profile/PublicPlaylistPage"));
 const WrappedPage = lazy(() => import("../pages/profile/WrappedPage"));
 const OfflineLibraryPage = lazy(() => import("../pages/profile/OfflineLibraryPage"));
+const MessagesPage = lazy(() => import("../pages/community/MessagesPage"));
 const NotificationsPage = lazy(() => import("../pages/profile/NotificationsPage"));
 const CalendarPage = lazy(() => import("../pages/base/CalendarPage"));
 const FollowConnectionsPage = lazy(() => import("../pages/profile/FollowConnectionsPage"));
@@ -515,6 +516,8 @@ const AppRoutes = () => {
         <Route path="/collections" element={<ProtectedRoute><CollectionsPage /></ProtectedRoute>} />
         <Route path="/favorites" element={<ProtectedRoute><FavoritesPage /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+        <Route path="/messages" element={<ProtectedRoute><MessagesPage /></ProtectedRoute>} />
+        <Route path="/messages/:conversationId" element={<ProtectedRoute><MessagesPage /></ProtectedRoute>} />
         <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
         <Route path="/calendar" element={<ProtectedRoute><CalendarPage /></ProtectedRoute>} />
         <Route path="/social/:username" element={<ProtectedRoute><FollowConnectionsPage /></ProtectedRoute>} />

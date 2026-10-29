@@ -5,10 +5,10 @@ import type { VideoSettings } from "@/hooks/media/useVideoSettings";
 export const CUSTOM_SUBTITLE_FONT_FAMILY = "TatakaiCustomSub";
 
 const SIZE_REM: Record<VideoSettings["subtitleSize"], string> = {
-  small: "1.4rem",
-  medium: "1.9rem",
-  large: "2.5rem",
-  xlarge: "3.1rem",
+  small: "clamp(0.75rem, 2.8vw, 1.4rem)",
+  medium: "clamp(0.875rem, 3.5vw, 1.9rem)",
+  large: "clamp(1rem, 4.2vw, 2.5rem)",
+  xlarge: "clamp(1.125rem, 5vw, 3.1rem)",
 };
 
 const FONT_STACK: Record<VideoSettings["subtitleFont"], string> = {
@@ -53,6 +53,7 @@ export function buildSubtitleCueStyle(settings: VideoSettings): CSSProperties {
     backgroundColor: bgAlpha > 0 ? `rgba(0,0,0,${bgAlpha})` : "transparent",
     textShadow: outline,
     whiteSpace: "pre-line",
+    overflowWrap: "anywhere",
     maxWidth: "90%",
   };
 }

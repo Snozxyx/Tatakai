@@ -1,3 +1,5 @@
+import { useBatchUserBadges } from '@/hooks/community/useUserBadges';
+import type { BadgeDef } from '@/lib/badges';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import uiI18n from '@/lib/uiI18n';
 import { useMemo } from 'react';
@@ -16,6 +18,8 @@ export interface DetailedCommentAuthor {
   display_name: string | null;
   username: string | null;
   avatar_url: string | null;
+  featured_badge_key?: string | null;
+  badges?: BadgeDef[];
 }
 
 /** A comment enriched with its entity title, a deep-link target, structured
@@ -156,12 +160,13 @@ export function useEnrichedComments(rows: RawComment[], withAuthors: boolean) {
     () => (withAuthors ? [...new Set(rows.map((r) => r.user_id))] : []),
     [rows, withAuthors],
   );
+  const {data: authorBadges} = useBatchUserBadges(authorIds);
   const { data: authorMap } = useQuery({
     queryKey: ['comments-detailed-authors', authorIds],
     queryFn: async () => {
       const { data } = await supabase
         .from('profiles')
-        .select('user_id, display_name, username, avatar_url')
+        .select('user_id, display_name, username, avatar_url, featured_badge_key')
         .in('user_id', authorIds);
       const map = new Map<string, DetailedCommentAuthor>();
       (data || []).forEach((p: any) => map.set(p.user_id, p));
@@ -225,10 +230,10 @@ export function useEnrichedComments(rows: RawComment[], withAuthors: boolean) {
         attachments: sanitizeAttachments((r as any).attachments),
         embeds: sanitizeEmbeds((r as any).embeds),
         poll: pollMap?.get(r.id) ?? null,
-        author: withAuthors ? authorMap?.get(r.user_id) ?? null : null,
+        author: withAuthors ? authorMap?.get(r.user_id) ? {...authorMap.get(r.user_id)!,badges:authorBadges?.[r.user_id] ?? []} : null : null,
       };
     });
-  }, [rows, animeMeta, mangaMeta, dbMeta, pollMap, authorMap, withAuthors]);
+  }, [rows, animeMeta, mangaMeta, dbMeta, pollMap, authorMap, authorBadges, withAuthors]);
 }
 
 /**

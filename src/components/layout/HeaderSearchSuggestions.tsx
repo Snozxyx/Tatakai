@@ -5,12 +5,20 @@ import { Trans, useTranslation } from "react-i18next";
 import i18n from "@/lib/i18n";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Search, Film, BookOpen, Loader2, Clock, TrendingUp } from "lucide-react";
+import { Search, Film, BookOpen, Loader2, Clock, TrendingUp, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { resolveApiV3Base } from "@/lib/api/backendOrigin";
 import { getPreferredTitleLanguage, selectMediaTitle } from '@/lib/titleLanguage';
 
+import { searchMangaTags } from '@/core/content/manga-tag-search';
+import { mergeCatalog, normalizeCatalogTitle } from '@/lib/catalogMerge';
+
 interface Suggestion {
+  anilistId?: number;
+  malId?: number;
+  canonicalTitle?: string;
+  mediaType?: string;
+  href?: string;
   id: string | number;
   name: string;
   poster: string | null;
@@ -25,7 +33,7 @@ async function fetchSuggestions(q: string): Promise<Suggestion[]> {
   const params = new URLSearchParams({ q: q.trim() });
   const raw = await fetch(`${resolveApiV3Base()}/content/search/suggestions?${params}`, {
     signal: AbortSignal.timeout(4000),
-  }).then((response) => response.json());
+  }).then((response) => { if (!response.ok) throw new Error('Search unavailable'); return response.json(); });
 
   const results: Suggestion[] = [];
   const mediaArr = Array.isArray(raw?.data?.media) ? raw.data.media : [];
@@ -35,7 +43,9 @@ async function fetchSuggestions(q: string): Promise<Suggestion[]> {
     const formatUpper = String(m.format ?? "").toUpperCase();
     const isNovel = formatUpper === "NOVEL" || formatUpper === "LIGHT_NOVEL" || m.mediaType === "novel";
     results.push({
-      id: m.anilistId ?? m.tatakaiId ?? m.malId,
+      id: m.anilistId ?? m.tatakaiId ?? (m.malId ? `mal:${m.malId}` : ''),
+      anilistId: m.anilistId, malId: m.malId, canonicalTitle: name,
+      mediaType: isNovel ? 'novel' : m.mediaType === 'manga' ? 'manga' : 'anime',
       name,
       poster: m.coverImageLarge || m.coverImageMedium || null,
       type: isNovel ? "novel" : m.mediaType === "manga" ? "manga" : "anime",
@@ -45,7 +55,7 @@ async function fetchSuggestions(q: string): Promise<Suggestion[]> {
     });
   }
 
-  return results;
+  return results.filter(item => item.id);
 }
 
 interface Props {
@@ -91,13 +101,35 @@ export function HeaderSearchSuggestions({ query, visible, onSelect, onClose, inl
     }
   });
 
-  const { data: suggestions = [], isFetching } = useQuery({
+  const { data: primary = [], isFetching: primaryFetching } = useQuery({
     queryKey: ["header-suggestions", debouncedQuery, getPreferredTitleLanguage()],
     queryFn: () => fetchSuggestions(debouncedQuery),
     enabled: visible && debouncedQuery.trim().length >= 2,
     staleTime: 30_000,
     retry: false,
   });
+
+  const { data: extra = [], isFetching: catalogFetching } = useQuery({
+    queryKey: ['header-mangabaka', debouncedQuery.trim(), getPreferredTitleLanguage()],
+    queryFn: async (): Promise<Suggestion[]> => {
+      const catalog = await searchMangaTags(debouncedQuery.trim(), 1, 12, { tagSource: 'mangabaka' });
+      return catalog.results.map(item => ({
+        id: item.id!, anilistId: item.anilistId, malId: item.malId,
+        name: item.canonicalTitle, canonicalTitle: item.canonicalTitle,
+        poster: item.poster, type: item.format === 'NOVEL' ? 'novel' : 'manga',
+        mediaType: item.format === 'NOVEL' ? 'novel' : 'manga',
+        href: item.href, year: item.year, format: item.format === 'NOVEL' ? 'NOVEL' : item.mediaType,
+      }));
+    },
+    enabled: visible && debouncedQuery.trim().length >= 2,
+    staleTime: 5 * 60_000, retry: false,
+  });
+  const isFetching = primaryFetching || catalogFetching;
+  const term = normalizeCatalogTitle(debouncedQuery);
+  const suggestions = mergeCatalog(primary, extra).sort((a, b) => {
+    const rank = (name: string) => normalizeCatalogTitle(name) === term ? 0 : normalizeCatalogTitle(name).startsWith(term) ? 1 : 2;
+    return rank(a.name) - rank(b.name);
+  }).slice(0, 14);
 
   // Close on outside click
   useEffect(() => {
@@ -120,6 +152,7 @@ export function HeaderSearchSuggestions({ query, visible, onSelect, onClose, inl
 
   const handleSelect = (item: Suggestion) => {
     onSelect(item.name);
+    if (item.href) { window.open(item.href, '_blank', 'noopener,noreferrer'); return; }
     navigate(
       item.type === "novel"
         ? `/novel/${item.id}`
@@ -156,23 +189,15 @@ export function HeaderSearchSuggestions({ query, visible, onSelect, onClose, inl
             <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{t('layout.searchRecent')}</span>
           </div>
           {history.slice(0, 5).map((term) => (
-            <button
-              type="button"
-              key={term}
-              onClick={() => handleHistorySelect(term)}
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/5 transition-colors group text-left"
-            >
-              <Search className="w-4 h-4 text-muted-foreground/50 shrink-0" />
-              <span className="flex-1 text-sm truncate">{term}</span>
-              <span
-                role="button"
-                tabIndex={0}
-                onClick={(e) => removeHistory(term, e as any)}
-                className="text-[10px] text-muted-foreground/40 hover:text-destructive opacity-0 group-hover:opacity-100 transition-all px-1"
-              >
-                ×
-              </span>
-            </button>
+            <div key={term} className="flex items-center rounded-xl hover:bg-accent">
+              <button type="button" onClick={() => handleHistorySelect(term)} className="flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-xl px-3 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <span className="truncate text-sm">{term}</span>
+              </button>
+              <button type="button" aria-label={t('discovery.removeSearch', { term })} onClick={event => removeHistory(term, event)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-muted-foreground hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <X className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </div>
           ))}
         </div>
       )}
@@ -197,7 +222,7 @@ export function HeaderSearchSuggestions({ query, visible, onSelect, onClose, inl
                   type="button"
                   key={`${item.type}-${item.id}`}
                   onClick={() => handleSelect(item)}
-                  className="w-full flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-white/5 transition-colors text-left group"
+                  className="w-full flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-accent focus-visible:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors text-left group"
                 >
                       <div className="w-8 h-10 rounded-lg overflow-hidden shrink-0 bg-muted">
                         {item.poster ? (
@@ -226,9 +251,9 @@ export function HeaderSearchSuggestions({ query, visible, onSelect, onClose, inl
                         className={cn(
                           "text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md",
                           item.type === "novel"
-                            ? "bg-violet-500/15 text-violet-400"
+                            ? "bg-muted text-muted-foreground"
                             : item.type === "manga"
-                              ? "bg-emerald-500/15 text-emerald-400"
+                              ? "bg-muted text-muted-foreground"
                               : "bg-primary/15 text-primary/80"
                         )}
                       >

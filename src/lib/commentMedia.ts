@@ -8,6 +8,8 @@ import { uploadUserMedia } from '@/lib/userMedia';
  */
 export interface CommentAttachment {
   type: 'image' | 'gif';
+  /** Private chat object key; never a public URL. */
+  storagePath?: string;
   url: string;
   /** Smaller still/preview URL, when the source provides one (Giphy does). */
   preview?: string;

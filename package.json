@@ -1,8 +1,8 @@
 {
   "name": "tatakai",
   "private": true,
-  "version": "6.4.2",
-  "description": "Tatakai \u00e2\u20ac\u201d an extension-based otaku community for tracking anime & manga",
+  "version": "6.4.3-beta.1",
+  "description": "Tatakai â€” an extension-based otaku community for tracking anime & manga",
   "author": {
     "name": "Snozxyx",
     "email": "snozxyx@gmail.com"
@@ -31,7 +31,7 @@
     "electron:dev": "npm run translate:build:dev && concurrently \"vite\" \"wait-on http://localhost:8090 && cross-env ELECTRON_DEVTOOLS=1 electron desktop/main.cjs\"",
     "assets:installer": "node scripts/generate-installer-assets.cjs",
     "assets:cloudflared": "node scripts/fetch-cloudflared.cjs",
-    "electron:build": "npm run server:build && npm run translate:build && npm run assets:installer && npm run assets:cloudflared && cross-env ELECTRON_BUILD=true NODE_OPTIONS=--max-old-space-size=6144 vite build && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --config.npmRebuild=false --config.electronDist=node_modules/electron/dist",
+    "electron:build": "npm run server:build && npm run translate:build && npm run assets:installer && npm run assets:cloudflared && node scripts/build-rtx-video.mjs && cross-env ELECTRON_BUILD=true NODE_OPTIONS=--max-old-space-size=6144 vite build && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --config.npmRebuild=false --config.electronDist=node_modules/electron/dist",
     "assets:generate": "node scripts/generate-assets.cjs",
     "server:build": "node tatakai-server/scripts/build.mjs",
     "server:start": "node tatakai-server/src/node.mjs",
@@ -47,7 +47,10 @@
     "mobile:build:ios:unsigned": "npm run build:native && npx cap sync ios && xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath ios/build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO clean build",
     "altstore:generate": "node scripts/generate-altstore-source.mjs",
     "build:native": "cross-env NODE_ENV=production NODE_OPTIONS=--max-old-space-size=6144 vite build --mode native && node scripts/bundle-report.mjs --check-native",
-    "build:report": "node scripts/bundle-report.mjs"
+    "build:report": "node scripts/bundle-report.mjs",
+    "rtx:build": "node scripts/build-rtx-video.mjs --required",
+    "version": "node scripts/sync-native-version.mjs",
+    "release:sync-version": "node scripts/sync-native-version.mjs"
   },
   "dependencies": {
     "@biwills/kittentts": "^1.0.0",
@@ -351,7 +354,8 @@
       "icon": "resources/icon.png",
       "category": "AudioVideo",
       "artifactName": "${productName}-${version}-${os}-${arch}.${ext}"
-    }
+    },
+    "generateUpdatesFilesForAllChannels": true
   },
   "allowScripts": {
     "electron@40.1.0": true

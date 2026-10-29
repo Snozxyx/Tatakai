@@ -1,3 +1,5 @@
+import { ProfilePresence } from '@/components/profile/ProfilePresence';
+import { ProfileSocialActions } from '@/components/profile/ProfileSocialActions';
 import { ArrowUpRight, Lock, UserCheck, UserPlus, X } from 'lucide-react';
 import { CosmeticAvatar, CosmeticName } from '@/components/profile/IdentityCosmetics';
 import { AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -66,7 +68,7 @@ export default function MidnightLofiProfilePreview(props: ThemePreviewProps) {
             >
               <CosmeticName userId={props.userId}>{props.name}</CosmeticName>
             </button>
-            <p className="mlp-handle">@{props.username || 'user'}</p>
+            <p className="mlp-handle">@{props.username || 'user'}</p><ProfilePresence userId={props.userId} />
           </div>
         </div>
 
@@ -131,7 +133,7 @@ export default function MidnightLofiProfilePreview(props: ThemePreviewProps) {
         </div>
 
         {/* Action Buttons (Image 2 style solid white pill & frosted secondary) */}
-        <div className="mlp-actions">
+        <div className="mlp-actions"><ProfileSocialActions userId={props.userId} onMessageOpened={props.onClose} />
           {props.canFollow && (
             <button
               type="button"

@@ -15,6 +15,8 @@ import type {
   MappedNovelChapter,
 } from '@/types/novel';
 import { ANILIST_GRAPHQL_ENDPOINT, resolveBackendOrigin } from '@/lib/api/backendOrigin';
+import { mergeCatalog } from '@/lib/catalogMerge';
+import { fetchMangaBakaSeries } from '@/lib/mapping/mangabaka';
 import { getMangaTagOptions, searchMangaTags } from './manga-tag-search';
 
 export type { NovelSearchItem, NovelSearchResult, MappedNovelChapter, NovelChapterResponse, NovelContentResponse };
@@ -109,7 +111,34 @@ export async function getNovelHome(adult = false): Promise<NovelHomeData> {
     genres: data.genres || [], fetchedAt: data.fetchedAt, trendingPending: data.trendingPending === true };
 }
 
-export async function searchNovels(
+export async function searchWebNovels(query = '', page = 1, limit = 20, options: NovelSearchOptions = {}): Promise<NovelSearchResult> {
+  const catalog = await searchMangaTags(query, page, limit, { ...options, mangaType: 'novel', tagSource: 'mangabaka' });
+  const results = catalog.results.map(item => ({ ...item, href: undefined, mediaType: 'novel' as const }))
+    .filter(item => (!options.minYear || (item.year ?? 0) >= options.minYear)
+      && (!options.maxYear || (item.year ?? Infinity) <= options.maxYear)
+      && (!options.minScore || (item.score ?? 0) >= options.minScore * 10)
+      && (!options.maxScore || (item.score ?? Infinity) <= options.maxScore * 10)
+      && (!options.statuses?.length || options.statuses.some(status => ({ ongoing: 'releasing', completed: 'completed', hiatus: 'hiatus', cancelled: 'cancelled' }[status] || status).toLowerCase() === item.status.toLowerCase())));
+  return { ...catalog, results };
+}
+
+export async function searchNovels(query: string, page = 1, limit = 20, options: NovelSearchOptions = {}): Promise<NovelSearchResult> {
+  if (options.tagSource === 'mangabaka') return searchWebNovels(query, page, limit, options);
+  // AniList tag names must never be sent to the other taxonomy.
+  if (options.tags?.length) return searchAniListNovels(query, page, limit, options);
+  const [primary, extra] = await Promise.allSettled([
+    searchAniListNovels(query, page, limit, options), searchWebNovels(query, page, limit, options),
+  ]);
+  if (primary.status === 'rejected' && extra.status === 'rejected') throw primary.reason;
+  const base = primary.status === 'fulfilled' ? primary.value : (extra as PromiseFulfilledResult<NovelSearchResult>).value;
+  return { ...base, results: mergeCatalog(primary.status === 'fulfilled' ? primary.value.results : [], extra.status === 'fulfilled' ? extra.value.results : []),
+    hasNextPage: (primary.status === 'fulfilled' && primary.value.hasNextPage) || (extra.status === 'fulfilled' && extra.value.hasNextPage),
+    total: undefined, totalPages: undefined, source: 'anilist+mangabaka',
+    partial: primary.status === 'rejected' || extra.status === 'rejected' || base.partial,
+    failedProviders: [...base.failedProviders, ...(primary.status === 'rejected' ? ['anilist'] : []), ...(extra.status === 'rejected' ? ['mangabaka'] : [])] };
+}
+
+async function searchAniListNovels(
   query: string,
   page = 1,
   limit = 20,
@@ -192,7 +221,17 @@ export async function searchNovels(
 export async function getNovelDetail(id: string) {
   const normalizedId = String(id || '');
   let row: any;
-  if (normalizedId.startsWith('anilist:')) {
+  if (/^mangabaka:\d+$/i.test(normalizedId)) {
+    const series = await fetchMangaBakaSeries(normalizedId.split(':')[1], { source: 'mangabaka' });
+    if (!series || series.type !== 'novel') throw new Error('Novel metadata could not be loaded. Please retry.');
+    row = { anilistId: series.anilistId, malId: series.malId,
+      titleEnglish: series.title, titleRomaji: series.romanizedTitle, titleNative: series.nativeTitle,
+      synonyms: series.aliases, coverImageLarge: series.cover.large || series.cover.original,
+      description: series.description, status: series.status, genres: series.genres, format: 'NOVEL',
+      startDate: { year: series.year }, averageScore: series.rating, authors: series.authors, artists: series.artists,
+      chapters: series.totalChapters, volumes: series.totalVolumes,
+      isAdult: ['erotica', 'pornographic'].includes(series.contentRating || ''), externalLinks: series.links };
+  } else if (normalizedId.startsWith('anilist:')) {
     row = await apiGet<any>(`/api/v3/manga/by-anilist/${normalizedId.replace('anilist:', '')}`);
   } else {
     const raw = Number(normalizedId);

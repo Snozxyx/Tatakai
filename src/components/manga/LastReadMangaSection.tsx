@@ -101,13 +101,13 @@ export function LastReadMangaSection() {
                 poster={item.manga_poster ? getProxiedImageUrl(item.manga_poster) : undefined}
                 title={item.manga_title}
                 primaryMeta={
-                  <span className="flex items-center gap-1.5 font-medium text-white/90">
+                  <span className="flex items-center gap-1.5 font-medium text-foreground">
                     <BookOpen className="h-3.5 w-3.5 text-primary" />
                     <span className="truncate">{chapterLabel}</span>
                   </span>
                 }
                 secondaryMeta={
-                  <span className="flex items-center gap-1.5 text-white/50">
+                  <span className="flex items-center gap-1.5 text-muted-foreground">
                     <Layers className="h-3 w-3" />
                     {uiI18n.t('app.page_fb06270f')} {pageLabel}
                   </span>
@@ -115,7 +115,7 @@ export function LastReadMangaSection() {
                 progress={progressPercent}
                 progressNote={
                   totalPages > 0 ? (
-                    <span className="tabular-nums text-white/60">{totalPages} {uiI18n.t('app.pages_eec6542d')}</span>
+                    <span className="tabular-nums text-muted-foreground">{totalPages} {uiI18n.t('app.pages_eec6542d')}</span>
                   ) : undefined
                 }
                 overlayIcon={BookOpen}

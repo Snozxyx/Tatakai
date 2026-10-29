@@ -1,3 +1,5 @@
+import { isMessageNotification, messageNotificationConversation } from '@/lib/messageNotifications';
+import { useChatDock } from '@/contexts/ChatDockContext';
 import { NotificationSoundToggle } from '@/components/community/NotificationSoundToggle';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
@@ -28,6 +30,8 @@ import {
   Reply,
   CheckCheck,
   Inbox,
+  MessageCircle,
+  UserPlus,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -36,11 +40,12 @@ export interface NotificationSheetProps {
   onOpenChange: (open: boolean) => void;
 }
 
-type Category = 'mention' | 'calendar' | 'announcement' | 'system';
+type Category = 'messages' | 'mention' | 'calendar' | 'announcement' | 'system';
 type Tab = 'all' | Category;
 
 const TABS: Array<{ value: Tab; label: string; icon: React.ElementType }> = [
   { value: 'all', get label() { return uiI18n.t('app.all_6a720856'); }, icon: Bell },
+  { value: 'messages', label: 'Messages', icon: MessageCircle },
   { value: 'mention', get label() { return uiI18n.t('app.mention_51258021'); }, icon: AtSign },
   { value: 'calendar', get label() { return uiI18n.t('app.calendar_adab5090'); }, icon: CalendarClock },
   { value: 'announcement', get label() { return uiI18n.t('app.announce_b6e44152'); }, icon: Megaphone },
@@ -57,6 +62,7 @@ interface FeedItem {
   createdAt: string;
   read: boolean;
   link?: string;
+  conversationId?: string | null;
   fromUsername?: string;
   fromAvatar?: string;
   fromUserId?: string;
@@ -64,6 +70,7 @@ interface FeedItem {
 }
 
 function categorize(type: string | undefined): Category {
+  if (isMessageNotification(type)) return 'messages';
   if (type === 'mention') return 'mention';
   if (type === 'airing') return 'calendar';
   if (type === 'broadcast' || type === 'announcement') return 'announcement';
@@ -73,6 +80,10 @@ function categorize(type: string | undefined): Category {
 /** A quiet, consistent icon for each activity type. */
 function iconFor(type: string): { icon: React.ElementType } {
   switch (type) {
+    case 'direct_message':
+      return { icon: MessageCircle };
+    case 'message_request':
+      return { icon: UserPlus };
     case 'mention':
       return { icon: AtSign };
     case 'airing':
@@ -298,6 +309,7 @@ function SentMentionsList({ onNavigate }: { onNavigate: (link: string) => void }
 export function NotificationSheet({ open, onOpenChange }: NotificationSheetProps) {
   useUiTranslation();
   const navigate = useNavigate();
+  const { openChat } = useChatDock();
   const [tab, setTab] = useState<Tab>('all');
   const [mentionView, setMentionView] = useState<'received' | 'sent'>('received');
 
@@ -342,6 +354,7 @@ export function NotificationSheet({ open, onOpenChange }: NotificationSheetProps
       createdAt: n.created_at,
       read: n.read,
       link: n.data?.link,
+      conversationId: messageNotificationConversation(n.data),
       fromUserId: n.data?.from_user ?? n.data?.actor_id,
       fromUsername: senderById.get(n.data?.from_user ?? n.data?.actor_id)?.display_name
         || senderById.get(n.data?.from_user ?? n.data?.actor_id)?.username || n.data?.from_username,
@@ -385,9 +398,10 @@ export function NotificationSheet({ open, onOpenChange }: NotificationSheetProps
       if (item.source === 'admin') markAdminAsRead.mutate(item.rawId);
       else markAsRead.mutate(item.rawId);
     }
-    if (item.link) {
+    if (item.conversationId || item.link) {
       onOpenChange(false);
-      navigate(item.link);
+      if (item.conversationId) openChat(item.conversationId);
+      else if (item.link) navigate(item.link);
     }
   };
 
@@ -440,10 +454,10 @@ export function NotificationSheet({ open, onOpenChange }: NotificationSheetProps
           </div>
         </SheetHeader>
 
-        <div className="grid shrink-0 grid-cols-5 border-b border-border px-4" role="group" aria-label={uiI18n.t('app.notifications_753a22b2')}>
+        <div className="flex shrink-0 overflow-x-auto border-b border-border px-2" role="group" aria-label={uiI18n.t('app.notifications_753a22b2')}>
           {TABS.map(({ value, label }) => (
             <button key={value} type="button" aria-pressed={tab === value} onClick={() => setTab(value)}
-              className={cn('relative min-h-11 min-w-0 px-1 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
+              className={cn('relative min-h-11 shrink-0 flex-1 px-3 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
                 tab === value ? 'font-semibold text-foreground' : 'font-medium text-muted-foreground hover:text-foreground')}>
               <span className="block truncate">{label}</span>
               {tab === value && <span className="absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-foreground" />}

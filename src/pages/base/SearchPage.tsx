@@ -1,3 +1,4 @@
+import { mergeCatalog } from '@/lib/catalogMerge';
 import { ThemedCheckbox } from '@/components/ui/themed-checkbox';
 import { ThemedSelect } from '@/components/ui/themed-select';
 import uiI18n from '@/lib/uiI18n';
@@ -801,7 +802,7 @@ export default function SearchPage() {
   }, [infiniteMangaData]);
 
   const allNovelResults = useMemo(() => {
-    return (infiniteNovelData?.pages || []).flatMap((page: any) => {
+    return mergeCatalog([], (infiniteNovelData?.pages || []).flatMap((page: any) => {
       const results = Array.isArray(page?.results) ? page.results : [];
       return results
         .map((novel: any) => {
@@ -814,7 +815,7 @@ export default function SearchPage() {
           if (!normalizedId || !fallbackTitle) return null;
           return {
             id: String(normalizedId),
-            name: fallbackTitle,
+            name: fallbackTitle, canonicalTitle: fallbackTitle, mediaType: 'novel',
             poster: novel?.poster || '',
             type: 'novel',
             status: novel?.status || undefined,
@@ -833,7 +834,7 @@ export default function SearchPage() {
           };
         })
         .filter(Boolean);
-    });
+    }));
   }, [infiniteNovelData]);
   const { data: aniListCharacterSearch, isLoading: loadingAniListCharacters } = useAniListCharacterSearch(query);
 

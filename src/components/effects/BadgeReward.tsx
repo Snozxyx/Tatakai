@@ -28,6 +28,8 @@ export function BadgeReward() {
     queryKey: ['badge-progress', user?.id],
     enabled: !!user,
     staleTime: 30_000,
+    refetchInterval: pathname === '/' || pathname === '/home' ? 300_000 : false,
+    refetchIntervalInBackground: false,
     queryFn: async () => {
       const { error } = await supabase.rpc('recompute_user_badges' as any, {
         p_user_id: user!.id,

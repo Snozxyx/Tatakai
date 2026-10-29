@@ -1,3 +1,4 @@
+import { usePublishSocialActivity } from '@/hooks/community/useSocialActivity';
 import { useReadingViewTracker } from '@/hooks/user/useReadingViews';
 import { ReaderPageRail } from '@/components/reader/ReaderPageRail';
 import { MangaSourceStatus } from '@/components/manga/MangaSourceStatus';
@@ -38,7 +39,7 @@ import {
   Unlock,
 } from "lucide-react";
 import { getMangaReadByKey } from "@/core/content/manga-client";
-import { useIsNativeApp } from "@/hooks/ui/useIsNativeApp";
+import { useIsNativeApp, useIsMobileApp } from "@/hooks/ui/useIsNativeApp";
 import { useReaderSettings, DEFAULT_READER_SETTINGS } from "@/hooks/media/useReaderSettings";
 import { getProfileKnobs } from "@/lib/memoryProfile";
 import { useReaderKeybinds } from "@/hooks/media/useReaderKeybinds";
@@ -114,6 +115,7 @@ export default function MangaReaderPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const isNative = useIsNativeApp();
+  const isMobileApp = useIsMobileApp();
   const reducedMotion = useMotionPreference();
   const compactReader = useIsMobile();
   const { user } = useAuth();
@@ -262,6 +264,8 @@ export default function MangaReaderPage() {
     const fromData = data?.data?.chapter?.number;
     return typeof fromData === "number" && Number.isFinite(fromData) ? fromData : null;
   }, [chapterNumberParam, data]);
+
+  usePublishSocialActivity(data && !isLoading && !error && detail ? { kind: 'manga', title: mangaTitle, href: `/manga/${encodeURIComponent(mangaId || '')}`, image: mangaPoster, detail: resolvedNumber != null ? `Chapter ${resolvedNumber}` : null } : null);
 
   // Discord RPC — update whenever the chapter or title changes.
   useEffect(() => {
@@ -977,9 +981,18 @@ export default function MangaReaderPage() {
     let cancelled = false;
     const t = window.setTimeout(() => {
       if (cancelled) return;
-      void import("@/core/extensions/mobile/mobileProxy").then((m) => {
+      void import("@/core/extensions/mobile/mobileProxy").then(async (m) => {
         if (cancelled || typeof m.prefetchMobileReaderImages !== "function") return;
-        const ahead = pages.slice(pageIndex, pageIndex + 8);
+        let ahead = pages.slice(pageIndex, pageIndex + 8);
+        if (isMobileApp) {
+          const [{ loadMobileConfig }, { buildMobileCloudImageProxyUrl }] = await Promise.all([
+            import('@/hooks/ui/useMobileConfig'), import('@/core/player/mobile-cloud-proxy'),
+          ]);
+          if (cancelled) return;
+          // Cloud pages use the browser image cache; don't also download them
+          // through the local blob bridge while warming upcoming pages.
+          if (loadMobileConfig().cloudProxyByDefault) ahead = ahead.filter(page => !buildMobileCloudImageProxyUrl(page));
+        }
         m.prefetchMobileReaderImages(ahead, { concurrency: 3 });
       }).catch(() => {});
     }, 250);
@@ -987,11 +1000,11 @@ export default function MangaReaderPage() {
       cancelled = true;
       window.clearTimeout(t);
     };
-  }, [pages, pageIndex, chapterKey]);
+  }, [pages, pageIndex, chapterKey, isMobileApp]);
 
 
   return (
-    <div ref={containerRef} data-reader-fullscreen={isFs || undefined} className="relative min-h-screen text-foreground" style={{ backgroundColor: settings.backgroundColor }}>
+    <div ref={containerRef} data-reader-fullscreen={isFs || undefined} data-reader-chrome={chromeVisible} className="relative min-h-screen text-foreground" style={{ backgroundColor: settings.backgroundColor }}>
       {chapterNotification && settings.showNotifications && <div role="status" className="pointer-events-none fixed left-1/2 top-20 z-50 max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-xl border border-border bg-background/95 px-4 py-3 text-sm shadow-lg">{chapterNotification}</div>}
       {/* The title and page counter open navigation; the back arrow opens manga info. */}
       {chromeVisible && <ReaderTopbar>
@@ -1149,7 +1162,7 @@ export default function MangaReaderPage() {
                     ) : null}
                     <div className="flex flex-col items-center" style={{ gap: `${settings.gap}px` }}>
                       {seg.pages.map((page, idx) => (
-                        <ReaderImage key={readerPageRenderKey(seg.key, page)} page={page} mode={settings.loadingMethod} style={widthStyle} eager={segEager(idx)} onRetryChapter={() => retryStreamedChapter(seg)} />
+                        <ReaderImage key={readerPageRenderKey(seg.key, page)} page={page} mode={settings.loadingMethod} upscaling={settings} style={widthStyle} eager={segEager(idx)} onRetryChapter={() => retryStreamedChapter(seg)} />
                       ))}
                     </div>
                   </div>
@@ -1172,7 +1185,7 @@ export default function MangaReaderPage() {
               ) : null}
               <div className="flex flex-col items-center" style={{ gap: `${settings.gap}px` }}>
                 {pages.map((page, idx) => (
-                  <ReaderImage key={readerPageRenderKey(chapterKey, page)} page={page} mode={settings.loadingMethod} style={widthStyle} eager={eagerFor(idx)} onRetryChapter={retryChapterPages} />
+                  <ReaderImage key={readerPageRenderKey(chapterKey, page)} page={page} mode={settings.loadingMethod} upscaling={settings} style={widthStyle} eager={eagerFor(idx)} onRetryChapter={retryChapterPages} />
                 ))}
               </div>
             </div>
@@ -1192,7 +1205,7 @@ export default function MangaReaderPage() {
                     ) : null}
                     <div className="flex flex-col items-center" style={{ gap: `${settings.gap}px` }}>
                       {seg.pages.map((page, idx) => (
-                        <ReaderImage key={readerPageRenderKey(seg.key, page)} page={page} mode={settings.loadingMethod} style={widthStyle} eager={segEager(idx)} onRetryChapter={() => retryStreamedChapter(seg)} />
+                        <ReaderImage key={readerPageRenderKey(seg.key, page)} page={page} mode={settings.loadingMethod} upscaling={settings} style={widthStyle} eager={segEager(idx)} onRetryChapter={() => retryStreamedChapter(seg)} />
                       ))}
                     </div>
                   </div>
@@ -1219,11 +1232,11 @@ export default function MangaReaderPage() {
                 className="flex items-center justify-center gap-1"
                 style={{ flexDirection: settings.readingDirection === "rtl" ? "row-reverse" : "row" }}
               >
-                <ReaderImage key={readerPageRenderKey(chapterKey, pages[pageIndex])} page={pages[pageIndex]} mode={settings.loadingMethod} style={pagedStyle} eager onRetryChapter={retryChapterPages} />
-                <ReaderImage key={readerPageRenderKey(chapterKey, pages[pageIndex + 1])} page={pages[pageIndex + 1]} mode={settings.loadingMethod} style={pagedStyle} eager onRetryChapter={retryChapterPages} />
+                <ReaderImage key={readerPageRenderKey(chapterKey, pages[pageIndex])} page={pages[pageIndex]} mode={settings.loadingMethod} upscaling={settings} style={pagedStyle} eager onRetryChapter={retryChapterPages} />
+                <ReaderImage key={readerPageRenderKey(chapterKey, pages[pageIndex + 1])} page={pages[pageIndex + 1]} mode={settings.loadingMethod} upscaling={settings} style={pagedStyle} eager onRetryChapter={retryChapterPages} />
               </div>
             ) : pages[pageIndex] ? (
-              <ReaderImage key={readerPageRenderKey(chapterKey, pages[pageIndex])} page={pages[pageIndex]} mode={settings.loadingMethod} style={pagedStyle} eager onRetryChapter={retryChapterPages} />
+              <ReaderImage key={readerPageRenderKey(chapterKey, pages[pageIndex])} page={pages[pageIndex]} mode={settings.loadingMethod} upscaling={settings} style={pagedStyle} eager onRetryChapter={retryChapterPages} />
             ) : null}
             {settings.clickToTurn ? (
               <>

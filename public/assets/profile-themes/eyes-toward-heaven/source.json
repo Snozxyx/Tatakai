@@ -1,0 +1,6 @@
+{
+  "source": "User-provided temp/eyes-toward-heaven.1920x1080.mp4",
+  "video": "scene.mp4",
+  "poster": "poster.webp",
+  "processing": "1080p H.264, no audio, fast start; WebP poster from the supplied video"
+}
