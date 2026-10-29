@@ -14,6 +14,15 @@ export interface ChangelogRelease {
 
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: "6.4.3",
+    date: "2026-10-29",
+    changes: [
+      "Bring the 6.4.3 profile themes, curated galleries, private messaging, custom emoji, activity badges and playback improvements to Production.",
+      "Prevent automatic desktop downgrades when checking updates or switching channels, while preserving genuine upgrades from stable and beta versions.",
+      "Publish correctly ordered native versions and reliable channel-specific update manifests."
+    ]
+  },
+  {
     version: "6.4.3-beta.2",
     date: "2026-10-29",
     changes: [

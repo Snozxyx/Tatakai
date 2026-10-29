@@ -4,6 +4,13 @@ All notable changes to Tatakai are documented here.
 
 ---
 
+## [6.4.3] - 2026-10-29
+
+- Release the 6.4.3 profile themes, curated galleries, private messaging, custom emoji, activity badges and playback improvements to the production channel.
+- Prevent the desktop updater from downloading an older release when checking updates or switching between Beta and Production.
+- Preserve genuine upgrades from previous stable versions and 6.4.3 betas, with correctly ordered Android and iOS build versions.
+- Include reliable native release publication and channel-specific update manifests.
+
 ## [6.4.3-beta.2] - 2026-10-29
 
 - Prevent automatic downgrades from 6.4.3 beta to 6.4.2 when checking for updates, switching release channels or applying device-specific update policies.
