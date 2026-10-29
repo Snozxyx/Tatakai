@@ -41,6 +41,10 @@ export async function finalize() {
   const {canonical,duplicates}=selectCanonicalRelease(releases,required);
   if (canonical.target_commitish !== sha) throw new Error('Package release source does not match the tag');
   const inventory=new Map(canonical.assets.map(a=>[a.name,a]));
+  const channel=version.includes('-beta.')?'beta':'latest';
+  if(!canonical.draft && !duplicates.length && canonical.prerelease===version.includes('-beta.') && ['altstore-apps.json',...['','-mac','-linux'].map(suffix=>`${channel}${suffix}.yml`)].every(name=>inventory.has(name))){
+    console.log(JSON.stringify({releaseId:canonical.id,url:canonical.html_url,draft:false,prerelease:canonical.prerelease,assets:canonical.assets.length,alreadyPublished:true}));return;
+  }
   const upload=async(name,bytes,type)=>{
     const prior=inventory.get(name);if(prior)await request(`/releases/assets/${prior.id}`,{method:'DELETE'});
     const asset=await request(`https://uploads.github.com/repos/${repo}/releases/${canonical.id}/assets?name=${encodeURIComponent(name)}`,{method:'POST',headers:{'Content-Type':type},body:bytes});inventory.set(name,asset);

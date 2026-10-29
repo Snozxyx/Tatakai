@@ -15,6 +15,16 @@ on:
         required: false
         default: false
         type: boolean
+      finalize_tag:
+        description: 'Verify or finalize an existing tag without rebuilding native packages'
+        required: false
+        default: ''
+        type: string
+      build_run_id:
+        description: 'Original successful native build run ID for finalize_tag'
+        required: false
+        default: ''
+        type: string
 
 concurrency:
   group: native-release-${{ github.ref }}
@@ -28,6 +38,7 @@ env:
 
 jobs:
   quality-gates:
+    if: ${{ !inputs.finalize_tag }}
     runs-on: ubuntu-latest
 
     steps:
@@ -518,3 +529,21 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ github.ref_name }}
           RELEASE_BUILD_RUN_ID: ${{ github.run_id }}
+
+  verify-existing-release:
+    if: ${{ inputs.finalize_tag != '' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Verify published packages and their original platform builds
+        run: node scripts/finalize-native-release.mjs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ inputs.finalize_tag }}
+          RELEASE_BUILD_RUN_ID: ${{ inputs.build_run_id }}
