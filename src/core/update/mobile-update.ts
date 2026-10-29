@@ -10,7 +10,7 @@ import { App } from '@capacitor/app';
 import { Browser } from '@capacitor/browser';
 import { Capacitor, CapacitorHttp, registerPlugin } from '@capacitor/core';
 import { toast } from 'sonner';
-import { compareAppVersions } from './version';
+import { compareAppVersions, installedAppVersion } from './version';
 
 export const MOBILE_RELEASES_URL = 'https://github.com/Snozxyx/Tatakai/releases/latest';
 const LATEST_RELEASE_API = 'https://api.github.com/repos/Snozxyx/Tatakai/releases/latest';
@@ -131,7 +131,7 @@ export async function checkMobileUpdate(
     publish({ phase: 'checking', message: undefined });
     try {
       const app = await App.getInfo();
-      const currentVersion = String(app.version || '').replace(/^v/i, '');
+      const currentVersion = installedAppVersion(app.version, Capacitor.getPlatform(), __APP_VERSION__);
       const { data: policy } = await supabase.rpc('get_device_update_policy' as never, { p_channel: policyChannel(), p_platform: updatePlatform(), p_device: updateDeviceId() } as never);
       const directive = policy as { target_version?: string; type?: string; platform?: string; eligible?: boolean; rollout_percentage?: number } | null;
       if (directive?.eligible === false) return publish({ phase: 'current', currentVersion, channel: selectedChannel, eligibility: 'not-offered', checkedAt: Date.now(), latestVersion: undefined, downloadUrl: undefined });

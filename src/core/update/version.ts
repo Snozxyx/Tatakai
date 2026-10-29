@@ -1,6 +1,6 @@
 /** SemVer precedence, including numeric beta identifiers and stable promotion. */
 export function compareAppVersions(left: string, right: string): number {
-  const parse = (value: string) => String(value || '').trim().replace(/^v/i, '').split('+')[0].match(/^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$/);
+  const parse = (value: string) => String(value || '').trim().replace(/^v/i, '').replace(/-tv$/i, '').split('+')[0].match(/^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$/);
   const a = parse(left), b = parse(right); if (!a || !b) return 0;
   for (let i = 1; i <= 3; i++) { const d = Number(a[i]) - Number(b[i]); if (d) return d > 0 ? 1 : -1; }
   if (!a[4] || !b[4]) return a[4] ? -1 : b[4] ? 1 : 0;
@@ -12,4 +12,9 @@ export function compareAppVersions(left: string, right: string): number {
     if (an !== bn) return an ? -1 : 1; return ap[i] > bp[i] ? 1 : -1;
   }
   return 0;
+}
+
+/** iOS marketing versions cannot contain prerelease labels; the packaged JS build can. */
+export function installedAppVersion(nativeVersion:string,platform:string,buildVersion:string):string {
+  return String(platform==='ios' ? buildVersion : nativeVersion || buildVersion).replace(/^v/i,'').replace(/-tv$/i,'');
 }

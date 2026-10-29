@@ -1,0 +1,3 @@
+import {test,expect} from 'bun:test';import {compareAppVersions as compare,installedAppVersion} from '../src/core/update/version';
+test('beta ordering, stable promotion and TV flavors',()=>{expect(compare('6.4.3-beta.2','6.4.3-beta.1')).toBe(1);expect(compare('6.4.3-beta.10','6.4.3-beta.2')).toBe(1);expect(compare('6.4.3','6.4.3-beta.9')).toBe(1);expect(compare('6.4.3-beta.1','6.4.3-beta.1-tv')).toBe(0);expect(compare('6.4.3-beta.1','6.4.3')).toBe(-1)});
+test('iOS preserves the packaged prerelease version',()=>{expect(installedAppVersion('6.4.3','ios','6.4.3-beta.1')).toBe('6.4.3-beta.1');expect(installedAppVersion('6.4.3-beta.1-tv','android','6.4.3-beta.1')).toBe('6.4.3-beta.1')});
