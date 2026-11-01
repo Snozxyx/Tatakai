@@ -1,3 +1,4 @@
+import { latestAnimeActivity, watchEpisodeHref } from '@/lib/favoritesEpisodes';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import React, { memo } from 'react';
@@ -107,19 +108,20 @@ export const OverviewWidgetsRail = memo(function OverviewWidgetsRail({
         onMore={() => onNavigateTab('watchlist')}
       >
         {watchlist.slice(0, 3).map((item) => {
+          const latest = latestAnimeActivity(history, item);
           const status = resolveWatchStatus(item?.status);
           const StatusIcon = status.icon;
           return (
             <Media
               key={`wl-${item.id || item.anime_id}`}
-              onClick={() => navigate(`/anime/${item.anime_id}`)}
+              onClick={() => navigate(latest?.episode_id ? watchEpisodeHref(latest.episode_id) : `/anime/${encodeURIComponent(item.anime_id)}`)}
               image={item.anime_poster}
               title={item.anime_name}
               color="rose"
               badge={
                 <>
                   <StatusIcon className="w-3 h-3" />
-                  {status.label}
+                  {latest ? `${uiI18n.t('favoritesHub.episode')} ${latest.episode_number}` : status.label}
                 </>
               }
               badgeClass={cn(status.bg, status.color)}

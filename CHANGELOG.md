@@ -4,6 +4,16 @@ All notable changes to Tatakai are documented here.
 
 ---
 
+## [6.4.4-beta.1] - 2026-11-01
+
+- Add a redesigned manga reader with reusable reading presets, improved image loading, layout anchoring, continuous navigation and progress recovery.
+- Add calendar release navigation, richer favorites/watchlist organization, viewing history controls and improved readlist synchronization.
+- Improve manga discovery and provider handling: preserve provider display names, resolve legacy Atsu sources to readable labels, and show source diagnostics accurately.
+- Refresh extension management with installed-runtime controls, clearer cards and safer mobile proxy handling.
+- Improve search, media cards, accessibility controls, settings, profile themes and mobile navigation.
+- Include new regression coverage for reader preferences, progress persistence, calendar links, favorites, episode merging, provider display names and Turnstile behavior.
+- This is a Beta-channel prerelease. Production users will not receive it unless they opt in to Beta updates.
+
 ## [6.4.3] - 2026-10-29
 
 - Release the 6.4.3 profile themes, curated galleries, private messaging, custom emoji, activity badges and playback improvements to the production channel.

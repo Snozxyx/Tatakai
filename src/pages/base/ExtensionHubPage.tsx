@@ -1,3 +1,4 @@
+import { InstalledRuntimeControls } from '@/components/extensions/InstalledRuntimeControls';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import './extension-hub.css';
 import { ExtensionStacks } from '@/components/extensions/ExtensionStacks';
@@ -166,14 +167,14 @@ function TileSkeleton() {
   );
 }
 
-export default function ExtensionHubPage() {
+export default function ExtensionHubPage({ management = false }: { management?: boolean }) {
   useUiTranslation();
   const isNative = useIsNativeApp();
   const isDesktopApp = useIsDesktopApp();
   const isIos = isIOS();
 
-  const [view, setView] = useState('browse');
-  const [visited, setVisited] = useState(() => new Set(['browse']));
+  const [view, setView] = useState(management ? 'library' : 'browse');
+  const [visited, setVisited] = useState(() => new Set([management ? 'library' : 'browse']));
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [serversOpen, setServersOpen] = useState(false);
   const [language, setLanguage] = useState('all');
@@ -335,11 +336,13 @@ export default function ExtensionHubPage() {
         </header>
       
         <Tabs value={view} onValueChange={next => { if (!['browse', 'library', 'sources'].includes(next)) return; setView(next); setVisited(previous => new Set([...previous, next])); }} className="mt-7">
-          <TabsList aria-label={uiI18n.t('extensionWorkspace.workspace')} className="grid h-12 w-full grid-cols-3 sm:w-auto sm:min-w-[28rem]">
-            <TabsTrigger value="browse" className="min-h-10"><Puzzle className="size-4" />{uiI18n.t('extensionWorkspace.browse')}</TabsTrigger>
-            <TabsTrigger value="library" className="min-h-10"><Library className="size-4" />{uiI18n.t('extensionWorkspace.library')}</TabsTrigger>
-            <TabsTrigger value="sources" className="min-h-10"><Cable className="size-4" />{uiI18n.t('extensionWorkspace.sources')}</TabsTrigger>
-          </TabsList>
+          <div className="flex flex-wrap items-center gap-3">
+          {management ? <TabsList aria-label={uiI18n.t('extensionWorkspace.workspace')}>
+            <TabsTrigger value="library"><Library className="size-4" />{uiI18n.t('extensionWorkspace.library')}</TabsTrigger>
+            <TabsTrigger value="sources"><Cable className="size-4" />{uiI18n.t('extensionWorkspace.sources')}</TabsTrigger>
+          </TabsList> : null}
+          <Button variant="outline" asChild><Link to={management ? '/extensions' : '/extensions/manage'}>{uiI18n.t(management ? 'feedback.discoverExtensions' : 'feedback.manageExtensions')}</Link></Button>
+          </div>
           {view !== 'sources' && <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
             <PillGroup<TypeFilter> options={typeFilters} value={type} onChange={setType} label={uiI18n.t('app.extension_type_3071e179')} />
             <Button variant="outline" className="min-h-11 gap-2" aria-expanded={filtersOpen} aria-controls="extension-filters" onClick={() => setFiltersOpen(open => !open)}><SlidersHorizontal className="size-4" />{uiI18n.t('extensionWorkspace.filters')}{activeFilters ? ` (${activeFilters})` : ''}</Button>
@@ -350,7 +353,7 @@ export default function ExtensionHubPage() {
         <label className="flex min-w-0 flex-col gap-1.5 text-sm">{uiI18n.t('app.compatibility_5d60c7dd')} <ThemedSelect className="w-full rounded-lg" value={compatibility} onChange={e => setCompatibility(e.target.value)}><option value="all">{uiI18n.t('app.all_compatibility_376b79c8')}</option>{['supported','limited','external','unavailable'].map(e => <option key={e} value={e}>{uiI18n.t(({"supported":"app.supported_2a5e9b1b","limited":"app.limited_1eb7d5c2","external":"app.external_59d8f3ec","unavailable":"app.unavailable_1d5ee313"})[e])}</option>)}</ThemedSelect></label>
       </div>}
           {view !== 'sources' && activeFilters > 0 && <Button variant="ghost" className="mt-2" onClick={() => { setLanguage('all'); setEcosystem('all'); setCompatibility('all'); }}>{uiI18n.t('extensionWorkspace.reset')}</Button>}
-          <TabsContent value="browse" forceMount className="data-[state=inactive]:hidden">
+          {!management && <TabsContent value="browse" forceMount className="data-[state=inactive]:hidden">
         {catalogue.serviceError || !catalogue.isServiceConfigured ? (
           <div className="mt-6 flex items-start gap-3 rounded-2xl border border-amber/25 bg-amber/10 p-4">
             <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber" />
@@ -459,7 +462,7 @@ export default function ExtensionHubPage() {
               <SectionHeading
                 title={uiI18n.t('app.all_extensions_9a2ff26b')}
                 meta={`${visibleItems.length} total · ${formatCompact(
-                  visibleItems.reduce((sum, item) => sum + item.installs + item.downloads, 0),
+                  visibleItems.reduce((sum, item) => sum + (Number.isFinite(item.installs) ? item.installs : 0) + item.downloads, 0),
                 )} installs`}
               />
               <div className="extension-catalogue grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -477,9 +480,10 @@ export default function ExtensionHubPage() {
           </div>
         )}
           {!searchParams.has('stack') && <div className="mt-10 extension-deferred-section"><ExtensionStacks installer={installer} /></div>}
-          </TabsContent>
+          </TabsContent>}
           {visited.has('library') && <TabsContent value="library" forceMount className="data-[state=inactive]:hidden">
             <div className="mt-6"><h2 className="text-xl font-semibold">{uiI18n.t('extensionWorkspace.yourExtensions')}</h2><p className="mt-1 text-sm text-muted-foreground">{uiI18n.t('extensionWorkspace.libraryDescription')}</p></div>
+            <InstalledRuntimeControls />
             <InstalledCompatibilityExtensions search={search} ecosystem={ecosystem} type={type} compatibility={compatibility} />
             <div className="mt-6">            {installed.length > 0 ? (
               <RowShelf

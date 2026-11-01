@@ -126,7 +126,7 @@ export function manifestToStoreExtension(
     isFeatured: Boolean(manifest.categories?.includes("official")),
     views: 0,
     downloads: manifest.downloads ?? 0,
-    installs: 0,
+    installs: Number.NaN,
     updatedAt: manifest.updatedAt,
     readme: "",
     versions: [],
@@ -182,6 +182,11 @@ function readAliasGroups(): string[][] {
       )
     )
     .filter((group) => group.length > 1);
+}
+
+export function registeredExtensionAliases(id: string): string[] {
+  const normalized = id.trim().toLowerCase();
+  return [...new Set([normalized, ...readAliasGroups().filter(group => group.includes(normalized)).flat()])];
 }
 
 /**
@@ -339,7 +344,7 @@ export function useStoreCatalogue({
     return list.sort((left, right) => {
       if (left.isFeatured !== right.isFeatured) return left.isFeatured ? -1 : 1;
       return (
-        right.installs + right.downloads - (left.installs + left.downloads)
+        (Number.isFinite(right.installs) ? right.installs : 0) + right.downloads - ((Number.isFinite(left.installs) ? left.installs : 0) + left.downloads)
       );
     });
   }, [query.data, needle, type, localRevision, safety.showAdultEverywhere, language]);

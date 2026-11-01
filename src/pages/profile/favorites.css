@@ -1,0 +1,24 @@
+/* Unslop direction: cover art and real charts carry the color.
+   Craft guidance: Damir Sokolovsky, https://github.com/heydamir/unslop (CC BY 4.0).
+   All overrides are scoped so profile themes keep their own visual identity. */
+.favorites-hub .glass-panel {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 12px;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+.favorites-hub .glass-panel > .pointer-events-none { display: none; }
+.favorites-hub .glass-panel h3 { font-weight: 500; letter-spacing: normal; }
+.favorites-hub .glass-panel .uppercase { text-transform: none; letter-spacing: normal; }
+.favorites-hub .glass-panel .font-black { font-weight: 600; }
+.favorites-hub .glass-panel [class*="blur-"] { display: none; }
+.favorites-hub .glass-panel [class*="bg-gradient-"] { background-image: none; }
+.favorites-hub select:focus-visible,
+.favorites-hub input:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  .favorites-hub *, .favorites-hub *::before, .favorites-hub *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

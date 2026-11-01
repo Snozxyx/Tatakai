@@ -100,7 +100,7 @@ export interface MangaDetail {
     failed: string[];
   };
   matchConfidence: number;
-  matchedBy: "anilist" | "mal" | "title" | "provider";
+  matchedBy: "anilist" | "mal" | "title" | "provider" | "mangaupdates";
   characters?: Character[];
   staff?: StaffMember[];
   relations?: MediaRelation[];

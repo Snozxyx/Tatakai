@@ -77,10 +77,13 @@ function loadTurnstileScript(): Promise<void> {
       };
       const onError = () => {
         cleanup();
+        existing.remove();
         scriptPromise = null;
         reject(new Error(uiI18n.t('app.turnstile_script_failed_7297629f')));
       };
+      const deadline = window.setTimeout(onError, 15000);
       const cleanup = () => {
+        clearTimeout(deadline);
         existing.removeEventListener("load", onLoad);
         existing.removeEventListener("error", onError);
       };
@@ -92,8 +95,10 @@ function loadTurnstileScript(): Promise<void> {
     script.src = TURNSTILE_SCRIPT_SRC;
     script.async = true;
     script.defer = true;
-    script.onload = () => resolve();
+    const deadline = window.setTimeout(() => { script.remove(); scriptPromise = null; reject(new Error("Verification timed out")); }, 15000);
+    script.onload = () => { clearTimeout(deadline); resolve(); };
     script.onerror = () => {
+      clearTimeout(deadline); script.remove();
       scriptPromise = null;
       reject(new Error(uiI18n.t('app.turnstile_script_failed_7297629f')));
     };
@@ -143,12 +148,13 @@ const HostedTurnstileWidget = forwardRef<TurnstileWidgetHandle, TurnstileWidgetP
       const id = Array.from(crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, '0')).join('');
       const url = new URL(HOSTED_TURNSTILE_URL);
       url.search = new URLSearchParams({ sitekey: TURNSTILE_SITE_KEY, action: action || '', id }).toString();
-      const timer = window.setTimeout(() => cbRef.current.onError?.(), 20000);
+      let timer = window.setTimeout(() => cbRef.current.onError?.(), 20000);
       const onMessage = (event: MessageEvent) => {
         const message = readHostedTurnstileMessage(event, frameRef.current?.contentWindow ?? null, id);
         if (!message) return;
         window.clearTimeout(timer);
         switch (message.event) {
+          case 'ready': timer = window.setTimeout(() => (cbRef.current.onTimeout ?? cbRef.current.onError)?.(), 120000); break;
           case 'token': cbRef.current.onToken(message.token!); break;
           case 'expired': cbRef.current.onExpire?.(); break;
           case 'error': cbRef.current.onError?.(); break;
@@ -166,7 +172,7 @@ const HostedTurnstileWidget = forwardRef<TurnstileWidgetHandle, TurnstileWidgetP
     return <div className={className} style={{ width: '100%', maxWidth: 320, minHeight: 65 }}>
       {frameUrl && <iframe ref={frameRef} key={frameUrl} src={frameUrl} title="Security verification"
         onError={() => cbRef.current.onError?.()} referrerPolicy="no-referrer"
-        style={{ display: 'block', border: 0, width: '100%', height: 80 }} />}
+        style={{ display: 'block', border: 0, width: '100%', height: 150 }} />}
     </div>;
   }
 );

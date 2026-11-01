@@ -564,6 +564,7 @@ export type AniListSearchFilters = {
   seasonYear?: number;
   countryOfOrigin?: 'JP' | 'KR' | 'CN' | 'TW' | 'US';
   genres?: string[];
+  tags?: string[];
   sort?: AniListSort;
 };
 
@@ -610,6 +611,7 @@ export async function searchAniListAnime(title: string, filters: AniListSearchFi
       $seasonYear: Int,
       $countryOfOrigin: CountryCode,
       $genreIn: [String],
+      $tags: [String],
       $sort: [MediaSort]
     ) {
       Page(page: $page, perPage: $perPage) {
@@ -622,6 +624,7 @@ export async function searchAniListAnime(title: string, filters: AniListSearchFi
           seasonYear: $seasonYear,
           countryOfOrigin: $countryOfOrigin,
           genre_in: $genreIn,
+          tag_in: $tags,
           sort: $sort
         ) {
           id
@@ -655,6 +658,7 @@ export async function searchAniListAnime(title: string, filters: AniListSearchFi
     seasonYear: filters.seasonYear,
     countryOfOrigin: filters.countryOfOrigin,
     genreIn: filters.genres,
+    tags: filters.tags,
     sort: filters.sort ? [filters.sort] : undefined,
   };
 
@@ -709,6 +713,7 @@ export async function fetchAniListDiscover(filters: AniListSearchFilters = {}): 
       $seasonYear: Int,
       $countryOfOrigin: CountryCode,
       $genreIn: [String],
+      $tags: [String],
       $sort: [MediaSort]
     ) {
       Page(page: $page, perPage: $perPage) {
@@ -720,6 +725,7 @@ export async function fetchAniListDiscover(filters: AniListSearchFilters = {}): 
           seasonYear: $seasonYear,
           countryOfOrigin: $countryOfOrigin,
           genre_in: $genreIn,
+          tag_in: $tags,
           sort: $sort
         ) {
           id
@@ -753,6 +759,7 @@ export async function fetchAniListDiscover(filters: AniListSearchFilters = {}): 
     seasonYear: filters.seasonYear,
     countryOfOrigin: filters.countryOfOrigin,
     genreIn: filters.genres,
+    tags: filters.tags,
     sort: filters.sort ? [filters.sort] : ['TRENDING_DESC'],
   };
 

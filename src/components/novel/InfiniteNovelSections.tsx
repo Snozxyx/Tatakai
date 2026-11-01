@@ -9,7 +9,7 @@ import { useInfiniteNovelSections, useNovelSectionItems, type NovelSection, type
 import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-import { ChevronLeft, ChevronRight, ArrowRight, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { HomeSectionHeading } from '@/components/home/HomeSectionHeading';
 
@@ -17,7 +17,7 @@ function SectionSkeleton({ layout }: { layout: NovelSectionLayout }) {
   useUiTranslation();
   void layout;
   return (
-    <div className="mb-16 animate-pulse">
+    <div className="animate-pulse">
       <div className="flex items-center justify-between mb-6 px-2">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-white/5" />
@@ -45,13 +45,12 @@ function SectionContent({ section, isMobile }: { section: NovelSection; isMobile
   const scrollRef = useRef<HTMLDivElement>(null);
   const {
     items: sectionItems,
-    loadMore,
     isFetching,
     hasMore,
     sentinelRef,
   } = useNovelSectionItems(section.id);
 
-  const listItems = useMemo(() => section.items.concat(sectionItems), [section.items, sectionItems]);
+  const listItems = useMemo(() => Array.from(new Map(section.items.concat(sectionItems).map(item => [item.id, item])).values()), [section.items, sectionItems]);
 
   const scroll = (direction: 'left' | 'right') => {
     if (scrollRef.current) {
@@ -59,11 +58,6 @@ function SectionContent({ section, isMobile }: { section: NovelSection; isMobile
       scrollRef.current.scrollBy({ left: amount, behavior: 'smooth' });
     }
   };
-
-  const genreSlug = section.genre
-    ? section.genre.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
-    : '';
-  const genreUrl = genreSlug ? `/novel/genre/${genreSlug}` : '/novel/discover';
 
   return (
     <div className="space-y-4 group/section">
@@ -106,45 +100,9 @@ function SectionContent({ section, isMobile }: { section: NovelSection; isMobile
             </motion.div>
           ))}
 
-          {/* Poster-size "Show more" card to the genre page */}
-          <Link
-            to={genreUrl}
-            aria-label={uiI18n.t('app.show_more_i18n_value_0_959378b5', { value0: section.genre })}
-            className="media-card-rail-item"
-          >
-            <span className="flex aspect-[2/3] w-full flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-white/15 bg-white/[0.02] transition-colors hover:border-primary/50 hover:bg-primary/[0.06]">
-              <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/15 text-primary">
-                <Plus className="h-6 w-6" />
-              </span>
-              <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                {uiI18n.t('app.show_more_25911d48')}
-              </span>
-            </span>
-            <span className="mt-2.5 block px-0.5 text-sm font-bold leading-snug text-white/45">
-              {section.genre}
-            </span>
-          </Link>
-
-          {/* Inline Loading / Sentinel Indicator */}
-          {hasMore && (
-            <div
-              ref={sentinelRef}
-              className="w-24 sm:w-32 flex-shrink-0 flex flex-col items-center justify-center rounded-2xl border border-white/5 bg-white/[0.02] p-4 text-center"
-            >
-              {isFetching ? (
-                <Loader2 className="w-6 h-6 animate-spin text-primary" />
-              ) : (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => loadMore()}
-                  className="text-xs font-bold text-muted-foreground hover:text-foreground"
-                >
-                  {uiI18n.t('app.load_more_dfe60ca9')}
-                </Button>
-              )}
-            </div>
-          )}
+          {hasMore && <div ref={sentinelRef} className="flex w-8 shrink-0 items-center justify-center" aria-hidden="true">
+            {isFetching && <Loader2 className="size-5 animate-spin text-muted-foreground" />}
+          </div>}
         </div>
       </div>
     </div>
@@ -200,7 +158,7 @@ export function InfiniteNovelSections() {
 
   if (status === 'pending') {
     return (
-      <div className="space-y-12">
+      <div className="space-y-8 md:space-y-12">
         <SectionSkeleton layout="featured" />
         <SectionSkeleton layout="carousel" />
       </div>
@@ -217,7 +175,7 @@ export function InfiniteNovelSections() {
   }
 
   return (
-    <div className={cn("space-y-16 md:space-y-24 mt-24")}>
+    <div className={cn("space-y-8 md:space-y-12 mt-8 md:mt-12")}>
       {sections.map((section) => (
         <section key={section.id} className="relative w-full">
           {(() => {
@@ -230,7 +188,6 @@ export function InfiniteNovelSections() {
               <HomeSectionHeading
                 icon={section.icon ? <section.icon className="w-5 h-5 text-primary" /> : undefined}
                 title={section.title}
-                subtitle={uiI18n.t('app.curated_i18n_value_0_22a0cb63', { value0: section.genre })}
                 action={
                   <Link
                     to={genreUrl}
@@ -248,7 +205,7 @@ export function InfiniteNovelSections() {
         </section>
       ))}
 
-      <div ref={loadMoreRef} className="h-32 flex items-center justify-center">
+      <div ref={loadMoreRef} className="h-16 flex items-center justify-center">
         {isFetchingNextPage ? (
           <Loader2 className="w-8 h-8 text-primary animate-spin" />
         ) : hasNextPage ? (

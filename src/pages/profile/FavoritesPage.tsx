@@ -1,886 +1,824 @@
-import { ReadingCollections } from '@/components/profile/ReadingCollections';
-import uiI18n from '@/lib/uiI18n';
-import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
-/**
- * Favorites (docs/Plans.md §2 "Favorites Page"), rebuilt in the discover design
- * language of docs/image-8.png.
- *
- * Four data sources land on this one page: the saved watchlist, the heuristic
- * recommender, the ML recommender, and AniList's all-time favorites. The old
- * page gave each its own card treatment, grid gutters and accent colour, so the
- * page read as four widgets stacked. Here they all render through the shared
- * `PosterCard`, and whatever is specific to a source — a match score, a reason,
- * an add-to-list button — goes in that card's `footer` slot.
- */
-import { useMemo, useState, type ReactNode } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import {
-  BookOpen,
-  Brain,
-  Check,
-  CheckCircle2,
-  ChevronDown,
-  Clock,
-  Heart,
-  Pause,
-  Plus,
-  Sparkles,
-  Trash2,
-  TrendingUp,
-  X,
-} from 'lucide-react';
-import { Background } from '@/components/layout/Background';
-import { Sidebar } from '@/components/layout/Sidebar';
-import { MobileNav } from '@/components/layout/MobileNav';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { useConfirm } from '@/components/ui/confirm-dialog';
-import { BoardHero } from '@/components/anime/discover/BoardHero';
-import { PillGroup, type PillOption } from '@/components/anime/discover/PillGroup';
-import { PosterCard } from '@/components/anime/discover/PosterCard';
+import FavoritesHistory from "./FavoritesHistory";
+import FavoritesWatchControls from "./FavoritesWatchControls";
+import { ThemedCheckbox } from "@/components/ui/themed-checkbox";
+import { ThemedSelect } from "@/components/ui/themed-select";
+import { lazy, Suspense, useMemo, useState, useEffect } from "react";
+import { Link, useSearchParams, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import { Heart, Search, Trash2 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { MobileNav } from "@/components/layout/MobileNav";
+import { ProfileOverviewTab } from "@/components/profile/overview";
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { PosterCard } from "@/components/anime/discover/PosterCard";
 import {
   POSTER_GRID_CLASS,
   PosterGridSkeleton,
-} from '@/components/anime/discover/DiscoverPosterGrid';
-import { SectionHeading } from '@/components/anime/discover/SectionHeading';
-import { MangaPicksSection } from '@/components/manga/MangaPicksSection';
+} from "@/components/anime/discover/DiscoverPosterGrid";
 import {
-  animeCardToPosterItem,
-  controlItemClass,
-  controlMenuClass,
-  controlTriggerClass,
-  RAIL_LENGTH,
-  type PosterItem,
-} from '@/components/anime/discover/types';
-import { useAuth } from '@/contexts/AuthContext';
-import {
-  useGenrePreferences,
-  usePersonalizedRecommendations,
-} from '@/hooks/api/useRecommendations';
-import { useMLRecommendations, useTasteProfile } from '@/hooks/api/useMLRecommendations';
-import { useSmartFavorites, type SmartFavorite } from '@/hooks/user/useSmartFavorites';
-import {
+  useWatchlist,
   useAddToWatchlist,
   useBulkRemoveFromWatchlist,
-  useWatchlist,
-  type WatchlistItem,
   type WatchlistStatus,
-} from '@/hooks/user/useWatchlist';
-import { useIsDesktopApp } from '@/hooks/ui/useIsNativeApp';
+} from "@/hooks/user/useWatchlist";
 import {
-  fetchAniListDiscover,
-  fetchAniListMediaById,
-  type AniListMedia,
-} from '@/lib/externalIntegrations';
-import { parseExternalAnimeId, buildExternalAnimeRouteId, toPositiveInt } from '@/lib/animeIdMapping';
-import { cn } from '@/lib/utils';
-import { ExtensionLibrary } from '@/components/extensions/ExtensionLibrary';
+  useMangaReadlist,
+  useReadingTrackTotals,
+  useUpsertMangaReadlist,
+  useRemoveFromMangaReadlist,
+  type MangaReadlistStatus,
+} from "@/hooks/user/useMangaReadlist";
+import {
+  useNovelReadlist,
+  useUpsertNovelReadlist,
+  useRemoveFromNovelReadlist,
+  type NovelReadlistStatus,
+} from "@/hooks/user/useNovelReadlist";
+import { useWatchHistory } from "@/hooks/user/useWatchHistory";
+import { useProfileAnalytics } from "@/hooks/user/useProfileAnalytics";
+import { useProfileWatchTime } from "@/hooks/user/useProfileWatchTime";
+import { useWatchStreaks } from "@/hooks/user/useWatchStreaks";
+import { useExternalStats } from "@/hooks/user/useExternalStats";
+import { useUserForumPosts } from "@/hooks/community/useForum";
+import { useFollow } from "@/hooks/community/useFollow";
+import { useResolvedMangaReadlist } from "@/hooks/api/useResolvedMangaReadlist";
+import { useIsDesktopApp } from "@/hooks/ui/useIsNativeApp";
+import { getReadingHistory, readingHistoryHref } from "@/lib/readingHistory";
+import { readlistProgressLabels } from "@/lib/reader/readlistDisplay";
+import {
+  filterLibrary,
+  groupLibrary,
+  type LibraryEntry,
+} from "@/lib/favoritesLibrary";
+import { parseExternalAnimeId } from "@/lib/animeIdMapping";
+import { cn } from "@/lib/utils";
+import "./favorites.css";
 
-type TabType =
-  | 'for-you'
-  | 'ai-recs'
-  | 'all'
-  | 'watching'
-  | 'completed'
-  | 'plan'
-  | 'on-hold'
-  | 'dropped';
-
-const TABS: ReadonlyArray<PillOption<TabType>> = [
-  { id: 'for-you', get label() { return uiI18n.t('app.for_you_7e13d94a'); }, icon: <Sparkles className="h-3.5 w-3.5" /> },
-  { id: 'ai-recs', get label() { return uiI18n.t('app.ai_picks_c9b4570a'); }, icon: <Brain className="h-3.5 w-3.5" /> },
-  { id: 'all', get label() { return uiI18n.t('app.all_saved_c84b82cf'); }, icon: <BookOpen className="h-3.5 w-3.5" /> },
-  { id: 'watching', get label() { return uiI18n.t('app.watching_96d9e027'); }, icon: <TrendingUp className="h-3.5 w-3.5" /> },
-  { id: 'completed', get label() { return uiI18n.t('app.completed_1798b3ba'); }, icon: <CheckCircle2 className="h-3.5 w-3.5" /> },
-  { id: 'plan', get label() { return uiI18n.t('app.planned_9cbe42aa'); }, icon: <Clock className="h-3.5 w-3.5" /> },
-  { id: 'on-hold', get label() { return uiI18n.t('app.on_hold_7725fc0e'); }, icon: <Pause className="h-3.5 w-3.5" /> },
-  { id: 'dropped', get label() { return uiI18n.t('app.dropped_8cf622d3'); }, icon: <X className="h-3.5 w-3.5" /> },
+const Recommendations = lazy(() => import("./FavoritesRecommendations"));
+const TABS = [
+  "overview",
+  "watchlist",
+  "manga",
+  "novels",
+  "history",
+  "recommendations",
+] as const;
+type Tab = (typeof TABS)[number];
+const ANIME_STATUSES = [
+  "watching",
+  "completed",
+  "plan_to_watch",
+  "on_hold",
+  "dropped",
 ];
-
-/** Tab → the `watchlist.status` it filters on. Null means "not a list tab". */
-const STATUS_MAP: Record<TabType, WatchlistStatus | null> = {
-  'for-you': null,
-  'ai-recs': null,
-  all: null,
-  watching: 'watching',
-  completed: 'completed',
-  plan: 'plan_to_watch',
-  'on-hold': 'on_hold',
-  dropped: 'dropped',
-};
-
-const STATUS_LABEL: Record<WatchlistStatus, string> = {
-  watching: 'Watching',
-  completed: 'Completed',
-  plan_to_watch: 'Planned',
-  on_hold: 'On hold',
-  dropped: 'Dropped',
-};
-
-type SortBy = 'recent' | 'alpha';
-
-const SORTS: ReadonlyArray<{ id: SortBy; label: string }> = [
-  { id: 'recent', get label() { return uiI18n.t('app.recently_added_53696342'); } },
-  { id: 'alpha', label: 'A–Z' },
+const READING_STATUSES = [
+  "reading",
+  "completed",
+  "plan_to_read",
+  "on_hold",
+  "dropped",
 ];
-
-/** Headings per tab, so the section under the filter row says what it lists. */
-const TAB_COPY: Record<TabType, { eyebrow: string; title: string }> = {
-  'for-you': { eyebrow: 'Picked for you', get title() { return uiI18n.t('app.because_of_what_you_watch_9e62e4f5'); } },
-  'ai-recs': { eyebrow: 'Taste model', get title() { return uiI18n.t('app.ranked_by_match_76daec7b'); } },
-  all: { eyebrow: 'Your collection', get title() { return uiI18n.t('app.everything_saved_f335b1d8'); } },
-  watching: { eyebrow: 'In progress', get title() { return uiI18n.t('app.currently_watching_8cb3624c'); } },
-  completed: { eyebrow: 'Finished', get title() { return uiI18n.t('app.completed_1798b3ba'); } },
-  plan: { eyebrow: 'Queued', get title() { return uiI18n.t('app.planned_to_watch_71debb3b'); } },
-  'on-hold': { eyebrow: 'Paused', get title() { return uiI18n.t('app.on_hold_7725fc0e'); } },
-  dropped: { eyebrow: 'Set aside', get title() { return uiI18n.t('app.dropped_8cf622d3'); } },
-};
-
-/** Empty copy per tab — eight tabs, one panel, no generic "nothing here". */
-const EMPTY_COPY: Record<TabType, { title: string; hint: string }> = {
-  'for-you': {
-    get title() { return uiI18n.t('app.no_recommendations_yet_d2c6e797'); },
-    hint: 'Watch a few episodes and this fills in with titles like the ones you finish.',
-  },
-  'ai-recs': {
-    get title() { return uiI18n.t('app.the_taste_model_needs_more_history_3c5b934d'); },
-    hint: 'Complete a couple of series and the match scores start to mean something.',
-  },
-  all: { get title() { return uiI18n.t('app.nothing_saved_yet_b54a5380'); }, hint: 'Add a title from its page and it lands here.' },
-  watching: {
-    get title() { return uiI18n.t('app.nothing_in_progress_a710d3cd'); },
-    hint: 'Titles you are part-way through show up here.',
-  },
-  completed: { get title() { return uiI18n.t('app.nothing_finished_yet_d7a5a84b'); }, hint: 'Mark a title completed and it moves here.' },
-  plan: { get title() { return uiI18n.t('app.your_queue_is_empty_fb670bd9'); }, hint: 'Save anything you want to get to later.' },
-  'on-hold': {
-    get title() { return uiI18n.t('app.nothing_on_hold_63f4a621'); },
-    hint: 'Paused a series? Park it here so it stays out of your active list.',
-  },
-  dropped: { get title() { return uiI18n.t('app.nothing_dropped_f27f0df5'); }, hint: 'Titles you set aside show up here.' },
-};
-
-/**
- * Saved rows and suggestions keep an `anime_id` only, so the id the hover
- * preview needs has to be read back out of it — `anilist:456` for anything that
- * came from AniList, nothing at all for a provider slug, in which case the card
- * simply never fetches a preview.
- */
-function previewAniListId(animeId: string | null | undefined): number | undefined {
-  const parsed = parseExternalAnimeId(String(animeId || '').trim());
-  return parsed?.provider === 'anilist' ? parsed.id : undefined;
-}
-
-function watchlistToPosterItem(entry: WatchlistItem, index: number): PosterItem {
-  return {
-    key: `${entry.id || entry.anime_id}-${index}`,
-    href: entry.anime_id
-      ? `/anime/${entry.anime_id}`
-      : `/search?q=${encodeURIComponent(entry.anime_name)}`,
-    title: entry.anime_name,
-    poster: entry.anime_poster || '',
-    anilistId: toPositiveInt((entry as any)?.anilist_id) || previewAniListId(entry.anime_id),
-    meta: STATUS_LABEL[entry.status] ?? undefined,
-  };
-}
-
-/** AniList and the smart recommender both hand over ids, names and posters only. */
-function suggestionToPosterItem(
-  suggestion: { animeId: string; animeName: string; animePoster: string | null },
-  index: number,
-): PosterItem {
-  return {
-    key: `${suggestion.animeId}-${index}`,
-    href: suggestion.animeId
-      ? `/anime/${suggestion.animeId}`
-      : `/search?q=${encodeURIComponent(suggestion.animeName)}`,
-    title: suggestion.animeName,
-    poster: suggestion.animePoster || '',
-    anilistId: previewAniListId(suggestion.animeId),
-  };
-}
+const EMPTY: any[] = [];
 
 export default function FavoritesPage() {
-  useUiTranslation();
-  const { user } = useAuth();
+  const { t } = useTranslation();
+  const { user, profile, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const isDesktopApp = useIsDesktopApp();
-  const [activeTab, setActiveTab] = useState<TabType>('for-you');
-  const [sortBy, setSortBy] = useState<SortBy>('recent');
-  const [selectMode, setSelectMode] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const confirm = useConfirm();
-
-  const { data: recommendations, isLoading: loadingRecs } = usePersonalizedRecommendations(24);
-  const { data: mlRecommendations, isLoading: loadingML } = useMLRecommendations(30);
-  const { data: tasteProfile, isLoading: loadingProfile } = useTasteProfile();
-  const { data: genrePrefs } = useGenrePreferences();
-  const { data: watchlist, isLoading: loadingWatchlist } = useWatchlist();
-  const { data: smartFavorites } = useSmartFavorites(6);
-  const { data: aniListFavorites = [], isLoading: loadingAniListFavorites } = useQuery({
-    queryKey: ['anilist-favorites-favorites-page'],
-    queryFn: () => fetchAniListDiscover({ perPage: 18, sort: 'FAVOURITES_DESC' }),
-    staleTime: 10 * 60 * 1000,
+  const desktop = useIsDesktopApp();
+  const [params, setParams] = useSearchParams();
+  const tab: Tab = TABS.includes(params.get("tab") as Tab)
+    ? (params.get("tab") as Tab)
+    : "overview";
+  const setParam = (key: string, value: string, replace = false) =>
+    setParams(
+      (previous) => {
+        const next = new URLSearchParams(previous);
+        next.set(key, value);
+        return next;
+      },
+      { replace }
+    );
+  const watchlist = useWatchlist();
+  const manga = useMangaReadlist();
+  const novels = useNovelReadlist();
+  const history = useWatchHistory();
+  const resolved = useResolvedMangaReadlist(manga.data || EMPTY);
+  const totals = useReadingTrackTotals();
+  const watchTime = useProfileWatchTime(profile?.user_id, !!user);
+  const { streak, achievements } = useWatchStreaks();
+  const external = useExternalStats(profile, !!user);
+  const forum = useUserForumPosts(profile?.user_id);
+  const { followStats } = useFollow(profile?.user_id);
+  const analytics = useProfileAnalytics({
+    profile,
+    watchlist: watchlist.data,
+    history: history.data,
+    mangaReadlist: resolved.data,
+    ownNovelReadlist: novels.data || EMPTY,
+    viewedStreak: streak,
+    forumPosts: forum.data || EMPTY,
+    followStats,
   });
+  const animeMutation = useAddToWatchlist();
+  const mangaMutation = useUpsertMangaReadlist();
+  const novelMutation = useUpsertNovelReadlist();
   const bulkRemove = useBulkRemoveFromWatchlist();
-  const addToWatchlist = useAddToWatchlist();
-
-  const showRecommendations = activeTab === 'for-you';
-  const showMLRecs = activeTab === 'ai-recs';
-  const isListTab = !showRecommendations && !showMLRecs;
-  const isLoading = showRecommendations
-    ? loadingRecs
-    : showMLRecs
-      ? loadingML || loadingProfile
-      : loadingWatchlist;
-
-  const rows = useMemo(() => watchlist ?? [], [watchlist]);
-
-  /** Lets a suggestion card say "in your list" instead of offering a second add. */
-  const savedIds = useMemo(() => new Set(rows.map((row) => row.anime_id)), [rows]);
-
-  const counts = useMemo(() => {
-    const tally = { total: rows.length, watching: 0, completed: 0 };
-    for (const row of rows) {
-      if (row.status === 'watching') tally.watching += 1;
-      if (row.status === 'completed') tally.completed += 1;
-    }
-    return tally;
-  }, [rows]);
-
-  const filteredWatchlist = useMemo(() => {
-    const status = STATUS_MAP[activeTab];
-    const list = status ? rows.filter((row) => row.status === status) : [...rows];
-    if (sortBy === 'alpha') {
-      list.sort((a, b) => a.anime_name.localeCompare(b.anime_name));
-    } else {
-      list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-    }
-    return list;
-  }, [rows, activeTab, sortBy]);
-
-  /** The row the hero is about: the most recently touched watching entry. */
-  const heroRow = useMemo(() => {
-    if (rows.length === 0) return null;
-    return rows.find((row) => row.status === 'watching') ?? rows[0];
-  }, [rows]);
-
-  const heroExternalIds = useMemo(() => {
-    if (!heroRow) return { anilistId: null as number | null, malId: null as number | null };
-
-    // Saved rows only keep `anime_id`, so the external ids usually have to be
-    // read back out of it — `mal:123` / `anilist:456` for externally-sourced
-    // titles, nothing at all for provider slugs.
-    const parsed = parseExternalAnimeId(String(heroRow.anime_id || '').trim());
-    let anilistId = toPositiveInt((heroRow as any)?.anilist_id) || null;
-    let malId = toPositiveInt((heroRow as any)?.mal_id) || null;
-    if (parsed?.provider === 'anilist') anilistId = parsed.id;
-    if (parsed?.provider === 'mal') malId = parsed.id;
-
-    return { anilistId, malId };
-  }, [heroRow]);
-
-  const { data: heroAniListMedia } = useQuery({
-    queryKey: ['favorites-hero-banner', heroExternalIds.anilistId, heroExternalIds.malId],
-    queryFn: () =>
-      fetchAniListMediaById({
-        anilistId: heroExternalIds.anilistId,
-        malId: heroExternalIds.malId,
-      }),
-    enabled: Boolean(heroRow && (heroExternalIds.anilistId || heroExternalIds.malId)),
-    staleTime: 10 * 60 * 1000,
-  });
-
-  /** Leader first, then the rest of the list in most-recent order. */
-  const heroItems = useMemo(() => {
-    if (!heroRow) return [];
-    const ordered = [heroRow, ...rows.filter((row) => row.id !== heroRow.id)];
-    return ordered.slice(0, RAIL_LENGTH).map(watchlistToPosterItem);
-  }, [heroRow, rows]);
-
-  const heroStats = useMemo(() => {
-    const chips: string[] = [];
-    if (counts.total) chips.push(`${counts.total} saved`);
-    if (counts.watching) chips.push(`${counts.watching} watching`);
-    if (counts.completed) chips.push(`${counts.completed} completed`);
-    return chips;
-  }, [counts]);
-
-  const recEntries = useMemo(
-    () =>
-      (recommendations ?? []).map((entry, index) => ({
-        item: animeCardToPosterItem(entry.anime, index),
-        note: entry.reason,
+  const removeManga = useRemoveFromMangaReadlist();
+  const removeNovel = useRemoveFromNovelReadlist();
+  const confirm = useConfirm();
+  const [selected, setSelected] = useState<string[]>([]);
+  const [managing, setManaging] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const [mutationError, setMutationError] = useState(false);
+  useEffect(() => {
+    setManaging(false);
+    setSelected([]);
+  }, [tab]);
+  const entries = useMemo<LibraryEntry[]>(
+    () => [
+      ...(watchlist.data || []).map((row) => ({
+        key: `anime:${row.anime_id}`,
+        id: row.anime_id,
+        kind: "anime" as const,
+        title: row.anime_name,
+        poster: row.anime_poster,
+        status: row.status,
+        format: "anime",
+        updatedAt: row.updated_at || row.created_at,
+        href: `/anime/${encodeURIComponent(row.anime_id)}`,
+        source: row,
       })),
-    [recommendations],
-  );
-
-  const mlEntries = useMemo(
-    () =>
-      (mlRecommendations ?? []).map((entry, index) => ({
-        item: animeCardToPosterItem(entry.anime, index),
-        note: [`${Math.round(entry.score)}% match`, entry.reasons?.[0]].filter(Boolean).join(' · '),
-      })),
-    [mlRecommendations],
-  );
-
-  const listEntries = useMemo(
-    () =>
-      filteredWatchlist.map((row, index) => ({
-        item: watchlistToPosterItem(row, index),
-        animeId: row.anime_id,
-      })),
-    [filteredWatchlist],
-  );
-
-  const smartEntries = useMemo(
-    () =>
-      (smartFavorites ?? []).map((suggestion: SmartFavorite, index) => ({
-        item: suggestionToPosterItem(suggestion, index),
-        suggestion,
-        note: suggestion.reason,
-      })),
-    [smartFavorites],
-  );
-
-  const aniListEntries = useMemo(
-    () =>
-      aniListFavorites.slice(0, 12).map((media: AniListMedia, index) => {
-        const suggestion = {
-          // `/anime/:id` resolves `mal:`/`anilist:` prefixed ids; the bare
-          // AniList id the old page linked to is not one of them.
-          animeId:
-            buildExternalAnimeRouteId(media?.idMal, media?.id) || String(media?.id ?? ''),
-          animeName:
-            media?.title?.english ||
-            media?.title?.romaji ||
-            media?.title?.native ||
-            `AniList #${media?.id}`,
-          animePoster: media?.coverImage?.large || media?.coverImage?.medium || null,
-        };
+      ...[
+        ...(resolved.data || []).map((row) => ({
+          row,
+          kind: "manga" as const,
+        })),
+        ...(novels.data || []).map((row) => ({ row, kind: "novel" as const })),
+      ].map(({ row, kind }) => {
+        const progress = readlistProgressLabels(row);
         return {
-          item: {
-            ...suggestionToPosterItem(suggestion, index),
-            anilistId: toPositiveInt(media?.id),
-            meta: [media?.format, media?.seasonYear].filter(Boolean).join(' · '),
-            score: media?.averageScore ? (media.averageScore / 10).toFixed(1) : undefined,
-          },
-          suggestion,
-          note: `${media?.favourites?.toLocaleString(uiI18n.language) ?? '—'} favorites`,
+          key: `${kind}:${row.manga_id}`,
+          id: row.manga_id,
+          kind,
+          title: row.manga_title,
+          poster: row.manga_poster,
+          status: row.status,
+          format: kind === "novel" ? "novel" : row.format || "manga",
+          updatedAt: row.updated_at,
+          href: `/${kind}/${encodeURIComponent(
+            ("resolved_manga_id" in row && row.resolved_manga_id) ||
+              row.manga_id
+          )}`,
+          resumeHref: progress.hasChapter ? readingHistoryHref(row) : undefined,
+          progress: [
+            progress.chapterLabel,
+            kind === "novel"
+              ? row.last_chapter_key
+                ? `${t("favoritesHub.paragraph")} ${
+                    (row.last_page_index || 0) + 1
+                  }`
+                : null
+              : progress.pageLabel,
+          ]
+            .filter(Boolean)
+            .join(" · "),
+          source: row,
         };
       }),
-    [aniListFavorites],
+    ],
+    [watchlist.data, resolved.data, novels.data, t]
   );
-
-  /**
-   * Suggestions land as `plan_to_watch` whichever section they came from. The
-   * old smart-favorites button saved them as `watching`, which marked a title
-   * the visitor had never opened as in progress.
-   */
-  const addSuggestion = (suggestion: {
-    animeId: string;
-    animeName: string;
-    animePoster: string | null;
-  }) =>
-    addToWatchlist.mutate({
-      animeId: suggestion.animeId,
-      animeName: suggestion.animeName,
-      animePoster: suggestion.animePoster || undefined,
-      status: 'plan_to_watch',
-    });
-
-  const removeSelected = async () => {
-    if (selectedIds.length === 0) return;
-    if (!(await confirm({ get title() { return uiI18n.t('app.remove_i18n_value_0_titlei18n_value_1_fdf60645', { value0: selectedIds.length, value1: selectedIds.length === 1 ? '' : 's' }); }, destructive: true }))) return;
-    await bulkRemove.mutateAsync(selectedIds);
-    setSelectedIds([]);
-    setSelectMode(false);
+  const historyEntries = useMemo<LibraryEntry[]>(
+    () => [
+      ...(history.data || []).map((row) => ({
+        key: `history:${row.id}`,
+        id: row.anime_id,
+        kind: "anime" as const,
+        title: row.anime_name,
+        poster: row.anime_poster,
+        status: row.completed ? "completed" : "watching",
+        format: "anime",
+        updatedAt: row.watched_at,
+        href: `/watch/${encodeURIComponent(row.episode_id)}`,
+        progress: `${t("favoritesHub.episode")} ${row.episode_number}`,
+        source: row,
+      })),
+      ...entries
+        .filter(
+          (entry) =>
+            entry.kind !== "anime" &&
+            getReadingHistory([entry.source]).length > 0
+        )
+        .map((entry) => ({
+          ...entry,
+          key: `history:${entry.key}`,
+          href: readingHistoryHref(entry.source),
+        })),
+    ],
+    [entries, history.data, t]
+  );
+  const prefix = `${tab}.`;
+  const query = params.get(`${prefix}q`) || "";
+  const status = params.get(`${prefix}status`) || "all";
+  const format = params.get(`${prefix}format`) || "all";
+  const sort = params.get(`${prefix}sort`) === "title" ? "title" : "recent";
+  const media = params.get("history.media") || "all";
+  const days = ["7", "30", "90"].includes(params.get("history.days") || "")
+    ? Number(params.get("history.days"))
+    : 0;
+  const list =
+    tab === "history"
+      ? historyEntries
+      : entries.filter(
+          (entry) =>
+            entry.kind ===
+            (tab === "watchlist"
+              ? "anime"
+              : tab === "novels"
+              ? "novel"
+              : "manga")
+        );
+  const filtered = filterLibrary(list, {
+    search: query,
+    status: tab === "history" ? "all" : status,
+    format: tab === "manga" ? format : "all",
+    sort: tab === "history" ? "recent" : sort,
+    kind: tab === "history" ? media : "all",
+    days: tab === "history" ? days : 0,
+  });
+  const groups = groupLibrary(filtered);
+  const sourceQueries =
+    tab === "watchlist"
+      ? [watchlist]
+      : tab === "manga"
+      ? [manga]
+      : tab === "novels"
+      ? [novels]
+      : [watchlist, manga, novels, history];
+  const loading =
+    sourceQueries.some((query) => query.isLoading) ||
+    ((tab === "manga" || tab === "overview" || tab === "history") &&
+      resolved.isLoading);
+  const failed = sourceQueries.some((query) => query.isError);
+  const statuses = tab === "watchlist" ? ANIME_STATUSES : READING_STATUSES;
+  const busy =
+    animeMutation.isPending ||
+    mangaMutation.isPending ||
+    novelMutation.isPending ||
+    removing;
+  const updateStatus = (entry: LibraryEntry, value: string) => {
+    if (entry.kind === "anime")
+      animeMutation.mutate({
+        animeId: entry.id,
+        animeName: entry.title,
+        animePoster: entry.poster || undefined,
+        status: value as WatchlistStatus,
+      });
+    else if (entry.kind === "novel")
+      novelMutation.mutate({
+        novelId: entry.id,
+        novelTitle: entry.title,
+        novelPoster: entry.poster,
+        status: value as NovelReadlistStatus,
+      });
+    else
+      mangaMutation.mutate({
+        mangaId: entry.id,
+        mangaTitle: entry.title,
+        mangaPoster: entry.poster,
+        format: entry.source.format,
+        status: value as MangaReadlistStatus,
+      });
   };
-
-  const shellClass = cn(
-    'relative z-10 mx-auto max-w-[1800px] pb-24 md:pb-6',
-    'pr-[max(1rem,env(safe-area-inset-right))] md:pr-6',
-    'pt-[calc(1rem+env(safe-area-inset-top,0px))] md:pt-6',
-    isDesktopApp ? 'p-4 md:p-6' : 'pl-[max(1rem,env(safe-area-inset-left))] md:pl-32',
+  const removeSelected = async () => {
+    const targets = entries.filter((entry) => selected.includes(entry.key));
+    if (
+      !targets.length ||
+      !(await confirm({
+        title: t("favoritesHub.confirmRemove", { count: targets.length }),
+        destructive: true,
+      }))
+    )
+      return;
+    setRemoving(true);
+    setMutationError(false);
+    try {
+      const anime = targets.filter((entry) => entry.kind === "anime");
+      if (anime.length)
+        await bulkRemove.mutateAsync(anime.map((entry) => entry.id));
+      for (const entry of targets.filter((entry) => entry.kind !== "anime")) {
+        if (entry.kind === "novel")
+          await removeNovel.mutateAsync({ novelId: entry.id });
+        else await removeManga.mutateAsync({ mangaId: entry.id });
+      }
+      setSelected([]);
+      setManaging(false);
+    } catch {
+      setMutationError(true);
+    } finally {
+      setRemoving(false);
+    }
+  };
+  const select = (
+    label: string,
+    value: string,
+    key: string,
+    options: Array<[string, string]>
+  ) => (
+    <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+      {label}
+      <ThemedSelect
+        aria-label={label}
+        value={value}
+        onChange={(event) => setParam(key, event.target.value)}
+        className="min-h-11 rounded-lg border border-border bg-background px-3 text-sm text-foreground"
+      >
+        {options.map(([value, label]) => (
+          <option key={value} value={value}>
+            {label}
+          </option>
+        ))}
+      </ThemedSelect>
+    </label>
   );
-
-  if (!user) {
-    return (
-      <div className="min-h-screen overflow-x-hidden bg-background text-foreground">
-        <Background />
-        <Sidebar />
-
-        <main className={shellClass}>
-          <section className="relative mt-2 overflow-hidden rounded-[2rem] border border-white/[0.07] bg-card">
-            <div className="absolute inset-0 bg-[radial-gradient(120%_90%_at_15%_110%,hsl(var(--primary)/0.28),transparent_60%)]" />
-            <div className="relative flex min-h-[60vh] flex-col items-center justify-center px-6 py-16 text-center">
-              <span className="flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04]">
-                <Heart className="h-7 w-7 text-primary" />
-              </span>
-              <p className="mt-6 text-[11px] font-bold uppercase tracking-[0.28em] text-primary">
-                {uiI18n.t('app.your_collection_f01e10ce')}
-              </p>
-              <h1 className="font-display mt-3 text-4xl font-black tracking-tight text-foreground sm:text-5xl">
-                {uiI18n.t('app.favorites_live_behind_sign_in_112f5156')}
-              </h1>
-              <p className="mt-4 max-w-md text-sm leading-relaxed text-white/55 sm:text-base">
-                {uiI18n.t('app.sign_in_to_keep_a_watchlist_pick_up_where_you_le_94db824c')}
-              </p>
-              <button
-                type="button"
-                onClick={() => navigate('/auth')}
-                className="group mt-8 inline-flex items-center gap-2 rounded-full bg-gradient-to-b from-primary to-secondary px-6 py-3 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:from-primary/90 hover:to-secondary/90 hover:shadow-primary/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-              >
-                {uiI18n.t('app.sign_in_ada2e9e9')}
-              </button>
-            </div>
-          </section>
-        </main>
-
-        <MobileNav />
-      </div>
-    );
-  }
-
-  const toggleSelected = (animeId: string) =>
-    setSelectedIds((prev) =>
-      prev.includes(animeId) ? prev.filter((id) => id !== animeId) : [...prev, animeId],
-    );
-
-  /** Only the card being saved shows a pending state, not all of them. */
-  const pendingAddId = addToWatchlist.isPending ? addToWatchlist.variables?.animeId : undefined;
-
-  /**
-   * All three tab families project to the same shape, so the grid below is
-   * written once: `note` carries the recommender's reason, `animeId` marks a row
-   * that select mode can act on.
-   */
-  const activeEntries: Array<{ item: PosterItem; note?: string; animeId?: string }> =
-    showRecommendations ? recEntries : showMLRecs ? mlEntries : listEntries;
-
   return (
     <div className="min-h-screen overflow-x-hidden bg-background text-foreground">
-      <Background />
-      <Sidebar />
-
-      <main className={shellClass}>
-        <BoardHero
-          className="mt-2"
-          eyebrow="Your collection"
-          heading={counts.total ? uiI18n.t('app.everything_you_saved_4f729b86') : uiI18n.t('app.start_your_collection_de2b910c')}
-          description={
-            counts.total
-              ? uiI18n.t('app.your_watchlist_the_titles_the_recommenders_think_f6ca6ad3')
-              : uiI18n.t('app.save_a_title_from_any_page_and_it_lands_here_alo_c00968bf')
-          }
-          leader={heroItems[0]}
-          leaderPrefix={heroRow?.status === 'watching' ? 'Resume' : 'Latest'}
-          ctaLabel={heroRow?.status === 'watching' ? 'Resume watching' : 'Open title'}
-          stats={heroStats}
-          backdrop={heroAniListMedia?.bannerImage || undefined}
-          items={heroItems}
-          isLoading={loadingWatchlist}
-        >
-          <PillGroup
-            options={TABS}
-            value={activeTab}
-            // Wrapped rather than passed as the setter: `SetStateAction` also
-            // accepts an updater function, and that candidate would widen the
-            // pill group's id type to bare `string`.
-            onChange={(id) => setActiveTab(id)}
-            label={uiI18n.t('app.collection_filter_09bab600')}
-          />
-        </BoardHero>
-
-        <section className="mt-12">
-          <SectionHeading
-            eyebrow={TAB_COPY[activeTab].eyebrow}
-            title={TAB_COPY[activeTab].title}
-            meta={`${activeEntries.length} ${activeEntries.length === 1 ? 'title' : 'titles'}`}
-            action={
-              isListTab ? (
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="mr-1 text-xs font-medium text-white/40">
-                    {activeEntries.length} {activeEntries.length === 1 ? uiI18n.t('app.title_3c6de1b7') : uiI18n.t('app.titles_50c9e3dd')}
-                  </span>
-
-                  <DropdownMenu>
-                    <DropdownMenuTrigger className={controlTriggerClass}>
-                      {SORTS.find((option) => option.id === sortBy)?.label}
-                      <ChevronDown className="h-3.5 w-3.5 opacity-60" />
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className={controlMenuClass}>
-                      {SORTS.map((option) => (
-                        <DropdownMenuItem
-                          key={option.id}
-                          className={controlItemClass}
-                          onSelect={() => setSortBy(option.id)}
-                        >
-                          {option.label}
-                          {sortBy === option.id && <Check className="h-3.5 w-3.5 text-primary" />}
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-
-                  {selectMode && selectedIds.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={removeSelected}
-                      disabled={bulkRemove.isPending}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-destructive/40 bg-destructive/15 px-4 py-2 text-sm font-semibold text-destructive transition-colors hover:border-destructive/70 hover:bg-destructive/25 hover:text-destructive-foreground disabled:opacity-50"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                      {uiI18n.t('app.remove_e963907d')} {selectedIds.length}
-                    </button>
-                  )}
-
-                  {activeEntries.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectMode((prev) => !prev);
-                        setSelectedIds([]);
-                      }}
-                      className={controlTriggerClass}
-                    >
-                      {selectMode ? uiI18n.t('app.done_e9b450d1') : uiI18n.t('app.manage_list_6c7a898b')}
-                    </button>
-                  )}
-                </div>
-              ) : undefined
-            }
-          />
-
-          {showMLRecs && tasteProfile && (
-            <div className="mt-6 rounded-3xl border border-white/[0.07] bg-white/[0.03] p-5">
-              <div className="flex flex-wrap items-start gap-x-8 gap-y-4">
-                <div className="flex items-center gap-3">
-                  <span className="flex h-11 w-11 items-center justify-center rounded-2xl border border-primary/20 bg-primary/15">
-                    <Brain className="h-5 w-5 text-primary" />
-                  </span>
-                  <div>
-                    <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-primary">{uiI18n.t('app.taste_model_df23c612')}</p>
-                    <h3 className="text-sm font-semibold text-white">{uiI18n.t('app.ranked_from_your_history_amp_ratings_6cfc3f75')}</h3>
-                  </div>
-                </div>
-
-                {tasteProfile.preferredGenres.length > 0 && (
-                  <div className="min-w-0">
-                    <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-white/40">{uiI18n.t('app.top_genres_1c865de6')}</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {tasteProfile.preferredGenres.slice(0, 5).map((g) => (
-                        <span
-                          key={g.genre}
-                          className="rounded-full border border-white/10 bg-white/[0.05] px-2.5 py-1 text-xs font-medium text-white/75"
-                        >
-                          {g.genre}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div>
-                  <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-white/40">{uiI18n.t('app.rating_range_afd5d520')}</p>
-                  <p className="text-sm font-semibold text-white">
-                    {tasteProfile.preferredRatings.min.toFixed(1)}–{tasteProfile.preferredRatings.max.toFixed(1)}{' '}
-                    <span className="font-normal text-white/45">{uiI18n.t('app.avg_97e77871')} {tasteProfile.preferredRatings.average.toFixed(1)}</span>
-                  </p>
-                </div>
-
-                <div className="min-w-[150px]">
-                  <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-white/40">{uiI18n.t('app.diversity_dcb3f6f3')}</p>
-                  <div className="flex items-center gap-2">
-                    <div className="h-1.5 w-24 overflow-hidden rounded-full bg-white/10">
-                      <div className="h-full bg-primary" style={{ width: `${Math.round(tasteProfile.diversityScore * 100)}%` }} />
-                    </div>
-                    <span className="text-xs font-semibold text-white/70">{Math.round(tasteProfile.diversityScore * 100)}%</span>
-                  </div>
-                </div>
-
+      <main
+        className={cn(
+          "favorites-hub relative z-10 mx-auto max-w-[1600px] px-4 pb-24 pt-[calc(1rem+env(safe-area-inset-top,0px))] md:py-6 md:pr-8",
+          desktop ? "md:pl-8" : "md:pl-32"
+        )}
+      >
+        <header className="mb-6 flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-medium">{t("favoritesHub.title")}</h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {t("favoritesHub.subtitle")}
+            </p>
+          </div>
+          <Heart className="mt-2 size-5 text-primary" aria-hidden="true" />
+        </header>
+        {!user && authLoading ? (
+          <p role="status">{t("favoritesHub.loading")}</p>
+        ) : !user ? (
+          <section className="rounded-xl border border-border p-8">
+            <h2 className="text-lg font-medium">{t("favoritesHub.signIn")}</h2>
+            <Button asChild className="mt-4">
+              <Link to="/auth">{t("favoritesHub.signInAction")}</Link>
+            </Button>
+          </section>
+        ) : (
+          <>
+            <nav
+              aria-label={t("favoritesHub.title")}
+              className="mb-6 flex gap-1 overflow-x-auto border-b border-border"
+            >
+              {TABS.map((value) => (
                 <Link
-                  to="/recommendations"
-                  className="ml-auto inline-flex items-center gap-1.5 self-center rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-white/70 transition-colors hover:border-white/25 hover:text-white"
+                  key={value}
+                  aria-current={tab === value ? "page" : undefined}
+                  to={{
+                    search: (() => {
+                      const next = new URLSearchParams(params);
+                      next.set("tab", value);
+                      return next.toString();
+                    })(),
+                  }}
+                  onClick={() => {
+                    setManaging(false);
+                    setSelected([]);
+                  }}
+                  className={cn(
+                    "shrink-0 border-b-2 px-4 py-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    tab === value
+                      ? "border-primary text-primary"
+                      : "border-transparent text-muted-foreground hover:text-foreground"
+                  )}
                 >
-                  <Sparkles className="h-3.5 w-3.5" />
-                  {uiI18n.t('app.full_recommendations_e905140f')}
+                  {t(`favoritesHub.${value}`)}
                 </Link>
-              </div>
-            </div>
-          )}
-
-          {isLoading ? (
-            <PosterGridSkeleton className="mt-6" count={14} />
-          ) : activeEntries.length === 0 ? (
-            <EmptyPanel
-              icon={
-                showRecommendations ? (
-                  <Sparkles className="h-7 w-7 text-white/25" />
-                ) : showMLRecs ? (
-                  <Brain className="h-7 w-7 text-white/25" />
-                ) : (
-                  <Heart className="h-7 w-7 text-white/25" />
-                )
-              }
-              title={EMPTY_COPY[activeTab].title}
-              hint={EMPTY_COPY[activeTab].hint}
-              action={
-                <Link
-                  to="/genre"
-                  className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-white/70 transition-colors hover:border-white/25 hover:text-white"
-                >
-                  {uiI18n.t('app.browse_anime_b42f8c8d')}
-                </Link>
-              }
-            />
-          ) : (
-            <div className={cn(POSTER_GRID_CLASS, 'mt-6')}>
-              {activeEntries.map((entry, index) => {
-                // Held in a const so the narrowing survives into the click
-                // handler's closure.
-                const animeId = entry.animeId;
-                const selected = animeId ? selectedIds.includes(animeId) : false;
-
-                return (
-                  <PosterCard
-                    key={entry.item.key}
-                    item={entry.item}
-                    eager={index < 7}
-                    preview
-                    footer={
+              ))}
+            </nav>
+            <section aria-label={t(`favoritesHub.${tab}`)}>
+              {tab === "recommendations" ? (
+                <Suspense fallback={<PosterGridSkeleton count={12} />}>
+                  <Recommendations />
+                </Suspense>
+              ) : (
+                <>
+                  {failed && (
+                    <div
+                      role="alert"
+                      className="mb-4 rounded-lg border border-border p-4 text-sm"
+                    >
+                      {t("favoritesHub.unavailable")}{" "}
+                      <button
+                        className="text-primary underline"
+                        onClick={() =>
+                          sourceQueries.forEach((query) => void query.refetch())
+                        }
+                      >
+                        {t("favoritesHub.retry")}
+                      </button>
+                    </div>
+                  )}
+                  {tab === "overview" ? (
+                    loading ||
+                    analytics.loading ||
+                    watchTime.isLoading ||
+                    totals.isLoading ||
+                    forum.isLoading ? (
+                      <div
+                        role="status"
+                        className="py-8 text-sm text-muted-foreground"
+                      >
+                        {t("favoritesHub.loading")}
+                      </div>
+                    ) : failed ? null : analytics.error ||
+                      watchTime.isError ||
+                      totals.isError ||
+                      forum.isError ? (
+                      <div
+                        role="alert"
+                        className="rounded-xl border border-border p-6 text-sm"
+                      >
+                        <p>{t("favoritesHub.partialAnalytics")}</p>
+                        <Button
+                          variant="outline"
+                          className="mt-3"
+                          onClick={() => {
+                            void analytics.retry();
+                            void watchTime.refetch();
+                            void totals.refetch();
+                            void forum.refetch();
+                          }}
+                        >
+                          {t("favoritesHub.retry")}
+                        </Button>
+                      </div>
+                    ) : (
                       <>
-                        {entry.note && (
-                          <p className="mt-1.5 line-clamp-2 text-[11px] font-medium leading-relaxed text-primary/80">
-                            {entry.note}
-                          </p>
-                        )}
-
-                        {selectMode && animeId && (
-                          <button
-                            type="button"
-                            onClick={() => toggleSelected(animeId)}
-                            aria-pressed={selected}
-                            aria-label={uiI18n.t('app.select_i18n_value_0_ad7d83f4', { value0: entry.item.title })}
-                            className={cn(
-                              'absolute right-2 top-2 z-20 flex h-8 w-8 items-center justify-center rounded-full border backdrop-blur-sm transition-colors',
-                              selected
-                                ? 'border-primary bg-primary text-primary-foreground'
-                                : 'border-white/25 bg-black/60 text-white/70 hover:border-white/60',
-                            )}
-                          >
-                            {selected && <Check className="h-4 w-4" />}
-                          </button>
-                        )}
+                        <ProfileOverviewTab
+                          userId={profile?.user_id}
+                          username={profile?.username}
+                          watchTimeSeconds={watchTime.data || 0}
+                          episodesCount={history.data?.length || 0}
+                          completedAnimeCount={
+                            (watchlist.data || []).filter(
+                              (row) => row.status === "completed"
+                            ).length
+                          }
+                          watchingAnimeCount={
+                            (watchlist.data || []).filter(
+                              (row) => row.status === "watching"
+                            ).length
+                          }
+                          planToWatchCount={
+                            (watchlist.data || []).filter(
+                              (row) => row.status === "plan_to_watch"
+                            ).length
+                          }
+                          mangaCount={analytics.mangaCounts.manga}
+                          manhwaCount={analytics.mangaCounts.manhwa}
+                          comicsCount={analytics.mangaCounts.comics}
+                          totalChaptersRead={
+                            analytics.mangaCounts.totalChapters
+                          }
+                          readingTotals={totals.data}
+                          streakDays={streak?.currentStreak || 0}
+                          longestStreak={streak?.longestStreak || 0}
+                          totalDaysActive={streak?.totalDaysWatched || 0}
+                          commentCount={analytics.commentsCount}
+                          forumPostCount={forum.data?.length || 0}
+                          forumUpvotes={analytics.forumUpvotes}
+                          reputationRate={analytics.reputationRate}
+                          reputationBreakdown={analytics.reputation.breakdown}
+                          leaderboardRank={analytics.userRank?.rank ?? null}
+                          totalRankedUsers={
+                            analytics.userRank?.totalUsers ?? null
+                          }
+                          followersCount={followStats?.followers || 0}
+                          followingCount={followStats?.following || 0}
+                          watchlist={watchlist.data || EMPTY}
+                          history={history.data || EMPTY}
+                          mangaReadlist={resolved.data}
+                          ratings={analytics.userRatings}
+                          commentDates={analytics.userCommentRows}
+                          favoriteCharacters={analytics.favoriteCharacters}
+                          favoriteCharactersLoading={
+                            analytics.loadingFavoriteCharacters
+                          }
+                          tasteProfile={analytics.tasteProfile}
+                          tasteProfileLoading={analytics.loadingTasteProfile}
+                          insights={analytics.overviewInsights}
+                          achievements={achievements}
+                          externalStats={external.stats}
+                          externalStatsLoading={external.isLoading}
+                          onNavigateTab={(value) => {
+                            const mapped =
+                              (
+                                {
+                                  readlist: "manga",
+                                  "manga-readlist": "manga",
+                                  "novel-readlist": "novels",
+                                } as Record<string, string>
+                              )[value] || value;
+                            if (TABS.includes(mapped as Tab))
+                              setParam("tab", mapped);
+                            else
+                              navigate(
+                                `/profile?tab=${encodeURIComponent(value)}`
+                              );
+                          }}
+                        />
                       </>
-                    }
-                  />
-                );
-              })}
-            </div>
-          )}
-        </section>
-
-        {showMLRecs && tasteProfile && (
-          <section className="mt-14">
-            <SectionHeading
-              eyebrow="Your taste model"
-              title={uiI18n.t('app.what_the_match_scores_are_built_from_3afb7394')}
-            />
-            <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <StatTile
-                label={uiI18n.t('app.diversity_dcb3f6f3')}
-                value={`${Math.round(tasteProfile.diversityScore * 100)}%`}
-                hint="How widely your history spreads"
-              />
-              <StatTile
-                label={uiI18n.t('app.scores_you_finish_6698d69b')}
-                value={tasteProfile.preferredRatings.average.toFixed(1)}
-                hint={`Mostly ${tasteProfile.preferredRatings.min.toFixed(1)}–${tasteProfile.preferredRatings.max.toFixed(1)}`}
-              />
-              <StatTile
-                label={uiI18n.t('app.top_genre_e1ef7452')}
-                value={tasteProfile.preferredGenres[0]?.genre ?? '—'}
-                hint={
-                  tasteProfile.preferredGenres.length > 1
-                    ? `+${tasteProfile.preferredGenres.length - 1} more weighted`
-                    : 'Weighted highest in your history'
-                }
-              />
-              <StatTile
-                label={uiI18n.t('app.preferred_format_3b4987ff')}
-                value={tasteProfile.preferredTypes[0]?.type ?? '—'}
-                hint={
-                  tasteProfile.preferredTypes[0]
-                    ? `${Math.round(tasteProfile.preferredTypes[0].weight * 100)}% of what you watch`
-                    : 'Not enough history'
-                }
-              />
-            </div>
-          </section>
-        )}
-
-        {showRecommendations && (genrePrefs?.length ?? 0) > 0 && (
-          <section className="mt-14">
-            <SectionHeading eyebrow="Your genres" title={uiI18n.t('app.weighted_by_what_you_finish_168f3cf4')} />
-            <div className="mt-5 flex flex-wrap gap-2">
-              {(genrePrefs ?? []).slice(0, 12).map((preference) => (
-                <Link
-                  key={preference.genre}
-                  to={`/genre/${encodeURIComponent(preference.genre.toLowerCase())}`}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-3.5 py-1.5 text-xs font-semibold text-white/70 transition-colors hover:border-primary/50 hover:text-primary"
-                >
-                  {preference.genre}
-                  <span className="tabular-nums text-white/35">{preference.count}</span>
-                </Link>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {(showRecommendations || activeTab === 'all') && smartEntries.length > 0 && (
-          <section className="mt-14">
-            <SectionHeading
-              eyebrow="From your history"
-              title={uiI18n.t('app.watched_never_saved_b2f3037d')}
-              meta="Scored on episodes, completions and recency"
-            />
-            <div className={cn(POSTER_GRID_CLASS, 'mt-6')}>
-              {smartEntries.map((entry) => (
-                <PosterCard
-                  key={entry.item.key}
-                  item={entry.item}
-                  preview
-                  footer={
+                    )
+                  ) : (
                     <>
-                      <p className="mt-1.5 line-clamp-2 text-[11px] font-medium leading-relaxed text-primary/80">
-                        {entry.note}
-                      </p>
-                      <AddToListButton
-                        saved={savedIds.has(entry.suggestion.animeId)}
-                        pending={pendingAddId === entry.suggestion.animeId}
-                        onAdd={() => addSuggestion(entry.suggestion)}
-                      />
+                      <div className="mb-6 flex flex-wrap items-end gap-3">
+                        <label className="min-w-48 flex-1 text-xs text-muted-foreground">
+                          {t("favoritesHub.search")}
+                          <div className="relative mt-1">
+                            <Search
+                              className="absolute left-3 top-3 size-4"
+                              aria-hidden="true"
+                            />
+                            <Input
+                              className="min-h-11 pl-9"
+                              value={query}
+                              onChange={(event) =>
+                                setParam(`${prefix}q`, event.target.value, true)
+                              }
+                            />
+                          </div>
+                        </label>
+                        {tab === "history" ? (
+                          <>
+                            {select(
+                              t("favoritesHub.media"),
+                              media,
+                              "history.media",
+                              ["all", "anime", "manga", "novel"].map(
+                                (value) => [value, t(`favoritesHub.${value}`)]
+                              )
+                            )}
+                            {select(
+                              t("favoritesHub.period"),
+                              String(days),
+                              "history.days",
+                              [
+                                ["0", t("favoritesHub.allTime")],
+                                ...[7, 30, 90].map(
+                                  (value) =>
+                                    [
+                                      String(value),
+                                      t("favoritesHub.days", { count: value }),
+                                    ] as [string, string]
+                                ),
+                              ]
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            {select(
+                              t("favoritesHub.status"),
+                              status,
+                              `${prefix}status`,
+                              [
+                                ["all", t("favoritesHub.all")],
+                                ...statuses.map(
+                                  (value) =>
+                                    [value, t(`feedback.status.${value}`)] as [
+                                      string,
+                                      string
+                                    ]
+                                ),
+                              ]
+                            )}
+                            {tab === "manga" &&
+                              select(
+                                t("favoritesHub.format"),
+                                format,
+                                `${prefix}format`,
+                                [
+                                  ["all", t("favoritesHub.all")],
+                                  ...Array.from(
+                                    new Set(list.map((entry) => entry.format))
+                                  )
+                                    .sort()
+                                    .map(
+                                      (value) =>
+                                        [value, value] as [string, string]
+                                    ),
+                                ]
+                              )}
+                            {select(
+                              t("favoritesHub.sort"),
+                              sort,
+                              `${prefix}sort`,
+                              [
+                                ["recent", t("favoritesHub.recent")],
+                                ["title", t("favoritesHub.alphabetical")],
+                              ]
+                            )}
+                            <Button
+                              variant="outline"
+                              disabled={busy}
+                              onClick={() => {
+                                setManaging(!managing);
+                                setSelected([]);
+                              }}
+                            >
+                              {t(
+                                managing
+                                  ? "favoritesHub.done"
+                                  : "favoritesHub.manage"
+                              )}
+                            </Button>
+                          </>
+                        )}
+                        <span className="py-3 text-xs tabular-nums text-muted-foreground">
+                          {t("favoritesHub.results", {
+                            count: filtered.length,
+                          })}
+                        </span>
+                      </div>
+                      {managing && (
+                        <div className="mb-4 flex gap-3">
+                          <Button
+                            variant="outline"
+                            onClick={() =>
+                              setSelected(filtered.map((entry) => entry.key))
+                            }
+                          >
+                            {t("favoritesHub.selectAll")}
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            disabled={!selected.length || busy}
+                            onClick={removeSelected}
+                          >
+                            <Trash2 className="mr-2 size-4" />
+                            {t("favoritesHub.removeSelected", {
+                              count: selected.length,
+                            })}
+                          </Button>
+                        </div>
+                      )}
+                      {mutationError && (
+                        <p
+                          role="alert"
+                          className="mb-4 text-sm text-destructive"
+                        >
+                          {t("favoritesHub.mutationFailed")}
+                        </p>
+                      )}
+                      {loading ? (
+                        <PosterGridSkeleton count={12} />
+                      ) : !filtered.length ? (
+                        failed ? null : (
+                          <p className="rounded-xl border border-border px-6 py-12 text-center text-sm text-muted-foreground">
+                            {t(
+                              list.length
+                                ? "favoritesHub.noMatches"
+                                : "favoritesHub.empty"
+                            )}
+                          </p>
+                        )
+                      ) : tab === "history" ? (
+                        <FavoritesHistory entries={filtered} />
+                      ) : (
+                        <div className="space-y-8">
+                          {groups.map((group) => (
+                            <section key={group.status} className="space-y-4">
+                              <h2 className="text-lg font-medium">
+                                {t(`feedback.status.${group.status}`)}{" "}
+                                <span className="ml-2 text-sm tabular-nums text-muted-foreground">
+                                  {group.entries.length}
+                                </span>
+                              </h2>
+                              <div className={POSTER_GRID_CLASS}>
+                                {group.entries.map((entry, index) => {
+                                  const parsed =
+                                    entry.kind === "anime"
+                                      ? parseExternalAnimeId(entry.id)
+                                      : null;
+                                  return (
+                                    <div
+                                      key={entry.key}
+                                      className="relative min-w-0"
+                                    >
+                                      {managing && (
+                                        <label className="absolute left-2 top-2 z-40 rounded bg-background/95 p-2">
+                                          <ThemedCheckbox
+                                            aria-label={t(
+                                              "favoritesHub.selectTitle",
+                                              { title: entry.title }
+                                            )}
+                                            checked={selected.includes(
+                                              entry.key
+                                            )}
+                                            onChange={(event) =>
+                                              setSelected((previous) =>
+                                                event.target.checked
+                                                  ? [...previous, entry.key]
+                                                  : previous.filter(
+                                                      (key) => key !== entry.key
+                                                    )
+                                              )
+                                            }
+                                          />
+                                        </label>
+                                      )}
+                                      <PosterCard
+                                        item={{
+                                          key: entry.key,
+                                          title: entry.title,
+                                          poster: entry.poster || "",
+                                          href: entry.href,
+                                          anilistId:
+                                            parsed?.provider === "anilist"
+                                              ? parsed.id
+                                              : undefined,
+                                        }}
+                                        preview={entry.kind === "anime"}
+                                        eager={index < 6}
+                                        footer={
+                                          <div className="mt-2 space-y-2">
+                                            {entry.progress && (
+                                              <p className="text-xs text-muted-foreground">
+                                                {entry.progress}
+                                              </p>
+                                            )}
+                                            <>
+                                              {entry.kind === "anime" && (
+                                                <FavoritesWatchControls
+                                                  anime={entry.source}
+                                                  history={
+                                                    history.data || EMPTY
+                                                  }
+                                                />
+                                              )}
+                                              {entry.resumeHref && (
+                                                <Link
+                                                  className="block text-xs font-medium text-primary hover:underline"
+                                                  to={entry.resumeHref}
+                                                >
+                                                  {t("favoritesHub.resume")}
+                                                </Link>
+                                              )}
+                                              <ThemedSelect
+                                                aria-label={t(
+                                                  "favoritesHub.statusFor",
+                                                  { title: entry.title }
+                                                )}
+                                                value={entry.status}
+                                                disabled={busy}
+                                                onChange={(event) =>
+                                                  updateStatus(
+                                                    entry,
+                                                    event.target.value
+                                                  )
+                                                }
+                                                className="min-h-10 w-full rounded-lg border border-border bg-background px-2 text-xs"
+                                              >
+                                                {(entry.kind === "anime"
+                                                  ? ANIME_STATUSES
+                                                  : READING_STATUSES
+                                                ).map((value) => (
+                                                  <option
+                                                    key={value}
+                                                    value={value}
+                                                  >
+                                                    {t(
+                                                      `feedback.status.${value}`
+                                                    )}
+                                                  </option>
+                                                ))}
+                                              </ThemedSelect>
+                                            </>
+                                          </div>
+                                        }
+                                      />
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </section>
+                          ))}
+                        </div>
+                      )}
                     </>
-                  }
-                />
-              ))}
-            </div>
-          </section>
+                  )}
+                </>
+              )}
+            </section>
+          </>
         )}
-
-        <section className="mt-14">
-          <SectionHeading eyebrow="All-time" title={uiI18n.t('app.fan_favorites_c94fbc02')} meta="Most favorited on AniList" />
-
-          {loadingAniListFavorites && aniListEntries.length === 0 ? (
-            <PosterGridSkeleton className="mt-6" count={12} />
-          ) : (
-            <div className={cn(POSTER_GRID_CLASS, 'mt-6')}>
-              {aniListEntries.map((entry) => (
-                <PosterCard
-                  key={entry.item.key}
-                  item={entry.item}
-                  preview
-                  footer={
-                    <>
-                      <p className="mt-1.5 text-[11px] font-bold uppercase tracking-widest text-white/35">
-                        {entry.note}
-                      </p>
-                      <AddToListButton
-                        saved={savedIds.has(entry.suggestion.animeId)}
-                        pending={pendingAddId === entry.suggestion.animeId}
-                        onAdd={() => addSuggestion(entry.suggestion)}
-                      />
-                    </>
-                  }
-                />
-              ))}
-            </div>
-          )}
-        </section>
-
-        {/* Fed by the same genre weights as the "Your genres" chips above, so the
-            row is about what this visitor finishes rather than a global chart. */}
-        <ReadingCollections />
-        <MangaPicksSection
-          className="mt-14"
-          genres={(genrePrefs ?? []).map((preference) => preference.genre)}
-        />
       </main>
-
       <MobileNav />
     </div>
-  );
-}
-
-/** One empty state for all eight tabs, so no tab invents its own. */
-function EmptyPanel({
-  icon,
-  title,
-  hint,
-  action,
-}: {
-  icon: ReactNode;
-  title: string;
-  hint: string;
-  action?: ReactNode;
-}) {
-  useUiTranslation();
-  return (
-    <div className="mt-6 flex flex-col items-center gap-2 rounded-3xl border border-white/[0.07] bg-white/[0.02] py-20 text-center">
-      {icon}
-      <p className="text-base font-bold text-white/70">{title}</p>
-      <p className="max-w-sm text-sm text-white/40">{hint}</p>
-      {action && <div className="mt-3">{action}</div>}
-    </div>
-  );
-}
-
-/** A single taste-profile figure. */
-function StatTile({ label, value, hint }: { label: string; value: string; hint: string }) {
-  useUiTranslation();
-  return (
-    <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5">
-      <p className="text-[10px] font-bold uppercase tracking-widest text-white/35">{label}</p>
-      <p className="font-display mt-2 text-2xl font-black text-foreground">{value}</p>
-      <p className="mt-1 text-xs text-white/40">{hint}</p>
-    </div>
-  );
-}
-
-/**
- * The suggestion cards' add control. A real button under the poster rather than
- * the old hover-only overlay, which was unreachable on touch.
- */
-function AddToListButton({
-  saved,
-  pending,
-  onAdd,
-}: {
-  saved: boolean;
-  pending: boolean;
-  onAdd: () => void;
-}) {
-  useUiTranslation();
-  return (
-    <button
-      type="button"
-      onClick={onAdd}
-      disabled={saved || pending}
-      className={cn(
-        'mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-bold transition-colors',
-        saved
-          ? 'border-primary/25 bg-primary/10 text-primary'
-          : 'border-white/10 bg-white/[0.04] text-white/70 hover:border-primary/50 hover:text-primary disabled:opacity-50',
-      )}
-    >
-      {saved ? <Check className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
-      {saved ? uiI18n.t('app.in_your_list_e18f2da3') : pending ? uiI18n.t('app.adding_ffb2e628') : uiI18n.t('app.add_to_list_5618a882')}
-    </button>
   );
 }

@@ -275,31 +275,10 @@ class ContentGraph {
   // ── Search ────────────────────────────────────────────────────────────────
 
   async search(filters: SearchFilters): Promise<ContentSearchResult> {
-    const cacheKey = `search:${JSON.stringify(filters)}`;
+    const cacheKey = `search:v3:${JSON.stringify(filters)}`;
     return this.cached(cacheKey, TTL.HOT, async () => {
-      const hasSimpleSearchInput = Boolean(filters.query?.trim() || filters.tags?.length);
-      const isSimpleTextSearch = hasSimpleSearchInput &&
-        !filters.genres?.length &&
-        !filters.format?.length &&
-        !filters.status?.length &&
-        !filters.studio?.length &&
-        !filters.season?.length &&
-        !filters.source?.length &&
-        !filters.year &&
-        !filters.rating &&
-        !filters.episodes &&
-        !filters.sortBy;
-
-      if (isSimpleTextSearch) {
-        return apiGet<ContentSearchResult>('/search/suggestions', {
-          q: filters.query,
-          type: 'anime',
-          tags: filters.tags?.join(','),
-          page: filters.page ?? 1,
-          perPage: filters.perPage ?? 20,
-        });
-      }
-
+      // Full results need pagination and alias-aware DB/AniList/Jikan matching.
+      // The suggestions endpoint deliberately returns only a short, single page.
       const params: Record<string, string | number | boolean | undefined> = {
         q:        filters.query,
         page:     filters.page ?? 1,
@@ -433,12 +412,16 @@ class ContentGraph {
     throw new Error(`Invalid media ID: ${id}`);
   }
 
-  // ── Episodes (AniList DB first; Jikan only via TatakaiAPI) ────────────────
+  // ── Episodes (catalog + provider indexes, mediated by TatakaiAPI) ─────────
 
   async getDbEpisodes(id: string): Promise<Array<{
     episodeNumber: number;
     title?: string | null;
     isFiller?: boolean;
+    image?: string;
+    overview?: string;
+    airDateUtc?: string;
+    runtime?: number;
   }>> {
     const rawId = String(id ?? '').trim();
     if (!rawId) return [];
@@ -449,12 +432,20 @@ class ContentGraph {
         title?: string | null;
         is_filler?: boolean;
         isFiller?: boolean;
+        thumbnail_url?: string | null;
+        description?: string | null;
+        airing_at?: string | null;
+        duration?: number | null;
       }>>(`/${encodeURIComponent(rawId)}/episodes`);
       if (!Array.isArray(rows)) return [];
       return rows.map((row) => ({
         episodeNumber: Number(row.episodeNumber ?? row.episode_number ?? 0),
         title: row.title ?? null,
         isFiller: Boolean(row.isFiller ?? row.is_filler),
+        image: row.thumbnail_url || undefined,
+        overview: row.description || undefined,
+        airDateUtc: row.airing_at || undefined,
+        runtime: row.duration ?? undefined,
       })).filter((row) => row.episodeNumber > 0);
     } catch {
       return [];
@@ -462,7 +453,7 @@ class ContentGraph {
   }
 
   async getMalEpisodesPage(malId: number, page = 1): Promise<{
-    episodes: Array<{ mal_id?: number; title?: string | null; filler?: boolean }>;
+    episodes: Array<{ mal_id?: number; title?: string | null; filler?: boolean; aired?: string | null }>;
     hasNextPage: boolean;
   }> {
     const url = new URL(`${CONTENT_BASE}/mal/${malId}/episodes`, resolveApiOrigin());
@@ -475,7 +466,7 @@ class ContentGraph {
       throw new Error(`TatakaiAPI ${res.status} on /mal/${malId}/episodes`);
     }
     const envelope = (await res.json()) as TatakaiAPIResponse<
-      Array<{ mal_id?: number; title?: string | null; filler?: boolean }>
+      Array<{ mal_id?: number; title?: string | null; filler?: boolean; aired?: string | null }>
     >;
     if (!envelope.success) {
       throw new Error(envelope.error ?? 'Failed to load MAL episodes');

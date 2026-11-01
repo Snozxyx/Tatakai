@@ -32,7 +32,7 @@ async function fetchSuggestions(q: string): Promise<Suggestion[]> {
   if (!q || q.trim().length < 2) return [];
   const params = new URLSearchParams({ q: q.trim() });
   const raw = await fetch(`${resolveApiV3Base()}/content/search/suggestions?${params}`, {
-    signal: AbortSignal.timeout(4000),
+    signal: AbortSignal.timeout(8000),
   }).then((response) => { if (!response.ok) throw new Error('Search unavailable'); return response.json(); });
 
   const results: Suggestion[] = [];

@@ -31,6 +31,8 @@ async function json(url: string, init: RequestInit = {}): Promise<any> {
           url
         )}`
       : url;
+  const timeout = AbortSignal.timeout(15_000);
+  const signal = init.signal ? AbortSignal.any([init.signal, timeout]) : timeout;
   const response = native
     ? await extensionFetch(target, {
         ...init,
@@ -38,9 +40,9 @@ async function json(url: string, init: RequestInit = {}): Promise<any> {
           "User-Agent": "Tatakai/6 (https://tatakai.me)",
           ...Object.fromEntries(new Headers(init.headers).entries()),
         },
-        signal: AbortSignal.timeout(15_000),
+        signal,
       })
-    : await fetch(target, { ...init, signal: AbortSignal.timeout(15_000) });
+    : await fetch(target, { ...init, signal });
   if (!response.ok)
     throw new Error(`MangaDex request failed (${response.status})`);
   return response.json();
@@ -250,7 +252,8 @@ export async function fetchMangaDexChapters(
 
 export async function fetchMangaDexPages(
   anilistId: number,
-  chapterKey: string
+  chapterKey: string,
+  signal?: AbortSignal
 ): Promise<MangaReadResponse> {
   const chapterId = chapterKey.replace(/^mangadex:/i, "");
   if (
@@ -260,7 +263,7 @@ export async function fetchMangaDexPages(
   )
     return { success: false, message: "Invalid MangaDex chapter." };
   try {
-    const result = await json(`${API}/at-home/server/${chapterId}`);
+    const result = await json(`${API}/at-home/server/${chapterId}`, { signal });
     const { hash, data: files } = result.chapter || {};
     if (!/^https:\/\//.test(result.baseUrl || "") || !hash || !files?.length)
       return {
@@ -320,6 +323,7 @@ export async function fetchMangaDexPages(
       },
     };
   } catch {
+    signal?.throwIfAborted();
     return {
       success: false,
       message: "MangaDex pages could not be loaded. Please retry.",

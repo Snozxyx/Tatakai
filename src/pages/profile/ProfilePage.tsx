@@ -1,3 +1,4 @@
+import { useProfileAnalytics } from '@/hooks/user/useProfileAnalytics';
 import { useCustomProfileTheme } from '@/hooks/user/useCustomProfileTheme';
 import { ProfileSocialActions } from '@/components/profile/ProfileSocialActions';
 import { ProfilePresence } from '@/components/profile/ProfilePresence';
@@ -62,17 +63,6 @@ import { useNovelReadlist } from '@/hooks/user/useNovelReadlist';
 import { getReadingHistory, readingHistoryHref } from '@/lib/readingHistory';
 import { useUserForumPosts } from '@/hooks/community/useForum';
 import { useFollow } from '@/hooks/community/useFollow';
-import { useUserRank } from '@/hooks/community/useLeaderboard';
-import { useUserRatings } from '@/hooks/user/useUserRatings';
-import { useUserComments } from '@/hooks/user/useUserComments';
-import { useTasteProfile } from '@/hooks/user/useTasteProfile';
-import { useCharacterFavorites } from '@/hooks/user/useCharacterFavorites';
-import { computeReputation } from '@/core/profile/reputation';
-import { computeLibraryDistribution } from '@/core/profile/libraryDistribution';
-import { computeWatchingHabits } from '@/core/profile/watchingHabits';
-import { computeRatingDistribution } from '@/core/profile/ratingStats';
-import { computeMonthlySeries } from '@/core/profile/growthSeries';
-import { deriveInsights } from '@/core/profile/insights';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { getProxiedImageUrl } from '@/lib/api';
@@ -145,7 +135,7 @@ export default function ProfilePage({ username: providedUsername }: { username?:
   const arrivalTheme = PROFILE_THEMES.find(theme => theme.id === arrivalPreferences.selected);
   const arrivalConfig = arrivalTheme?.parse(arrivalPreferences.configurations[arrivalPreferences.selected]) as { motion?: boolean } | null | undefined;
   const enterCustomWorld = Boolean(profile && arrivalConfig && arrivalTheme?.Loading && (loadingProfileBadges || (verifiedProfileBadges && canUseProfileTheme(arrivalTheme, profile, profileBadges, ownedThemes.data))));
-  const arrivalPending = useProfileArrival(`${location.pathname}:${profile?.user_id || ''}`, enterCustomWorld, reducedMotion || arrivalConfig?.motion === false ? 0 : arrivalTheme?.arrivalMs ?? 0);
+  const arrivalPending = useProfileArrival(`${location.pathname}:${profile?.user_id || ''}`, enterCustomWorld, 0);
   useEffect(() => { if (enterCustomWorld) void arrivalTheme?.preload?.().catch(() => undefined); }, [enterCustomWorld, arrivalTheme]);
   const hint = (location.state as { profileArrival?: Record<string, unknown> } | null)?.profileArrival;
   const arrivalHint = hint && typeof hint === 'object' ? {
@@ -202,13 +192,6 @@ export default function ProfilePage({ username: providedUsername }: { username?:
 
   const { data: forumPosts = [] } = useUserForumPosts(profile?.user_id);
   const { isFollowing, checkingFollow, followStats, follow, unfollow, isFollowingLoading } = useFollow(profile?.user_id);
-
-  // Analytics data sources for the Overview tab.
-  const { data: userRatings = [] } = useUserRatings(profile?.user_id);
-  const { data: userCommentRows = [] } = useUserComments(profile?.user_id);
-  const { data: favoriteCharacters = [], isLoading: loadingFavoriteCharacters } = useCharacterFavorites(profile?.user_id);
-  const { data: tasteProfile = null, isLoading: loadingTasteProfile } = useTasteProfile(!isViewingOther);
-  const { data: userRank = null } = useUserRank('active', profile?.user_id);
 
   const profileNovels = isViewingOther ? publicMangaReadlist.filter(item=>item.format==='novel') : ownNovelReadlist;
   const watchlist = isViewingOther ? publicWatchlist : ownWatchlist;
@@ -277,94 +260,11 @@ export default function ProfilePage({ username: providedUsername }: { username?:
   const viewedStreakStats = isViewingOther ? publicStreakStats : ownStreakStats;
 
 
-  const { data: commentsCount = 0 } = useQuery({
-    queryKey: ['user_comments_count', profile?.user_id],
-    enabled: !!profile?.user_id,
-    queryFn: async () => {
-      const { count, error } = await supabase
-        .from('comments' as any)
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', profile!.user_id);
-      if (error) return 0;
-      return count || 0;
-    },
-  });
-
-  const mangaCounts = useMemo(() => {
-    let manga = 0, manhwa = 0, comics = 0, totalChapters = 0;
-    (mangaReadlist || []).forEach((item: any) => {
-      const title = (item.manga_title || '').toLowerCase();
-      const format = (item.format || '').toLowerCase();
-      if (format.includes('manhwa') || title.includes('manhwa') || title.includes('solo leveling') || title.includes('ranker') || title.includes('tower of god')) {
-        manhwa++;
-      } else if (format.includes('comic') || title.includes('comic')) {
-        comics++;
-      } else {
-        manga++;
-      }
-      if (item.last_chapter_number) totalChapters += Number(item.last_chapter_number) || 0;
-    });
-    return { manga, manhwa, comics, totalChapters };
-  }, [mangaReadlist]);
-
-  const forumUpvotes = useMemo(
-    () => (forumPosts || []).reduce((acc: number, p: any) => acc + (p.upvotes || 0), 0),
-    [forumPosts],
-  );
-
-  const novelChaptersRead = useMemo(
-    () =>
-      (ownNovelReadlist || []).reduce(
-        (acc: number, item: any) => acc + (Number(item.last_chapter_number) || 0),
-        0,
-      ),
-    [ownNovelReadlist],
-  );
-
-  // Real reputation score (0–100) from actual activity signals. viewedStreak is
-  // resolved for whichever profile is open (own or public), so streak now
-  // contributes for other users too.
-  const reputation = useMemo(
-    () =>
-      computeReputation({
-        episodes: history?.length || 0,
-        longestStreak: viewedStreak?.longestStreak || 0,
-        ratingsCount: userRatings.length,
-        commentsCount: commentsCount,
-        forumPosts: forumPosts?.length || 0,
-        forumUpvotes,
-        followers: followStats?.followers || 0,
-      }),
-    [history, viewedStreak, userRatings, commentsCount, forumPosts, forumUpvotes, followStats],
-  );
-  const reputationRate = reputation.score;
-
-  // Derived analytics shared across the Overview cards.
-  const libraryDistribution = useMemo(
-    () => computeLibraryDistribution(watchlist || [], mangaReadlist || []),
-    [watchlist, mangaReadlist],
-  );
-
-  const overviewInsights = useMemo(() => {
-    const habits = computeWatchingHabits(history || []);
-    const ratingDist = computeRatingDistribution(userRatings);
-    const growth = computeMonthlySeries({
-      history: history || [],
-      watchlist: watchlist || [],
-      mangaReadlist: mangaReadlist || [],
-      ratings: userRatings,
-      comments: userCommentRows,
-    });
-    return deriveInsights({
-      distribution: libraryDistribution,
-      habits,
-      ratings: ratingDist,
-      growth,
-      topGenre: tasteProfile?.topGenres?.[0]?.genre ?? null,
-      currentStreak: viewedStreak?.currentStreak || 0,
-      longestStreak: viewedStreak?.longestStreak || 0,
-    });
-  }, [history, userRatings, watchlist, mangaReadlist, userCommentRows, libraryDistribution, tasteProfile, viewedStreak]);
+  const { userRatings, userCommentRows, favoriteCharacters, loadingFavoriteCharacters,
+    tasteProfile, loadingTasteProfile, userRank, commentsCount, mangaCounts, forumUpvotes,
+    novelChaptersRead, reputation, reputationRate, libraryDistribution, overviewInsights,
+  } = useProfileAnalytics({ profile, isViewingOther, watchlist, history, mangaReadlist,
+    ownNovelReadlist, viewedStreak, forumPosts, followStats });
 
   const [activeTab, setActiveTab] = useState<string>('overview');
 

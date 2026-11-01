@@ -30,7 +30,6 @@ import { useSaveNovelReadingProgress } from '@/hooks/user/useNovelReadlist';
 import { useAuth } from '@/contexts/AuthContext';
 import { Background } from '@/components/layout/Background';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { ReaderPanel } from '@/components/settings/panels/ReaderPanel';
 import { NovelReaderPanel } from '@/components/settings/panels/NovelReaderPanel';
 import { Comments } from '@/components/comments/Comments';
 import { NovelNarrator, narratorEngineLabel, type NarratorBackend } from '@/lib/novel/narrator';
@@ -768,10 +767,6 @@ export default function NovelReaderPage() {
           <SheetHeader><SheetTitle>{uiI18n.t('app.novel_reader_settings_391b370d')}</SheetTitle></SheetHeader>
           <div className="mt-4 space-y-6">
             <NovelReaderPanel />
-            <div>
-              <h3 className="mb-2 text-sm font-black">{uiI18n.t('app.manga_reader_layout_shared_ec25e2e2')}</h3>
-              <ReaderPanel />
-            </div>
           </div>
         </SheetContent>
       </Sheet>

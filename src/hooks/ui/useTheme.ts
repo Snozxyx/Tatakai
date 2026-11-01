@@ -36,6 +36,7 @@ export type Theme =
   | 'matcha-light'
   | 'ocean-breeze'
   | 'brutalist-concrete'
+  | 'dark-lite'
   | 'ultra-lite'
   | 'lite'
   | 'amoled';
@@ -543,6 +544,15 @@ export const THEME_COLORS: Record<Theme, ThemeColors> = {
     isBrutalism: true,
     highContrast: true,
   },
+  'dark-lite': {
+    primary: '215 85% 65%', primaryForeground: '220 20% 8%',
+    secondary: '220 12% 18%', secondaryForeground: '220 15% 94%',
+    accent: '220 12% 22%', background: '220 15% 8%', foreground: '220 15% 94%',
+    card: '220 14% 12%', cardForeground: '220 15% 94%',
+    muted: '220 12% 17%', mutedForeground: '220 10% 72%', border: '220 10% 28%',
+    glass: '220 14% 12%', glowPrimary: '220 15% 8%', glowSecondary: '220 15% 8%',
+    surface: '220 14% 12%', surfaceHover: '220 12% 18%', sidebarBackground: '220 15% 10%', sidebarBorder: '220 10% 28%', isUltraLite: true,
+  },
   'ultra-lite': {
     primary: '0 0% 0%',
     primaryForeground: '0 0% 100%',
@@ -564,6 +574,7 @@ export const THEME_COLORS: Record<Theme, ThemeColors> = {
     sidebarBackground: '0 0% 100%',
     sidebarBorder: '0 0% 90%',
     isUltraLite: true,
+    isLight: true,
   },
   'lite': {
     primary: '220 90% 50%',
@@ -779,12 +790,16 @@ export const THEME_INFO: Record<Theme, { name: string; gradient: string; descrip
     icon: '🧱',
     category: 'light',
   },
+  'dark-lite': {
+    name: 'Dark Lite', gradient: 'from-slate-950 via-slate-900 to-gray-950',
+    get description() { return uiI18n.t('feedback.darkLiteDescription'); }, icon: '🌘', category: 'dark',
+  },
   'ultra-lite': {
     name: 'Ultra Lite',
     gradient: 'from-gray-900 via-gray-800 to-black',
     get description() { return uiI18n.t('app.minimal_resources_no_animations_max_speed_dc134a8d'); },
     icon: '⚡',
-    category: 'dark',
+    category: 'light',
   },
   'lite': {
     name: 'Lite',
@@ -1001,7 +1016,9 @@ export function useTheme() {
         }
       });
       root.style.setProperty('--ring', colors.primary);
-      root.style.setProperty('--accent-foreground', colors.accentForeground || (colors as unknown as Record<string, string>)['accent-foreground'] || (colors.isLight ? colors.foreground : '0 0% 100%'));
+      root.style.setProperty('--popover', colors.card);
+      root.style.setProperty('--popover-foreground', colors.cardForeground);
+      root.style.setProperty('--accent-foreground', readableMutedColor(colors.accentForeground || (colors as unknown as Record<string, string>)['accent-foreground'] || colors.foreground, [colors.accent]));
       root.style.colorScheme = colors.isLight ? 'light' : 'dark';
       const muted = colors.mutedForeground || (colors as unknown as Record<string, string>)['muted-foreground'];
       if (muted) root.style.setProperty('--muted-foreground', readableMutedColor(muted, [colors.background, colors.card, colors.muted, colors.surface]));

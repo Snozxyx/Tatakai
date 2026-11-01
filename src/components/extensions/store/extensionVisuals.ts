@@ -85,8 +85,9 @@ export function lettermark(name: string): string {
 
 /** `12400` → `12.4K`, matching how the Store renders install counts. */
 export function formatCompact(value?: number | null): string {
-  const count = Number(value ?? 0);
-  if (!Number.isFinite(count) || count <= 0) return '0';
+  if (value == null || !Number.isFinite(value)) return '—';
+  const count = Number(value);
+  if (count <= 0) return '0';
   if (count < 1000) return String(Math.round(count));
   if (count < 1_000_000) return `${(count / 1000).toFixed(count < 10_000 ? 1 : 0)}K`;
   return `${(count / 1_000_000).toFixed(1)}M`;

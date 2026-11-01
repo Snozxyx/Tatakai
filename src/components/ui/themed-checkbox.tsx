@@ -8,7 +8,7 @@ export const ThemedCheckbox = React.forwardRef<HTMLInputElement, React.InputHTML
   const [internal, setInternal] = React.useState(!!defaultChecked);
   const input = React.useRef<HTMLInputElement | null>(null);
   const selected = checked ?? internal;
-  return <>
+  return <span className="contents" data-media-control onPointerDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()}>
     <input type="checkbox" hidden aria-hidden="true" tabIndex={-1} name={name} value={value} checked={selected} disabled={disabled}
       ref={node => { input.current = node; if (typeof forwardedRef === 'function') forwardedRef(node); else if (forwardedRef) forwardedRef.current = node; }}
       onChange={event => { setInternal(event.target.checked); onChange?.(event); }} />
@@ -20,5 +20,5 @@ export const ThemedCheckbox = React.forwardRef<HTMLInputElement, React.InputHTML
       onChange?.({ target, currentTarget: target, nativeEvent: event, type: 'change', bubbles: true, cancelable: false, defaultPrevented: false, eventPhase: 3, isTrusted: false, timeStamp: event.timeStamp,
         preventDefault: () => event.preventDefault(), stopPropagation: () => event.stopPropagation(), isDefaultPrevented: () => event.defaultPrevented, isPropagationStopped: () => false, persist: () => {} } as React.ChangeEvent<HTMLInputElement>);
     }} />
-  </>;
+  </span>;
 });

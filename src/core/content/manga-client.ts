@@ -1,3 +1,4 @@
+import { abortableReaderTask } from '@/lib/reader/loading';
 import type {
   MangaChapterResponse,
   MangaDetailResponse,
@@ -381,7 +382,16 @@ export async function getMangaDetail(id: string): Promise<MangaDetailResponse> {
   const normalizedId = String(id || "");
   let row: any;
 
-  if (normalizedId.startsWith("anilist:")) {
+  if (/^mangaupdates:\d+$/.test(normalizedId)) {
+    const { fetchMangaUpdatesSeries } = await import('./mangaupdates-api');
+    const series = await fetchMangaUpdatesSeries(normalizedId);
+    const genres = (series.genres || []).map((value: any) => value.genre).filter(Boolean);
+    row = { titleEnglish: series.title, synonyms: (series.associated || []).map((value: any) => value.title),
+      description: series.description, coverImageLarge: series.image?.url?.original || series.image?.url?.thumb,
+      status: series.status || 'unknown', format: String(series.type || 'manga').toLowerCase(), genres,
+      isAdult: genres.some((value: string) => /^(adult|hentai|smut)$/i.test(value)),
+      authors: (series.authors || []).map((value: any) => value.name).filter(Boolean), source_api: 'mangaupdates' };
+  } else if (normalizedId.startsWith("anilist:")) {
     const aniId = normalizedId.replace("anilist:", "");
     row = await apiGet<any>(`/api/v3/manga/by-anilist/${aniId}`);
   } else if (normalizedId.startsWith("mal:")) {
@@ -439,7 +449,7 @@ export async function getMangaDetail(id: string): Promise<MangaDetailResponse> {
       languagesAvailable: [],
       providerCoverage: { available: [], failed: [] },
       matchConfidence: 1,
-      matchedBy: "anilist",
+      matchedBy: normalizedId.startsWith("mangaupdates:") ? "mangaupdates" : "anilist",
       characters: media?.characters || [],
       staff: media?.staff || [],
       relations: media?.relations || [],
@@ -504,10 +514,16 @@ export async function getMangaChapters(id: string, _providers?: string, _languag
   }
 }
 
-export async function getMangaReadByKey(
+export function getMangaReadByKey(id: string, chapterKey: string, options?: Parameters<typeof readMangaChapter>[2]): Promise<MangaReadResponse> {
+  options?.signal?.throwIfAborted();
+  return abortableReaderTask(readMangaChapter(id, chapterKey, options), options?.signal);
+}
+
+async function readMangaChapter(
   id: string,
   chapterKey: string,
   options?: {
+    signal?: AbortSignal;
     provider?: string;
     providerChapterId?: string;
     alternatives?: Array<{ provider: string; chapterKey: string; providerChapterId?: string }>;
@@ -684,7 +700,9 @@ export async function getMangaReadByKey(
       .filter(source => source.provider === 'mangadex').map(source => source.chapterKey)])];
     let failure: MangaReadResponse = {success:false,message:'MangaDex pages could not be loaded.'};
     for (const [index, key] of keys.entries()) {
-      const result = await fetchMangaDexPages(Number.isFinite(anilistIdNum) ? anilistIdNum : 0, key);
+      options?.signal?.throwIfAborted();
+      const result = await fetchMangaDexPages(Number.isFinite(anilistIdNum) ? anilistIdNum : 0, key, options?.signal);
+      options?.signal?.throwIfAborted();
       if (result.success) {
         if (result.data?.readMeta) result.data.readMeta.fallbackUsed = index > 0;
         return result;
@@ -695,7 +713,7 @@ export async function getMangaReadByKey(
     if (otherSources.length) {
       const { fetchExtensionMangaPages } = await import('./manga-extension-runtime');
       const first = otherSources[0];
-      const result = await fetchExtensionMangaPages({extensionId:first.provider,chapterKey:first.chapterKey,
+      const result = await fetchExtensionMangaPages({signal: options?.signal, extensionId:first.provider,chapterKey:first.chapterKey,
         providerChapterId:first.providerChapterId,anilistId:Number.isFinite(anilistIdNum)?anilistIdNum:undefined,
         alternatives:otherSources.slice(1)});
       if (result.success) {
@@ -708,7 +726,9 @@ export async function getMangaReadByKey(
   if ((isNative || provider?.startsWith('server-')) && provider && provider !== "tatakai_media") {
     const { fetchExtensionMangaPages } = await import("@/core/content/manga-extension-runtime");
     const anilistId = Number(String(id).replace(/^anilist:/i, ""));
+    options?.signal?.throwIfAborted();
     return fetchExtensionMangaPages({
+      signal: options?.signal,
       extensionId: provider,
       chapterKey: effKey,
       providerChapterId,

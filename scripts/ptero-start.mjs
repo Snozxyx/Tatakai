@@ -67,9 +67,9 @@ const SITE_CSP = [
  */
 function applySecurityHeaders(res, opts = {}) {
   if (!res.headersSent) {
-    if (opts.html !== false) res.setHeader('Content-Security-Policy', SITE_CSP);
+    if (opts.html !== false) res.setHeader('Content-Security-Policy', opts.verification ? SITE_CSP.replace("frame-ancestors 'none'", "frame-ancestors capacitor://tatakai.me capacitor://localhost https://tatakai.me") : SITE_CSP);
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('X-Frame-Options', 'DENY');
+    if (!opts.verification) res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
     res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
@@ -191,7 +191,7 @@ function startStaticServer() {
       if (serveStaticMedia(req, res, filePath)) return;
       const contentType = MIME_TYPES[extname(filePath).toLowerCase()] || 'application/octet-stream';
       res.setHeader('Content-Type', contentType);
-      applySecurityHeaders(res);
+      applySecurityHeaders(res, { verification: reqPath === '/security/turnstile.html' });
       createReadStream(filePath)
         .on('error', () => {
           res.statusCode = 500;

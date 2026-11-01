@@ -1,7 +1,6 @@
-import { BetaChannelSettings } from '../BetaChannelSettings';
+import { DiagnosticsSettings } from '../DiagnosticsSettings';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
-import { DiagnosticsSettings } from '../DiagnosticsSettings';
 import { useNavigate } from 'react-router-dom';
 import { FileText, Info, MessageSquarePlus, Scale, ScrollText, Users } from 'lucide-react';
 import { useTheme } from '@/hooks/ui/useTheme';
@@ -60,7 +59,6 @@ export function AboutPanel() {
         />
       </SettingsSection>
 
-      <BetaChannelSettings />
       <DiagnosticsSettings />
 
       <SettingsSection icon={Scale} eyebrow="Legal" title={uiI18n.t('app.legal_policies_69a80df0')}>

@@ -1,3 +1,4 @@
+import { ThemedSelect } from '@/components/ui/themed-select';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
@@ -92,6 +93,7 @@ export function SyncPreviewModal({
   const reduceMotion = useReducedMotion();
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set(items.map(i => i.id)));
+  const [resolutions, setResolutions] = useState<Record<string, 'import' | 'export' | 'skip'>>({});
   const [logoFailed, setLogoFailed] = useState(false);
 
   // Reset the logo fallback whenever the sheet switches integration.
@@ -101,7 +103,8 @@ export function SyncPreviewModal({
 
   // Re-sync selection whenever a new preview loads.
   useEffect(() => {
-    setSelectedIds(new Set(items.map(i => i.id)));
+    setSelectedIds(new Set(items.filter(i => i.direction !== 'conflict' && !i.unresolved).map(i => i.id)));
+    setResolutions({});
   }, [items]);
 
   const toggleItem = (id: string) => {
@@ -115,10 +118,11 @@ export function SyncPreviewModal({
 
   const toggleAll = () => {
     if (items.every(item => selectedIds.has(item.id))) setSelectedIds(new Set());
-    else setSelectedIds(new Set(items.map(i => i.id)));
+    else setSelectedIds(new Set(items.filter(i => !i.unresolved).map(i => i.id)));
   };
 
-  const selectedItems = items.filter(i => selectedIds.has(i.id));
+  const selectedItems = items.filter(i => selectedIds.has(i.id) && !i.unresolved && (i.direction !== 'conflict' || (resolutions[i.id] && resolutions[i.id] !== 'skip'))).map(i => i.direction === 'conflict' ? { ...i, direction: resolutions[i.id] as 'import' | 'export' } : i);
+  const resolveAll = (choice: 'import' | 'export' | 'skip') => { setResolutions(Object.fromEntries(items.filter(i => i.direction === 'conflict' && !i.unresolved).map(i => [i.id, choice]))); if (choice !== 'skip') setSelectedIds(new Set(items.filter(i => !i.unresolved).map(i => i.id))); };
   const importCount = items.filter(i => i.direction === 'import').length;
   const exportCount = items.filter(i => i.direction === 'export').length;
   const conflictCount = items.filter(i => i.direction === 'conflict').length;
@@ -173,6 +177,7 @@ export function SyncPreviewModal({
             {uiI18n.t('app.review_e29a79fe')} {mediaType ?? uiI18n.t('app.anime_manga_405d3673')} {uiI18n.t('app.changes_before_applying_select_what_to_sync_3bc94939')}
           </p>
 
+          {conflictCount > 0 && <div className="mt-3 flex flex-wrap gap-2">{(['export','import','skip'] as const).map(choice => <Button key={choice} size="sm" variant="outline" onClick={() => resolveAll(choice)} disabled={isApplying}>{uiI18n.t(`feedback.sync.${choice}`)}</Button>)}</div>}
           {/* Stats row */}
           {!isLoading && items.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 mt-4">
@@ -227,8 +232,8 @@ export function SyncPreviewModal({
                 {items.map((item) => {
                   const isSelected = selectedIds.has(item.id);
                   return (
-                    <motion.button
-                      key={item.id}
+                    <div key={item.id}><motion.button
+                      disabled={item.unresolved || isApplying}
                       type="button"
                       onClick={() => toggleItem(item.id)}
                       animate={isSelected ? selectAnim : {}}
@@ -306,6 +311,13 @@ export function SyncPreviewModal({
                         <Check className="h-4 w-4" />
                       </div>
                     </motion.button>
+                    {item.direction === 'conflict' && !item.unresolved && <div className="mb-3 flex flex-wrap items-center gap-2 px-3 py-2" onClick={e => e.stopPropagation()}>
+                      <span className="text-xs text-muted-foreground">{uiI18n.t('feedback.scores', { local: item.localScore || 0, remote: item.remoteScore || 0 })}</span>
+                      <ThemedSelect aria-label={uiI18n.t('feedback.resolveConflict', { name: item.title })} value={resolutions[item.id] || 'skip'} disabled={isApplying} onChange={e => { const choice = e.target.value as 'import' | 'export' | 'skip'; setResolutions(old => ({ ...old, [item.id]: choice })); if (choice !== 'skip') setSelectedIds(old => new Set([...old, item.id])); }}>
+                        {(['skip','export','import'] as const).map(choice => <option key={choice} value={choice}>{uiI18n.t(`feedback.sync.${choice}`)}</option>)}
+                      </ThemedSelect>
+                    </div>}
+                    </div>
                   );
                 })}
               </div>

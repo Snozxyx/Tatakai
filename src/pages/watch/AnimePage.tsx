@@ -1,3 +1,4 @@
+import { CharacterQuickFavorite } from '@/components/media/MediaLibraryMenu';
 import { MobileDetailQuickActions } from '@/components/anime/MobileDetailQuickActions';
 import '@/components/anime/mobile-detail.css';
 import type { CatalogDetailProps } from "@/components/extensions/CatalogSourceContext";
@@ -1729,6 +1730,7 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
                       <p className="font-bold text-sm truncate group-hover:text-primary transition-colors">{cva.character.name}</p>
                       <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{cva.character.cast || uiI18n.t('app.character_ee9946c8')}</p>
                     </div>
+                    <CharacterQuickFavorite item={{ kind:'character', id:String(cva.character.id), name:cva.character.name, poster:cva.character.poster }} className="relative z-40 grid size-9 shrink-0 place-items-center rounded-full border border-border bg-card text-card-foreground" />
                     {cva.voiceActor.name !== "Unknown" && (
                        <div className="text-right border-l border-white/10 pl-3 hidden sm:block">
                           <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{uiI18n.t('app.voice_3091c844')}</p>

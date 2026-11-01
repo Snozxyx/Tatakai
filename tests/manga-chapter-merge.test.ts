@@ -1,6 +1,12 @@
 import {expect,test} from 'bun:test';
-import {mergeChaptersWithExtensions} from '../src/core/content/manga-extension-runtime';
+import {mergeChaptersWithExtensions,mangaProviderDisplayName} from '../src/core/content/manga-extension-runtime';
 const source=(key:string,provider='mangadex')=>({provider,chapterKey:key,providerChapterId:key,language:'en',scanlator:'Group',releaseDate:null});
+
+test('legacy Atsu sources get readable names without changing routing identities', () => {
+ expect(mangaProviderDisplayName({ provider: 'atsu@opaque-id', scanlator: 'MangaK' })).toBe('Atsu · MangaK');
+ expect(mangaProviderDisplayName({ provider: 'atsu@opaque-id' })).toBe('Atsu');
+ expect(mangaProviderDisplayName({ provider: 'custom', providerName: 'Custom source' })).toBe('Custom source');
+});
 
 test('pending discovery keeps polling even before extensions return chapters', () => {
  const result=mergeChaptersWithExtensions({anilistId:42,partial:false,failedProviders:[],chapters:[],mappedChapters:[]},

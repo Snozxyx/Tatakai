@@ -411,6 +411,7 @@ function flattenMangaChapters(entries) {
                 title: ch.title ?? null,
                 volume: ch.volume ?? null,
                 provider: src.provider,
+                providerName: src.providerName,
                 chapterKey: src.chapterKey,
                 providerChapterId: src.providerChapterId ?? null,
                 language: src.language ?? null,

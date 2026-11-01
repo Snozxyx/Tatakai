@@ -119,7 +119,7 @@ export function MangaChapterProviderRows({
 
         // Req 2.7.3 / 2.7.4 — label format
         const label =
-          src.scanlator && src.scanlator.trim()
+          src.scanlator && src.scanlator.trim() && !src.providerName?.endsWith(` · ${src.scanlator.trim()}`)
             ? uiI18n.t('app.i18n_value_0_i18n_value_1_i18n_value_2_a8d53279', { value0: src.providerName || src.provider, value1: src.scanlator, value2: langLabel })
             : uiI18n.t('app.i18n_value_0_i18n_value_1_8568f691', { value0: src.providerName || src.provider, value1: langLabel });
 

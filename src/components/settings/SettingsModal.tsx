@@ -89,7 +89,7 @@ export function SettingsModal() {
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) closeSettings(); }}>
-      <DialogContent overlayClassName="z-[70]" aria-describedby={undefined} className="z-[80] flex flex-col w-[95vw] max-w-6xl h-[88vh] max-h-[88vh] max-md:w-[calc(100vw-1rem)] max-md:h-[94dvh] max-md:max-h-[94dvh] p-0 gap-0 overflow-hidden bg-background/95 backdrop-blur-xl border-border rounded-2xl max-md:rounded-3xl shadow-2xl">
+      <DialogContent overlayClassName="z-[70]" aria-describedby={undefined} className="z-[80] flex flex-col w-[95vw] max-w-6xl h-[88vh] max-h-[88vh] max-md:w-[calc(100vw-1rem)] max-md:h-[94dvh] max-md:max-h-[94dvh] p-0 gap-0 overflow-hidden bg-background border-border rounded-2xl max-md:rounded-3xl shadow-2xl">
         <DialogTitle className="sr-only">{t('settings.title')} — {activeDisplay.label}</DialogTitle>
         <div className="flex flex-1 min-h-0 min-w-0">
           {/* Left rail */}
@@ -148,7 +148,7 @@ export function SettingsModal() {
                 if (items.length === 0) return null;
                 return (
                   <div key={group}>
-                    <p className="px-2 mb-1 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
+                    <p className="px-2 mb-1 text-xs font-medium text-muted-foreground">
                       {t(`settings.groups.${group}`)}
                     </p>
                     <div className="space-y-0.5">

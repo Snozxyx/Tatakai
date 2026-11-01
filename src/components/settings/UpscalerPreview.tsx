@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { captureUpscaleSample, upscaleImage, type EnhancementQuality, type UpscalerEngine } from '@/lib/upscaling';
+import { captureUpscaleSample, upscaleImage, withUpscaleSlot, type EnhancementQuality, type UpscalerEngine } from '@/lib/upscaling';
 import type { Anime4KMode } from '@/lib/video/anime4k/Anime4KRenderer';
 import { enhanceRtxSample } from '@/lib/video/rtx-video';
 
@@ -41,7 +41,7 @@ export function UpscalerPreview({ engine, preset = 'standard', scale = 2, qualit
       const sample = file || refresh || !original ? await captureUpscaleSample(file || chosenFile.current) : original;
       if (controller.signal.aborted) return;
       setOriginal(sample);
-      const result = engine === 'rtx' ? await enhanceRtxSample(sample, quality, controller.signal) : await upscaleImage(sample, engine, preset, scale, controller.signal, { quality, preview: true, onProgress: setProgress });
+      const result = engine === 'rtx' ? await enhanceRtxSample(sample, quality, controller.signal) : await withUpscaleSlot(100, () => upscaleImage(sample, engine, preset, scale, controller.signal, { quality, preview: true, onProgress: setProgress }));
       if (!controller.signal.aborted) setAfter(URL.createObjectURL(result));
     } catch (err) {
       if (!controller.signal.aborted) setError(err instanceof Error ? err.message : 'Preview failed. Try another image.');

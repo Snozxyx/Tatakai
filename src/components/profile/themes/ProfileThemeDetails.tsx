@@ -31,6 +31,8 @@ export default function ProfileThemeDetails({data,themeId,configuration}:{data:P
  const frosted=themeId==='frosted-blast'?readFrostedConfig(configuration):null;
  const palette=useMemo(()=>frosted?paletteFromSeed(frosted.seed):profilePalettes[themeId]||profilePalettes['eyes-toward-heaven'],[themeId,frosted?.seed]);
  useProfileChrome(palette,themeId);
+ // Keep each theme's window chrome, but reserve this panel for the Heaven family.
+ if(themeId!=='eyes-toward-heaven'&&themeId!=='frosted-blast')return null;
  const badges=data.badges.map(b=>getBadge(b.key)).filter((b):b is BadgeDef=>!!b);
  const stat=data.statistics;
  const values=[['anime',data.canViewLibrary?data.stats.anime:null],['manga',data.canViewLibrary?data.stats.manga:null],['manhwa',data.canViewLibrary?stat?.manhwa:null],['comics',data.canViewLibrary?stat?.comics:null],['novels',data.canViewLibrary?data.stats.novels:null],['episodes',data.canViewHistory?data.stats.episodes:null],['hours',data.canViewHistory?data.stats.hours:null],['completed',data.canViewLibrary?data.stats.completed:null],['watching',data.canViewLibrary?stat?.watching:null],['planned',data.canViewLibrary?stat?.planned:null],['chapters',data.canViewHistory?stat?.chapters:null],['novelChapters',data.canViewHistory?stat?.novelChapters:null],['streak',data.canViewHistory?data.stats.streak:null],['longestStreak',data.canViewHistory?data.stats.longestStreak:null],['activeDays',data.canViewHistory?stat?.activeDays:null],['comments',stat?.comments],['posts',stat?.posts],['upvotes',stat?.upvotes],['reputation',stat?.reputation],['discussions',stat?(stat.comments+stat.posts):null],['completionRate',data.canViewLibrary&&stat?Math.round(data.stats.completed/Math.max(1,data.stats.completed+stat.watching)*100):null]] as const;

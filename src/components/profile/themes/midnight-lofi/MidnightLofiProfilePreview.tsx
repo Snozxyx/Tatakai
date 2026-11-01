@@ -1,3 +1,4 @@
+import { formatWatchHours } from '@/lib/formatWatchHours';
 import { ProfilePresence } from '@/components/profile/ProfilePresence';
 import { ProfileSocialActions } from '@/components/profile/ProfileSocialActions';
 import { ArrowUpRight, Lock, UserCheck, UserPlus, X } from 'lucide-react';
@@ -13,7 +14,7 @@ export default function MidnightLofiProfilePreview(props: ThemePreviewProps) {
   const config = readMidnightLofiConfig(props.configuration) ?? defaultMidnightLofiConfig();
 
   const watchHours = props.canViewHistory && props.watchTimeSeconds !== undefined
-    ? `${Math.floor(props.watchTimeSeconds / 3600)}h`
+    ? `${formatWatchHours(props.watchTimeSeconds / 3600)}h`
     : undefined;
 
   return (

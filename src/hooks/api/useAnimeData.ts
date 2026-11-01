@@ -3,6 +3,7 @@ import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { applyEpisodeAvailability } from '@/lib/episodeAvailability';
+import { mergeEpisodeLists } from '@/lib/mergeEpisodeLists';
 import { contentGraph, toAnimeCard, toHomeData } from "@/core";
 import { trackEvent } from "@/core/analytics/AnalyticsService";
 import type { MediaFormat, MediaSeason, MediaStatus, SearchFilters, TatakaiMedia } from "@/core";
@@ -62,6 +63,11 @@ const STATUS_MAP: Record<string, MediaStatus> = {
 
 const SORT_MAP: Record<string, SearchFilters['sortBy']> = {
   score: 'SCORE_DESC',
+  score_desc: 'SCORE_DESC',
+  title_asc: 'TITLE_ROMAJI',
+  start_date_desc: 'START_DATE_DESC',
+  popularity_desc: 'POPULARITY_DESC',
+  trending_desc: 'TRENDING_DESC',
   'name-a-z': 'TITLE_ROMAJI',
   'released-date': 'START_DATE_DESC',
   'recently-added': 'START_DATE_DESC',
@@ -81,7 +87,7 @@ function buildSearchFilters(query: string, page: number, filters: AnimeSearchFil
   const sortKey = String(filters.sort || '').toLowerCase();
   const format = FORMAT_MAP[formatKey];
   const status = STATUS_MAP[statusKey];
-  const sortBy = SORT_MAP[sortKey];
+  const sortBy = SORT_MAP[sortKey] || (!query.trim() && filters.tags?.length ? 'POPULARITY_DESC' : undefined);
   const minRating = typeof filters.minRating === 'number' && filters.minRating > 0
     ? Math.round(filters.minRating * 10)
     : undefined;
@@ -380,6 +386,10 @@ async function fetchDbEpisodes(media: TatakaiMedia, baseId: string): Promise<Epi
       number: row.episodeNumber,
       title: normalizeEpisodeTitle(row.title, row.episodeNumber),
       isFiller: Boolean(row.isFiller),
+      image: row.image,
+      overview: row.overview,
+      airDateUtc: row.airDateUtc,
+      runtime: row.runtime,
     }));
 }
 
@@ -461,13 +471,14 @@ async function fetchMalEpisodesViaApi(malId: number, baseId: string): Promise<Ep
         number,
         title: normalizeEpisodeTitle(row?.title, number),
         isFiller: Boolean(row?.filler),
+        airDateUtc: row.aired || undefined,
       });
     }
     hasNext = res.hasNextPage;
     page += 1;
   }
 
-  return episodes;
+  return mergeEpisodeLists(episodes);
 }
 
 function computeNextAiringFromBroadcast(broadcast?: {
@@ -605,23 +616,16 @@ export function useEpisodes(animeId: string | undefined) {
       const baseId = media.tatakaiId || animeId;
       let episodes: EpisodeData[] = [];
 
-      // ani.zip decides episode identity, so it is awaited before the fallback
-      // chain rather than alongside it. It is the only source here keyed by *this*
-      // AniList entry's episode numbers. AniList's own `streamingEpisodes` is NOT
-      // used for episodes at all — it regularly carries a neighbouring season's
-      // Crunchyroll rows (wrong numbers, wrong order), so it was removed as a
-      // source entirely. DB and Jikan remain only as non-ani.zip safety fallbacks.
-      const mapping = await fetchAniZipMapping(media.anilistId);
+      // Fetch both indexes even when ani.zip has rows: its latest episode can
+      // lag behind the provider indexes now exposed by TatakaiAPI. Tracker rows
+      // retain their identities while API rows fill metadata and number gaps.
+      const [mapping, apiEpisodes] = await Promise.all([
+        fetchAniZipMapping(media.anilistId).catch(() => null),
+        fetchDbEpisodes(media, baseId).catch(() => []),
+      ]);
+      episodes = mergeEpisodeLists(episodesFromAniZip(mapping, baseId), apiEpisodes);
 
-      // 1. ani.zip — numbers, titles, air dates, synopses and screencaps.
-      episodes = episodesFromAniZip(mapping, baseId);
-
-      // 2. TatakaiAPI DB episode rows
-      if (episodes.length === 0) {
-        episodes = await fetchDbEpisodes(media, baseId);
-      }
-
-      // 3. Server-mediated MAL/Jikan episodes (via TatakaiAPI only)
+      // If both indexes are empty, try the server-mediated MAL episode index.
       if (episodes.length === 0) {
         let resolvedMalId = media.malId ?? null;
         if (!resolvedMalId) {
@@ -632,7 +636,7 @@ export function useEpisodes(animeId: string | undefined) {
         }
       }
 
-      // 4. Count-based placeholders from AniList episode total
+      // Finally, build count-based placeholders from the AniList episode total.
       if (episodes.length === 0) {
         const count = Math.min(media.episodes ?? 0, 2000);
         episodes = Array.from({ length: count }, (_, i) => ({
@@ -656,11 +660,8 @@ export function useEpisodes(animeId: string | undefined) {
       }
 
       return {
-        // ani.zip's count is the one that matches the list actually rendered, so
-        // it leads. AniList's `episodeSubCount`/`episodes` are the season totals
-        // and only stand in when ani.zip has no record.
-        totalEpisodes:
-          mapping?.episodeCount ?? media.episodeSubCount ?? media.episodes ?? episodes.length,
+        totalEpisodes: Math.max(mapping?.episodeCount ?? 0, media.episodeSubCount ?? 0,
+          media.episodes ?? 0, episodes.length, ...episodes.map(episode => episode.number)),
         episodes: episodes,
         specials: mapping ? mapping.specials.map((entry) => aniZipToEpisodeData(entry, baseId)) : [],
       };

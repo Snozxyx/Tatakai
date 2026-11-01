@@ -125,12 +125,21 @@ module.exports = function registerRuntimeHandlers(ipcMain, app, fs, path, logger
     //
     // Requirements: 1.5, 12.3
     ipcMain.handle('electron.listInstalledExtensions', async () => {
-        const loaded = registry.listLoaded();
-        return loaded.map((id) => {
+        const installed = new Map();
+        const root = path.join(app.getPath('userData'), 'extensions');
+        if (fs.existsSync(root)) for (const dir of fs.readdirSync(root, { withFileTypes: true })) {
+            if (!dir.isDirectory() || !isValidExtensionId(dir.name)) continue;
+            try {
+                const manifest = JSON.parse(fs.readFileSync(path.join(root, dir.name, 'manifest.json'), 'utf8'));
+                if (manifest.id === dir.name) installed.set(dir.name, manifest);
+            } catch { /* incomplete installs are not runnable */ }
+        }
+        for (const id of registry.listLoaded()) installed.set(id, registry.lookup(id)?.manifest || {});
+        return [...installed.keys()].map((id) => {
             const entry = registry.lookup(id);
-            const manifest = entry ? entry.manifest : {};
+            const manifest = entry ? entry.manifest : installed.get(id);
             return {
-                id,
+                id, enabled: manifest.enabled !== false, loaded: Boolean(entry),
                 name: manifest.name ?? null,
                 version: manifest.version ?? null,
                 type: manifest.type ?? null,
@@ -961,6 +970,12 @@ module.exports = function registerRuntimeHandlers(ipcMain, app, fs, path, logger
         const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
         manifest.enabled = !!enabled; fs.writeFileSync(manifestPath, JSON.stringify(manifest));
         if (!enabled) { workerPool.terminate(id); registry.unregister(id); }
+        else {
+            if (registry.isKillSwitched(id)) return { success: false, error: 'Extension is blocked by kill-switch' };
+            const bundlePath = path.join(app.getPath('userData'), 'extensions', id, 'bundle.js');
+            if (manifest.id !== id || !fs.existsSync(bundlePath)) return { success: false, error: 'Extension bundle is missing or invalid' };
+            registry.register(id, manifest, bundlePath);
+        }
         return { success: true };
     });
     ipcMain.handle('extension:remove', async (_event, id) => {
@@ -1301,7 +1316,7 @@ module.exports = function registerRuntimeHandlers(ipcMain, app, fs, path, logger
             // Requirement 17.5 — only read from the canonical extensions path;
             // validate the resolved path to prevent path traversal
             const extensionsDir = path.join(app.getPath('userData'), 'extensions');
-            const bundlePath = path.join(extensionsDir, extensionId, 'bundle.js');
+            const bundlePath = entry.bundlePath || path.join(extensionsDir, extensionId, 'bundle.js');
 
             // Normalise both paths to catch traversal attempts (e.g. extensionId = '../../etc')
             const resolvedBundle = path.resolve(bundlePath);

@@ -45,7 +45,7 @@ export interface MobileConfig {
   generalNotifications: boolean; // route in-app notifications to the tray
   // Data & offline (mobile smooth-experience bundle)
   dataSaver: boolean; // cap quality, preload, autoplay on metered links
-  cloudProxyByDefault: boolean; // explicit consent to route video through Hoko
+  cloudProxyByDefault: boolean; // route supported video + manga through Hoko without asking
   autoDownloadNext: boolean; // queue the next episode/chapter when one finishes
   wifiOnlyDownloads: boolean; // only auto-download on unmetered WiFi
   autoEvictWatched: boolean; // free watched offline items when storage is tight
@@ -67,7 +67,10 @@ export const DEFAULT_MOBILE_CONFIG: MobileConfig = {
   downloadCompleteNotifications: true,
   generalNotifications: true,
   dataSaver: false,
-  cloudProxyByDefault: false,
+  // Cloud proxy is the default: videos and manga route through hoko.tatakai.me
+  // without the “use the cloud proxy?” prompt, so playback/reading never stalls
+  // waiting for consent. Users can switch it off in Mobile App Settings.
+  cloudProxyByDefault: true,
   autoDownloadNext: false,
   wifiOnlyDownloads: true,
   autoEvictWatched: false,

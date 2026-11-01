@@ -102,6 +102,7 @@ export function Sidebar() {
   return (
     <nav
       data-sidebar
+      data-sidebar-rail={isDesktopApp ? "desktop" : "floating"}
       className={cn(
         "fixed z-40 flex flex-col transition-[color,background-color,opacity,transform] duration-500 ease-out",
         isDesktopApp

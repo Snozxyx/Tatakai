@@ -137,7 +137,7 @@ export const UnifiedMediaCard = memo(function UnifiedMediaCard({ item, variant, 
     disabled: !peekMedia,
   });
 
-  return <MediaCardFrame title={item.name} href={routeTo} variant={variant} className={className} {...longPress}
+  return <MediaCardFrame libraryItem={isAnime || isManga || isNovel || isCharacter ? { kind: isCharacter ? 'character' : isAnime ? 'anime' : isNovel ? 'novel' : 'manga', id: item.id, name: item.name, poster: item.poster, anilistId: item.anilistId, format: isNovel ? 'novel' : item.type } : undefined} title={item.name} href={routeTo} variant={variant} className={className} {...longPress}
     onMouseEnter={previewEnabled ? preview.onEnter : undefined} onMouseLeave={previewEnabled ? preview.onLeave : undefined}
     poster={<><img src={getProxiedImageUrl(item.poster || '')} alt="" aria-hidden loading="lazy" decoding="async" fetchPriority="low"
       className={cn('media-card-image h-full w-full object-cover object-top', preview.isActive && !shouldBlurAdult && 'opacity-0', shouldBlurAdult && 'blur-md scale-105')}
@@ -164,8 +164,8 @@ export const UnifiedMediaCard = memo(function UnifiedMediaCard({ item, variant, 
       {overlay && topBadges !== 'none' && <span className={cn('absolute left-2 z-20 inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-black/60 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white', rank !== undefined || isAdultItem ? 'top-10' : 'top-2')}>
         {isManga || isNovel ? <BookOpen aria-hidden className="h-3 w-3" /> : isAnime ? <Film aria-hidden className="h-3 w-3" /> : <Star aria-hidden className="h-3 w-3" />}{mediaBadgeLabel}
       </span>}
-      {overlay && topBadges !== 'none' && item.status && !isCharacter && !isAdultItem && <span className="absolute right-2 top-2 z-20 max-w-[60%] truncate rounded-full border border-white/10 bg-black/60 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white/85">{item.status}</span>}
-      {!overlay && score && <span className="media-card-score absolute right-2 top-2 z-20 inline-flex items-center gap-1 rounded-lg bg-black/75 px-2 py-1 text-xs font-semibold text-white"><Star aria-hidden className="h-3 w-3 fill-amber text-amber" />{score}</span>}
+      {overlay && topBadges !== 'none' && item.status && !isCharacter && !isAdultItem && <span className="absolute left-2 top-10 z-20 max-w-[calc(100%-1rem)] truncate rounded-full border border-white/10 bg-black/60 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white/85">{item.status}</span>}
+      {!overlay && score && <span className="media-card-score absolute right-16 top-2 z-20 inline-flex items-center gap-1 rounded-lg bg-black/75 px-2 py-1 text-xs font-semibold text-white"><Star aria-hidden className="h-3 w-3 fill-amber text-amber" />{score}</span>}
     </>}
     metadata={overlay ? <div className="flex flex-wrap items-center gap-2">
       {score && <ScoreBadge score={score} />}{label && <MetaBadge className="text-white/85">{label}</MetaBadge>}

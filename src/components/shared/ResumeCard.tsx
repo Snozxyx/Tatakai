@@ -81,8 +81,8 @@ export function ResumeCard({
       : undefined;
 
   const shell = cn(
-    'tk-pressable group relative flex w-full items-stretch gap-4 overflow-hidden rounded-2xl border border-border bg-card p-4 text-left transition-all duration-300',
-    'hover:border-primary/40 hover:bg-accent',
+    'tk-pressable group relative flex w-full items-stretch gap-4 overflow-hidden rounded-2xl border border-border bg-card p-4 text-card-foreground text-left transition-all duration-300',
+    'hover:border-primary/40',
     'focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-primary',
     dimmed && 'opacity-60 grayscale hover:opacity-100 hover:grayscale-0',
     className,
@@ -103,7 +103,7 @@ export function ResumeCard({
           />
         ) : null}
         {!poster && FallbackIcon ? (
-          <FallbackIcon className="absolute inset-0 m-auto h-6 w-6 text-muted-foreground" />
+          <FallbackIcon className="absolute inset-0 m-auto h-6 w-6 text-card-foreground/75" />
         ) : null}
 
         {busy ? (
@@ -124,12 +124,12 @@ export function ResumeCard({
           <Link
             to={titleHref}
             onClick={(event) => event.stopPropagation()}
-            className="pointer-events-auto relative z-10 line-clamp-2 self-start text-sm font-bold leading-snug text-foreground transition-colors hover:text-primary"
+            className="pointer-events-auto relative z-10 line-clamp-2 self-start text-sm font-bold leading-snug text-card-foreground transition-colors hover:text-primary"
           >
             {title}
           </Link>
         ) : (
-          <p className="line-clamp-2 text-sm font-bold leading-snug text-foreground transition-colors group-hover:text-primary">
+          <p className="line-clamp-2 text-sm font-bold leading-snug text-card-foreground transition-colors group-hover:text-primary">
             {title}
           </p>
         )}
@@ -140,19 +140,19 @@ export function ResumeCard({
           </p>
         ) : null}
         {secondaryMeta ? (
-          <p className="mt-1 line-clamp-1 text-xs font-medium text-muted-foreground">{secondaryMeta}</p>
+          <p className="mt-1 line-clamp-1 text-xs font-medium text-card-foreground/75">{secondaryMeta}</p>
         ) : null}
 
         <div className="mt-auto pt-3">
           {percent !== undefined ? (
             <>
-              <div className="mb-1.5 flex items-center justify-between text-[11px] font-bold text-muted-foreground">
+              <div className="mb-1.5 flex items-center justify-between text-[11px] font-bold text-card-foreground/75">
                 <span>{percent}%</span>
                 {progressNote ? <span>{progressNote}</span> : null}
               </div>
               <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-primary to-secondary transition-[width] duration-500"
+                  className="h-full rounded-full bg-primary transition-[width] duration-500"
                   style={{ width: `${percent}%` }}
                 />
               </div>

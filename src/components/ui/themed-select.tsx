@@ -30,7 +30,9 @@ export const ThemedSelect = React.forwardRef<HTMLSelectElement, Props>(function 
   const groups = [...new Set(options.map(option => option.group))];
   // Keep a real select as the event target for existing handlers and form values.
   // It is hidden from focus/accessibility; the themed trigger owns interaction.
-  return <>
+  // Portalled option clicks still bubble through React to a card's click handler.
+  // Keep every select self-contained, including callers that render clickable cards.
+  return <span className="contents" data-media-control onPointerDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()}>
     <select ref={node => { nativeRef.current = node; if (typeof forwardedRef === 'function') forwardedRef(node); else if (forwardedRef) forwardedRef.current = node; }}
       hidden aria-hidden="true" tabIndex={-1} name={name} form={props.form} value={selected} disabled={disabled} onChange={event => { setInternalValue(event.target.value); onChange?.(event); }}>{children}</select>
     <Select value={encode(selected)} disabled={disabled} required={required} onValueChange={next => {
@@ -50,5 +52,5 @@ export const ThemedSelect = React.forwardRef<HTMLSelectElement, Props>(function 
         {options.filter(option => option.group === group).map(option => <SelectItem key={option.value} value={encode(option.value)} disabled={option.disabled}>{option.label}</SelectItem>)}
       </SelectGroup>)}</SelectContent>
     </Select>
-  </>;
+  </span>;
 });

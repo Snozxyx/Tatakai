@@ -12,7 +12,6 @@ import { RichCommentComposer, type ComposerPayload } from '@/components/comments
 import { CommentContent } from '@/components/comments/CommentContent';
 import { CommentAttachments } from '@/components/comments/CommentAttachments';
 import { CommentEmbeds } from '@/components/comments/CommentEmbeds';
-import { StorageUsageBar } from '@/components/media/StorageUsageBar';
 import { ProfilePresence } from '@/components/profile/ProfilePresence';
 import { ProfileConversationTheme } from '@/components/profile/themes/ProfileConversationTheme';
 import { Button } from '@/components/ui/button';
@@ -181,7 +180,7 @@ function ConversationView({ conversation, active, onBack }: { conversation: Dire
                   }
                   void cache.invalidateQueries({ queryKey: ['storage-usage', user?.id] });
                   return attachment;
-                }} />{accepted && <div className="messages-storage"><StorageUsageBar /></div>}</>}
+                }} /></>}
     </div>
     <ReportModal isOpen={!!report} onClose={() => setReport(null)} targetType="direct_message" targetId={report || ''} targetName="private message" />
   </div></ProfileConversationTheme>;

@@ -3,3 +3,6 @@
 .header-social-actions>button:hover,.header-social-actions>div>button:hover{color:hsl(var(--foreground));background:hsl(var(--muted))}.header-social-actions>button[aria-expanded=true]{color:hsl(var(--primary));background:hsl(var(--primary)/.12)}
 .header-social-actions button:focus-visible{outline:2px solid hsl(var(--ring));outline-offset:2px}.header-social-divider{height:18px;width:1px;background:hsl(var(--border)/.7);margin-inline:2px}.header-social-actions button>span{top:0;right:0;min-width:15px;height:15px;font-size:9px;line-height:15px;padding-inline:3px;animation:none}
 @media(max-width:639px){.header-social-actions{padding:3px;gap:1px}.header-social-actions>button,.header-social-actions>div>button{width:34px;height:34px}.header-social-divider{height:16px;margin-inline:1px}}
+
+[data-mobile-header] .header-social-actions{border:0;background:transparent;border-radius:0;padding:0;box-shadow:none}
+[data-mobile-header] .header-social-divider{display:none}

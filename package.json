@@ -1,7 +1,7 @@
 {
   "name": "tatakai",
   "private": true,
-  "version": "6.4.3",
+  "version": "6.4.4-beta.1",
   "description": "Tatakai â€” an extension-based otaku community for tracking anime & manga",
   "author": {
     "name": "Snozxyx",
@@ -24,8 +24,8 @@
     "type-check": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json",
     "check:i18n": "node scripts/check-i18n.mjs && node scripts/i18n-extract.mjs --check",
     "check:migrations": "node scripts/check-migrations.mjs",
-    "test": "bun test tests",
-    "test:watch": "bun test --watch tests",
+    "test": "bun test tests src",
+    "test:watch": "bun test --watch tests src",
     "preview": "vite preview --host 0.0.0.0",
     "start": "cross-env NODE_ENV=production electron .",
     "electron:dev": "npm run translate:build:dev && concurrently \"vite\" \"wait-on http://localhost:8090 && cross-env ELECTRON_DEVTOOLS=1 electron desktop/main.cjs\"",
@@ -119,6 +119,7 @@
     "@tiptap/starter-kit": "^3.32.0",
     "@tiptap/suggestion": "^3.32.0",
     "@types/dompurify": "^3.0.5",
+    "@vidstack/react": "^1.15.7",
     "ag-psd": "31.0.3",
     "animejs": "^4.5.0",
     "axios": "^1.13.4",

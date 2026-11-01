@@ -23,10 +23,11 @@ export function ReaderUpscaling() {
     refresh(); const timer = window.setInterval(refresh, 2000);
     return () => { disposed = true; clearInterval(timer); };
   }, [bridge]);
-  const install = async () => {
-    if (!bridge || !native) return;
+  const install = async (target?: UpscalerEngine) => {
+    const engineToInstall = (target || engine) as 'realesrgan' | 'manga' | undefined;
+    if (!bridge || !engineToInstall || (engineToInstall !== 'realesrgan' && engineToInstall !== 'manga')) return;
     setStarting(true); setError('');
-    try { await bridge.install(engine); setStatus(await bridge.status()); }
+    try { await bridge.install(engineToInstall); setStatus(await bridge.status()); }
     catch (err) { setError(err instanceof Error ? err.message : 'Setup failed. Please try again.'); }
     finally { setStarting(false); }
   };
@@ -37,7 +38,14 @@ export function ReaderUpscaling() {
   };
   const megabytes = (bytes = 0) => `${(bytes / 1024 / 1024).toFixed(1)} MB`;
   return <SettingsSection title="Reader page enhancement" description="Make small pages clearer while you read. Originals are kept, and you can switch this off at any time.">
-    <SettingRow title="Upscaler" description={UPSCALERS.find(item => item.value === engine)?.description} control={({ labelId }) => <Select value={engine} onValueChange={value => updateSetting('upscaler', value as UpscalerEngine)}>
+    <SettingRow title="Upscaler" description={UPSCALERS.find(item => item.value === engine)?.description} control={({ labelId }) => <Select value={engine} onValueChange={value => {
+      const next = value as UpscalerEngine;
+      updateSetting('upscaler', next);
+      // Setup before enable: picking a native engine that isn't installed yet
+      // starts the one-time setup immediately (and the reader waits for it), so
+      // “enable” never fires enhancement at a not-yet-set-up model.
+      if ((next === 'realesrgan' || next === 'manga') && !status?.[next] && !status?.installing) void install(next);
+    }}>
       <SelectTrigger aria-labelledby={labelId} className="h-9 w-44"><SelectValue /></SelectTrigger>
       <SelectContent>{UPSCALERS.map(item => <SelectItem key={item.value} value={item.value} disabled={['realesrgan', 'manga'].includes(item.value) && !bridge}>{item.label}</SelectItem>)}</SelectContent>
     </Select>} />

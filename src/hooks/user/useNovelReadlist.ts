@@ -1,3 +1,4 @@
+import { preserveNovelReadlistFields } from '@/lib/reader/novelReadlistPatch';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
@@ -165,7 +166,7 @@ export function useUpsertNovelReadlist() {
       };
       const { data, error } = await supabase
         .from('manga_readlist')
-        .upsert(payload, { onConflict: 'user_id,manga_id' })
+        .upsert(preserveNovelReadlistFields(payload, input), { onConflict: 'user_id,manga_id' })
         .select()
         .single();
       if (error) throw error;

@@ -58,10 +58,13 @@ export function useContinuousReader(params: {
   // must not append into the reset stream after navigation (stale segments
   // from ch1 appearing inside ch2's scroll surface).
   const generationRef = useRef(0);
+  const controllerRef = useRef<AbortController | null>(null);
 
   // New navigation (or toggling the feature) starts a fresh stream from the entry.
   useEffect(() => {
     generationRef.current += 1;
+    const controller = new AbortController();
+    controllerRef.current = controller;
     setBlockedIndex(null);
     setLoadingNext(false);
     setLoadingPrev(false);
@@ -69,6 +72,7 @@ export function useContinuousReader(params: {
     setBefore([]);
     busyRef.current = new Set();
     doneRef.current = new Set(entryIndex >= 0 ? [entryIndex] : []);
+    return () => { generationRef.current += 1; controller.abort(); };
   }, [entryIndex, mangaId, enabled, lockedProvider, preferProvider]);
 
   const loadChapter = useCallback(
@@ -79,6 +83,7 @@ export function useContinuousReader(params: {
       if (!source) return null;
       const alternatives = sortMangaChapterSources(chapter.sources).filter((s) => !lockedProvider || s.provider === lockedProvider);
       const resp = await getMangaReadByKey(mangaId, source.chapterKey, {
+        signal: controllerRef.current?.signal,
         provider: source.provider,
         providerChapterId: source.providerChapterId,
         alternatives,

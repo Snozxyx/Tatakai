@@ -280,7 +280,7 @@ export function toStoreExtension(row: StoreExtensionRow): StoreExtension {
     isFeatured: Boolean(row.is_featured),
     views: Number(row.view_count ?? 0) || 0,
     downloads: Number(row.download_count ?? 0) || 0,
-    installs: Number(row.install_count ?? 0) || 0,
+    installs: row.install_count == null ? Number.NaN : Number(row.install_count),
     createdAt: row.created_at ?? undefined,
     updatedAt: row.updated_at ?? undefined,
     readme: String(row.readme_text ?? '').trim(),

@@ -1,3 +1,4 @@
+import { formatWatchHours } from '@/lib/formatWatchHours';
 import ProfileThemeDetails from '../ProfileThemeDetails';
 import { ProfilePresence } from '@/components/profile/ProfilePresence';
 import { ProfileSocialActions } from '@/components/profile/ProfileSocialActions';
@@ -94,7 +95,7 @@ function LofiOverview({ data }: { data: ProfileThemeData }) {
         />
         <PillStat
           label="Devotion Time"
-          value={data.canViewHistory ? `${data.stats.hours}h` : '—'}
+          value={data.canViewHistory ? `${formatWatchHours(data.stats.hours)}h` : '—'}
           highlight
         />
       </div>

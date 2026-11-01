@@ -6,6 +6,8 @@ const ACCOUNT_SETTINGS_LOCAL_PREFIX = "tatakai_account_settings_v1:";
 
 export interface PersistedAppSettings {
   locale?: string;
+  readerPresets?: import('@/hooks/media/useReaderPresets').ReaderPresets;
+  sidebar?: Record<string, unknown>;
   contentSafety?: {
     showAdultEverywhere?: boolean;
     warnBeforeAdultOpen?: boolean;
@@ -143,16 +145,39 @@ function writeAccountSettingsToLocal(
   return next;
 }
 
-export async function saveAccountSettingsPatch(
+const pendingSettingsWrites = new Map<string, Promise<PersistedAppSettings>>();
+export function saveAccountSettingsPatch(userId: string, patch: Partial<PersistedAppSettings>): Promise<PersistedAppSettings> {
+  // Persist before starting I/O; serialize read/merge/write to avoid lost patches.
+  const local = writeAccountSettingsToLocal(userId, patch);
+  const key = `${ACCOUNT_SETTINGS_LOCAL_PREFIX}pending:${userId}`;
+  let pending: Partial<PersistedAppSettings> = {};
+  try { pending = JSON.parse(localStorage.getItem(key) || '{}'); } catch { /* empty outbox */ }
+  const combined = mergeSettings(pending, patch);
+  try { localStorage.setItem(key, JSON.stringify(combined)); } catch { return saveAccountSettingsRemote(userId, combined); }
+  const previous = pendingSettingsWrites.get(userId) || Promise.resolve(local);
+  const task = previous.catch(() => local).then(async () => {
+    const queued = localStorage.getItem(key);
+    if (!queued) return local;
+    const result = await saveAccountSettingsRemote(userId, JSON.parse(queued));
+    if (localStorage.getItem(key) === queued) localStorage.removeItem(key);
+    return result;
+  });
+  pendingSettingsWrites.set(userId, task);
+  void task.finally(() => { if (pendingSettingsWrites.get(userId) === task) pendingSettingsWrites.delete(userId); }).catch(() => undefined);
+  return task;
+}
+if (typeof window !== 'undefined') window.addEventListener('online', () => {
+  void supabase.auth.getUser().then(({ data }) => {
+    if (!data.user) return;
+    const key = `${ACCOUNT_SETTINGS_LOCAL_PREFIX}pending:${data.user.id}`;
+    try { const value = localStorage.getItem(key); if (value) void saveAccountSettingsPatch(data.user.id, JSON.parse(value)).catch(() => undefined); } catch { /* storage unavailable */ }
+  }).catch(() => undefined);
+});
+async function saveAccountSettingsRemote(
   userId: string,
   patch: Partial<PersistedAppSettings>,
 ): Promise<PersistedAppSettings> {
-  // App settings are currently local-only while the backend schema is being rewritten.
-  return writeAccountSettingsToLocal(userId, patch);
-
-  // Kept below for future re-enablement once profiles.app_settings exists again.
-  // eslint-disable-next-line no-unreachable
-  const profileTable = supabase.from("profiles" as any);
+  const profileTable = (supabase as any).from("profiles");
 
   const { data: profileRow, error: selectError } = await profileTable
     .select("app_settings")
@@ -161,10 +186,12 @@ export async function saveAccountSettingsPatch(
 
   if (selectError) {
     if (isMissingAppSettingsColumnError(selectError)) {
-      return mergeSettings({}, patch);
+      throw selectError;
     }
     throw selectError;
   }
+
+  if (!profileRow) throw new Error('Account settings are not available yet');
 
   const current = isObject(profileRow?.app_settings)
     ? (profileRow.app_settings as PersistedAppSettings)
@@ -178,7 +205,7 @@ export async function saveAccountSettingsPatch(
 
   if (updateError) {
     if (isMissingAppSettingsColumnError(updateError)) {
-      return next;
+      throw updateError;
     }
     throw updateError;
   }

@@ -593,7 +593,6 @@ export function CustomReaderView(props: CustomReaderViewProps) {
               <div
                 key={readerPageRenderKey(chapterId, page)}
                 data-extension-page={index}
-                data-page={index}
                 className="flex w-full justify-center"
               >
                 <ReaderImage

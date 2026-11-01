@@ -151,12 +151,9 @@ export interface EpisodeData {
   title: string;
   episodeId: string;
   isFiller: boolean;
-  // ── ani.zip enrichment — optional ───────────────────────────────────────────
-  // Filled from `GET https://api.ani.zip/mappings?anilist_id=…` when a mapping
-  // exists. AniList gives at most a title and a thumbnail per episode and
-  // nothing at all for unaired ones, so air dates, synopses and localized
-  // titles only ever come from here. Every field stays optional: an unmapped
-  // show still renders, just without the extra detail.
+  // ── Episode enrichment — optional ──────────────────────────────────────────
+  // Tracker mappings and TatakaiAPI's catalog/provider index supply images,
+  // air dates and descriptions. Unmapped shows can render with partial detail.
   overview?: string;
   image?: string;
   /** Local broadcast date, `YYYY-MM-DD`. */

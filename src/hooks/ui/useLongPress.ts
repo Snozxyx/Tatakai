@@ -23,6 +23,13 @@ interface LongPressHandlers {
   onClickCapture: (e: React.MouseEvent) => void;
 }
 
+/** Controls inside a card own their gestures, including portalled selectors. */
+function isCardControl(event: React.PointerEvent | React.MouseEvent) {
+  const target = event.target as Element;
+  const control = target?.closest?.('button, input, select, [role="combobox"], [role="menuitem"], [data-media-control], [data-media-controls]');
+  return Boolean(control && control !== event.currentTarget);
+}
+
 /**
  * Long-press / right-click hook for media cards.
  *
@@ -59,7 +66,7 @@ export function useLongPress({
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent) => {
-      if (disabled) return;
+      if (disabled || isCardControl(e)) return;
       if (e.isPrimary === false) return;
       // Mouse: only the main button starts a hold; the right button is
       // handled by onContextMenu.
@@ -103,7 +110,7 @@ export function useLongPress({
 
   const onContextMenu = useCallback(
     (e: React.MouseEvent) => {
-      if (disabled) return;
+      if (disabled || isCardControl(e)) return;
       // Desktop right-click = same quick-peek action.
       e.preventDefault();
       e.stopPropagation();
@@ -116,6 +123,7 @@ export function useLongPress({
   );
 
   const onClickCapture = useCallback((e: React.MouseEvent) => {
+    if (isCardControl(e)) return;
     // Swallow the tap that ends a touch hold (and any click right after a
     // context-menu open) so a long-press never navigates.
     if (firedRef.current || Date.now() - lastFiredAtRef.current < 600) {

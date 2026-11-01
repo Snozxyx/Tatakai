@@ -1,7 +1,7 @@
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
-import { useRef, useCallback } from 'react';
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { useRef, useCallback, useEffect } from 'react';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { searchNovels } from '@/core/content/novel-client';
 import type { UnifiedMediaCardProps } from '@/components/UnifiedMediaCard';
 import {
@@ -123,32 +123,38 @@ export function useInfiniteNovelSections() {
 /** Within-shelf pagination — second genre page appended to a shelf rail. */
 export function useNovelSectionItems(sectionId: string) {
   useUiTranslation();
-  const shelf = SHELVES.find((s) => s.id === sectionId);
-  const pageRef = useRef(1);
-  const query = useQuery({
-    queryKey: ['novel-section-items', sectionId],
-    queryFn: async () => {
-      if (!shelf) return [];
-      pageRef.current += 1;
-      const res = await searchNovels('', pageRef.current, SHELF_ITEMS, {
-        genre: shelf.genre,
-        sort: 'POPULARITY_DESC',
-      }).catch(() => null);
-      return mapRowsToItems(res?.results ?? [], true);
+  const shelf = SHELVES.find(shelf => shelf.id === sectionId);
+  const { settings } = useContentSafetySettings();
+  const showAdult = settings.showAdultEverywhere;
+  const query = useInfiniteQuery({
+    queryKey: ['novel-section-pages', sectionId, showAdult],
+    initialPageParam: 2,
+    queryFn: async ({ pageParam }) => {
+      if (!shelf) return { items: [], hasNextPage: false };
+      const result = await searchNovels('', pageParam, SHELF_ITEMS, { genre: shelf.genre, sort: 'POPULARITY_DESC', adult: showAdult });
+      return { items: mapRowsToItems(result.results, showAdult), hasNextPage: result.hasNextPage ?? result.results.length >= SHELF_ITEMS };
     },
+    getNextPageParam: (page, _pages, previousPage) => page.hasNextPage ? previousPage + 1 : undefined,
     enabled: false,
+    retry: false,
     staleTime: 10 * 60 * 1000,
   });
-
-  const loadMore = useCallback(() => {
-    void query.refetch();
-  }, [query]);
-
+  const observer = useRef<IntersectionObserver | null>(null);
+  useEffect(() => () => observer.current?.disconnect(), []);
+  const { isError, isFetching, hasNextPage, data, fetchNextPage } = query;
+  const sentinelRef = useCallback((node: HTMLDivElement | null) => {
+    observer.current?.disconnect();
+    if (!node || isError) return;
+    observer.current = new IntersectionObserver(entries => {
+      if (entries[0]?.isIntersecting && !isFetching && (!data || hasNextPage)) void fetchNextPage();
+    }, { rootMargin: '200px' });
+    observer.current.observe(node);
+  }, [isError, isFetching, hasNextPage, data, fetchNextPage]);
   return {
-    items: (query.data ?? []) as UnifiedMediaCardProps['item'][],
-    loadMore,
+    items: dedupeItems(query.data?.pages.flatMap(page => page.items) || []),
+    loadMore: query.fetchNextPage,
     isFetching: query.isFetching,
-    hasMore: true,
-    sentinelRef: { current: null } as React.RefObject<HTMLDivElement | null>,
+    hasMore: !query.isError && (query.hasNextPage ?? true),
+    sentinelRef,
   };
 }

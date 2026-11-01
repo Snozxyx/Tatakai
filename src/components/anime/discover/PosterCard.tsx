@@ -69,7 +69,7 @@ export function PosterCard({ item, rank, eager, footer, preview, className }: Po
         {hover.unavailable && <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center"><span className="rounded-lg bg-black/75 px-3 py-2 text-xs text-white">{uiI18n.t('app.preview_unavailable_36d31d45')}</span></div>}
       </>}
       badges={<>{item.isAdult && <AdultBadge className="absolute left-2 top-2 z-20" />}{item.score && <span className="media-card-score absolute right-2 top-2 z-20 inline-flex items-center gap-1 rounded-lg bg-black/75 px-2 py-1 text-xs font-semibold text-white"><Star aria-hidden className="h-3 w-3 fill-amber text-amber" />{item.score}</span>}</>}
-      metadata={<>{item.meta}{readingViews}{animeViewId && <TatakaiAnimeViews animeId={animeViewId} />}{footer}</>} />
+      metadata={<>{item.meta}{readingViews}{animeViewId && <TatakaiAnimeViews animeId={animeViewId} />}</>} footer={footer} />
   </Peekable>;
 
   return (

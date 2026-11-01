@@ -9,6 +9,11 @@ export const sourceReports = () => reports;
 export function recordSourceReport(report: ExtensionSourceReport) {
   recordSourceReports([report]);
 }
+/** Replace a discovery snapshot, removing providers absent from the current title. */
+export function replaceSourceReports(ecosystem: string, kind: ExtensionSourceReport['kind'], batch: ExtensionSourceReport[]) {
+  reports = reports.filter(row => row.ecosystem !== ecosystem || row.kind !== kind);
+  recordSourceReports(batch);
+}
 export function recordSourceReports(batch: ExtensionSourceReport[]) {
   // Errors can contain personalized URLs or proxy tokens. Diagnostics contain labels/counts only.
   const safe = batch.map(report => ({ ...report, error: report.error?.replace(/https?:\/\/[^\s)]+/gi, '[URL]').slice(0, 300) }));

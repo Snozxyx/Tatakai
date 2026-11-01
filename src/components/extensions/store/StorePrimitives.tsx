@@ -248,7 +248,7 @@ export function ExtensionHeroCard({
         <div className="flex flex-wrap items-center gap-3">
           <InstallButton state={state} label={extension.capabilities?.includes('extension-server')?'Connect':extension.compatibility === "external" ? uiI18n.t('app.open_externally_d666a3ea') : extension.compatibility === "unavailable" ? uiI18n.t('app.unavailable_2c9c1f79') : undefined} onClick={onInstall} size="lg" />
           <span className="text-xs font-semibold text-muted-foreground">
-            {formatCompact(extension.installs || extension.downloads)} {uiI18n.t('app.installs_v_45093ddd')}{extension.version}
+            {formatCompact(extension.installs)} {uiI18n.t('app.installs_v_45093ddd')}{extension.version}
           </span>
         </div>
       </div>
@@ -285,7 +285,7 @@ export function ExtensionPromoTile({
       <div className="relative min-w-0 flex-1">
         <p className="truncate text-sm font-bold text-foreground">{extension.name}</p>
         <p className="mt-0.5 truncate text-xs font-medium text-muted-foreground">
-          {visual.label} · {formatCompact(extension.installs || extension.downloads)} {uiI18n.t('app.installs_b7a92138')}
+          {visual.label} · {formatCompact(extension.installs)} {uiI18n.t('app.installs_b7a92138')}
         </p>
       </div>
       <InstallButton state={state} label={extension.capabilities?.includes('extension-server')?'Connect':extension.compatibility === "external" ? uiI18n.t('app.open_externally_d666a3ea') : extension.compatibility === "unavailable" ? uiI18n.t('app.unavailable_2c9c1f79') : undefined} onClick={onInstall} size="sm" className="relative" />
@@ -332,7 +332,7 @@ export function ExtensionRow({
           <visual.icon className={cn('h-3 w-3', visual.textClass)} />
           {visual.short}
           <span className="text-muted-foreground">·</span>
-          {formatCompact(extension.installs || extension.downloads)}
+          {formatCompact(extension.installs)}
         </p>
       </div>
       <InstallButton state={state} label={extension.capabilities?.includes('extension-server')?'Connect':extension.compatibility === "external" ? uiI18n.t('app.open_externally_d666a3ea') : extension.compatibility === "unavailable" ? uiI18n.t('app.unavailable_2c9c1f79') : undefined} onClick={onInstall} size="sm" />
@@ -383,7 +383,7 @@ export function ExtensionTile({
       </p>
       <div className="relative mt-4 flex items-center justify-between gap-2">
         <span className="text-[11px] font-semibold text-muted-foreground">
-          v{extension.version} · {formatCompact(extension.installs || extension.downloads)} {uiI18n.t('app.installs_b7a92138')}
+          v{extension.version} · {formatCompact(extension.installs)} {uiI18n.t('app.installs_b7a92138')}
         </span>
         <InstallButton state={state} label={extension.capabilities?.includes('extension-server')?'Connect':extension.compatibility === "external" ? uiI18n.t('app.open_externally_d666a3ea') : extension.compatibility === "unavailable" ? uiI18n.t('app.unavailable_2c9c1f79') : undefined} onClick={onInstall} size="sm" />
       </div>

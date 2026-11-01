@@ -30,5 +30,6 @@
       "@tatakai/candidate-evaluator": ["./src/core/download/candidate-evaluator.cjs"]
     }
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
 }

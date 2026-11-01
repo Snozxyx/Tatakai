@@ -1,3 +1,5 @@
+import { isReleaseChapter } from '@/lib/releaseNavigation';
+import { CharacterQuickFavorite } from '@/components/media/MediaLibraryMenu';
 import { TatakaiReadingViews } from '@/components/media/TatakaiReadingViews';
 import { useReadingViewTracker } from '@/hooks/user/useReadingViews';
 import { readingViewId } from '@/lib/readingViewId';
@@ -21,7 +23,7 @@ import { ExtensionRequired } from '@/components/extensions/ExtensionRequired';
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from 'sonner';
 import { motion } from "framer-motion";
@@ -231,6 +233,9 @@ export default function MangaPage({ catalogId, sourceContext }: CatalogDetailPro
   const [refreshingChapters, setRefreshingChapters] = useState(false);
   const { mangaId: routeId } = useParams<{ mangaId: string }>();
   const mangaId = catalogId || routeId;
+  const [releaseParams] = useSearchParams();
+  const requestedRelease = releaseParams.get('highlightChapter');
+  const focusedRelease = useRef('');
   const navigate = useNavigate();
   const isNative = useIsNativeApp();
   const isDesktopApp = useIsDesktopApp();
@@ -498,14 +503,14 @@ export default function MangaPage({ catalogId, sourceContext }: CatalogDetailPro
 
   const visibleChapters = useMemo(() => {
     return sortedChapters.filter((chapter) =>
-      chapter.sources?.some((source) => {
+      isReleaseChapter(chapter.chapterNumber, requestedRelease) || chapter.sources?.some((source) => {
         const providerMatch = preferredProvider === "auto" || source.provider === preferredProvider;
         const languageMatch =
           effectivePreferredLanguage === "auto" || normalizeLanguageKey(source.language) === effectivePreferredLanguage;
         return providerMatch && languageMatch;
       }),
     );
-  }, [sortedChapters, preferredProvider, effectivePreferredLanguage]);
+  }, [sortedChapters, preferredProvider, effectivePreferredLanguage, requestedRelease]);
 
   const displayChapters = useMemo(() => {
     if (chapterSortMode === "oldest") return visibleChapters;
@@ -772,7 +777,7 @@ export default function MangaPage({ catalogId, sourceContext }: CatalogDetailPro
           })),
         };
       });
-  }, [sortedChapters, preferredProvider, effectivePreferredLanguage]);
+  }, [sortedChapters, preferredProvider, effectivePreferredLanguage, requestedRelease]);
 
   // Desktop vs Mobile sidebar display
   const showSidebar = !isMobileViewport;
@@ -824,6 +829,20 @@ export default function MangaPage({ catalogId, sourceContext }: CatalogDetailPro
   useEffect(() => {
     setSelectedChapterGroup(0);
   }, [chapterSortMode, preferredProvider, effectivePreferredLanguage, chapterSearchTerm, selectedVolumeFilter]);
+
+  useEffect(() => {
+    const identity = `${mangaId}:${requestedRelease || ''}`;
+    if (!requestedRelease || focusedRelease.current === identity || isChapterListLoading) return;
+    const index = filteredDisplayChapters.findIndex(chapter => isReleaseChapter(chapter.chapterNumber, requestedRelease));
+    if (index < 0) return;
+    const group = Math.floor(index / CHAPTERS_PER_GROUP);
+    if (activeChapterGroup !== group) { setSelectedChapterGroup(group); return; }
+    const element = document.querySelector<HTMLElement>('[data-calendar-release="true"]');
+    if (!element) return;
+    focusedRelease.current = identity;
+    element.scrollIntoView({ block: 'center', behavior: 'instant' });
+  }, [mangaId, requestedRelease, filteredDisplayChapters, activeChapterGroup, isChapterListLoading]);
+
 
   useEffect(() => {
     if (selectedVolumeFilter == null) return;
@@ -1591,7 +1610,7 @@ export default function MangaPage({ catalogId, sourceContext }: CatalogDetailPro
                     {info.characters.slice(0, 12).map((char: any, index: number) => (
                       <GlassPanel
                         key={`${char.id || char.name}-${index}`}
-                        className="p-0 overflow-hidden cursor-pointer group hover:bg-white/10 transition-colors"
+                        className="relative p-0 overflow-hidden cursor-pointer group hover:bg-white/10 transition-colors"
                         onClick={() =>
                           navigate(
                             `/character/${char.id || encodeURIComponent(char.name)}?name=${encodeURIComponent(char.name)}`,
@@ -1610,6 +1629,7 @@ export default function MangaPage({ catalogId, sourceContext }: CatalogDetailPro
                             {char.role || uiI18n.t('app.character_ee9946c8')}
                           </p>
                         </div>
+                        <CharacterQuickFavorite item={{ kind:'character', id:String(char.id || char.name), name:char.name, poster:char.image || char.poster || char.imageUrl }} />
                       </GlassPanel>
                     ))}
                   </div>
@@ -1618,6 +1638,7 @@ export default function MangaPage({ catalogId, sourceContext }: CatalogDetailPro
 
               {/* Chapters List */}
               <div id="manga-chapters-section" className="detail-entry-section">
+                {requestedRelease && !isChapterListLoading && !sortedChapters.some(chapter => isReleaseChapter(chapter.chapterNumber, requestedRelease)) && <p role="status" className="mb-4 rounded-lg border border-border p-4 text-sm text-muted-foreground">{uiI18n.t('calendarView.chapterUnavailable', { chapter: requestedRelease })}</p>}
               {sourceContext ? sourceContext.entries : (<section>
                 {chapterData?.mangaUpdates && <p className="mb-3 text-sm text-muted-foreground">
                   {uiI18n.t('app.latest_chapter_aa694e41')} {chapterData.mangaUpdates.latestChapter ?? uiI18n.t('app.unknown_bc7819b3')} {uiI18n.t('app.mangaupdates_63cdc568')}
@@ -1810,7 +1831,10 @@ export default function MangaPage({ catalogId, sourceContext }: CatalogDetailPro
                 ) : filteredDisplayChapters.length > 0 ? (
                   <div className="flex flex-col gap-2">
                     {chapterCards.map((chapter) => (
-                      <div key={`${chapter.canonicalOrder}-${chapter.chapterNumber ?? "?"}`}>
+                      <div key={`${chapter.canonicalOrder}-${chapter.chapterNumber ?? "?"}`}
+                        data-calendar-release={isReleaseChapter(chapter.chapterNumber, requestedRelease) || undefined}
+                        className={cn("scroll-mt-24 rounded-xl", isReleaseChapter(chapter.chapterNumber, requestedRelease) && "ring-2 ring-primary bg-primary/5")}>
+                        {isReleaseChapter(chapter.chapterNumber, requestedRelease) && <p className="px-3 pt-3 text-xs font-medium text-primary">{uiI18n.t('calendarView.selectedRelease')}</p>}
                         {/* Kitsu chapter enrichment: thumbnail + synopsis */}
                         {((chapter as any)._kitsuThumbnail || (chapter as any)._kitsuSynopsis) && (
                           <div className="mb-1 flex gap-3 px-3 pt-3 pb-0">

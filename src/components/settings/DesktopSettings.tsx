@@ -386,7 +386,6 @@ export function DesktopSettings() {
 
     return (
         <div className="space-y-8 min-w-0">
-            <BetaChannelSettings />
             {/* GENERAL */}
             <SettingsSection title={uiI18n.t('app.general_9239ee2c')} bodyClassName="space-y-1">
                 {(window as any).electron?.setAutoLaunch && (
@@ -529,6 +528,9 @@ export function DesktopSettings() {
                         </div>
                     )}
                 </SettingRow>
+
+                {/* Release channel: which update feed this device installs from. */}
+                <BetaChannelSettings />
 
                 {systemInfo && (
                     <SettingRow title={uiI18n.t('app.system_information_b5923ed1')}>

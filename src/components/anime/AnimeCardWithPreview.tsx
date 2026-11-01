@@ -11,7 +11,7 @@ import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
  * this and `UnifiedMediaCard` stay in step, and the preview itself is
  * `useHoverPreview` — the same hook the v6 `PosterCard` uses.
  */
-import { Play, Plus, Check, Loader2, Star, RefreshCw } from "lucide-react";
+import { Play, Loader2, Star } from "lucide-react";
 import { MediaCardFrame } from "@/components/MediaCardFrame";
 import { useTranslation } from "react-i18next";
 import { BlurhashImage } from "@/components/ui/blurhash-image";
@@ -20,12 +20,9 @@ import { FeatureFlag, useFeatureFlag } from '@/core/feature-flags';
 import { inferAnimeAdultFlag } from "@/lib/contentSafety";
 import { splitRating } from "@/lib/mediaRating";
 import { AdultBadge } from "@/components/MediaCardBadges";
-import { useNavigate } from "react-router-dom";
-import { useState, useEffect, useMemo, useRef, memo } from "react";
+import { useState, useEffect, useMemo, memo } from "react";
 import { useHoverPreview } from "@/hooks/useHoverPreview";
 import { buildPreferredAnimeRouteId } from "@/lib/animeIdMapping";
-import { useAuth } from "@/contexts/AuthContext";
-import { useWatchlistItem, useAddToWatchlist, useRemoveFromWatchlist } from "@/hooks/user/useWatchlist";
 import { useLongPress } from "@/hooks/ui/useLongPress";
 import { openMediaQuickPeek } from "@/components/media/quickPeekStore";
 import { resolveTatakaiAnimeViewId, TatakaiAnimeViews } from '@/components/media/TatakaiAnimeViews';
@@ -48,8 +45,6 @@ const resolveAniListId = (value: unknown): number | null => {
 function AnimeCardWithPreviewInner({ anime, showPreview = true, disableClick = false }: AnimeCardWithPreviewProps) {
   useUiTranslation();
   const { t } = useTranslation();
-  const navigate = useNavigate();
-  const { user } = useAuth();
   const blurhashEnabled = useFeatureFlag(FeatureFlag.BLURHASH_IMAGES);
 
   const [posterIndex, setPosterIndex] = useState(0);
@@ -87,13 +82,6 @@ function AnimeCardWithPreviewInner({ anime, showPreview = true, disableClick = f
     enabled: showPreview,
   });
 
-  const { data: watchlistItem, isLoading: isWatchlistLoading } = useWatchlistItem(anime.id);
-  const addToWatchlist = useAddToWatchlist();
-  const removeFromWatchlist = useRemoveFromWatchlist();
-  const saving = useRef(false);
-  const [saveFailed, setSaveFailed] = useState(false);
-  useEffect(() => { setSaveFailed(false); }, [anime.id]);
-
   const posterCandidates = useMemo(() => {
     const directPoster = anime.poster?.trim() || "";
     const directLargeAniList = directPoster
@@ -119,34 +107,6 @@ function AnimeCardWithPreviewInner({ anime, showPreview = true, disableClick = f
     });
   };
 
-  const handleWatchlistClick = async (e: React.MouseEvent) => {
-    e.preventDefault(); 
-    e.stopPropagation();
-    if (saving.current || isWatchlistLoading || addToWatchlist.isPending || removeFromWatchlist.isPending) return;
-
-    if (!user) {
-      navigate('/auth');
-      return;
-    }
-
-    saving.current = true;
-    setSaveFailed(false);
-    try {
-      if (watchlistItem) await removeFromWatchlist.mutateAsync(anime.id);
-      else await addToWatchlist.mutateAsync({
-      animeId: anime.id,
-      animeName: anime.name,
-      animePoster: anime.poster,
-      status: 'plan_to_watch',
-    });
-    } catch {
-      // Mutation hooks retain their existing toast; the control offers a retry.
-      setSaveFailed(true);
-    } finally { saving.current = false; }
-  };
-
-  const isBusy = isWatchlistLoading || addToWatchlist.isPending || removeFromWatchlist.isPending;
-
   // Long-press quick peek with the card's own fields (detail enriches inside).
   const longPress = useLongPress({
     onLongPress: () => {
@@ -169,7 +129,7 @@ function AnimeCardWithPreviewInner({ anime, showPreview = true, disableClick = f
   });
 
   const posterClass = `media-card-image absolute inset-0 w-full h-full object-cover ${preview.isActive ? 'opacity-0' : 'opacity-100'}`;
-  return <MediaCardFrame title={anime.name} href={disableClick ? null : routeTo}
+  return <MediaCardFrame libraryItem={{ kind: 'anime', id: anime.id, name: anime.name, poster: anime.poster, anilistId: previewAniListId }} title={anime.name} href={disableClick ? null : routeTo}
     onMouseEnter={preview.onEnter} onMouseLeave={preview.onLeave} {...longPress}
     poster={<>
       {blurhashEnabled ? <BlurhashImage src={posterCandidates[posterIndex] || '/placeholder.svg'} alt="" loading="lazy" decoding="async"
@@ -186,14 +146,8 @@ function AnimeCardWithPreviewInner({ anime, showPreview = true, disableClick = f
     </>}
     badges={<>
       {isAdult && <AdultBadge className="absolute left-2 top-2 z-20" />}
-      {score && <span className="media-card-score absolute right-2 top-2 z-20 rounded-lg bg-black/75 px-2 py-1 text-xs font-semibold text-white"><Star aria-hidden className="inline h-3 w-3 fill-amber text-amber mr-1" />{score}</span>}
+      {score && <span className="media-card-score absolute right-16 top-2 z-20 rounded-lg bg-black/75 px-2 py-1 text-xs font-semibold text-white"><Star aria-hidden className="inline h-3 w-3 fill-amber text-amber mr-1" />{score}</span>}
     </>}
-    actions={<button type="button" onClick={handleWatchlistClick} onPointerDown={event => event.stopPropagation()} disabled={isBusy} aria-busy={isBusy} aria-pressed={Boolean(watchlistItem)}
-      className={`media-card-action absolute right-1 top-10 z-40 flex h-11 w-11 items-center justify-center rounded-full border border-white/20 transition-[opacity,background-color] duration-150 ${watchlistItem ? 'bg-primary text-primary-foreground' : 'bg-black/70 text-white hover:bg-black/90'}`}
-      title={saveFailed ? t('migration.watchlistFailed') : undefined}
-      aria-label={saveFailed ? t('migration.retryWatchlist', { name: anime.name }) : watchlistItem ? t('discover.removeFromWatchlistLabel', { name: anime.name }) : t('discover.addToWatchlistLabel', { name: anime.name })}>
-      {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : saveFailed ? <RefreshCw className="h-4 w-4" /> : watchlistItem ? <Check className="ui-save-check h-4 w-4" /> : <Plus className="h-4 w-4" />}
-    </button>}
     metadata={<div className="flex flex-wrap items-center gap-x-1.5">
       <span>{anime.type || uiI18n.t('app.anime_f1b32a19')}</span>{anime.year && <span>· {anime.year}</span>}
       {!!anime.episodes?.sub && <span>· {anime.episodes.sub} {t('anime.sub')}</span>}

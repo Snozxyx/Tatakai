@@ -741,7 +741,7 @@ export function getMobileHeaderedImageBlobUrl(
  */
 export function prefetchMobileReaderImages(
   pages: Array<{ proxiedImageUrl?: string | null; imageUrl: string; originalUrl?: string | null; headers?: unknown }>,
-  options: { concurrency?: number } = {},
+  options: { concurrency?: number; signal?: AbortSignal } = {},
 ): void {
   try {
     const jobs = (Array.isArray(pages) ? pages : []).filter((p) => p && (p.proxiedImageUrl || p.imageUrl));
@@ -749,7 +749,7 @@ export function prefetchMobileReaderImages(
     const concurrency = Math.max(1, Math.min(4, options.concurrency ?? 3));
     let idx = 0;
     const worker = async () => {
-      while (idx < jobs.length) {
+      while (idx < jobs.length && !options.signal?.aborted) {
         const p = jobs[idx++];
         try {
           const proxy = String(p.proxiedImageUrl || '');

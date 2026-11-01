@@ -38,6 +38,10 @@ export interface SyncProposalItem {
   remoteProgress?: number | null;
   localVolumes?: number | null;
   remoteVolumes?: number | null;
+  localScore?: number | null;
+  remoteScore?: number | null;
+  unresolved?: boolean;
+  format?: string;
   actionText: string;
 }
 
@@ -160,11 +164,16 @@ export function useIntegrationSync() {
         body: JSON.stringify({ integration, actions }),
       });
 
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ get message() { return uiI18n.t('app.apply_failed_94b61451'); } }));
-        throw new Error(err.message || err.error || 'Apply failed');
+      const result = await res.json().catch(() => null);
+      if (!result || (!res.ok && !result?.data?.failures?.length)) throw new Error(result?.message || result?.error || 'Apply failed');
+      const failures: { id: string; message: string }[] = result.data?.failures || [];
+      await queryClient.invalidateQueries({ predicate: query => /watch|history|readlist|stats|reading|rating|profile/i.test(String(query.queryKey[0])) });
+      if (failures.length) {
+        const failedIds = new Set(failures.map(f => f.id));
+        const message = failures.map(f => f.message).join('; ');
+        setState(s => ({ ...s, isApplying: false, previewItems: actions.filter(a => failedIds.has(a.id)), error: message }));
+        return { success: false, error: message };
       }
-
       // Record last sync time locally
       await queryClient.invalidateQueries({ predicate: query => /watch|history|readlist|stats/i.test(String(query.queryKey[0])) });
       const mediaTypes = [...new Set(actions.map(a => a.type))] as MediaType[];

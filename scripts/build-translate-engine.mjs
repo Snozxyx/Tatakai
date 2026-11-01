@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { copyFileSync, mkdirSync, existsSync, chmodSync, readFileSync, writeFileSync, renameSync } from "node:fs";
+import { copyFileSync, mkdirSync, existsSync, chmodSync, readFileSync, writeFileSync, renameSync, readdirSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { join, dirname, resolve, delimiter } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -31,7 +31,7 @@ const cargoFallback = join(
   process.platform === "win32" ? "cargo.exe" : "cargo"
 );
 const cargo = existsSync(cargoFallback) ? cargoFallback : "cargo";
-const env = { ...process.env };
+const env = process.env;
 const cachedCompiler = join(
   root,
   ".cache",
@@ -41,6 +41,44 @@ const cachedCompiler = join(
 );
 if (process.platform === "win32" && existsSync(cachedCompiler))
   env.PATH = `${cachedCompiler}${delimiter}${env.PATH || ""}`;
+// A project-local MSVC/Windows SDK toolchain (scripts/prepare-rtx-toolchain.py)
+// is not registered with the system, so cc-rs cannot derive INCLUDE/LIB from it.
+// When no Visual Studio developer environment is already active, feed the local
+// toolchain into the environment so cl.exe finds the standard headers/libs.
+if (process.platform === "win32") {
+  const localToolchain = join(root, ".cache", "rtx-toolchain");
+  const msvcRoot = join(localToolchain, "msvc", "VC", "Tools", "MSVC");
+  const sdkRoot = join(localToolchain, "sdk", "c");
+  if (existsSync(msvcRoot)) {
+    const msvcVersions = readdirSync(msvcRoot)
+      .filter((name) => existsSync(join(msvcRoot, name, "include")))
+      .sort();
+    const sdkIncludeRoot = join(sdkRoot, "Include");
+    const sdkVersions = existsSync(sdkIncludeRoot)
+      ? readdirSync(sdkIncludeRoot).sort()
+      : [];
+    const msvc = msvcVersions.at(-1);
+    const sdkVersion = sdkVersions.at(-1);
+    if (msvc && sdkVersion) {
+      const include = [
+        join(msvcRoot, msvc, "include"),
+        ...[...["ucrt", "shared", "um", "winrt"]].map((kind) =>
+          join(sdkRoot, "Include", sdkVersion, kind)
+        ),
+      ].join(";");
+      const lib = [
+        join(msvcRoot, msvc, "lib", "x64"),
+        join(sdkRoot, "ucrt", "x64"),
+        join(sdkRoot, "um", "x64"),
+      ].join(";");
+      const binDir = join(msvcRoot, msvc, "bin", "Hostx64", "x64");
+      if (!env.INCLUDE) env.INCLUDE = include;
+      if (!env.LIB) env.LIB = lib;
+      if (!env.LIBPATH) env.LIBPATH = env.LIB;
+      if (existsSync(binDir)) env.PATH = `${binDir}${delimiter}${env.PATH || ""}`;
+    }
+  }
+}
 const args = [
   "build",
   "--locked",

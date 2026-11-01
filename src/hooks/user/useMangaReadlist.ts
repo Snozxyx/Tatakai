@@ -1,3 +1,6 @@
+import { mergeReadlistAliases } from '@/lib/reader/readlistDisplay';
+import { useEffect } from 'react';
+import { queueReadingProgress, acknowledgeReadingProgress, flushReadingProgress, writeReadingProgress } from '@/lib/reader/progressOutbox';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -9,7 +12,7 @@ import { mapTatakaiMangaStatusToAniList, updateAniListMangaStatus } from '@/lib/
 
 export type MangaReadlistStatus = 'plan_to_read' | 'reading' | 'completed' | 'on_hold' | 'dropped';
 
-const EXPLICIT_READLIST_STATUSES: MangaReadlistStatus[] = ['plan_to_read', 'completed', 'on_hold', 'dropped'];
+const EXPLICIT_READLIST_STATUSES: MangaReadlistStatus[] = ['plan_to_read', 'reading', 'completed', 'on_hold', 'dropped'];
 
 export interface MangaReadlistItem {
   id: string;
@@ -214,7 +217,7 @@ const upsertLocalMangaReadlist = (input: UpsertMangaReadlistInput): MangaReadlis
     user_id: null,
     manga_id: input.mangaId,
     manga_title: input.mangaTitle,
-    manga_poster: normalizeString(input.mangaPoster),
+    manga_poster: normalizeString(input.mangaPoster) || existing?.manga_poster || null,
     mal_id: nextMalId,
     anilist_id: nextAniListId,
     format: normalizeFormat(input.format ?? existing?.format),
@@ -256,6 +259,19 @@ const removeLocalMangaReadlist = (mangaId: string) => {
   saveLocalMangaReadlist(next);
 };
 
+async function fetchAllReadingRows(userId: string, statuses?: MangaReadlistStatus[], includeNovels = false) {
+  const rows: MangaReadlistItem[] = [];
+  for (let offset = 0; ; offset += 1000) {
+    let request = supabase.from('manga_readlist').select('*').eq('user_id', userId);
+    if (!includeNovels) request = request.or('format.is.null,format.neq.novel');
+    if (statuses) request = request.in('status', statuses);
+    const { data, error } = await request.order('id').range(offset, offset + 999);
+    if (error) return { data: null, error };
+    rows.push(...(data || []) as MangaReadlistItem[]);
+    if (!data || data.length < 1000) return { data: rows.sort((a,b) => Date.parse(b.updated_at) - Date.parse(a.updated_at)), error: null };
+  }
+}
+
 export function useMangaReadlist(statuses: MangaReadlistStatus[] = EXPLICIT_READLIST_STATUSES) {
   useUiTranslation();
   const { user } = useAuth();
@@ -267,13 +283,7 @@ export function useMangaReadlist(statuses: MangaReadlistStatus[] = EXPLICIT_READ
     queryFn: async () => {
       if (!user) return [];
 
-      const { data, error } = await supabase
-        .from('manga_readlist')
-        .select('*')
-        .eq('user_id', user.id)
-        .neq('format', 'novel')
-        .in('status', statusFilter)
-        .order('updated_at', { ascending: false });
+      const { data, error } = await fetchAllReadingRows(user.id, statusFilter);
 
       if (error) {
         if (isMissingTableError(error)) {
@@ -318,7 +328,7 @@ export function useMangaContinueReading(limit: number = 6) {
           .from('manga_readlist')
           .select('*')
           .eq('user_id', user.id)
-          .neq('format', 'novel')
+          .or('format.is.null,format.neq.novel')
           .not('last_chapter_key', 'is', null)
           .order('updated_at', { ascending: false })
           .limit(Math.max(limit, 30));
@@ -358,7 +368,7 @@ export function useMangaReadlistItem(mangaId: string | undefined) {
         .select('*')
         .eq('user_id', user.id)
         .eq('manga_id', mangaId)
-        .neq('format', 'novel')
+        .or('format.is.null,format.neq.novel')
         .maybeSingle();
 
       if (error) {
@@ -424,6 +434,15 @@ export function useUpsertMangaReadlist() {
         updated_at: safeNow(),
       };
 
+      // Status-only changes must preserve the current chapter, page and source.
+      const optionalFields: Record<string, keyof UpsertMangaReadlistInput> = {
+        last_chapter_key:'lastChapterKey', last_chapter_number:'lastChapterNumber', last_chapter_title:'lastChapterTitle',
+        last_provider:'lastProvider', last_language:'lastLanguage', last_page_index:'lastPageIndex', total_pages:'totalPages',
+        last_extension_id:'lastExtensionId', last_scanlator:'lastScanlator', last_page_id:'lastPageId',
+      };
+      for (const [column, field] of Object.entries(optionalFields)) if (input[field] === undefined) delete payload[column];
+      if (!malId) delete payload.mal_id;
+      if (!anilistId) delete payload.anilist_id;
       const { data, error } = await supabase
         .from('manga_readlist')
         .upsert(payload, { onConflict: 'user_id,manga_id' })
@@ -440,6 +459,7 @@ export function useUpsertMangaReadlist() {
       return data as MangaReadlistItem;
     },
     onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ predicate: q => /reading-track|reading-history|profile|stats/.test(String(q.queryKey[0])) });
       queryClient.invalidateQueries({ queryKey: ['manga-readlist'] });
       queryClient.invalidateQueries({ queryKey: ['manga-readlist-item'] });
       queryClient.invalidateQueries({ queryKey: ['manga-continue-reading'] });
@@ -544,6 +564,12 @@ export function useSaveMangaReadingProgress() {
   const { user, profile } = useAuth();
   const queryClient = useQueryClient();
 
+  useEffect(() => {
+    if (!user) return;
+    const flush = () => { void flushReadingProgress(user.id).then(() => queryClient.invalidateQueries({ predicate: q => /reading|readlist|stats/.test(String(q.queryKey[0])) })).catch(() => undefined); };
+    flush(); window.addEventListener('online', flush);
+    return () => window.removeEventListener('online', flush);
+  }, [user?.id, queryClient]);
   return useMutation({
     mutationFn: async (input: Omit<UpsertMangaReadlistInput, 'status' | 'silentToast'>) => {
       const mangaId = String(input.mangaId || '').trim();
@@ -629,14 +655,12 @@ export function useSaveMangaReadingProgress() {
         /* local mirror best-effort */
       }
 
+      queueReadingProgress(payload);
       try {
-        const { data, error } = await supabase
-          .from('manga_readlist')
-          .upsert(payload, { onConflict: 'user_id,manga_id' })
-          .select()
-          .single();
+        const { data, error } = await writeReadingProgress(payload);
 
         if (error) throw error;
+        acknowledgeReadingProgress(payload);
         return data as MangaReadlistItem;
       } catch (error) {
         // Offline / transient failure: keep the local row so the position is
@@ -654,6 +678,7 @@ export function useSaveMangaReadingProgress() {
     onSuccess: (data) => {
       if (!data) return;
       queryClient.setQueryData(['manga-readlist-item', user?.id || 'guest', data.manga_id], data);
+      queryClient.invalidateQueries({ predicate: q => /reading-track|reading-history|profile|stats/.test(String(q.queryKey[0])) });
       queryClient.invalidateQueries({ queryKey: ['manga-readlist'] });
       queryClient.invalidateQueries({ queryKey: ['manga-continue-reading'] });
 
@@ -714,12 +739,7 @@ export function usePublicMangaReadlist(
     queryFn: async () => {
       if (!userId) return [];
 
-      const { data, error } = await supabase
-        .from('manga_readlist')
-        .select('*')
-        .eq('user_id', userId)
-        .in('status', statusFilter)
-        .order('updated_at', { ascending: false });
+      const { data, error } = await fetchAllReadingRows(userId, statusFilter, true);
 
       if (error) {
         if (isMissingTableError(error)) return [];
@@ -757,7 +777,7 @@ const EMPTY_READING_TOTALS: ReadingTrackTotals = { manga: 0, manhwa: 0, comic: 0
 
 function sumChaptersByFormat(rows: MangaReadlistItem[]): ReadingTrackTotals {
   const totals: ReadingTrackTotals = { manga: 0, manhwa: 0, comic: 0, novel: 0 };
-  for (const row of rows) {
+  for (const row of mergeReadlistAliases(rows)) {
     const fmt = normalizeFormat(row.format);
     if (fmt === 'manga' || fmt === 'manhwa' || fmt === 'comic' || fmt === 'novel') {
       const n = Number(row.last_chapter_number);
@@ -777,10 +797,7 @@ export function useReadingTrackTotals() {
     queryFn: async (): Promise<ReadingTrackTotals> => {
       if (!user) return { ...EMPTY_READING_TOTALS };
 
-      const { data, error } = await supabase
-        .from('manga_readlist')
-        .select('format,last_chapter_number')
-        .eq('user_id', user.id);
+      const { data, error } = await fetchAllReadingRows(user.id, undefined, true);
 
       if (error) {
         if (isMissingTableError(error)) {
@@ -807,10 +824,7 @@ export function usePublicReadingTrackTotals(
     queryFn: async (): Promise<ReadingTrackTotals> => {
       if (!userId) return { ...EMPTY_READING_TOTALS };
 
-      const { data, error } = await supabase
-        .from('manga_readlist')
-        .select('format,last_chapter_number')
-        .eq('user_id', userId);
+      const { data, error } = await fetchAllReadingRows(userId, undefined, true);
 
       if (error) {
         if (isMissingTableError(error)) return { ...EMPTY_READING_TOTALS };

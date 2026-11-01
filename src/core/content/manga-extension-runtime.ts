@@ -1,5 +1,6 @@
+import { abortableReaderTask } from '@/lib/reader/loading';
 import { discoverReadingBatches } from './reading-discovery';
-import { recordSourceReport } from '@/core/extensions/remote/diagnostics';
+import { replaceSourceReports, type ExtensionSourceReport } from '@/core/extensions/remote/diagnostics';
 import { serverMappedChapters, serverMappedPages } from '@/core/extensions/server/client';
 import { declaresNovelContent } from '@/lib/reader/mangaSourceFormat';
 /**
@@ -162,10 +163,10 @@ async function resolveMangaHttpEnv(): Promise<HttpMangaEnv | null> {
   }
 }
 
-async function httpGetJson(url: string, timeoutMs = 20_000): Promise<{ status: number; body: any | null }> {
+async function httpGetJson(url: string, timeoutMs = 20_000, signal?: AbortSignal): Promise<{ status: number; body: any | null }> {
   try {
     const res = await fetch(url, {
-      signal: AbortSignal.timeout(timeoutMs),
+      signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs),
       headers: { Accept: "application/json" },
     });
     if (!res.ok) {
@@ -272,6 +273,7 @@ export interface MangaChaptersPayload {
   providersAvailable: string[];
   failedProviders: string[];
   pending?: boolean;
+  reports?: ExtensionSourceReport[];
 }
 
 /** Flat chapter row as returned by both the HTTP host and the IPC handler. */
@@ -280,6 +282,7 @@ interface FlatChapterRow {
   title?: string;
   volume?: number;
   provider?: string;
+  providerName?: string;
   chapterKey?: string;
   providerChapterId?: string;
   language?: string;
@@ -288,6 +291,7 @@ interface FlatChapterRow {
   /** Mobile bundle results may already be aggregated by chapter. */
   sources?: Array<{
     provider?: string;
+    providerName?: string;
     chapterKey?: string;
     providerChapterId?: string;
     language?: string | null;
@@ -325,6 +329,7 @@ function mergeFlatRows(
         if (namespace && sourceProvider) subProviderToNamespace.set(sourceProvider, namespace);
         existing.sources.push({
           provider: sourceProvider,
+          providerName: source.providerName,
           chapterKey: source.chapterKey || String(number),
           providerChapterId: source.providerChapterId || source.chapterKey || String(number),
           language: source.language ?? null,
@@ -337,6 +342,7 @@ function mergeFlatRows(
     }
     existing.sources.push({
       provider,
+      providerName: row.providerName,
       chapterKey: row.chapterKey || String(number),
       providerChapterId: row.providerChapterId || row.chapterKey || String(number),
       language: row.language ?? null,
@@ -355,6 +361,9 @@ export async function fetchExtensionMangaChapters(params: { anilistId?: number; 
     servers: () => serverMappedChapters(params),
   });
   const byNumber = new Map<number, MangaChapterAggregate>();
+  // Republish cached discovery snapshots too, so revisiting a title does not
+  // leave diagnostics from a different title visible.
+  replaceSourceReports('tatakai', 'manga', (native as MangaChaptersPayload).reports || []);
   for (const chapter of [...native.chapters, ...remote.chapters, ...compatibility.chapters, ...servers.chapters]) {
     if (declaresNovelContent(chapter)) continue;
     chapter.sources = chapter.sources.filter(source => !declaresNovelContent(source));
@@ -370,6 +379,7 @@ async function fetchNativeMangaChapters(params: {
   anilistId?: number;
   malId?: number;
   title?: string;
+  titles?: string[];
 }): Promise<MangaChaptersPayload> {
   dbg("fetchExtensionMangaChapters: params=", params);
   // Prefer the HTTP host: it serves every manga-capable namespace, so multiple
@@ -396,7 +406,7 @@ async function fetchNativeMangaChapters(params: {
 /** HTTP path: fan out `manga/chapters` across every manga-capable namespace. */
 async function fetchChaptersViaHttp(
   env: HttpMangaEnv,
-  params: { anilistId?: number; malId?: number; title?: string },
+  params: { anilistId?: number; malId?: number; title?: string; titles?: string[] },
 ): Promise<MangaChaptersPayload> {
   const byNumber = new Map<number, MangaChapterAggregate>();
   const providersAvailable: string[] = [];
@@ -415,6 +425,7 @@ async function fetchChaptersViaHttp(
             anilistId: params.anilistId,
             malId: params.malId,
             title: params.title,
+            titles: params.titles,
           });
         } catch {
           body = null;
@@ -424,6 +435,7 @@ async function fetchChaptersViaHttp(
         if (params.anilistId) u.searchParams.set("anilistId", String(params.anilistId));
         if (params.malId) u.searchParams.set("malId", String(params.malId));
         if (params.title) u.searchParams.set("title", params.title);
+        for (const title of params.titles || []) u.searchParams.append("titles[]", title);
         dbg("fetchChaptersViaHttp: GET", u.toString());
         ({ body } = await httpGetJson(u.toString()));
       }
@@ -461,13 +473,34 @@ async function fetchChaptersViaHttp(
     for (const s of ch.sources) perProvider.set(s.provider, (perProvider.get(s.provider) ?? 0) + 1);
   }
   logMangaSummary(diagnostics, perProvider, byNumber.size);
-  for (const diag of diagnostics) recordSourceReport({ provider: diag.provider, name: diag.provider, ecosystem: 'tatakai', kind: 'manga', status: diag.status, count: perProvider.get(diag.provider) || 0, durationMs: diag.durationMs || 0, error: diag.error });
-  for (const [provider, count] of perProvider) if (!diagnostics.some(d => d.provider === provider)) recordSourceReport({ provider, name: provider, ecosystem: 'tatakai', kind: 'manga', status: 'ok', count, durationMs: 0 });
+  const names = new Map<string, string>();
+  for (const chapter of byNumber.values()) for (const source of chapter.sources) {
+    names.set(source.provider, mangaProviderDisplayName(source));
+  }
+  const reports: ExtensionSourceReport[] = diagnostics.map(diag => {
+    // Atsu reports one provider run, but its releases belong to upstream IDs.
+    const count = perProvider.get(diag.provider) ?? [...perProvider]
+      .filter(([provider]) => provider.startsWith(`${diag.provider}@`))
+      .reduce((total, [, count]) => total + count, 0);
+    return {
+      provider: diag.provider, name: names.get(diag.provider) || mangaProviderDisplayName(diag),
+      ecosystem: 'tatakai', kind: 'manga', count,
+      status: diag.status === 'ok' && !count ? 'empty' : diag.status,
+      durationMs: diag.durationMs || 0, error: diag.error,
+    };
+  });
+  for (const [provider, count] of perProvider) {
+    if (!diagnostics.some(d => d.provider === provider)) reports.push({
+      provider, name: names.get(provider) || provider, ecosystem: 'tatakai',
+      kind: 'manga', status: 'ok', count, durationMs: 0,
+    });
+  }
 
   return {
     chapters: Array.from(byNumber.values()).sort((a, b) => a.number - b.number),
     providersAvailable,
     failedProviders,
+    reports,
   };
 }
 
@@ -488,7 +521,7 @@ async function fetchChaptersViaIpc(params: {
         chapters?: FlatChapterRow[];
       } | null;
 
-      const rows = Array.isArray(result?.chapters) ? result!.chapters! : [];
+      const rows = Array.isArray(result) ? result : Array.isArray(result?.chapters) ? result.chapters : [];
       if (rows.length === 0) continue;
       providersAvailable.push(extensionId);
       mergeFlatRows(byNumber, rows, extensionId);
@@ -534,6 +567,7 @@ export function mangaPageAttemptIdentity(attempt: MangaPageAttempt): string {
  * source transparently falls through to MangaDex.
  */
 export async function fetchExtensionMangaPages(params: {
+  signal?: AbortSignal;
   extensionId: string;
   chapterKey: string;
   providerChapterId?: string;
@@ -550,18 +584,20 @@ export async function fetchExtensionMangaPages(params: {
   let lastFailure: MangaReadResponse | null = null;
 
   for (const attempt of attempts) {
+    params.signal?.throwIfAborted();
     if (!attempt.provider || !attempt.chapterKey) continue;
     const key = mangaPageAttemptIdentity(attempt);
     if (seen.has(key)) continue;
     seen.add(key);
     attempted.push(attempt.provider);
 
-    const res = await fetchOneSourcePages({
+    const res = await abortableReaderTask(fetchOneSourcePages({
+      signal: params.signal,
       extensionId: attempt.provider,
       chapterKey: attempt.chapterKey,
       providerChapterId: attempt.providerChapterId,
       anilistId: params.anilistId,
-    });
+    }), params.signal);
     if (res.success && (res.data?.pages?.length ?? 0) > 0) {
       if (attempted.length > 1 && res.data?.readMeta) res.data.readMeta.fallbackUsed = true;
       return res;
@@ -591,6 +627,7 @@ export async function fetchExtensionMangaPages(params: {
 
 /** Fetch pages for exactly one source (HTTP host first, IPC fallback). */
 async function fetchOneSourcePages(params: {
+  signal?: AbortSignal;
   extensionId: string;
   chapterKey: string;
   providerChapterId?: string;
@@ -637,6 +674,7 @@ async function fetchOneSourcePages(params: {
       },
     };
   }
+  params.signal?.throwIfAborted();
   return fetchPagesViaIpc(params);
 }
 
@@ -671,7 +709,7 @@ function resolvePageNamespaces(env: HttpMangaEnv, subProvider: string, chapterKe
 /** HTTP path: fetch pages from the owning namespace (with try-all fallback). */
 async function fetchPagesViaHttp(
   env: HttpMangaEnv,
-  params: { extensionId: string; chapterKey: string; providerChapterId?: string; anilistId?: number },
+  params: { signal?: AbortSignal; extensionId: string; chapterKey: string; providerChapterId?: string; anilistId?: number },
 ): Promise<{ response: MangaReadResponse | null; reached: boolean }> {
   const candidates = resolvePageNamespaces(env, params.extensionId, params.chapterKey);
 
@@ -683,6 +721,7 @@ async function fetchPagesViaHttp(
 
   let reached = false;
   for (const ns of candidates) {
+    params.signal?.throwIfAborted();
     let status = 0;
     let body: any = null;
     if (isMobile && mobileHost) {
@@ -704,8 +743,9 @@ async function fetchPagesViaHttp(
       if (params.extensionId) u.searchParams.set("provider", params.extensionId);
       if (params.providerChapterId) u.searchParams.set("providerChapterId", params.providerChapterId);
       if (params.anilistId) u.searchParams.set("anilistId", String(params.anilistId));
-      ({ status, body } = await httpGetJson(u.toString()));
+      ({ status, body } = await httpGetJson(u.toString(), 20_000, params.signal));
     }
+    params.signal?.throwIfAborted();
     if (status > 0) reached = true;
     // Same shape difference as chapters: mobile dispatch returns the page
     // array directly while the desktop API wraps it in `{ pages }`.
@@ -837,11 +877,21 @@ function buildReadResponse(
   };
 }
 
+/** Recover readable Atsu labels from older bundles that omitted providerName. */
+export function mangaProviderDisplayName(s: { provider: string; providerName?: string; scanlator?: string | null }): string {
+  if (s.providerName && s.providerName !== s.provider) return s.providerName;
+  if (/^atsu(?:@|$)/i.test(s.provider)) {
+    const group = s.scanlator?.trim();
+    return group && group !== s.provider.split('@')[1] ? `Atsu · ${group}` : 'Atsu';
+  }
+  return s.providerName || s.provider;
+}
+
 /** Convert an extension source row to the response `MangaChapterSource` shape. */
 function extSource(s: MangaChapterSourceRow): MangaChapterSource {
   return {
     provider: s.provider,
-    providerName: s.providerName,
+    providerName: mangaProviderDisplayName(s),
     chapterKey: s.chapterKey,
     providerChapterId: s.providerChapterId,
     language: s.language ?? null,

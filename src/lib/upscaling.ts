@@ -26,6 +26,49 @@ export const UPSCALERS = [
 
 /** One page at a time avoids retaining multiple GPU pass chains in long chapters. */
 let gpuQueue: Promise<unknown> = Promise.resolve();
+
+/**
+ * Renderer-side concurrency gate for enhancement chains. Enabling the
+ * upscaler on a whole chapter fires one enhancement per page the moment its
+ * image loads; without a cap, a long chapter would fetch + decode + re-encode
+ * dozens of pages at once, flooding the native bridge / GPU and freezing the
+ * reader while scrolling. Only a few chains run at a time, and near-viewport
+ * pages (higher `priority`) are started first, so the pages you are looking at
+ * are enhanced before the rest of the chapter. Both page enhancement and the
+ * settings preview share this gate.
+ */
+const MAX_CONCURRENT_UPSCALES = 2;
+let activeUpscales = 0;
+let upscaleSeq = 0;
+const waitingUpscales: Array<{ priority: number; seq: number; resolve: () => void }> = [];
+
+function pumpUpscaleGate() {
+  while (activeUpscales < MAX_CONCURRENT_UPSCALES && waitingUpscales.length > 0) {
+    waitingUpscales.sort((a, b) => b.priority - a.priority || a.seq - b.seq);
+    const next = waitingUpscales.shift()!;
+    activeUpscales += 1;
+    next.resolve();
+  }
+}
+
+/** Run an enhancement chain with the shared concurrency cap + priority ordering. */
+export async function withUpscaleSlot<T>(priority: number, work: () => Promise<T>): Promise<T> {
+  await new Promise<void>((resolve) => {
+    if (activeUpscales < MAX_CONCURRENT_UPSCALES) {
+      activeUpscales += 1;
+      resolve();
+    } else {
+      waitingUpscales.push({ priority, seq: upscaleSeq++, resolve });
+    }
+  });
+  try {
+    return await work();
+  } finally {
+    activeUpscales -= 1;
+    pumpUpscaleGate();
+  }
+}
+
 export function upscaleImage(blob: Blob, engine: Exclude<UpscalerEngine, 'off'>, preset: Anime4KMode, scale: 2 | 4, signal?: AbortSignal, options: UpscaleOptions = {}): Promise<Blob> {
   const execute = async () => {
     signal?.throwIfAborted();

@@ -1,7 +1,8 @@
+import { ReaderPresets } from '@/components/settings/ReaderPresets';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useEffect, useState } from 'react';
-import { Repeat, RotateCcw } from 'lucide-react';
+import { BookOpen, Gauge, Keyboard, Monitor, Repeat, RotateCcw, Settings2 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -47,10 +48,34 @@ export function ReaderPanel() {
     return () => window.removeEventListener('keydown', handler, { capture: true });
   }, [listeningAction, setBinding]);
 
+  // Sticky in-panel navigator: jump straight to a group instead of scrolling
+  // through a long flat list.
+  const READER_SECTION_NAV = [
+    { id: 'reader-layout', get label() { return uiI18n.t('app.reading_layout_cfae87b0'); }, icon: BookOpen },
+    { id: 'reader-behavior', get label() { return uiI18n.t('app.behavior_70cb647a'); }, icon: Settings2 },
+    { id: 'reader-interface', get label() { return uiI18n.t('app.interface_7b4db7ef'); }, icon: Monitor },
+    { id: 'reader-performance', get label() { return uiI18n.t('app.loading_performance_756c2d22'); }, icon: Gauge },
+    { id: 'reader-shortcuts', get label() { return uiI18n.t('app.keyboard_shortcuts_26669547'); }, icon: Keyboard },
+  ] as const;
+  const scrollToSection = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
   return (
     <div className="space-y-6">
+      <div className="flex flex-wrap gap-1.5">
+        {READER_SECTION_NAV.map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => scrollToSection(id)}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-muted/30 px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
+          >
+            <Icon className="h-3.5 w-3.5" />{label}
+          </button>
+        ))}
+      </div>
+      <ReaderPresets />
       <ReaderUpscaling />
-      <SettingsSection title={uiI18n.t('app.reading_layout_cfae87b0')} description={uiI18n.t('app.how_pages_are_laid_out_and_sized_in_the_reader_c2e71668')}>
+      <SettingsSection id="reader-layout" icon={BookOpen} eyebrow="Layout" title={uiI18n.t('app.reading_layout_cfae87b0')} description={uiI18n.t('app.how_pages_are_laid_out_and_sized_in_the_reader_c2e71668')}>
         <div className="flex flex-col">
           <SettingRow
             title={uiI18n.t('app.reading_mode_d75871a6')}
@@ -177,7 +202,7 @@ export function ReaderPanel() {
         </div>
       </SettingsSection>
 
-      <SettingsSection title={uiI18n.t('app.behavior_70cb647a')} description={uiI18n.t('app.navigation_and_automatic_scrolling_524082f8')}>
+      <SettingsSection id="reader-behavior" icon={Settings2} title={uiI18n.t('app.behavior_70cb647a')} description={uiI18n.t('app.navigation_and_automatic_scrolling_524082f8')}>
         <div className="flex flex-col">
           <SettingRow title={uiI18n.t('app.continuous_scroll_bf2bf036')} description={uiI18n.t('app.load_the_next_chapter_at_the_end_and_the_previou_1702ff09')} control={<Switch checked={settings.continuousScroll} onCheckedChange={(c) => updateSetting('continuousScroll', c)} />} />
           <SettingRow title={uiI18n.t('app.click_to_turn_pages_73343530')} description={uiI18n.t('app.tap_the_left_right_edge_of_a_page_to_turn_paged__2fa7e749')} control={<Switch checked={settings.clickToTurn} onCheckedChange={(c) => updateSetting('clickToTurn', c)} />} />
@@ -200,7 +225,7 @@ export function ReaderPanel() {
         </div>
       </SettingsSection>
 
-      <SettingsSection title={uiI18n.t('app.interface_7b4db7ef')} description={uiI18n.t('app.on_screen_indicators_and_toolbar_buttons_475f7477')}>
+      <SettingsSection id="reader-interface" icon={Monitor} title={uiI18n.t('app.interface_7b4db7ef')} description={uiI18n.t('app.on_screen_indicators_and_toolbar_buttons_475f7477')}>
         <div className="flex flex-col">
           <SettingRow
             title={uiI18n.t('app.progress_indicator_f8660a3b')}
@@ -223,7 +248,7 @@ export function ReaderPanel() {
         </div>
       </SettingsSection>
 
-      <SettingsSection title={uiI18n.t('app.loading_performance_756c2d22')} description={uiI18n.t('app.how_chapter_pages_are_fetched_and_preloaded_ed50e04d')}>
+      <SettingsSection id="reader-performance" icon={Gauge} title={uiI18n.t('app.loading_performance_756c2d22')} description={uiI18n.t('app.how_chapter_pages_are_fetched_and_preloaded_ed50e04d')}>
         <div className="flex flex-col">
           <SettingRow
             title={uiI18n.t('app.preloading_f2684504')}
@@ -265,10 +290,12 @@ export function ReaderPanel() {
               </Select>
             }
           />
+          <SettingRow title="Prefetch prev/next chapters" description="Fetch the previous and next chapter ahead of time so Prev/Next advance instantly, with no loading screen." control={<Switch checked={settings.prefetchAdjacentChapters} onCheckedChange={(c) => updateSetting('prefetchAdjacentChapters', c)} />} />
+          <SettingRow title="Chapter load screen" description="Show the full-screen progress overlay when a chapter first opens. Off lets pages appear as they load." control={<Switch checked={settings.chapterLoadScreen} onCheckedChange={(c) => updateSetting('chapterLoadScreen', c)} />} />
         </div>
       </SettingsSection>
 
-      <SettingsSection title={uiI18n.t('app.keyboard_shortcuts_26669547')} description={uiI18n.t('app.rebind_the_reader_keys_click_a_shortcut_then_pre_e97bf516')}>
+      <SettingsSection id="reader-shortcuts" icon={Keyboard} title={uiI18n.t('app.keyboard_shortcuts_26669547')} description={uiI18n.t('app.rebind_the_reader_keys_click_a_shortcut_then_pre_e97bf516')}>
         <div className="flex flex-col gap-2">
           {READER_KEYBIND_ACTIONS.map(({ action, label, hint }) => {
             const isListening = listeningAction === action;

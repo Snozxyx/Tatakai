@@ -62,6 +62,18 @@ async function request(
   return response.json();
 }
 
+const seriesCache = new Map<string, { at: number; work: Promise<any> }>();
+export function fetchMangaUpdatesSeries(id: string): Promise<any> {
+  const token = id.replace(/^mangaupdates:/i, '');
+  if (!/^\d+$/.test(token)) return Promise.reject(new Error('Invalid MangaUpdates series'));
+  const hit = seriesCache.get(token);
+  if (hit && Date.now() - hit.at < 3600_000) return hit.work;
+  const work = request('series', token).catch(error => { seriesCache.delete(token); throw error; });
+  seriesCache.set(token, { at: Date.now(), work });
+  while (seriesCache.size > 100) seriesCache.delete(seriesCache.keys().next().value!);
+  return work;
+}
+
 /** Safe mapping for modern numeric IDs, base-36 slugs, and old MangaDex mu links. */
 async function resolveSeries(manga: any): Promise<any | null> {
   const link = String(manga.attributes?.links?.mu || "").trim();
@@ -115,9 +127,10 @@ export function releaseChapterNumbers(raw: unknown): number[] {
 }
 
 async function load(id: string): Promise<MangaUpdatesCatalog | null> {
-  const manga = await resolveMangaDexMapping(id);
-  if (!manga) return null;
-  const series = await resolveSeries(manga);
+  const direct = /^mangaupdates:\d+$/.test(id);
+  const manga = direct ? null : await resolveMangaDexMapping(id);
+  if (!direct && !manga) return null;
+  const series = direct ? await fetchMangaUpdatesSeries(id) : await resolveSeries(manga);
   if (!series?.series_id) return null;
   const chapters = new Map<number, MappedMangaChapter>();
   let latestDate: string | null = null,

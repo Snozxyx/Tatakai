@@ -1,3 +1,4 @@
+import { useScrollRestoration } from '@/hooks/ui/useScrollRestoration';
 import { MangaWhatsNew } from '@/components/manga/MangaUpdatesDiscovery';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
@@ -150,6 +151,7 @@ export default function MangaHomePage() {
   );
 
   const isInitialLoading = isLoading && !home;
+  useScrollRestoration('manga-home', { useWindow: true, ready: !isInitialLoading });
 
   return (
     <div className="relative min-h-screen bg-background text-foreground overflow-x-clip">

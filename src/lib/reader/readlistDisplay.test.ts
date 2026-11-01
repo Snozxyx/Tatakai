@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { mergeReadlistAliases, readlistProgressLabels, type ResolvedReadlistItem } from "../src/lib/reader/readlistDisplay";
+import { mergeReadlistAliases, readlistProgressLabels, type ResolvedReadlistItem } from "./readlistDisplay";
 
 function row(overrides: Partial<ResolvedReadlistItem>): ResolvedReadlistItem {
   return {
@@ -18,7 +18,7 @@ test("combines resolved MangaBaka and AniList aliases and keeps the newest saved
     updated_at: "2026-10-11T00:00:00Z", status: "reading", last_chapter_number: 125,
     last_chapter_key: "chapter-125", last_page_index: 8, manga_poster: null });
   expect(mergeReadlistAliases([imported, local])).toEqual([{
-    ...local, manga_poster: imported.manga_poster,
+    ...local, manga_poster: imported.manga_poster, format: undefined, resolved_manga_id: imported.resolved_manga_id,
   }]);
   expect(local.manga_poster).toBeNull();
   expect(imported.status).toBe("completed");
@@ -45,4 +45,11 @@ test("retains chapter zero and page progress when an actual reading session exis
   expect(readlistProgressLabels(row({ last_chapter_number: 0, last_chapter_key: "prologue", last_page_index: 3 }))).toEqual({
     hasChapter: true, chapterLabel: "Chapter 0", pageLabel: "Page 4",
   });
+});
+
+test('reconciles provider aliases through proven MAL identities without using title guesses', () => {
+ const first=row({ manga_id:'provider-one',resolved_manga_id:undefined,anilist_id:8,mal_id:55,format:'manhwa' });
+ const second=row({ manga_id:'provider-two',resolved_manga_id:undefined,anilist_id:null,mal_id:55,format:'unknown',updated_at:'2026-10-12T00:00:00Z',last_chapter_number:125 });
+ const merged=mergeReadlistAliases([first,second]);
+ expect(merged).toHaveLength(1);expect(merged[0].format).toBe('manhwa');expect(merged[0].last_chapter_number).toBe(125);
 });

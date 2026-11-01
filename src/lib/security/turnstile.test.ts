@@ -2,13 +2,26 @@ import { afterEach, describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import { Capacitor } from '@capacitor/core';
-import { needsHostedTurnstile, readHostedTurnstileMessage } from '../src/lib/security/turnstile';
+import { needsHostedTurnstile, readHostedTurnstileMessage } from './turnstile';
 
 const platform = Capacitor.getPlatform;
 const native = Capacitor.isNativePlatform;
 afterEach(() => Object.assign(Capacitor, { getPlatform: platform, isNativePlatform: native }));
 
 describe('iOS CAPTCHA bridge', () => {
+  test('hosting allows only the verification page to be embedded by the native app', () => {
+    const source = readFileSync(new URL('../../../scripts/ptero-start.mjs', import.meta.url), 'utf8');
+    const fn = source.slice(source.indexOf('function applySecurityHeaders('), source.indexOf('function runOrExit('));
+    const apply = new Function('SITE_CSP', `${fn}; return applySecurityHeaders;`)("frame-ancestors 'none'; script-src 'self'");
+    const normal: Record<string,string> = {}, verification: Record<string,string> = {};
+    apply({ setHeader:(key:string,value:string)=>normal[key]=value });
+    apply({ setHeader:(key:string,value:string)=>verification[key]=value },{ verification:true });
+    expect(normal['X-Frame-Options']).toBe('DENY');
+    expect(normal['Content-Security-Policy']).toContain("frame-ancestors 'none'");
+    expect(verification['X-Frame-Options']).toBeUndefined();
+    expect(verification['Content-Security-Policy']).toContain('capacitor://tatakai.me');
+    expect(verification['Content-Security-Policy']).not.toContain('*');
+  });
   test('uses HTTPS hosting only in native iOS, preserving Safari and Android', () => {
     Capacitor.getPlatform = () => 'ios';
     Capacitor.isNativePlatform = () => true;
@@ -37,7 +50,7 @@ describe('iOS CAPTCHA bridge', () => {
   });
 
   function loadPage(search: string) {
-    const html = readFileSync(new URL('../public/security/turnstile.html', import.meta.url), 'utf8');
+    const html = readFileSync(new URL('../../../public/security/turnstile.html', import.meta.url), 'utf8');
     const script = html.match(/<script>([\s\S]*?)<\/script>/)![1];
     const messages: any[] = [];
     const scripts: any[] = [];

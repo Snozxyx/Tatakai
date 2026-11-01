@@ -1,3 +1,4 @@
+import { flushReadingProgress } from '@/lib/reader/progressOutbox';
 import { ChatDockProvider } from '@/contexts/ChatDockContext';
 import { ChatDock } from '@/components/community/messages/ChatDock';
 import { useSocialPresencePublisher } from '@/hooks/community/useSocialActivity';
@@ -57,6 +58,14 @@ import { useMobileUpdateOrchestrator } from '@/core/update/mobile-update';
 import { EmailProofBanner } from '@/components/auth/EmailProofBanner';
 
 const MainLayout = ({ children }: { children: React.ReactNode }) => {
+  const { user: progressOwner } = useAuth();
+  useEffect(() => {
+    if (!progressOwner) return;
+    const replay = () => { void flushReadingProgress(progressOwner.id).catch(() => undefined); };
+    replay(); window.addEventListener('online', replay); window.addEventListener('focus', replay);
+    return () => { window.removeEventListener('online', replay); window.removeEventListener('focus', replay); };
+  }, [progressOwner?.id]);
+
   const { fullPage: fullPageProfile } = useProfilePresentation();
   const { open: settingsOpen } = useSettingsModal();
   const [settingsReady, setSettingsReady] = useState(false);

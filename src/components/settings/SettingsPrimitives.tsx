@@ -50,7 +50,7 @@ export function SettingsBadge({
     <span
       className={cn(
         "inline-flex items-center gap-1 rounded-full border px-2 py-0.5",
-        "text-[10px] font-black uppercase tracking-wider leading-4 whitespace-nowrap",
+        "text-xs font-medium leading-4 whitespace-nowrap",
         TONE_CLASSES[tone],
         className,
       )}
@@ -74,6 +74,8 @@ export function SettingsSection({
   id,
   className,
   bodyClassName,
+  icon: Icon,
+  eyebrow,
   children,
 }: {
   icon?: LucideIcon;
@@ -93,11 +95,7 @@ export function SettingsSection({
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 space-y-1">
           <h2 className="font-display text-lg font-semibold text-foreground">{title}</h2>
-          {description && (
-            <p className="max-w-2xl text-[13px] leading-relaxed text-muted-foreground">
-              {description}
-            </p>
-          )}
+          {description && <p className="max-w-2xl text-[13px] leading-relaxed text-muted-foreground">{description}</p>}
         </div>
         {action && <div className="shrink-0">{action}</div>}
       </div>
@@ -143,7 +141,7 @@ export function SettingRow({
   return (
     <div
       className={cn(
-        "settings-row py-3.5",
+        "settings-row py-4",
         tone === "accent" && "rounded-xl bg-primary/5 px-3",
         className,
       )}

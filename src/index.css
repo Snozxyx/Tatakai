@@ -90,6 +90,20 @@
     background-attachment: fixed;
   }
 
+  /* No document-level horizontal scroll, ever. `clip` (not `hidden`) so
+     `position: sticky` descendants keep working — clip doesn't create a
+     scroll container. Old browsers fall back to `hidden`. */
+  html,
+  body {
+    overflow-x: clip;
+  }
+  @supports not (overflow: clip) {
+    html,
+    body {
+      overflow-x: hidden;
+    }
+  }
+
   h1,
   h2,
   h3,
@@ -1528,29 +1542,8 @@ body[data-theme="harvest"] .glass-panel {
 
 /* ========== ULTRA LITE MODE STYLES ========== */
 /* Optimized for low-end devices by removing expensive filters and animations */
-.ultra-lite-theme {
-  --background: 0 0% 100% !important;
-  --card: 0 0% 95% !important;
-  --foreground: 0 0% 0% !important;
-  color: #000000 !important;
-  /* The user specifically asked for black text in ultra mode */
-}
-
-.ultra-lite-theme p,
-.ultra-lite-theme span,
-.ultra-lite-theme h1,
-.ultra-lite-theme h2,
-.ultra-lite-theme h3,
-.ultra-lite-theme h4,
-.ultra-lite-theme h5,
-.ultra-lite-theme h6 {
-  color: #000000 !important;
-}
-
-.ultra-lite-theme .glass-panel {
-  background: #ffffff !important;
-  color: #000000 !important;
-}
+.ultra-lite-theme { color: hsl(var(--foreground)); background-color: hsl(var(--background)); background-image: none !important; }
+.ultra-lite-theme .glass-panel { background: hsl(var(--card)) !important; color: hsl(var(--card-foreground)); }
 
 .ultra-lite-theme *,
 .ultra-lite-theme *::before,
@@ -2506,3 +2499,13 @@ html.mobile-pull-refresh-enabled { overscroll-behavior-y: contain; }
 
 /* Compact stickers: preserve artwork proportions without filling the feed. */
 .tatakai-mascot-sticker { width: auto; height: auto; max-width: min(140px, 100%); max-height: 140px; object-fit: contain; }
+
+@media(min-width:768px) {
+  /* The web floating pill may need to scroll on short screens. */
+  [data-sidebar] { max-height:calc(100dvh - 32px); overflow-y:auto; scrollbar-width:none; }
+  [data-sidebar]::-webkit-scrollbar { display:none; width:0; height:0; }
+  /* The desktop rail is a fixed app chrome: its icons must NOT scroll in any
+     direction (overflow-y:auto above would also compute overflow-x:auto and
+     make the rail scrollable both ways). Clip instead — the rail never grows. */
+  [data-sidebar-rail="desktop"] { overflow:hidden; }
+}

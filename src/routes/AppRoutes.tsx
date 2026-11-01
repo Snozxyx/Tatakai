@@ -1,7 +1,8 @@
+const WatchlistPage = lazy(() => import('../pages/base/WatchlistPage'));
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { useRoutePreload } from '@/hooks/ui/useRoutePreload';
 import TVLinkPage from '@/pages/tv/TVLinkPage';
-import { Routes, Route, Navigate, useLocation, useParams, useNavigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation, useParams, useNavigate, useNavigationType } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMaintenanceMode } from "@/hooks/admin/useAdminMessages";
@@ -173,6 +174,7 @@ function CatchAllHandler() {
 }
 
 export function GlobalListeners() {
+  const navigationType = useNavigationType();
   const navigate = useNavigate();
   const location = useLocation();
   const { user, isLoading } = useAuth();
@@ -214,8 +216,8 @@ export function GlobalListeners() {
   }, [isNative, isSetupComplete, navigate, location.pathname]);
 
   useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [location.pathname]);
+    if (navigationType !== 'POP') window.scrollTo(0, 0);
+  }, [location.pathname, navigationType]);
 
   // Progress reconciliation on foreground + realtime. Stale-while-revalidate
   // alone (5m desktop / 10m mobile) meant the other device's progress stayed
@@ -466,7 +468,9 @@ const AppRoutes = () => {
         <Route path="/error" element={<StatusPageGuard allowedWhen={false}><ErrorPage /></StatusPageGuard>} />
         <Route path="/char/:charname" element={<CharacterPage />} />
         <Route path="/character/:charname" element={<CharacterPage />} />
-        <Route path="/extensions" element={<ProtectedRoute><ExtensionHubPage /></ProtectedRoute>} />
+        <Route path="/watchlist" element={<ProtectedRoute><WatchlistPage /></ProtectedRoute>} />
+        <Route path="/extensions/manage" element={<ProtectedRoute><ExtensionHubPage key="management" management /></ProtectedRoute>} />
+        <Route path="/extensions" element={<ProtectedRoute><ExtensionHubPage key="discovery" /></ProtectedRoute>} />
         <Route path="/extensions/:extensionId" element={<ProtectedRoute><ExtensionDetailPage /></ProtectedRoute>} />
         <Route path="/auth" element={<AuthPage />} />
         <Route path="/link" element={<TVLinkPage />} />

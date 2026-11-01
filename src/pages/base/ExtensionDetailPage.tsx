@@ -1,3 +1,4 @@
+import { registeredExtensionAliases } from '@/hooks/api/useExtensionStore';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
@@ -60,6 +61,7 @@ type DetailTab = 'overview' | 'versions' | 'permissions' | 'source';
 interface SourceCodeResult {
   success: boolean;
   content?: string;
+  source?: string;
   truncated?: boolean;
   totalBytes?: number;
   error?: string;
@@ -110,9 +112,19 @@ function SourceCodeTab({ extensionId }: { extensionId: string }) {
 
   const { data, isLoading, error } = useQuery<SourceCodeResult>({
     queryKey: ['extension-source-code', extensionId],
-    queryFn: () => (window as any).tatakaiRuntime.getExtensionSourceCode(extensionId),
+    queryFn: async () => {
+      const runtime = (window as any).tatakaiRuntime;
+      const aliases = registeredExtensionAliases(extensionId);
+      const health = await runtime.health?.().catch(() => null);
+      const loaded = (health?.loadedExtensions || []) as string[];
+      const candidates = [...aliases].sort((a, b) => Number(loaded.includes(b)) - Number(loaded.includes(a)));
+      let result: SourceCodeResult | undefined;
+      for (const id of candidates) { result = await runtime.getExtensionSourceCode(id); if (result?.success) return result; }
+      return result!;
+    },
     enabled: hasRuntime,
-    staleTime: Infinity,
+    staleTime: 5000,
+    refetchOnWindowFocus: true,
   });
 
   if (!hasRuntime) {
@@ -159,7 +171,7 @@ function SourceCodeTab({ extensionId }: { extensionId: string }) {
         </p>
       ) : null}
       <pre className="max-h-[32rem] overflow-auto rounded-2xl border border-white/[0.07] bg-black/40 p-4 text-xs leading-relaxed text-white/70">
-        <code className="whitespace-pre-wrap font-mono">{data.content}</code>
+        <code className="whitespace-pre-wrap font-mono">{data.source ?? data.content}</code>
       </pre>
     </div>
   );

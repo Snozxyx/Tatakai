@@ -6,3 +6,22 @@
 @media(max-width:600px){.pt-arrival{padding:14px}.pt-arrival-top{padding:12px 18px}.pt-arrival-top>i{width:20px}.pt-arrival-scene{padding:55px 12px}.pt-arrival-card{padding:26px 22px}.pt-arrival h1{font-size:23px}.pt-arrival-orbit{width:90vw}.pt-arrival-symbol{width:64px;height:64px}}
 
 .ge-arrival[data-motion=false],.ge-arrival[data-motion=false] *,.ml-profile[role=status][data-motion=false],.ml-profile[role=status][data-motion=false] *{animation:none!important;transition:none!important}
+
+.theme-entry { min-height:100dvh; width:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; background:hsl(var(--background)); color:hsl(var(--foreground)); }
+.theme-entry>p { font-size:1.2rem; font-weight:600; } .theme-entry>span { font-size:.875rem; opacity:.7; }
+.theme-entry-art { position:relative; width:200px; height:170px; display:grid; place-items:center; overflow:hidden; }
+.theme-entry-art i { display:block; } .theme-entry[data-motion=true] .theme-entry-art { animation:entry-breathe 2.5s ease-in-out infinite alternate; }
+.theme-entry-sakura-letter { background:#fff5f8; color:#9e395c; } .entry-envelope { position:relative; margin-top:35px; }
+.entry-letter { position:absolute; width:74px; height:84px; background:#fff; border:1px solid #edb3c4; left:19px; top:-28px; text-align:center; padding:5px; transform:rotate(-5deg); }
+.entry-letter i,.entry-notebook>i { height:2px; background:currentColor; opacity:.25; margin:8px; } .entry-petal { position:absolute; right:20px; top:30px; font-size:30px; }
+.theme-entry-cloud-notebook { background:#eff7ff; color:#356891; } .entry-notebook { width:115px; height:140px; border:2px solid #92b9d5; border-radius:8px 16px 16px 8px; background:#fff; padding:18px 12px 8px 24px; transform:rotate(6deg); }
+.entry-binding { position:absolute; left:35px; top:20px; line-height:35px; } .theme-entry-eyes-toward-heaven { background:linear-gradient(#dcefff,#fff9e8); color:#9b751f; }
+.entry-horizon { position:absolute; height:1px; background:#7eaebd; bottom:30px; width:100%; } .entry-cloud { position:absolute; bottom:25px; left:8px; color:#fff; }
+.theme-entry-frosted-blast { background:#e9edf8; color:#495b86; } .entry-pane { position:absolute; width:100px; height:110px; border:2px solid #fff; border-radius:16px; background:#ffffff77; transform:rotate(-14deg); }
+.entry-pane-one { left:28px; top:18px; } .entry-pane-two { right:28px; bottom:16px; transform:rotate(12deg); display:grid; place-items:center; }
+.theme-entry-uchiha { background:#131218; color:#e76565; } .entry-tomoe { width:100px; height:100px; border:2px solid currentColor; border-radius:50%; position:relative; display:grid; place-items:center; }
+.entry-tomoe i { position:absolute; height:18px; width:12px; border-radius:50% 50% 20% 50%; background:currentColor; } .entry-feather { position:absolute; right:10px; bottom:12px; color:#aaa1b4; transform:rotate(30deg); }
+.theme-entry-komorebi { background:#fbf7e9; color:#607849; } .entry-sunbeam { position:absolute; width:90px; height:230px; background:#f2cd5d55; transform:rotate(30deg); } .entry-leaf { position:absolute; } .entry-leaf-0 { left:35px; top:28px; transform:rotate(-35deg); } .entry-leaf-1 { right:26px; top:65px; transform:rotate(45deg); } .entry-leaf-2 { bottom:17px; left:57px; transform:rotate(95deg); }
+.entry-book-lines { position:absolute; bottom:28px; width:100px; display:flex; gap:6px; } .entry-book-lines i { width:30px; height:3px; background:currentColor; opacity:.3; }
+@keyframes entry-breathe { to { transform:translateY(-6px); opacity:.8; } }
+@media(prefers-reduced-motion:reduce) { .theme-entry-art { animation:none!important; } }

@@ -1,3 +1,5 @@
+import { useHistoryPreference } from '@/hooks/ui/useHistoryPreference';
+import { useScrollRestoration } from '@/hooks/ui/useScrollRestoration';
 import { mergeCatalog } from '@/lib/catalogMerge';
 import { ThemedCheckbox } from '@/components/ui/themed-checkbox';
 import { ThemedSelect } from '@/components/ui/themed-select';
@@ -146,7 +148,7 @@ export default function SearchPage() {
     }
   }, [searchInput]);
   const [page, setPage] = useState(1);
-  const [resultType, setResultType] = useState<'all' | 'anime' | 'manga' | 'novel' | 'character'>(() => {
+  const [resultType, setResultType] = useHistoryPreference<'all' | 'anime' | 'manga' | 'novel' | 'character'>('resultType', () => {
     const t = searchParams.get("type");
     if (t === 'manga') return 'manga';
     if (t === 'novel') return 'novel';
@@ -155,30 +157,30 @@ export default function SearchPage() {
     return 'all';
   });
   const [enableSecondaryResultStreams, setEnableSecondaryResultStreams] = useState(false);
-  const [animeTypeFilter, setAnimeTypeFilter] = useState<string>('all');
-  const [animeStatusFilter, setAnimeStatusFilter] = useState<string>('all');
-  const [animeGenreFilter, setAnimeGenreFilter] = useState<string>('all');
-  const [animeSortFilter, setAnimeSortFilter] = useState<string>('default');
-  const [mangaTypeFilter, setMangaTypeFilter] = useState<string>('all');
-  const [mangaStatusFilter, setMangaStatusFilter] = useState<string>('all');
-  const [mangaOrigin, setMangaOrigin] = useState<string>('all');
-  const [mangaGenreFilter, setMangaGenreFilter] = useState<string>(() => {
+  const [animeTypeFilter, setAnimeTypeFilter] = useHistoryPreference<string>('animeTypeFilter', 'all');
+  const [animeStatusFilter, setAnimeStatusFilter] = useHistoryPreference<string>('animeStatusFilter', 'all');
+  const [animeGenreFilter, setAnimeGenreFilter] = useHistoryPreference<string>('animeGenreFilter', 'all');
+  const [animeSortFilter, setAnimeSortFilter] = useHistoryPreference<string>('animeSortFilter', 'default');
+  const [mangaTypeFilter, setMangaTypeFilter] = useHistoryPreference<string>('mangaTypeFilter', 'all');
+  const [mangaStatusFilter, setMangaStatusFilter] = useHistoryPreference<string>('mangaStatusFilter', 'all');
+  const [mangaOrigin, setMangaOrigin] = useHistoryPreference<string>('mangaOrigin', 'all');
+  const [mangaGenreFilter, setMangaGenreFilter] = useHistoryPreference<string>('mangaGenreFilter', () => {
     const g = searchParams.get("genre");
     return g ? g.trim() : 'all';
   });
-  const [mangaAdultFilter, setMangaAdultFilter] = useState(false);
-  const [novelFilters, setNovelFilters] = useState<NovelSearchOptions>({});
+  const [mangaAdultFilter, setMangaAdultFilter] = useHistoryPreference('mangaAdultFilter', false);
+  const [novelFilters, setNovelFilters] = useHistoryPreference<NovelSearchOptions>('novelFilters', {});
   const [localNovelFilters, setLocalNovelFilters] = useState<NovelSearchOptions>({});
   const novelFilterActive = Object.entries(novelFilters).some(([key, value]) => key !== 'tagSource' && (Array.isArray(value) ? value.length > 0 : Boolean(value)));
-  const [minRating, setMinRating] = useState<number>(0);
-  const [minReleaseYear, setMinReleaseYear] = useState<number>(0);
-  const [maxRating, setMaxRating] = useState<number>(0);
-  const [maxReleaseYear, setMaxReleaseYear] = useState<number>(0);
-  const [seasonFilter, setSeasonFilter] = useState<string>('all');
-  const [minEpisodes, setMinEpisodes] = useState<number>(0);
-  const [maxEpisodes, setMaxEpisodes] = useState<number>(0);
-  const [sortMode, setSortMode] = useState<'relevance' | 'rating' | 'title' | 'popularity'>('relevance');
-  const [discoverSort, setDiscoverSort] = useState<DiscoverSort>('for-you');
+  const [minRating, setMinRating] = useHistoryPreference<number>('minRating', 0);
+  const [minReleaseYear, setMinReleaseYear] = useHistoryPreference<number>('minReleaseYear', 0);
+  const [maxRating, setMaxRating] = useHistoryPreference<number>('maxRating', 0);
+  const [maxReleaseYear, setMaxReleaseYear] = useHistoryPreference<number>('maxReleaseYear', 0);
+  const [seasonFilter, setSeasonFilter] = useHistoryPreference<string>('seasonFilter', 'all');
+  const [minEpisodes, setMinEpisodes] = useHistoryPreference<number>('minEpisodes', 0);
+  const [maxEpisodes, setMaxEpisodes] = useHistoryPreference<number>('maxEpisodes', 0);
+  const [sortMode, setSortMode] = useHistoryPreference<'relevance' | 'rating' | 'title' | 'popularity'>('sortMode', 'relevance');
+  const [discoverSort, setDiscoverSort] = useHistoryPreference<DiscoverSort>('discoverSort', 'for-you');
 
   const handleDiscoverSortChange = (newSort: DiscoverSort) => {
     setDiscoverSort(newSort);
@@ -199,21 +201,21 @@ export default function SearchPage() {
 
   const [imageConfidenceThreshold, setImageConfidenceThreshold] = useState<number>(0.85);
   const [showAdvancedAssist, setShowAdvancedAssist] = useState(false);
-  const [selectedAnimeTags, setSelectedAnimeTags] = useState<string[]>(() => {
+  const [selectedAnimeTags, setSelectedAnimeTags] = useHistoryPreference<string[]>('selectedAnimeTags', () => {
     const values = searchParams.getAll('animeTag');
     const packed = searchParams.get('animeTags');
     const typeParam = searchParams.get('type');
     const generic = typeParam !== 'manga' && typeParam !== 'novel' ? searchParams.getAll('tag').concat(searchParams.get('tags')?.split(',') ?? []) : [];
     return Array.from(new Set([...values, ...(packed ? packed.split(',') : []), ...generic].filter(Boolean)));
   });
-  const [selectedMangaTags, setSelectedMangaTags] = useState<string[]>(() => {
+  const [selectedMangaTags, setSelectedMangaTags] = useHistoryPreference<string[]>('selectedMangaTags', () => {
     const values = searchParams.getAll('mangaTag').concat(searchParams.getAll('manwhaTag'));
     const packed = searchParams.get('mangaTags') || searchParams.get('manwhaTags');
     const typeParam = searchParams.get('type');
     const generic = typeParam === 'manga' ? searchParams.getAll('tag').concat(searchParams.get('tags')?.split(',') ?? []) : [];
     return Array.from(new Set([...values, ...(packed ? packed.split(',') : []), ...generic].filter(Boolean)));
   });
-  const [mangaTagSource, setMangaTagSource] = useState<'anilist' | 'mangabaka' | undefined>(() => {
+  const [mangaTagSource, setMangaTagSource] = useHistoryPreference<'anilist' | 'mangabaka' | undefined>('mangaTagSource', () => {
     const source = searchParams.get('mangaTagSource');
     return source === 'anilist' || source === 'mangabaka' ? source : undefined;
   });
@@ -587,6 +589,7 @@ export default function SearchPage() {
     isFetchingNextPage: isFetchingNextSearchPage,
     isLoading: isLoadingSearch,
   } = useInfSearch(query, animeBackendFilters, shouldEnableAnimeSearch, animeFilterActive || selectedAnimeTags.length > 0);
+  useScrollRestoration('search', { useWindow: true, ready: !isLoadingSearch });
 
   const {
     data: producerInfiniteData,

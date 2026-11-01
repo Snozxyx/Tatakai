@@ -48,12 +48,13 @@ export interface AiringEntry {
   siteUrl: string | null;
 }
 
-async function fetchAiringWindow(startSec: number, endSec: number): Promise<AiringEntry[]> {
+async function fetchAiringWindow(startSec: number, endSec: number, signal?: AbortSignal): Promise<AiringEntry[]> {
   const out: AiringEntry[] = [];
   let page = 1;
   // AniList caps at 50/page; a busy week is comfortably under a few pages.
   for (let i = 0; i < 6; i++) {
     const res = await fetch(ANILIST_ENDPOINT, {
+      signal,
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({ query: QUERY, variables: { start: startSec, end: endSec, page }, forceUpstream: true }),
@@ -91,11 +92,12 @@ async function fetchAiringWindow(startSec: number, endSec: number): Promise<Airi
 export function useAiringSchedule(weekStart: Date) {
   useUiTranslation();
   const startSec = Math.floor(weekStart.getTime() / 1000);
-  const endSec = startSec + 7 * 24 * 60 * 60;
+  const endDate = new Date(weekStart); endDate.setDate(endDate.getDate() + 7);
+  const endSec = Math.floor(endDate.getTime() / 1000);
 
   return useQuery({
     queryKey: ['airing-schedule', startSec],
-    queryFn: () => fetchAiringWindow(startSec, endSec),
+    queryFn: ({ signal }) => fetchAiringWindow(startSec, endSec, signal),
     staleTime: 30 * 60 * 1000,
     retry: 1,
   });
