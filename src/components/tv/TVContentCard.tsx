@@ -11,6 +11,10 @@ import { Link } from "react-router-dom";
 import { Info } from "lucide-react";
 import { useTVTitleArt } from "@/core/tv/useTVTitleArt";
 import { observeTVVisibility } from "@/core/tv/visibility";
+import { useCardDesign } from '@/components/customization/CardDesignContext';
+import { CustomCardLayout } from '@/components/customization/CustomCardLayout';
+import { AdultBadge } from '@/components/MediaCardBadges';
+import '@/components/customization/customization.css';
 export interface TVCard extends TVCardMetadataInput {
   id: string;
   name: string;
@@ -29,6 +33,7 @@ export const TVContentCard = memo(function TVContentCard({
   item: TVCard;
   onFocus?(item: TVCard): void;
 }) {
+  const { design, readOnly } = useCardDesign();
   const panel = useRef<HTMLElement>(null);
   const anchor = useRef<HTMLAnchorElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>();
@@ -84,6 +89,7 @@ export const TVContentCard = memo(function TVContentCard({
     return observeTVVisibility(anchor.current, setVisible);
   }, []);
   function show() {
+    if (readOnly) return;
     clearTimeout(timer.current);
     onFocus?.(item);
     timer.current = setTimeout(() => {
@@ -156,7 +162,17 @@ export const TVContentCard = memo(function TVContentCard({
         onMouseEnter={show}
         onMouseLeave={hide}
         aria-describedby={open ? `tv-preview-${item.id}` : undefined}
+        onClick={readOnly ? event => event.preventDefault() : undefined}
+        tabIndex={readOnly ? -1 : undefined}
+        aria-label={item.name}
       >
+        {design ? <CustomCardLayout design={design} title={item.name} readOnly={readOnly}
+          poster={<img loading="lazy" decoding="async" src={item.tvMetadata?.banner || item.banner || item.poster || '/placeholder.svg'} alt="" className="h-full w-full object-cover" />}
+          safety={item.isAdult ? <AdultBadge className="absolute top-2 left-2 z-40" /> : undefined}
+          footer={item.progress !== undefined ? <progress max={1} value={item.progress} aria-label="Watch progress" /> : undefined}
+          slots={{ title: item.name, rating: metadata.score, type: metadata.type, year: metadata.year, status: metadata.status, rank: item.rank ? `#${item.rank}` : undefined,
+            episodes: metadata.sub ? `${metadata.sub} SUB${metadata.dub ? ` · ${metadata.dub} DUB` : ''}` : undefined, chapters: metadata.chapters ? `${metadata.chapters} ch` : undefined,
+            views: !readOnly && visible && viewId ? <TVCardFacts metadata={{ ...metadata, score: undefined, type: undefined, year: undefined, sub: undefined, dub: undefined, chapters: undefined, contentRating: undefined }} viewId={viewId} /> : undefined }} /> : <>
         <div className="tv-card-art">
           {item.poster && (
             <img
@@ -193,11 +209,12 @@ export const TVContentCard = memo(function TVContentCard({
           {item.subtitle && <span>{item.subtitle}</span>}
           <TVCardFacts
             metadata={metadata}
-            viewId={visible ? viewId : undefined}
+            viewId={!readOnly && visible ? viewId : undefined}
             adult={item.isAdult}
           />
           <TVCardTags tags={metadata.tags} />
         </div>
+        </>}
       </Link>
       {open &&
         createPortal(

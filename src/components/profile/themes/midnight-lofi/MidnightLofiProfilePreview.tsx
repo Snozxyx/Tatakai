@@ -1,3 +1,4 @@
+import { ProfileBadges } from '@/components/profile/ProfileBadges';
 import { formatWatchHours } from '@/lib/formatWatchHours';
 import { ProfilePresence } from '@/components/profile/ProfilePresence';
 import { ProfileSocialActions } from '@/components/profile/ProfileSocialActions';
@@ -76,15 +77,7 @@ export default function MidnightLofiProfilePreview(props: ThemePreviewProps) {
         {/* Badges */}
         {props.badges.length > 0 && (
           <div className="mlp-badges" aria-label="Badges">
-            {props.badges.slice(0, 6).map(badge => (
-              <img
-                key={badge.key}
-                src={badge.image}
-                alt={badge.label}
-                title={badge.label}
-                loading="lazy"
-              />
-            ))}
+            <ProfileBadges badges={props.badges.slice(0, 6)} size={26} grid={false} interactive={false} className="contents" />
           </div>
         )}
 

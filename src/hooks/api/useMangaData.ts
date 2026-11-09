@@ -1,5 +1,7 @@
-import { useEffect } from "react";
-import { useQuery, useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect } from "react";
+import { useQuery, useInfiniteQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
+import { usePreferredReadingTitleLanguage } from '@/hooks/ui/useTitleLanguage';
+import { withReadingTitle } from '@/lib/titleLanguage';
 import { EXTENSION_INSTALLED_EVENT } from '@/core/extensions/ecosystems';
 import {
   searchManga,
@@ -37,10 +39,13 @@ export function useMangaSearch(
   options: MangaSearchOptions = {}
 ) {
   const requiresQuery = options.requiresQuery ?? true;
+  const titleLanguage = usePreferredReadingTitleLanguage();
+  const select = useCallback((data: Awaited<ReturnType<typeof searchManga>>) => ({ ...data, results: data.results.map(row => withReadingTitle(row, titleLanguage)) }), [titleLanguage]);
 
   return useQuery({
     queryKey: ["manga-search", query, page, limit, options],
     queryFn: () => searchManga(query, page, limit, options),
+    select,
     enabled: requiresQuery ? query.length > 0 : true,
     staleTime: STALE_TIME.search,
   });
@@ -53,6 +58,8 @@ export function useInfiniteMangaSearch(
   options: MangaSearchOptions = {}
 ) {
   const requiresQuery = options.requiresQuery ?? true;
+  const titleLanguage = usePreferredReadingTitleLanguage();
+  const select = useCallback((data: InfiniteData<Awaited<ReturnType<typeof searchManga>>>) => ({ ...data, pages: data.pages.map(page => ({ ...page, results: page.results.map(row => withReadingTitle(row, titleLanguage)) })) }), [titleLanguage]);
 
   const getResultRows = (page: any) =>
     Array.isArray(page?.results) ? page.results : [];
@@ -63,6 +70,7 @@ export function useInfiniteMangaSearch(
   return useInfiniteQuery({
     queryKey: ["manga-search-infinite", query, limit, options],
     queryFn: ({ pageParam = 1 }) => searchManga(query, pageParam, limit, options),
+    select,
     getNextPageParam: (lastPage: any, allPages: any[]) => {
       const lastResults = getResultRows(lastPage);
       if (lastResults.length === 0 && lastPage?.hasNextPage !== true) {
@@ -111,9 +119,12 @@ export function useInfiniteMangaSearch(
 }
 
 export function useMangaDetail(id: string | undefined) {
+  const titleLanguage = usePreferredReadingTitleLanguage();
+  const select = useCallback((data: Awaited<ReturnType<typeof getMangaDetail>>) => ({ ...data, detail: withReadingTitle(data.detail, titleLanguage) }), [titleLanguage]);
   return useQuery({
     queryKey: ["manga-detail", id],
     queryFn: () => getMangaDetail(id!),
+    select,
     enabled: !!id,
     staleTime: MEDIA_METADATA_STALE_TIME,
   });

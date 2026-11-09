@@ -1,4 +1,5 @@
 import uiI18n from "@/lib/uiI18n";
+import { SpotlightPresentation, SpotlightPart, useSpotlightPresentation, useSpotlightEditing, spotlightArtworkBlur } from '@/components/customization/SpotlightPresentation';
 import { useUiTranslation } from "@/hooks/ui/useUiTranslation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BookOpen, Pause, Play, Star } from "lucide-react";
@@ -13,6 +14,8 @@ import { AddToPlaylistButton } from "@/components/playlist/AddToPlaylistButton";
 import { getHighQualityImage, type SpotlightAnime } from "@/lib/api";
 import { buildPreferredAnimeRouteId } from "@/lib/animeIdMapping";
 import { useMotionPreference } from "@/hooks/ui/useMotionPreference";
+import { CinematicHeaderBackdrop, useCinematicHeaderBackdrop } from './CinematicHeaderBackdrop';
+import { useAppBackdropPortal, useAppSystemBlur } from '@/components/layout/AppThemeBackground';
 
 export type CinematicSpotlight = SpotlightAnime & { chapters?: number };
 
@@ -23,8 +26,9 @@ function TitleArtwork({ anime }: { anime: SpotlightAnime }) {
     (url) => url && !failed.includes(url)
   );
   return (
-    <h1
-      className="cinematic-title ui-spotlight-copy font-display"
+    <h1 data-spotlight-title
+      data-long-title={anime.name.length > 60}
+      className="cinematic-title spotlight-heading ui-spotlight-copy font-display font-bold tracking-tight leading-[1.04]"
       title={anime.name}
     >
       {source ? (
@@ -35,7 +39,7 @@ function TitleArtwork({ anime }: { anime: SpotlightAnime }) {
           onError={() => setFailed((previous) => [...previous, source])}
         />
       ) : (
-        <span className="line-clamp-2 text-balance text-[28px] font-extrabold leading-tight tracking-tight">
+        <span className="line-clamp-2 text-balance">
           {anime.name}
         </span>
       )}
@@ -55,7 +59,7 @@ function Poster({
   useUiTranslation();
   const [failed, setFailed] = useState(false);
   return (
-    <img
+    <img data-spotlight-art
       src={
         failed || !anime.poster
           ? "/placeholder.svg"
@@ -90,6 +94,10 @@ export function CinematicHero({
   actionLabel?: string;
 }) {
   useUiTranslation();
+  const presentation = useSpotlightPresentation();
+  const editing = useSpotlightEditing();
+  const systemBlur = useAppSystemBlur();
+  const appBackdropPortal = useAppBackdropPortal();
   const items = useMemo(
     () => spotlights.filter(Boolean).slice(0, 5),
     [spotlights]
@@ -106,6 +114,8 @@ export function CinematicHero({
   const navigate = useNavigate();
   const active = items[index] || items[0];
   const identities = items.map((item) => item.id).join("|");
+  const headerBackdrop = useCinematicHeaderBackdrop(section, active?.id);
+  const nativeHero = systemBlur && !headerBackdrop?.owner.closest('[data-preview-target]');
 
   useEffect(() => {
     if (active) onActiveSpotlightChange?.(active);
@@ -143,7 +153,7 @@ export function CinematicHero({
 
   useEffect(() => {
     if (
-      !api ||
+      editing || !api ||
       items.length < 2 ||
       paused ||
       interacting ||
@@ -163,6 +173,7 @@ export function CinematicHero({
     return () => window.clearInterval(timer);
   }, [
     api,
+    editing,
     items.length,
     paused,
     interacting,
@@ -179,9 +190,12 @@ export function CinematicHero({
     ? active.id
     : buildPreferredAnimeRouteId({ ...active }) || active.id;
   return (
-    <section
+    <SpotlightPresentation>
+    <section data-spotlight-stage
       ref={section}
       className="cinematic-hero"
+      data-header-backdrop={Boolean(headerBackdrop)}
+      data-native-hero={nativeHero}
       aria-label={uiI18n.t("app.featured_i18n_value_0_9e42d616", {
         value0: mediaType,
       })}
@@ -195,7 +209,7 @@ export function CinematicHero({
           setFocused(false);
       }}
     >
-      <div className="cinematic-backdrop" aria-hidden="true">
+      {(!headerBackdrop || nativeHero) && <div className="cinematic-backdrop" aria-hidden="true">
         <img
           key={`${active.id}:${active.banner}`}
           src={
@@ -204,6 +218,7 @@ export function CinematicHero({
           }
           alt=""
           decoding="async"
+          style={{ filter: `blur(${spotlightArtworkBlur(presentation?.backgroundBlur)}px)` }}
           onError={(event) => {
             const img = event.currentTarget;
             if (img.dataset.fallback) {
@@ -216,7 +231,9 @@ export function CinematicHero({
               : "/placeholder.svg";
           }}
         />
-      </div>
+      </div>}
+      {headerBackdrop && <CinematicHeaderBackdrop placement={headerBackdrop} anime={active} nativePortal={nativeHero ? appBackdropPortal : null} />}
+      {presentation?.shade != null && <div data-spotlight-shade className="pointer-events-none absolute inset-0 bg-black" />}
       <div className="relative z-10">
         <div className="flex items-center justify-center gap-2 pb-2 pt-6 text-[10px] font-bold uppercase tracking-[0.24em] text-white/80">
           <Star className="h-3 w-3 fill-primary text-primary" />{" "}
@@ -275,12 +292,12 @@ export function CinematicHero({
             ))}
           </CarouselContent>
         </Carousel>
-        <div className="px-5 text-center">
-          <TitleArtwork
+        <div data-spotlight-copy className="cinematic-copy mx-auto w-full max-w-[720px] px-5 text-center">
+          <SpotlightPart part="title"><TitleArtwork
             key={`${active.id}:${active.titleLogo}:${active.logo}`}
             anime={active}
-          />
-          <div className="mt-2 flex min-h-6 items-center justify-center gap-2 overflow-hidden text-[11px] font-medium text-white/75">
+          /></SpotlightPart>
+          <SpotlightPart part="details"><div data-spotlight-metadata className="mt-2 flex min-h-6 items-center justify-center gap-2 overflow-hidden text-[11px] font-medium text-white/75">
             {active.otherInfo.slice(0, 3).map((info, i) => (
               <span
                 key={i}
@@ -302,14 +319,14 @@ export function CinematicHero({
                     })}
               </span>
             )}
-          </div>
-          <p
+          </div></SpotlightPart>
+          <SpotlightPart part="description"><p data-spotlight-description
             key={active.id}
-            className="ui-spotlight-copy mt-3 h-9 line-clamp-2 text-xs leading-[18px] text-white/60"
+            className="ui-spotlight-copy mx-auto mt-4 max-w-[56ch] line-clamp-3 text-sm leading-relaxed text-white/70 sm:text-base"
           >
             {active.description}
-          </p>
-          <div className="mt-5 flex items-center gap-3">
+          </p></SpotlightPart>
+          <SpotlightPart part="actions"><div data-spotlight-actions className="mt-5 flex items-center justify-center gap-3">
             <button
               type="button"
               onClick={() =>
@@ -319,7 +336,7 @@ export function CinematicHero({
                     : `/${mediaType}/${routeId}`
                 )
               }
-              className="ui-button flex h-[52px] flex-1 items-center justify-center gap-2 rounded-2xl bg-primary text-sm font-bold text-primary-foreground transition-[background-color,transform] duration-150 hover:bg-primary/90 motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+              className="ui-button flex h-[52px] flex-1 items-center justify-center gap-2 rounded-2xl bg-primary text-sm font-bold text-primary-foreground transition-[background-color,transform] duration-150 hover:bg-primary/90 motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white sm:h-14 sm:min-w-[180px] sm:flex-none sm:px-8"
             >
               {isText ? (
                 <BookOpen className="h-4 w-4" />
@@ -339,10 +356,10 @@ export function CinematicHero({
                 mediaType={isText ? "manga" : mediaType}
                 {...(mediaType === "novel" ? { mediaFormat: "novel" } : {})}
                 variant="icon"
-                className="h-[52px] w-[52px] shrink-0 rounded-2xl border border-border bg-muted/60 text-foreground"
+                className="h-[52px] w-[52px] shrink-0 rounded-2xl border border-border bg-muted/60 text-foreground sm:h-14 sm:w-14"
               />
             )}
-          </div>
+          </div></SpotlightPart>
         </div>
         {items.length > 1 ? (
           <div className="cinematic-pagination flex h-16 items-center justify-center">
@@ -389,13 +406,14 @@ export function CinematicHero({
         )}
       </div>
     </section>
+    </SpotlightPresentation>
   );
 }
 
 export function CinematicHeroSkeleton() {
   useUiTranslation();
   return (
-    <div
+    <div data-spotlight-stage
       className="cinematic-hero"
       aria-label={uiI18n.t("app.loading_spotlight_c7d73b9d")}
       aria-busy="true"

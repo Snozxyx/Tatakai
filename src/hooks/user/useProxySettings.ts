@@ -17,7 +17,7 @@ const STORAGE_KEY = 'tatakai_custom_proxies_v2';
 
 export const DEFAULT_APP_PROXY_URL = 'http://127.0.0.1:8099';
 export const DEFAULT_ENV_PROXY_URL =
-  String(import.meta.env.VITE_STREAM_PROXY_URL || import.meta.env.VITE_PROXY_NODE_URL || 'https://moko.tatakai.me/api/v1/streamingProxy').trim();
+  String(import.meta.env.VITE_STREAM_PROXY_URL || import.meta.env.VITE_PROXY_NODE_URL || 'https://moko.tatakai.app/api/v1/streamingProxy').trim();
 export const DEFAULT_ENV_PROXY_PASSWORD =
   String(import.meta.env.VITE_STREAM_PROXY_PASSWORD || import.meta.env.VITE_PROXY_PASSWORD || '').trim();
 

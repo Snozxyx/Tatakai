@@ -1,3 +1,6 @@
+import { selectReadingTitle } from '@/lib/titleLanguage';
+import '@/components/anime/detail-polish.css';
+import '@/components/layout/catalog-polish.css';
 import { TatakaiReadingViews } from '@/components/media/TatakaiReadingViews';
 import { useReadingViewTracker } from '@/hooks/user/useReadingViews';
 import { readingViewId } from '@/lib/readingViewId';
@@ -87,7 +90,7 @@ function RelationTree({ relations }: { relations: MediaRelation[] }) {
         type="button"
         onClick={() => scroll('left')}
         aria-label={uiI18n.t('app.scroll_series_tree_left_b8db9779')}
-        className="absolute -left-3 top-[38%] -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/80 hover:bg-black text-white border border-white/10 hidden md:flex items-center justify-center opacity-0 group-hover/rail:opacity-100 transition-all shadow-xl backdrop-blur-md"
+        className="absolute -left-3 top-[38%] -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/80 hover:bg-black text-white border border-white/10 hidden md:flex items-center justify-center opacity-0 group-hover/rail:opacity-100 transition-[color,background-color,border-color,opacity] shadow-xl backdrop-blur-md"
       >
         <ChevronLeft className="w-5 h-5" />
       </button>
@@ -120,7 +123,7 @@ function RelationTree({ relations }: { relations: MediaRelation[] }) {
         type="button"
         onClick={() => scroll('right')}
         aria-label={uiI18n.t('app.scroll_series_tree_right_37e703d6')}
-        className="absolute -right-3 top-[38%] -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/80 hover:bg-black text-white border border-white/10 hidden md:flex items-center justify-center opacity-0 group-hover/rail:opacity-100 transition-all shadow-xl backdrop-blur-md"
+        className="absolute -right-3 top-[38%] -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/80 hover:bg-black text-white border border-white/10 hidden md:flex items-center justify-center opacity-0 group-hover/rail:opacity-100 transition-[color,background-color,border-color,opacity] shadow-xl backdrop-blur-md"
       >
         <ChevronRight className="w-5 h-5" />
       </button>
@@ -172,7 +175,7 @@ const getChapterDisplayNumber = (chapter: any): number | null => {
 };
 
 const toRecommendationCard = (item: NovelSearchItem): UnifiedMediaCardProps["item"] | null => {
-  const title = item.canonicalTitle || item.title?.english || item.title?.romaji || item.title?.native;
+  const title = selectReadingTitle(item);
   const id = item.anilistId || item.malId || item.id;
   if (!title || !id) return null;
 
@@ -309,12 +312,12 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
     const detail = (novelData as any)?.detail;
     if (!detail) return;
     const title =
-      detail.canonicalTitle || detail.title?.english || detail.title?.romaji || '';
+      selectReadingTitle(detail) || '';
     if (!title) return;
     setViewingNovelRpc({
       novelTitle: title,
       novelImageUrl: detail.coverImage ?? null,
-      novelUrl: `https://tatakai.me/novel/${novelId}`,
+      novelUrl: `https://tatakai.app/novel/${novelId}`,
     });
     return () => {
       clearDiscordRpc();
@@ -663,10 +666,7 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
   useReadingViewTracker('novel',readingViewId(novelId,(info as any)?.anilistId),!!info&&!loadingInfo);
 
   const displayTitle =
-    info?.canonicalTitle ||
-    info?.title?.english ||
-    info?.title?.romaji ||
-    info?.title?.native ||
+    selectReadingTitle(info) ||
     uiI18n.t('app.unknown_title_58dfae3c');
 
   const recommendationTerms = useMemo(() => {
@@ -813,9 +813,9 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
   if (loadingInfo) {
     return (
       <div className="min-h-screen bg-background text-foreground">
-        {!isNative && <Background />}
+        {!isNative && <Background quiet />}
         {showSidebar && <Sidebar />}
-        <main className={cn("relative z-10 py-6 max-w-[1800px] mx-auto", isDesktopApp ? "p-6" : "pl-6 md:pl-32 pr-6")}>
+        <main className={cn("relative z-10 py-6 max-w-[1600px] mx-auto", isDesktopApp ? "p-6" : "pl-6 md:pl-32 pr-6")}>
           <div className="space-y-8">
             <Skeleton className="h-8 w-32" />
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -841,9 +841,9 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center p-6">
           <BookOpen className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-          <h1 className="text-2xl font-bold mb-2">{uiI18n.t('app.novel_details_not_available_f0918058')}</h1>
+          <h1 className="text-2xl font-medium mb-2">{uiI18n.t('app.novel_details_not_available_f0918058')}</h1>
           <p className="text-muted-foreground mb-4">{uiI18n.t('app.we_couldn_t_retrieve_the_information_for_this_no_bd8b587e')}</p>
-          <button onClick={() => navigate("/novel")} className="px-6 py-2 bg-primary text-primary-foreground rounded-full hover:brightness-110 font-bold transition-all">
+          <button onClick={() => navigate("/novel")} className="px-6 py-2 bg-primary text-primary-foreground rounded-full hover:brightness-110 font-medium transition-[color,background-color,border-color,opacity]">
             {uiI18n.t('app.back_to_novels_dd3a5da4')}
           </button>
         </div>
@@ -858,8 +858,8 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
 
   if (requiresAdultWarning) {
     return (
-      <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
-        {!isNative && <Background />}
+      <div className="catalog-page detail-page min-h-screen bg-background text-foreground overflow-x-hidden">
+        {!isNative && <Background quiet />}
         {showSidebar && <Sidebar />}
 
         <main className={cn(
@@ -867,9 +867,9 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
           isDesktopApp ? "px-4" : "pl-6 md:pl-32 pr-6"
         )}>
           <AdultWarningGate
-            title={info.canonicalTitle || info.title?.english || info.title?.romaji || uiI18n.t('app.unknown_bc7819b3')}
+            title={selectReadingTitle(info) || uiI18n.t('app.unknown_bc7819b3')}
             mediaLabel="novel"
-            onBack={() => navigate(-1)}
+            onBack={() => navigate('/novel')}
             onContinue={() => setAllowAdultForSession(true)}
             onAlwaysShow={() => {
               updateContentSafetySettings({
@@ -997,32 +997,32 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
         <meta property="og:description" content={info.synopsis?.slice(0, 160) || `Track and discuss ${displayTitle} on Tatakai — the otaku community.`} />
         <meta property="og:image" content={info.coverImage || ""} />
         <meta property="og:type" content="book" />
-        <meta property="og:url" content={`https://tatakai.me/novel/${novelId}`} />
+        <meta property="og:url" content={`https://tatakai.app/novel/${novelId}`} />
         <meta property="og:site_name" content="Tatakai" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content={`${displayTitle} — Novel on Tatakai`} />
         <meta name="twitter:description" content={info.synopsis?.slice(0, 160) || `Track and discuss ${displayTitle} on Tatakai.`} />
         {info.coverImage ? <meta name="twitter:image" content={info.coverImage} /> : null}
-        <link rel="canonical" href={`https://tatakai.me/novel/${novelId}`} />
+        <link rel="canonical" href={`https://tatakai.app/novel/${novelId}`} />
         <script type="application/ld+json">
           {JSON.stringify({
             "@context": "https://schema.org",
             "@type": "Book",
             name: displayTitle,
-            url: `https://tatakai.me/novel/${novelId}`,
+            url: `https://tatakai.app/novel/${novelId}`,
             ...(info.synopsis ? { description: info.synopsis.slice(0, 5000) } : {}),
             ...(info.coverImage ? { image: info.coverImage } : {}),
-            isPartOf: { "@type": "WebSite", name: "Tatakai", url: "https://tatakai.me" },
+            isPartOf: { "@type": "WebSite", name: "Tatakai", url: "https://tatakai.app" },
           })}
         </script>
       </Helmet>
 
-      <div className="min-h-screen bg-background text-foreground overflow-x-hidden selection:bg-primary/30">
-        {!isNative && <Background />}
+      <div className="catalog-page detail-page min-h-screen bg-background text-foreground overflow-x-hidden selection:bg-primary/30">
+        {!isNative && <Background quiet />}
         {showSidebar && <Sidebar />}
 
         <main className={cn(
-          "relative z-10 py-6 max-w-[1800px] mx-auto pb-24 lg:pb-6",
+          "relative z-10 py-6 max-w-[1600px] mx-auto pb-24 lg:pb-6",
           isDesktopApp ? "px-4 pt-4" : "pl-6 md:pl-32 pr-6 pt-10"
         )}>
           {/* Banner Image Background */}
@@ -1040,7 +1040,7 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
           {sourceContext?.header}
             {/* Back Button */}
           <button
-            onClick={() => navigate(-1)}
+            onClick={() => navigate('/novel')}
             className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors min-h-11 md:min-h-0 mb-4 md:mb-6 group w-fit"
           >
             <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
@@ -1049,7 +1049,7 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
 
           {/* Hero Section — AnimePage-aligned GlassPanel layout */}
           <div className="mobile-detail-hero grid grid-cols-1 lg:grid-cols-3 gap-8 mb-16 pt-4 md:pt-8">
-            <GlassPanel className="mobile-detail-poster overflow-hidden mx-auto lg:mx-0 w-full max-w-[320px] lg:max-w-none">
+            <GlassPanel quiet className="mobile-detail-poster overflow-hidden mx-auto lg:mx-0 w-full max-w-[320px] lg:max-w-none">
               <img
                 src={coverImageSrc}
                 alt={displayTitle}
@@ -1069,13 +1069,13 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
 
             <div className="lg:col-span-2 space-y-6">
               <div>
-                <h1 className="mobile-detail-title font-display text-4xl md:text-5xl font-bold mb-4">{displayTitle}</h1>
+                <h1 className="mobile-detail-title font-display text-4xl md:text-5xl font-medium mb-4">{displayTitle}</h1>
                 <TatakaiReadingViews kind="novel" id={novelId} anilistId={(info as any)?.anilistId} detail/>
                 <MobileDetailQuickActions target="novel-chapters-section" label={uiI18n.t('app.chapters_034e2733')}>
                   <button
                     onClick={handleReadNow}
                     disabled={sourceContext ? !sourceContext.canOpen : sortedChapters.length === 0}
-                    className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 font-bold text-primary-foreground disabled:opacity-50"
+                    className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 font-medium text-primary-foreground disabled:opacity-50"
                   >
                     <BookOpen className="h-5 w-5 shrink-0" />
                     {sourceContext ? (sourceContext.resume ? 'Continue reading' : 'Read now') : hasSavedProgress ? uiI18n.t('app.continue_reading_54800d4f') : uiI18n.t('app.read_from_chapter_1_8933469a')}
@@ -1158,7 +1158,7 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
                   {displayRating && (
                     <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber/20 text-amber">
                       <Star className="w-4 h-4 fill-amber" />
-                      <span className="font-bold">{displayRating}</span>
+                      <span className="font-medium">{displayRating}</span>
                     </div>
                   )}
                   <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted">
@@ -1167,7 +1167,7 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
                   </div>
                   {info.status && (
                     <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary/20 text-primary">
-                      <span className="font-semibold capitalize">
+                      <span className="font-medium capitalize">
                         {String(info.status).toLowerCase().replace(/_/g, " ")}
                       </span>
                     </div>
@@ -1220,7 +1220,7 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
                 {/* Tags in Hero */}
                 {combinedNovelTags.length > 0 && (
                   <div className="flex flex-wrap items-center gap-1.5 mb-4">
-                    <span className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mr-1 flex items-center gap-1">
+                    <span className="text-xs normal-case tracking-normal text-muted-foreground font-medium mr-1 flex items-center gap-1">
                       <Tag className="w-3 h-3 text-primary" />
                       {uiI18n.t('app.tags_b5ddd4e8')}
                     </span>
@@ -1229,12 +1229,12 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
                         key={`hero-tag-${tag.id || tag.name}`}
                         type="button"
                         onClick={() => navigate(`/search?novelTag=${encodeURIComponent(tag.name)}&novelTagSource=${tag.source}&type=novel`)}
-                        className="px-2.5 py-0.5 rounded-full bg-white/5 hover:bg-primary/20 border border-white/10 hover:border-primary/40 text-xs text-muted-foreground hover:text-primary transition-all flex items-center gap-1 group"
+                        className="px-2.5 py-0.5 rounded-full bg-white/5 hover:bg-primary/20 border border-white/10 hover:border-primary/40 text-xs text-muted-foreground hover:text-primary transition-[color,background-color,border-color,opacity] flex items-center gap-1 group"
                         title={tag.rank ? uiI18n.t('app.i18n_value_0_i18n_value_1_click_to_search_b5c1c535', { value0: tag.name, value1: tag.rank }) : uiI18n.t('app.i18n_value_0_click_to_search_befc3ac0', { value0: tag.name })}
                       >
                         <span>{tag.name}</span>
                         {typeof tag.rank === 'number' && (
-                          <span className="text-[10px] text-muted-foreground/60 group-hover:text-primary/70">
+                          <span className="text-xs text-muted-foreground/60 group-hover:text-primary/70">
                             {tag.rank}%
                           </span>
                         )}
@@ -1249,9 +1249,9 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
                 <button
                   onClick={handleReadNow}
                   disabled={sourceContext ? !sourceContext.canOpen : sortedChapters.length === 0}
-                  className="hidden md:flex items-center justify-center gap-2 bg-primary text-primary-foreground px-8 py-3.5 rounded-xl font-bold hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-primary/25 disabled:opacity-50 disabled:cursor-not-allowed group"
+                  className="hidden md:flex items-center justify-center gap-2 bg-primary text-primary-foreground px-8 py-3.5 rounded-xl font-medium hover:brightness-110 active:scale-95 transition-[color,background-color,border-color,opacity] shadow-lg shadow-primary/25 disabled:opacity-50 disabled:cursor-not-allowed group"
                 >
-                  <BookOpen className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                  <BookOpen className="w-5 h-5  transition-transform" />
                   {sourceContext ? (sourceContext.resume ? 'Continue reading' : 'Read now') : hasSavedProgress ? uiI18n.t('app.continue_reading_54800d4f') : uiI18n.t('app.read_from_chapter_1_8933469a')}
                 </button>
                 <AddToPlaylistButton
@@ -1260,12 +1260,12 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
                   animePoster={info.coverImage || undefined}
                   mediaType="manga"
                   mediaFormat="novel"
-                  className="h-auto border border-white/15 bg-white/5 text-foreground px-6 py-3.5 rounded-xl font-bold hover:bg-white/10 active:scale-95 transition-all"
+                  className="h-auto border border-white/15 bg-white/5 text-foreground px-6 py-3.5 rounded-xl font-medium hover:bg-white/10 active:scale-95 transition-[color,background-color,border-color,opacity]"
                 />
                 <button
                   onClick={() => setShowNovelDownload(true)}
                   disabled={sortedChapters.length === 0}
-                  className="flex items-center justify-center gap-2 border border-white/15 bg-white/5 text-foreground px-6 py-3.5 rounded-xl font-bold hover:bg-white/10 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center justify-center gap-2 border border-white/15 bg-white/5 text-foreground px-6 py-3.5 rounded-xl font-medium hover:bg-white/10 active:scale-95 transition-[color,background-color,border-color,opacity] disabled:opacity-50 disabled:cursor-not-allowed"
                   title={uiI18n.t('app.download_chapters_for_offline_reading_a3dc5b8e')}
                 >
                   <Download className="w-5 h-5" />
@@ -1274,7 +1274,7 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
                 {!user ? (
                   <button
                     onClick={() => navigate("/auth")}
-                    className="flex items-center justify-center gap-2 border border-white/15 bg-white/5 text-foreground px-6 py-3.5 rounded-xl font-bold hover:bg-white/10 active:scale-95 transition-all"
+                    className="flex items-center justify-center gap-2 border border-white/15 bg-white/5 text-foreground px-6 py-3.5 rounded-xl font-medium hover:bg-white/10 active:scale-95 transition-[color,background-color,border-color,opacity]"
                   >
                     <BookmarkPlus className="w-5 h-5" />
                     {uiI18n.t('app.sign_in_for_library_e0c3c048')}
@@ -1284,7 +1284,7 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
                     <DropdownMenuTrigger asChild>
                       <button
                         disabled={addToReadlist.isPending || removeFromReadlist.isPending}
-                        className="flex items-center justify-center gap-2 border border-white/15 bg-white/5 text-foreground px-6 py-3.5 rounded-xl font-bold hover:bg-white/10 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex items-center justify-center gap-2 border border-white/15 bg-white/5 text-foreground px-6 py-3.5 rounded-xl font-medium hover:bg-white/10 active:scale-95 transition-[color,background-color,border-color,opacity] disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {currentReadlistStatus ? <BookmarkCheck className="w-5 h-5 text-primary" /> : <BookmarkPlus className="w-5 h-5" />}
                         {currentReadlistLabel ?? uiI18n.t('app.add_to_library_84540e9d')}
@@ -1324,11 +1324,11 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
               {/* Overview */}
               {info.synopsis && (
                 <section>
-                  <h3 className="font-display text-xl md:text-2xl font-bold mb-4 flex items-center gap-2">
+                  <h3 className="font-display text-xl md:text-2xl font-medium mb-4 flex items-center gap-2">
                     <Sparkles className="w-5 h-5 text-primary" />
                     {uiI18n.t('app.synopsis_36c0630a')}
                   </h3>
-                  <GlassPanel className="p-6 md:p-8 relative overflow-hidden group">
+                  <GlassPanel quiet className="p-6 md:p-8 relative overflow-hidden group">
                     <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap relative z-10 text-sm md:text-base">
                       {info.synopsis}
                     </p>
@@ -1338,18 +1338,18 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
 
               {combinedNovelTags.length > 0 && (
                 <section>
-                  <h3 className="font-display text-xl md:text-2xl font-bold mb-4 flex items-center gap-2">
+                  <h3 className="font-display text-xl md:text-2xl font-medium mb-4 flex items-center gap-2">
                     <Palette className="w-5 h-5 text-primary" />
                     {uiI18n.t('app.tags_848eed0f')}
                   </h3>
-                  <GlassPanel className="p-5">
+                  <GlassPanel quiet className="p-5">
                     <div className="flex flex-wrap gap-1.5">
                       {combinedNovelTags.slice(0, 40).map((tag: any) => (
                         <button
                           key={`tag-${tag.id ?? tag.name}`}
                           type="button"
                           onClick={() => navigate(`/search?novelTag=${encodeURIComponent(tag.name)}&novelTagSource=${tag.source}&type=novel`)}
-                          className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-colors hover:border-primary/40 hover:text-primary flex items-center gap-1 ${tag.weight === 'defining'
+                          className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors hover:border-primary/40 hover:text-primary flex items-center gap-1 ${tag.weight === 'defining'
                               ? 'bg-primary/10 border-primary/20 text-primary/80'
                               : tag.weight === 'core'
                               ? 'bg-white/5 border-white/10 text-foreground/70'
@@ -1358,7 +1358,7 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
                         >
                           <span>{tag.name}</span>
                           {typeof tag.rank === 'number' && (
-                            <span className="text-[9px] opacity-60">{tag.rank}%</span>
+                            <span className="text-xs opacity-60">{tag.rank}%</span>
                           )}
                         </button>
                       ))}
@@ -1370,7 +1370,7 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
               {/* Relation Tree */}
               {info.relations && info.relations.length > 0 && (
                 <section className="mb-8">
-                  <h3 className="font-display text-xl md:text-2xl font-bold mb-4 flex items-center gap-2">
+                  <h3 className="font-display text-xl md:text-2xl font-medium mb-4 flex items-center gap-2">
                     <GitGraph className="w-5 h-5 text-primary" />
                     {uiI18n.t('app.series_tree_31ecaced')}
                   </h3>
@@ -1381,13 +1381,13 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
               {/* Characters Section — AnimePage-aligned GlassPanel cards */}
               {info.characters && info.characters.length > 0 && (
                 <section className="mb-10">
-                  <h3 className="font-display text-xl md:text-2xl font-bold mb-6 flex items-center gap-2">
+                  <h3 className="font-display text-xl md:text-2xl font-medium mb-6 flex items-center gap-2">
                     <Users className="w-5 h-5 text-primary" />
                     {uiI18n.t('app.characters_b6f59f08')}
                   </h3>
                   <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3">
                     {info.characters.slice(0, 12).map((char: any, index: number) => (
-                      <GlassPanel
+                      <GlassPanel quiet
                         key={`${char.id || char.name}-${index}`}
                         className="p-0 overflow-hidden cursor-pointer group hover:bg-white/10 transition-colors"
                         onClick={() =>
@@ -1403,8 +1403,8 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
                           loading="lazy"
                         />
                         <div className="p-2">
-                          <p className="font-bold text-xs truncate group-hover:text-primary transition-colors">{char.name}</p>
-                          <p className="text-[9px] text-muted-foreground uppercase tracking-wider truncate">
+                          <p className="font-medium text-xs truncate group-hover:text-primary transition-colors">{char.name}</p>
+                          <p className="text-xs text-muted-foreground normal-case tracking-normal truncate">
                             {char.role || uiI18n.t('app.character_ee9946c8')}
                           </p>
                         </div>
@@ -1419,7 +1419,7 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
               {sourceContext ? sourceContext.entries : (<section>
                 <div className="mb-4 space-y-3">
                   <div className="flex flex-wrap items-center justify-between gap-3">
-                    <h3 className="font-display text-xl md:text-2xl font-bold flex items-center gap-2">
+                    <h3 className="font-display text-xl md:text-2xl font-medium flex items-center gap-2">
                       <Layers className="w-5 h-5 text-primary" />
                       {uiI18n.t('app.chapters_034e2733')}
                     </h3>
@@ -1433,24 +1433,24 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
                         size="sm"
                         onClick={() => setShowNovelDownload(true)}
                         disabled={chapters.length === 0}
-                        className="min-h-11 md:min-h-0 h-8 gap-1.5 rounded-lg glow-primary text-xs font-bold"
+                        className="min-h-11 md:min-h-0 h-8 gap-1.5 rounded-lg  text-xs font-medium"
                       >
                         <Download className="w-3.5 h-3.5" />
                         {uiI18n.t('app.download_all_d69edf7c')}
                       </Button>
-                      <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                      <label className="text-xs font-medium normal-case tracking-normal text-muted-foreground">
                         {uiI18n.t('app.sort_by_a2a5bdec')}
                       </label>
                       <ThemedSelect
                         aria-label={uiI18n.t('app.sort_by_a2a5bdec')}
                         value={chapterSortMode}
                         onChange={(event) => setChapterSortMode(event.target.value as ChapterSortMode)}
-                        className="min-h-11 md:min-h-0 rounded-lg border border-white/10 bg-background/70 px-2.5 py-1.5 text-sm md:text-xs font-semibold"
+                        className="min-h-11 md:min-h-0 rounded-lg border border-white/10 bg-background/70 px-2.5 py-1.5 text-sm md:text-xs font-medium"
                       >
                         <option value="oldest">{uiI18n.t('app.oldest_first_6a99c65c')}</option>
                         <option value="newest">{uiI18n.t('app.newest_first_f5ec7772')}</option>
                       </ThemedSelect>
-                      <span className="text-sm font-bold text-muted-foreground bg-muted px-3 py-1 rounded-full">
+                      <span className="text-sm font-medium text-muted-foreground bg-muted px-3 py-1 rounded-full">
                         {isChapterListLoading
                           ? "Loading..."
                           : hasChapterFilters
@@ -1475,7 +1475,7 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
 
                     {volumeSections.length > 0 && (
                       <div className="flex items-center gap-2">
-                        <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                        <label className="text-xs font-medium normal-case tracking-normal text-muted-foreground">
                           {uiI18n.t('app.book_volume')}
                         </label>
                         <ThemedSelect
@@ -1491,7 +1491,7 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
                             setSelectedVolumeFilter(Number(nextValue));
                             setChapterSearchTerm("");
                           }}
-                          className="min-h-11 md:min-h-0 rounded-lg border border-white/10 bg-background/70 px-2.5 py-1.5 text-sm md:text-xs font-semibold"
+                          className="min-h-11 md:min-h-0 rounded-lg border border-white/10 bg-background/70 px-2.5 py-1.5 text-sm md:text-xs font-medium"
                         >
                           <option value="all">{uiI18n.t('app.all_volumes_d12fdd83')}</option>
                           {volumeSections.map((volumeItem) => (
@@ -1509,7 +1509,7 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
                           setChapterSearchTerm("");
                           setSelectedVolumeFilter(null);
                         }}
-                        className="min-h-11 md:min-h-0 rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider hover:bg-white/10 transition-colors"
+                        className="min-h-11 md:min-h-0 rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-medium normal-case tracking-normal hover:bg-white/10 transition-colors"
                       >
                         {uiI18n.t('app.clear_719ea396')}
                       </button>
@@ -1517,7 +1517,7 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
                   </div>
 
                 <div className="space-y-1 md:hidden">
-                  <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                  <label className="mb-1 block text-xs font-medium normal-case tracking-normal text-muted-foreground">
                     {uiI18n.t('app.preferred_translator_1225eea2')}
                   </label>
                   <ThemedSelect
@@ -1547,7 +1547,7 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
                             onClick={() => setSelectedChapterGroup(index)}
                             aria-pressed={isActiveGroup}
                             className={cn(
-                              "px-3 py-1.5 rounded-full text-xs font-bold border transition-colors",
+                              "px-3 py-1.5 rounded-full text-xs font-medium border transition-colors",
                               isActiveGroup
                                 ? "bg-primary text-primary-foreground border-primary"
                                 : "bg-white/5 text-muted-foreground border-white/10 hover:bg-white/10 hover:text-foreground",
@@ -1573,7 +1573,7 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
                 </div>
 
                 {isChapterListLoading ? (
-                  <GlassPanel className="p-8">
+                  <GlassPanel quiet className="p-8">
                     <div className="flex items-center justify-center gap-2 text-muted-foreground">
                       <Loader2 className="w-4 h-4 animate-spin" />
                       <span>{uiI18n.t('app.loading_chapters_6e009b7e')}</span>
@@ -1614,7 +1614,7 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
                     ))}
                   </div>
                 ) : (
-                  <GlassPanel className="p-8 text-center">
+                  <GlassPanel quiet className="p-8 text-center">
                     <p className="text-muted-foreground">
                       {sortedChapters.length === 0
                         ? uiI18n.t('app.no_chapters_available_yet_89eae277')
@@ -1635,22 +1635,22 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
 
               {volumeSections.length > 0 && (
                 <section>
-                  <h3 className="font-display text-xl md:text-2xl font-bold mb-4 flex items-center gap-2">
+                  <h3 className="font-display text-xl md:text-2xl font-medium mb-4 flex items-center gap-2">
                     <Layers className="w-5 h-5 text-primary" />
                     {uiI18n.t('app.volumes_39c0ee03')}
                   </h3>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     {volumeSections.map((volumeItem) => (
-                      <GlassPanel key={`volume-${volumeItem.volume}`} className="p-4 border border-white/10">
+                      <GlassPanel quiet key={`volume-${volumeItem.volume}`} className="p-4 border border-white/10">
                         <div className="flex items-center justify-between gap-2">
-                          <p className="text-base font-bold">{uiI18n.t('app.book_volume')} {volumeItem.volume}</p>
-                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                          <p className="text-base font-medium">{uiI18n.t('app.book_volume')} {volumeItem.volume}</p>
+                          <span className="text-xs normal-case tracking-normal text-muted-foreground">
                             {volumeItem.readableCount}/{volumeItem.chapterCount} {uiI18n.t('app.readable_1d28e511')}
                           </span>
                         </div>
 
-                        <p className="mt-2 text-xs uppercase tracking-wider text-muted-foreground">
+                        <p className="mt-2 text-xs normal-case tracking-normal text-muted-foreground">
                           {uiI18n.t('app.chapters_034e2733')} {volumeItem.rangeLabel}
                         </p>
 
@@ -1664,7 +1664,7 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
                           <button
                             onClick={() => goToReader(volumeItem.firstChapter, volumeItem.firstSource, 0)}
                             disabled={!volumeItem.firstChapterKey}
-                            className="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                           >
                             {uiI18n.t('app.read_volume_0e0ca02c')}
                           </button>
@@ -1672,7 +1672,7 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
                           <button
                             onClick={() => goToReader(volumeItem.latestChapter, volumeItem.latestSource, 0)}
                             disabled={!volumeItem.latestChapterKey}
-                            className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-bold hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-medium hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                           >
                             {uiI18n.t('app.latest_in_volume_3eb30bf5')}
                           </button>
@@ -1686,7 +1686,7 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
                               const chapterSection = document.getElementById("novel-chapters-section");
                               chapterSection?.scrollIntoView({ behavior: "smooth", block: "start" });
                             }}
-                            className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary/20 transition-colors"
+                            className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/20 transition-colors"
                           >
                             {uiI18n.t('app.view_chapters_f90f45bd')}
                           </button>
@@ -1698,13 +1698,13 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
                               <button
                                 key={`volume-${volumeItem.volume}-chapter-${chapterItem.chapterKey}`}
                                 onClick={() => goToReader(chapterItem.chapter, chapterItem.source, 0)}
-                                className="rounded-md border border-white/15 bg-white/5 px-2 py-1 text-[10px] font-bold uppercase tracking-wider hover:bg-white/10 transition-colors"
+                                className="rounded-md border border-white/15 bg-white/5 px-2 py-1 text-xs font-medium normal-case tracking-normal hover:bg-white/10 transition-colors"
                               >
                                 {chapterItem.chapterNumber != null ? uiI18n.t('app.ch_i18n_value_0_4ed07eb4', { value0: chapterItem.chapterNumber }) : uiI18n.t('app.open_chapter_5e1d2940')}
                               </button>
                             ))}
                             {volumeItem.readableChapters.length > 6 && (
-                              <span className="rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-wider text-muted-foreground">
+                              <span className="rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs normal-case tracking-normal text-muted-foreground">
                                 +{volumeItem.readableChapters.length - 6} {uiI18n.t('app.more_e7c95b4c')}
                               </span>
                             )}
@@ -1717,7 +1717,7 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
               )}
 
               <section>
-                <h3 className="font-display text-xl md:text-2xl font-bold mb-4 flex items-center gap-2">
+                <h3 className="font-display text-xl md:text-2xl font-medium mb-4 flex items-center gap-2">
                   <Sparkles className="w-5 h-5 text-primary" />
                   {uiI18n.t('app.recommendations_4faa65b5')}
                 </h3>
@@ -1737,7 +1737,7 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
                     ))}
                   </div>
                 ) : (
-                  <GlassPanel className="p-5">
+                  <GlassPanel quiet className="p-5">
                     <p className="text-sm text-muted-foreground">
                       {uiI18n.t('app.recommendations_are_warming_up_check_back_in_a_m_bd89f750')}
                     </p>
@@ -1754,10 +1754,10 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
               </section>
             </div>
             <div className="space-y-4">
-              <GlassPanel className="p-5">
-                <h4 className="font-display font-bold mb-3">{uiI18n.t('app.metadata_251edc0e')}</h4>
+              <GlassPanel quiet className="p-5">
+                <h4 className="font-display font-medium mb-3">{uiI18n.t('app.metadata_251edc0e')}</h4>
                 <div className="mb-4 hidden md:block">
-                  <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                  <label className="mb-1 block text-xs font-medium normal-case tracking-normal text-muted-foreground">
                     {uiI18n.t('app.preferred_translator_1225eea2')}
                   </label>
                   <ThemedSelect
@@ -1794,7 +1794,7 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
                 </div>
 
                 <div className="mt-4">
-                  <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                  <p className="mb-2 text-xs font-medium normal-case tracking-normal text-muted-foreground">
                     {uiI18n.t('app.genres_96817ade')}
                   </p>
                   {info.genres && info.genres.length > 0 ? (
@@ -1804,7 +1804,7 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
                           key={`meta-genre-${genre}`}
                           type="button"
                           onClick={() => navigate(`/search?genre=${encodeURIComponent(genre)}&type=novel`)}
-                          className="rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-foreground transition-colors hover:border-primary/40 hover:text-primary"
+                          className="rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-xs font-medium normal-case tracking-normal text-foreground transition-colors hover:border-primary/40 hover:text-primary"
                         >
                           {genre}
                         </button>
@@ -1817,7 +1817,7 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
 
                 {Array.isArray(anilistNovelMeta?.tags) && anilistNovelMeta.tags.length > 0 && (
                   <div className="mt-4">
-                    <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                    <p className="mb-2 text-xs font-medium normal-case tracking-normal text-muted-foreground">
                       {uiI18n.t('app.anilist_tags_dae15328')}
                     </p>
                     <div className="flex flex-wrap gap-1.5">
@@ -1827,7 +1827,7 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
                           type="button"
                           title={tag.isAdult ? uiI18n.t('app.adult_anilist_tag_09278eca') : uiI18n.t('app.search_this_anilist_tag_c14512b4')}
                           onClick={() => navigate(`/search?novelTag=${encodeURIComponent(tag.name)}&novelTagSource=anilist&type=novel`)}
-                          className="rounded-md border border-primary/20 bg-primary/5 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary/80 transition-colors hover:border-primary/40 hover:bg-primary/15"
+                          className="rounded-md border border-primary/20 bg-primary/5 px-2 py-0.5 text-xs font-medium normal-case tracking-normal text-primary/80 transition-colors hover:border-primary/40 hover:bg-primary/15"
                         >
                           #{tag.name}
                         </button>
@@ -1839,7 +1839,7 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
                 {/* MangaBaka enrichment: cross-site ratings */}
                 {(mangaBakaData as any) && Object.keys((mangaBakaData as any).sources || {}).length > 0 && (
                   <div className="mt-4 pt-4 border-t border-white/5">
-                    <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                    <p className="mb-2 text-xs font-medium normal-case tracking-normal text-muted-foreground">
                       {uiI18n.t('app.cross_site_ratings_39a0e8db')}
                     </p>
                     <div className="space-y-1.5">
@@ -1851,11 +1851,11 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
                           const pct = Math.round(src.ratingNormalized ?? 0);
                           return (
                             <div key={key} className="flex items-center gap-2">
-                              <span className="text-[10px] text-muted-foreground w-16 shrink-0">{label}</span>
+                              <span className="text-xs text-muted-foreground w-16 shrink-0">{label}</span>
                               <div className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden">
                                 <div className="h-full bg-primary rounded-full" style={{ width: `${pct}%` }} />
                               </div>
-                              <span className="text-[10px] font-bold text-foreground/70 w-8 text-right">{src.rating !== null ? src.rating.toFixed(2) : '—'}</span>
+                              <span className="text-xs font-medium text-foreground/70 w-8 text-right">{src.rating !== null ? src.rating.toFixed(2) : '—'}</span>
                             </div>
                           );
                         })}
@@ -1866,7 +1866,7 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
                 {/* MangaBaka: publishers */}
                 {(mangaBakaData as any) && (mangaBakaData as any).publishers?.length > 0 && (
                   <div className="mt-4 pt-4 border-t border-white/5">
-                    <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                    <p className="mb-2 text-xs font-medium normal-case tracking-normal text-muted-foreground">
                       {uiI18n.t('app.publishers_107e7fab')}
                     </p>
                     <div className="space-y-1">
@@ -1874,7 +1874,7 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
                         <div key={i} className="flex items-center justify-between text-xs">
                           <span className="text-foreground/80">{pub.name}</span>
                           {pub.type && (
-                            <span className="text-[10px] text-muted-foreground px-1.5 py-0.5 rounded bg-white/5">
+                            <span className="text-xs text-muted-foreground px-1.5 py-0.5 rounded bg-white/5">
                               {pub.type}{pub.note ? uiI18n.t('app.i18n_value_0_92e4cd32', { value0: pub.note }) : ''}
                             </span>
                           )}
@@ -1887,7 +1887,7 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
                 {/* MangaBaka: anime coverage */}
                 {(mangaBakaData as any)?.animeCoverage && (mangaBakaData as any).hasAnime && (
                   <div className="mt-4 pt-4 border-t border-white/5">
-                    <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                    <p className="mb-1.5 text-xs font-medium normal-case tracking-normal text-muted-foreground">
                       {uiI18n.t('app.anime_coverage_0d07955c')}
                     </p>
                     <p className="text-xs text-foreground/80">
@@ -1900,7 +1900,7 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
                 {/* MangaBaka: external links */}
                 {(mangaBakaData as any) && (mangaBakaData as any).links?.length > 0 && (
                   <div className="mt-4 pt-4 border-t border-white/5">
-                    <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                    <p className="mb-2 text-xs font-medium normal-case tracking-normal text-muted-foreground">
                       {uiI18n.t('app.external_links_4d57eab2')}
                     </p>
                     <div className="flex flex-wrap gap-1.5">
@@ -1910,7 +1910,7 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
                           href={link.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="px-2 py-1 rounded-md border border-white/10 bg-white/5 text-[10px] font-semibold text-muted-foreground hover:text-primary hover:border-primary/30 transition-colors"
+                          className="px-2 py-1 rounded-md border border-white/10 bg-white/5 text-xs font-medium text-muted-foreground hover:text-primary hover:border-primary/30 transition-colors"
                         >
                           {link.label}
                         </a>

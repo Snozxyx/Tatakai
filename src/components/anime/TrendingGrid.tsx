@@ -234,7 +234,7 @@ const TrendingCard = memo(function TrendingCard({ anime, spanClass }: { anime: T
         loading="lazy"
         decoding="async"
         fetchPriority="low"
-        className={`w-full h-full object-cover md:transition-all md:duration-700 ${!isMobile && isHovering && previewUrl ? 'opacity-0' : 'md:group-hover:scale-110'}`}
+        className={`w-full h-full object-cover md:transition-[color,background-color,border-color,opacity] md:duration-200 ${!isMobile && isHovering && previewUrl ? 'opacity-0' : 'md:'}`}
       />
 
       {/* Video Preview — desktop hover only */}
@@ -258,15 +258,15 @@ const TrendingCard = memo(function TrendingCard({ anime, spanClass }: { anime: T
       <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent opacity-80 md:transition-opacity md:duration-300 md:group-hover:opacity-60" />
 
       <div className="absolute top-3 left-3 md:top-4 md:left-4 z-10">
-        <span className="px-2.5 py-1 md:px-3 rounded-full bg-black/50 border border-white/10 text-[11px] md:text-xs font-bold uppercase tracking-wider">
+        <span className="px-2.5 py-1 md:px-3 rounded-full bg-black/50 border border-white/10 text-xs md:text-xs font-medium normal-case tracking-normal">
           #{anime.rank} {t('discover.trendingBadge')}
         </span>
       </div>
 
       <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6 z-10">
-        <h4 data-mobile-poster-title className="font-display text-lg md:text-2xl font-bold mb-1 leading-tight line-clamp-2">{anime.name}</h4>
+        <h4 data-mobile-poster-title className="font-display text-lg md:text-2xl font-medium mb-1 leading-tight line-clamp-2">{anime.name}</h4>
         <div className="hidden md:flex items-center justify-end">
-          <span className="hidden w-10 h-10 rounded-full bg-foreground text-background md:flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300">
+          <span className="hidden w-10 h-10 rounded-full bg-foreground text-background md:flex items-center justify-center opacity-0 group-hover:opacity-100 transition-[color,background-color,border-color,opacity] duration-300">
             <Play className="w-4 h-4 fill-background" />
           </span>
         </div>
@@ -284,7 +284,7 @@ export const TrendingGrid = memo(function TrendingGrid({ animes }: TrendingGridP
   return (
     <section className="mb-14 md:mb-24" style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 500px' }}>
       <div className="flex items-center justify-between mb-5 md:mb-8 px-1 md:px-2">
-        <h3 className="font-display text-xl md:text-2xl font-semibold tracking-tight flex items-center gap-2">
+        <h3 className="font-display text-xl md:text-2xl font-medium tracking-tight flex items-center gap-2">
           <Flame className="w-5 h-5 text-orange" />
           {t('discover.trendingNow')}
         </h3>
@@ -293,7 +293,7 @@ export const TrendingGrid = memo(function TrendingGrid({ animes }: TrendingGridP
         </Link>
       </div>
 
-      <div data-mobile-trending-grid className="grid grid-cols-2 md:grid-cols-4 md:grid-rows-2 gap-3 md:gap-4 h-auto md:h-[600px]">
+      <div data-mobile-home-rail data-mobile-trending-grid className="grid grid-cols-2 md:grid-cols-4 md:grid-rows-2 gap-3 md:gap-4 h-auto md:h-[600px]">
         {displayAnimes.map((anime, idx) => (
           <TrendingCard key={anime.id} anime={anime} spanClass={SPAN_CLASSES[idx]} />
         ))}

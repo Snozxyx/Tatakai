@@ -21,6 +21,7 @@ export interface AnimatedBeamProps {
   gradientStopColor?: string;
   delay?: number;
   duration?: number;
+  animated?: boolean;
   startXOffset?: number;
   startYOffset?: number;
   endXOffset?: number;
@@ -36,6 +37,7 @@ export const AnimatedBeam: React.FC<AnimatedBeamProps> = ({
   reverse = false, // Include the reverse prop
   duration = Math.random() * 3 + 4,
   delay = 0,
+  animated = true,
   pathColor = "gray",
   pathWidth = 2,
   pathOpacity = 0.2,
@@ -141,14 +143,14 @@ export const AnimatedBeam: React.FC<AnimatedBeamProps> = ({
         strokeOpacity={pathOpacity}
         strokeLinecap="round"
       />
-      <path
+      {animated && <path
         d={pathD}
         strokeWidth={pathWidth}
         stroke={`url(#${id})`}
         strokeOpacity="1"
         strokeLinecap="round"
-      />
-      <defs>
+      />}
+      {animated && <defs>
         <motion.linearGradient
           className="transform-gpu"
           id={id}
@@ -182,7 +184,7 @@ export const AnimatedBeam: React.FC<AnimatedBeamProps> = ({
             stopOpacity="0"
           ></stop>
         </motion.linearGradient>
-      </defs>
+      </defs>}
     </svg>
   );
 };

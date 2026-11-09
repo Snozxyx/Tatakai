@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useMotionPreference } from '@/hooks/ui/useMotionPreference';
+import { profileThemeAssetUrl } from '@/lib/profileThemeAssets';
 import './uchiha-crows.css';
 
-/** Sourced NIAID / Ryan Kissinger SVG; attribution is bundled with the artwork. */
+/** Sourced NIAID / Ryan Kissinger SVG; attribution is hosted with the artwork. */
 function Crow() {
-  return <img className="uc-bird" src="/assets/profile-themes/uchiha/crow.svg" alt="" draggable={false} />;
+  return <img className="uc-bird" src={profileThemeAssetUrl('/assets/profile-themes/uchiha/crow.svg')} alt="" draggable={false} />;
 }
 
 const FLOCK = [

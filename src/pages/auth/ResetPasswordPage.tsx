@@ -1,3 +1,4 @@
+import { BrandLogo } from '@/components/branding/BrandLogo';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useRef } from 'react';
@@ -9,13 +10,14 @@ import { GlassPanel } from '@/components/ui/GlassPanel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, Mail, Loader2, Lock, Eye, EyeOff, ShieldCheck, KeyRound, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Mail, Loader2, Lock, Eye, EyeOff, ShieldCheck, KeyRound } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { OtpCodeInput } from '@/components/auth/OtpCodeInput';
-import { TurnstileWidget, type TurnstileWidgetHandle } from '@/components/security/TurnstileWidget';
-import { isTurnstileEnabled } from '@/lib/security/turnstile';
+import { CaptchaWidget, type CaptchaWidgetHandle } from '@/components/security/CaptchaWidget';
+import { isCaptchaRequired } from '@/lib/security/captcha';
+import { solveCaptcha } from '@/lib/security/capClient';
 
 const emailSchema = z.string().email('Please enter a valid email');
 const passwordSchema = z.string().min(6, 'Password must be at least 6 characters');
@@ -36,22 +38,13 @@ export default function ResetPasswordPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
-  // Mirrors AuthPage: surfaces a retry affordance when Cloudflare's own
-  // challenge fails (iPhone Private Relay / VPN / content blocker).
-  const [challengeError, setChallengeError] = useState(false);
-  const turnstileRef = useRef<TurnstileWidgetHandle>(null);
-  const turnstileEnabled = isTurnstileEnabled();
+  const captchaRequired = isCaptchaRequired();
+  const captchaRef = useRef<CaptchaWidgetHandle>(null);
+  const resending = useRef(false);
 
   const resetCaptcha = () => {
-    turnstileRef.current?.reset();
+    captchaRef.current?.reset();
     setCaptchaToken(null);
-    setChallengeError(false);
-  };
-
-  const retryChallenge = () => {
-    setChallengeError(false);
-    setCaptchaToken(null);
-    turnstileRef.current?.reset();
   };
 
   const handleSendCode = async (e: React.FormEvent) => {
@@ -61,7 +54,7 @@ export default function ResetPasswordPage() {
       toast.error(t('auth.invalidEmail'));
       return;
     }
-    if (turnstileEnabled && !captchaToken) {
+    if (captchaRequired && !captchaToken) {
       toast.error(t('auth.completeChallenge'));
       return;
     }
@@ -129,17 +122,20 @@ export default function ResetPasswordPage() {
   };
 
   const handleResend = async () => {
-    if (turnstileEnabled) {
-      toast.info(t('auth.resendChallengeHint'));
-      setStep('email');
-      return;
-    }
+    if (resending.current) return;
+    resending.current = true;
     setIsLoading(true);
     try {
-      const { error } = await sendPasswordResetCode(email);
+      const proof = await solveCaptcha('recover');
+      const { error } = await sendPasswordResetCode(email, proof);
       if (error) toast.error(error.message);
-      else toast.success(t('auth.newCodeSent', { email }));
+      else {
+        toast.success(t('auth.newCodeSent', { email }));
+      }
+    } catch {
+      toast.error(uiI18n.t('captcha.unavailable'));
     } finally {
+      resending.current = false;
       setIsLoading(false);
     }
   };
@@ -162,7 +158,7 @@ export default function ResetPasswordPage() {
 
           {/* Logo */}
           <div className="text-center mb-6">
-            <img src={`${import.meta.env.BASE_URL}assets/logo/tatakai-logo.png`} alt={uiI18n.t('app.tatakai_logo_26c9f0b7')} className="mx-auto h-52 w-282 transition-transform duration-300 hover:scale-105 hover:drop-shadow-lg" />
+            <BrandLogo  alt={uiI18n.t('app.tatakai_logo_26c9f0b7')} className="mx-auto h-52 w-282 transition-transform duration-300 hover:scale-105 hover:drop-shadow-lg" />
           </div>
 
           <GlassPanel className="p-6 md:p-8">
@@ -190,35 +186,8 @@ export default function ResetPasswordPage() {
                     />
                   </div>
                 </div>
-                {turnstileEnabled && (
-                  <div className="space-y-2">
-                    <TurnstileWidget
-                      ref={turnstileRef}
-                      action="password_reset"
-                      onToken={(token) => { setCaptchaToken(token); setChallengeError(false); }}
-                      onExpire={() => setCaptchaToken(null)}
-                      onError={() => { setCaptchaToken(null); setChallengeError(true); }}
-                      onTimeout={() => { setCaptchaToken(null); setChallengeError(true); }}
-                      className="flex justify-center"
-                    />
-                    {challengeError && !captchaToken && (
-                      <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-center">
-                        <p className="text-sm text-foreground font-medium">{uiI18n.t('app.verification_didn_t_load_correctly_4902f292')}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {uiI18n.t('app.on_iphone_this_is_usually_icloud_private_relay_a_b6f8de3d')}
-                        </p>
-                        <button
-                          type="button"
-                          onClick={retryChallenge}
-                          className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline"
-                        >
-                          <RefreshCw className="w-4 h-4" /> {uiI18n.t('app.retry_verification_a113d86c')}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-                <Button type="submit" className="w-full" disabled={isLoading || !email || (turnstileEnabled && !captchaToken)}>
+                <CaptchaWidget ref={captchaRef} action="recover" onToken={setCaptchaToken} onExpire={() => setCaptchaToken(null)} onError={() => setCaptchaToken(null)} disabled={isLoading} />
+                <Button type="submit" className="w-full" disabled={isLoading || !email || (captchaRequired && !captchaToken)}>
                   {isLoading ? (
                     <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> {t('auth.sending')}</>
                   ) : (
@@ -330,7 +299,7 @@ export default function ResetPasswordPage() {
             <p>
               {t('auth.stillNeedHelp')}{' '}
               <button
-                onClick={() => window.open('https://discord.gg/Vr5GZFJszp', '_blank')}
+                onClick={() => window.open('https://dsc.gg/tatakai', '_blank')}
                 className="text-primary hover:underline"
               >
                 {t('auth.contactSupport')}

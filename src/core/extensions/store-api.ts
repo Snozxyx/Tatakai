@@ -3,7 +3,7 @@ import { ecosystemOf, type ExtensionEcosystem, type Compatibility } from "./ecos
  * Client for the extension service (docs/Plans.md §3 — "Extension Service API").
  *
  * Six read-only endpoints under `VITE_EXTENSION_API_URL`, which is
- * `https://extensions.tatakai.me/api` in production and a Supabase edge function
+ * `https://extensions.tatakai.app/api` in production and a Supabase edge function
  * in staging. Nothing here sends credentials: every route is public, and
  * `/extension/:id` and `/download/...` deliberately have side effects on the
  * service (they bump `view_count` / `download_count`), which is why the detail
@@ -218,7 +218,7 @@ export function extensionDownloadUrl(idOrSlug: string, version = 'latest'): stri
  */
 export const EXTENSION_PORTAL_URL =
   trimSlashes(String(import.meta.env.VITE_EXTENSION_PORTAL_URL ?? '')) ||
-  'https://extensions.tatakai.me';
+  'https://extensions.tatakai.app';
 
 const TYPES: StoreExtensionType[] = ['torrent', 'onlinestream', 'custom'];
 

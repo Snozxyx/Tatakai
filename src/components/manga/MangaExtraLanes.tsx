@@ -1,3 +1,5 @@
+import { selectReadingTitle } from '@/lib/titleLanguage';
+import { HomeSectionGroup, useHomeSectionSettings } from '@/components/customization/HomeCustomization';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { memo } from "react";
@@ -59,7 +61,7 @@ const LANES: LaneDef[] = [
 
 function toCard(item: MangaSearchItem): UnifiedMediaCardProps["item"] | null {
   const title =
-    item.canonicalTitle || item.title?.english || item.title?.romaji || item.title?.native;
+    selectReadingTitle(item);
   const rawId = item.anilistId || item.malId || item.id;
   if (!rawId || !title) return null;
   return {
@@ -83,11 +85,13 @@ function toCard(item: MangaSearchItem): UnifiedMediaCardProps["item"] | null {
 
 export const MangaExtraLanes = memo(function MangaExtraLanes() {
   useUiTranslation();
+  const sectionSettings = useHomeSectionSettings();
   const { settings } = useContentSafetySettings();
   const canShowAdult = settings.showAdultEverywhere;
 
   const results = useQueries({
     queries: LANES.map((lane) => ({
+      enabled: sectionSettings?.[`extra-${lane.id}`]?.visible !== false,
       queryKey: ["manga-extra-lane", lane.id, canShowAdult],
       queryFn: async () => {
         const res = await searchManga("", 1, 12, {
@@ -117,11 +121,11 @@ export const MangaExtraLanes = memo(function MangaExtraLanes() {
 
   return (
     <>
-      {LANES.map((lane, index) => {
+      <HomeSectionGroup groupId="extra-lanes" sections={LANES.map((lane, index) => {
         const items = results[index]?.data ?? [];
         const isLoading = results[index]?.isLoading ?? false;
-        if (!isLoading && items.length === 0) return null;
-        return (
+        if (!isLoading && items.length === 0 && sectionSettings?.[`extra-${lane.id}`]?.visible !== false) return null;
+        return { id: `extra-${lane.id}`, label: lane.title, collection: true, node: (
           <section key={lane.id} className="mb-12 md:mb-16" aria-label={lane.title}>
             <HomeSectionHeading
               icon={lane.icon}
@@ -164,8 +168,8 @@ export const MangaExtraLanes = memo(function MangaExtraLanes() {
               </div>
             )}
           </section>
-        );
-      })}
+        ) };
+      }).filter(Boolean)} />
     </>
   );
 });

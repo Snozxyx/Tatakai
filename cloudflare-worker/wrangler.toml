@@ -15,6 +15,10 @@ compatibility_date = "2024-11-01"
 # Stream large media bodies through without buffering; the free plan is fine for
 # pass-through since we never read the video body into memory.
 workers_dev = true
+routes = [
+  { pattern = "hoko.tatakai.me", custom_domain = true },
+  { pattern = "hoko.tatakai.app", custom_domain = true },
+]
 
 [observability]
 enabled = true

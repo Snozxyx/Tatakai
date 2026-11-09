@@ -27,8 +27,8 @@ const { createExtensionApiHost } = require('../runtime/extension-api-host/superv
 const { createShareTunnel } = require('../runtime/share-tunnel/share-tunnel.cjs');
 
 // ── Tatakai API base URL ──────────────────────────────────────────────────────
-// Resolves to https://api.tatakai.me/api/v3 (VITE_BACKEND_ORIGIN); no localhost fallback.
-const TATAKAI_API_BASE = (process.env.VITE_BACKEND_ORIGIN || 'https://api.tatakai.me') + '/api/v3';
+// Resolves to https://api.tatakai.app/api/v3 (VITE_BACKEND_ORIGIN); no localhost fallback.
+const TATAKAI_API_BASE = (process.env.VITE_BACKEND_ORIGIN || 'https://api.tatakai.app') + '/api/v3';
 
 module.exports = function registerRuntimeHandlers(ipcMain, app, fs, path, logger, getMainWindow) {
     require('../runtime/upscaler/index.cjs')(ipcMain, app);

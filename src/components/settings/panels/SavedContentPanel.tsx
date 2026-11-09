@@ -14,6 +14,7 @@ import {
   Heart,
   Eye,
   Loader2,
+  Award,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
@@ -25,14 +26,18 @@ import { PostCard } from '@/components/community/feed/PostCard';
 import { listUserMedia, deleteUserMedia, type UserMediaFile } from '@/lib/userMedia';
 import { StorageUsageBar } from '@/components/media/StorageUsageBar';
 import { SettingsEmptyState } from '@/components/settings/SettingsPrimitives';
+import { useUserBadges } from '@/hooks/community/useUserBadges';
+import { UserBadges } from '@/components/ui/UserBadges';
+import { Input } from '@/components/ui/input';
 
-type SavedTab = 'bookmarks' | 'tierlists' | 'playlists' | 'media';
+type SavedTab = 'bookmarks' | 'tierlists' | 'playlists' | 'media' | 'badges';
 
 const TABS: { id: SavedTab; label: string; icon: React.ReactNode }[] = [
   { id: 'bookmarks', get label() { return uiI18n.t('app.bookmarks_ca3cddd2'); }, icon: <Bookmark className="w-4 h-4" /> },
   { id: 'tierlists', get label() { return uiI18n.t('app.tier_lists_86752701'); }, icon: <ListChecks className="w-4 h-4" /> },
   { id: 'playlists', get label() { return uiI18n.t('app.playlists_77b69f32'); }, icon: <ListMusic className="w-4 h-4" /> },
   { id: 'media', get label() { return uiI18n.t('app.media_0c77aeec'); }, icon: <ImageIcon className="w-4 h-4" /> },
+  { id: 'badges', get label() { return uiI18n.t('badgeUi.collection'); }, icon: <Award className="w-4 h-4" /> },
 ];
 
 function Loading() {
@@ -62,6 +67,7 @@ export function SavedContentPanel({ section }: { section?: string }) {
   const bookmarks = useBookmarkedPosts();
   const tierLists = useUserTierLists();
   const playlists = usePlaylists();
+  const badges = useUserBadges(user?.id);
   const media = useQuery({
     queryKey: ['user-media', user?.id, 'include-private'],
     queryFn: () => listUserMedia(user!.id, true),
@@ -88,6 +94,7 @@ export function SavedContentPanel({ section }: { section?: string }) {
     tierlists: tierLists.data?.length,
     playlists: playlists.data?.length,
     media: media.data?.length,
+    badges: badges.data?.length,
   };
 
   const handleDeleteMedia = async (file: { bucket: string; path: string }) => {
@@ -112,6 +119,8 @@ export function SavedContentPanel({ section }: { section?: string }) {
         {TABS.map((t) => (
           <button
             key={t.id}
+            type="button"
+            aria-pressed={tab === t.id}
             onClick={() => setTab(t.id)}
             className={
               'flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-medium transition-colors ' +
@@ -135,8 +144,24 @@ export function SavedContentPanel({ section }: { section?: string }) {
       {tab === 'tierlists' && <TierListsSection query={tierLists} onOpen={open} />}
       {tab === 'playlists' && <PlaylistsSection query={playlists} onOpen={open} />}
       {tab === 'media' && <MediaSection query={media} onDelete={handleDeleteMedia} />}
+      {tab === 'badges' && <SavedBadgesSection query={badges} />}
     </div>
   );
+}
+
+function SavedBadgesSection({ query }: { query: ReturnType<typeof useUserBadges> }) {
+  const [search, setSearch] = useState('');
+  if (query.isPending) return <Loading />;
+  if (query.isError) return <div role="status" className="rounded-xl border border-border p-5"><p className="text-sm text-muted-foreground">{uiI18n.t('badgeUi.loadFailed')}</p><Button variant="outline" className="mt-3" onClick={() => void query.refetch()}>{uiI18n.t('app.try_again_042c862e')}</Button></div>;
+  const badges = query.data ?? [];
+  const visible = badges.filter(badge => `${badge.label} ${badge.rarity} ${badge.description}`.toLowerCase().includes(search.toLowerCase()));
+  if (!badges.length) return <SettingsEmptyState icon={Award} title={uiI18n.t('badgeUi.noBadges')} description={uiI18n.t('badgeUi.earnedCollectionHint')} />;
+  return <section className="space-y-4" aria-label={uiI18n.t('badgeUi.collection')}>
+    <div><h3 className="text-lg font-medium">{uiI18n.t('badgeUi.collection')}</h3><p className="mt-1 text-sm text-muted-foreground">{uiI18n.t('badgeUi.earnedCollectionHint')}</p></div>
+    <Input value={search} onChange={event => setSearch(event.target.value)} placeholder={uiI18n.t('badgeUi.search')} aria-label={uiI18n.t('badgeUi.search')} />
+    <UserBadges badges={visible} max={visible.length} size={40} layout="grid" appearance="plain" showLabels />
+    {!visible.length && <p className="py-6 text-center text-sm text-muted-foreground">{uiI18n.t('badgeUi.noMatches')}</p>}
+  </section>;
 }
 
 function BookmarksSection({ query }: { query: ReturnType<typeof useBookmarkedPosts> }) {
@@ -251,6 +276,7 @@ function PlaylistsSection({
 }
 
 const CATEGORY_LABEL: Record<string, string> = {
+  get appearance() { return uiI18n.t('customization.appearanceImage'); },
   private_chat: 'Private chat',
   comment: 'Comment',
   forum_image: 'Forum',

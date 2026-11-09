@@ -1,3 +1,4 @@
+import { SpotlightPresentation, SpotlightOptionalDescription, useSpotlightPresentation } from '@/components/customization/SpotlightPresentation';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { Star, BookOpen, Pause, Play } from "lucide-react";
@@ -24,9 +25,10 @@ interface MangaHeroSectionProps {
 export function MangaHeroSection({ spotlight, spotlights, onActiveSpotlightChange }: MangaHeroSectionProps) {
   useUiTranslation();
   const refreshed = useMobileAppearance();
+  const presentation = useSpotlightPresentation();
   const items = useMemo(() => (spotlights?.length ? spotlights : [spotlight]).map(toMangaSpotlight), [spotlight, spotlights]);
-  return refreshed ? <CinematicHero spotlights={items} mediaType="manga" onActiveSpotlightChange={onActiveSpotlightChange} />
-    : <ClassicMangaHeroSection spotlight={spotlight} spotlights={spotlights} />;
+  return (presentation?.variant === 'cinematic' || presentation?.variant !== 'classic' && refreshed) ? <CinematicHero spotlights={items} mediaType="manga" onActiveSpotlightChange={onActiveSpotlightChange} />
+    : <SpotlightPresentation><ClassicMangaHeroSection spotlight={spotlight} spotlights={spotlights} /></SpotlightPresentation>;
 }
 
 function ClassicMangaHeroSection({ spotlight, spotlights = [] }: MangaHeroSectionProps) {
@@ -95,20 +97,20 @@ function ClassicMangaHeroSection({ spotlight, spotlights = [] }: MangaHeroSectio
 
   return (
     <section ref={sectionRef} onFocusCapture={() => setFocused(true)} onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false); }} className="balanced-spotlight relative mb-12 md:mb-16">
-      <div
+      <div data-spotlight-stage
         className="classic-spotlight-mobile lg:hidden relative overflow-hidden rounded-3xl border border-white/[0.08] bg-black/80 shadow-2xl shadow-black/50"
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
       >
         <div className="absolute inset-0 h-[400px] overflow-hidden">
-          <img
+          <img data-spotlight-art
             src={getHighQualityImage(spotlightPoster)}
             alt=""
             className="w-full h-full object-cover scale-105 brightness-50"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-primary/15 via-black/70 to-black/90" />
+          <div data-spotlight-shade className="absolute inset-0 bg-gradient-to-b from-primary/15 via-black/70 to-black/90" />
           {/* Ambient glow — same token language as the anime hero */}
-          <div className="absolute -top-16 left-1/2 h-40 w-3/4 -translate-x-1/2 rounded-full bg-primary/25 blur-[80px]" aria-hidden />
+<div className="absolute -top-16 left-1/2 h-40 w-3/4 -translate-x-1/2 rounded-full bg-primary/25 blur-[80px]" aria-hidden />
         </div>
 
         <div
@@ -117,7 +119,7 @@ function ClassicMangaHeroSection({ spotlight, spotlights = [] }: MangaHeroSectio
           <div className="flex gap-4 mb-6">
             <div className="w-32 flex-shrink-0">
               <GlassPanel className="overflow-hidden rounded-2xl ring-1 ring-white/10 shadow-2xl shadow-black/60">
-                <img
+                <img data-spotlight-art
                   src={getHighQualityImage(spotlightPoster)}
                   alt={spotlightName}
                   className="w-full aspect-[3/4] object-cover"
@@ -125,17 +127,17 @@ function ClassicMangaHeroSection({ spotlight, spotlights = [] }: MangaHeroSectio
               </GlassPanel>
             </div>
 
-            <div className="flex-1 min-w-0 py-2">
+            <div data-spotlight-copy className="flex-1 min-w-0 py-2">
               <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-amber/30 bg-amber-500/15 backdrop-blur-md text-amber text-[10px] font-bold tracking-wider uppercase mb-2 shadow-lg shadow-black/30">
                 <Star className="w-2.5 h-2.5 fill-amber" />
                 {uiI18n.t('app.featured_manga_c823f1c9')}
               </div>
 
-              <h1 className="font-display text-xl font-black tracking-tight leading-tight text-white text-balance drop-shadow-lg mb-2 line-clamp-3">
+              <h1 data-spotlight-title className="font-display text-xl font-black tracking-tight leading-tight text-white text-balance drop-shadow-lg mb-2 line-clamp-3">
                 {spotlightName}
               </h1>
 
-              <div className="text-xs font-medium text-white/65">
+              <div data-spotlight-metadata className="text-xs font-medium text-white/65">
                 {spotlightType} •{" "}
                 {activeSpotlight.chapters
                   ? uiI18n.t('app.i18n_value_0_chapters_a5ec6adf', { value0: activeSpotlight.chapters })
@@ -144,7 +146,8 @@ function ClassicMangaHeroSection({ spotlight, spotlights = [] }: MangaHeroSectio
             </div>
           </div>
 
-          <div className="flex gap-3">
+          <SpotlightOptionalDescription description={activeSpotlight.description} />
+          <div data-spotlight-actions className="flex gap-3">
             <button
               onClick={handleRead}
               className="flex-1 h-12 rounded-2xl bg-white text-black font-bold text-sm hover:bg-white/90 motion-safe:active:scale-[.98] transition-[opacity,transform,background-color] flex items-center justify-center gap-2 shadow-xl shadow-black/40 ring-1 ring-white/40"
@@ -176,8 +179,8 @@ function ClassicMangaHeroSection({ spotlight, spotlights = [] }: MangaHeroSectio
         </div>
       </div>
 
-      <div className="hidden lg:grid grid-cols-12 gap-8 items-center">
-        <div
+      <div data-spotlight-stage className="hidden lg:grid grid-cols-12 gap-8 items-center">
+        <div data-spotlight-copy
           className={`col-span-5 space-y-8 z-20 transition-opacity duration-300 ${isTransitioning ? "opacity-0" : "opacity-100 "}`}
         >
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-amber/30 bg-amber/10 text-amber text-xs font-bold tracking-wider uppercase">
@@ -185,7 +188,7 @@ function ClassicMangaHeroSection({ spotlight, spotlights = [] }: MangaHeroSectio
             {uiI18n.t('app.featured_manga_c823f1c9')}
           </div>
 
-          <h1 data-long-title={spotlightName.length > 60} className="spotlight-heading font-display text-5xl font-bold tracking-tight leading-[1.04] text-foreground">
+          <h1 data-spotlight-title data-long-title={spotlightName.length > 60} className="spotlight-heading font-display text-5xl font-bold tracking-tight leading-[1.04] text-foreground">
             {spotlightName.split(" ").slice(0, 3).join(" ")}
             {spotlightName.split(" ").length > 3 && (
               <>
@@ -195,7 +198,8 @@ function ClassicMangaHeroSection({ spotlight, spotlights = [] }: MangaHeroSectio
             )}
           </h1>
 
-          <div className="flex flex-wrap gap-3">
+          <SpotlightOptionalDescription description={activeSpotlight.description} />
+          <div data-spotlight-metadata className="flex flex-wrap gap-3">
             <span className="px-4 py-1.5 rounded-lg border border-border bg-muted/50 text-sm font-medium hover:bg-muted cursor-default transition-colors">
               {spotlightType}
             </span>
@@ -209,7 +213,7 @@ function ClassicMangaHeroSection({ spotlight, spotlights = [] }: MangaHeroSectio
             )}
           </div>
 
-          <div className="flex items-center gap-4 pt-4">
+          <div data-spotlight-actions className="flex items-center gap-4 pt-4">
             <button
               onClick={handleRead}
               className="h-14 px-8 rounded-full bg-foreground text-background font-bold text-lg hover:scale-105 active:scale-95 transition-[opacity,transform,background-color] flex items-center gap-2 glow-primary"
@@ -239,19 +243,19 @@ function ClassicMangaHeroSection({ spotlight, spotlights = [] }: MangaHeroSectio
           className={`col-span-7 relative transition-[opacity,transform,background-color] duration-700 ease-out ${isTransitioning ? "opacity-0" : "opacity-100"}`}
         >
           <div className="relative aspect-[16/9] w-full rounded-[2.5rem] overflow-hidden group">
-            <img
+            <img data-spotlight-art
               src={getHighQualityImage(spotlightPoster)}
               alt={spotlightName}
               className="absolute inset-0 w-full h-full object-cover transition-transform duration-[2s] ease-out group-hover:scale-105"
             />
-            <div className="absolute inset-0 bg-gradient-to-r from-background via-background/20 to-transparent" />
-            <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent" />
+            <div data-spotlight-shade className="absolute inset-0 bg-gradient-to-r from-background via-background/20 to-transparent" />
+            <div data-spotlight-shade className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent" />
 
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 rounded-full bg-primary/20 blur-[100px] pointer-events-none mix-blend-screen" />
           </div>
 
           <div className="absolute -right-6 -bottom-6 w-48 aspect-[3/4] rounded-2xl overflow-hidden shadow-2xl border-4 border-background rotate-[-6deg] group-hover:rotate-0 transition-transform duration-500">
-            <img
+            <img data-spotlight-art
               src={getHighQualityImage(spotlightPoster)}
               alt={spotlightName}
               className="w-full h-full object-cover"

@@ -1,6 +1,7 @@
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
-import { resolveColors, useTheme, type ThemeId } from '@/hooks/ui/useTheme';
+import { resolveThemePalette, useTheme, type ThemeId } from '@/hooks/ui/useTheme';
+import type { CustomThemeDefinitions, ThemeCustomization } from '@/lib/customization';
 import { SettingsSection } from '@/components/settings/SettingsPrimitives';
 import { Check, Palette, Sparkles } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -17,14 +18,22 @@ import { motion } from 'framer-motion';
  * disagree with the theme it is previewing; reading the resolved palette (built-in
  * OR extension-contributed) means it can't.
  */
-function swatchGradient(t: ThemeId): string {
-  const c = resolveColors(t);
+function swatchGradient(t: ThemeId, definitions?: CustomThemeDefinitions, overrides?: Record<string, ThemeCustomization | null>): string {
+  const c = resolveThemePalette(t, overrides?.[t]?.palette, definitions);
   return `linear-gradient(135deg, hsl(${c.primary}) 0%, hsl(${c.secondary}) 55%, hsl(${c.accent}) 100%)`;
 }
 
-export function ThemeSelector() {
+export interface ThemeSelectorProps { selectedTheme?: ThemeId; onSelectTheme?: (theme: ThemeId) => void; customThemes?: CustomThemeDefinitions; draftOverrides?: Record<string, ThemeCustomization | null> }
+export function ThemeSelector({ selectedTheme, onSelectTheme, customThemes, draftOverrides }: ThemeSelectorProps = {}) {
   useUiTranslation();
-  const { theme, setTheme, themes, themeInfo } = useTheme();
+  const { theme, setTheme, themes: savedThemes, themeInfo: savedInfo } = useTheme();
+  const themeInfo = { ...savedInfo };
+  const themes = [...savedThemes.filter(id => !customThemes || !Object.prototype.hasOwnProperty.call(customThemes, id) || !!customThemes[id])];
+  for (const [id, definition] of Object.entries(customThemes || {})) if (definition) {
+    if (!themes.includes(id)) themes.push(id);
+    const colors = resolveThemePalette(id, draftOverrides?.[id]?.palette, customThemes);
+    themeInfo[id] = { name: definition.name, description: '', icon: '🎨', category: colors.isLight ? 'light' : 'dark', gradient: '' };
+  }
 
   const darkThemes = themes.filter(t => themeInfo[t]?.category === 'dark');
   const lightThemes = themes.filter(t => themeInfo[t]?.category === 'light');
@@ -33,8 +42,8 @@ export function ThemeSelector() {
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
       {themeList.map((t, index) => {
         const info = themeInfo[t];
-        const isActive = theme === t;
-        const gradient = swatchGradient(t);
+        const isActive = (selectedTheme ?? theme) === t;
+        const gradient = swatchGradient(t, customThemes, draftOverrides);
 
         return (
           <motion.button
@@ -44,7 +53,7 @@ export function ThemeSelector() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: (startIndex + index) * 0.05 }}
-            onClick={() => setTheme(t)}
+            onClick={() => (onSelectTheme || setTheme)(t)}
             className={`relative p-3 rounded-2xl border-2 transition-all duration-300 text-left group overflow-hidden ${isActive
                 ? 'border-primary bg-primary/10 ring-2 ring-primary/30'
                 : 'border-border/50 hover:border-primary/50 bg-muted/30 hover:bg-muted/50'}`}

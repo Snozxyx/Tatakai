@@ -1,6 +1,6 @@
 // Marketing demos stay on the website; native features keep their offline media.
 export const BRAND_ASSET_BASE = import.meta.env.VITE_PACKAGED_BUILD === 'true'
-  ? 'https://tatakai.me/assets/brand'
+  ? 'https://tatakai.app/assets/brand'
   : `${import.meta.env.BASE_URL}assets/brand`;
 
 const compactBackgrounds: Record<string, string> = {

@@ -33,10 +33,27 @@ const calls: string[] = [];
 mock.module('../src/lib/platform/platform', () => ({ isCapacitor: () => true }));
 mock.module('../src/core/extensions/remote/custom', () => ({
   listRemoteCustomSources: async () => [], remoteCustomRow: async () => null,
-  remoteCustomHome: async () => null, remoteCustomSearch: async () => null,
+  remoteCustomHome: async () => null, remoteCustomCatalogPage: async () => null, remoteCustomSearch: async () => null,
   remoteCustomInfo: async () => null, remoteCustomWatch: async () => null, remoteCustomRead: async () => null,
 }));
-mock.module('../src/core/extensions/remote/media', () => ({ proxyCustomSources: async (sources: any) => sources }));
+mock.module('../src/core/extensions/remote/media', () => ({
+  proxyCustomSources: async (sources: any) => sources,
+  proxyRemoteSources: async (sources: any) => sources,
+  proxyRemoteUrl: async (url: string) => url,
+}));
+// This fixture exercises the native mobile host, with no connected servers or
+// compatibility providers. Keep their imports from starting other runtimes.
+const unavailableContent = () => { throw Error('Unexpected external content request'); };
+mock.module('../src/core/extensions/compatibility/content', () => ({
+  compatibilityCustomSources: async () => [], compatibilityHome: unavailableContent,
+  compatibilitySearch: unavailableContent, compatibilityInfo: unavailableContent,
+  compatibilityWatch: unavailableContent, compatibilityRead: unavailableContent,
+}));
+mock.module('../src/core/extensions/server/client', () => ({
+  serverCustomSources: async () => [], serverCustomHome: unavailableContent,
+  serverCustomSearch: unavailableContent, serverCustomInfo: unavailableContent,
+  serverCustomWatch: unavailableContent, serverCustomRead: unavailableContent,
+}));
 mock.module('../src/hooks/media/useExtensionSourceStream', () => ({
   MOBILE_EXT_BASE: 'mobile://extensions', resolveExtensionApiBase: async () => ({
     baseUrl: 'mobile://extensions', namespaces: hydrated ? [{ namespace: 'custom', customSources: [{ id: 'books', name: 'Books' }] }] : [],
@@ -53,8 +70,9 @@ const custom = await import('../src/core/content/custom-source-runtime');
 test('a mobile custom deep link hydrates installed bundles before dispatch with no global Capacitor object', async () => {
   delete (globalThis as any).Capacitor;
   expect((globalThis as any).Capacitor).toBeUndefined();
-  expect((await custom.fetchCustomHome('custom', 'books')).sections).toHaveLength(1);
   expect((await custom.listAllCustomSources())[0].namespace).toBe('custom');
+  expect(hydrated).toBe(true);
+  expect((await custom.fetchCustomHome('custom', 'books')).sections).toHaveLength(1);
   await custom.fetchCustomSearch('custom', 'books', 'title');
   expect((await custom.fetchCustomInfo('custom', 'books', 'book'))?.id).toBe('book');
   await custom.fetchCustomWatch('custom', 'books', 'book', 'episode');

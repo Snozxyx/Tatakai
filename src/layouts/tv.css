@@ -1,21 +1,21 @@
 /* The TV canvas scales with viewport width, including 4K panels and browser preview zoom. */
 .tatakai-tv {
   color-scheme: dark;
-  --tv-ground: #141416;
-  --background: 240 6% 5%;
-  --foreground: 0 0% 98%;
-  --muted-foreground: 240 5% 75%;
+  --tv-ground: #0f0b0c;
+  --background: 340 15% 5%;
+  --foreground: 340 5% 95%;
+  --muted-foreground: 340 10% 60%;
 }
 .tatakai-tv body {
-  background: #141416 !important;
-  color: #f8f8fa !important;
+  background: hsl(var(--background)) !important;
+  color: hsl(var(--foreground)) !important;
   overflow: hidden;
 }
 .tv-shell {
   height: 100dvh;
   overflow: auto;
-  background: #141416;
-  color: #f8f8fa;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
   font-family: "Outfit", sans-serif;
   font-size: max(18px, 1.42vw);
   padding: 0 4.8vw 5vh;

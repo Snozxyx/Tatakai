@@ -49,6 +49,8 @@ import {
 import { VideoPlayer } from "@/components/video/VideoPlayer";
 import { MobileVideoPlayer } from "@/components/video/MobileVideoPlayer";
 import { NativeTorrentPlayer } from "@/components/video/NativeTorrentPlayer";
+import { TVWatchView } from '@/pages/tv/TVWatchView';
+import { isTV } from '@/core/tv/device';
 import { EmbedPlayer } from "@/components/video/EmbedPlayer";
 import type {
   PlaybackSource,
@@ -186,18 +188,20 @@ export default function CustomWatchPage() {
   const sources = useMemo(() => data?.sources ?? [], [data?.sources]);
   const servers = useMemo(() => groupByServer(sources), [sources]);
   const [serverIdx, setServerIdx] = useState(0);
+  const [tvSourceIndex, setTVSourceIndex] = useState(0);
 
   // Reset to the first server whenever the episode (hence the source set) changes.
   useEffect(() => {
     setServerIdx(0);
+    setTVSourceIndex(0);
     setFailed(false);
     setLanguage("all");
   }, [episodeId, servers.length]);
 
   const activeServer = servers[serverIdx] ?? servers[0];
   const activeSources = useMemo(
-    () => activeServer?.sources ?? [],
-    [activeServer]
+    () => isTV() ? sources[tvSourceIndex] ? [sources[tvSourceIndex]] : [] : activeServer?.sources ?? [],
+    [activeServer, sources, tvSourceIndex]
   );
   const activeEmbed = activeSources.find(
     (source) =>
@@ -298,6 +302,10 @@ export default function CustomWatchPage() {
     setFailed(false);
     void refetch();
   };
+  const tvSources = sources.map((item, index) => ({
+    id: JSON.stringify([item.url, item.quality, item.server, item.source, item.audioLanguage]), title: [item.server || item.source || source?.name, item.quality].filter(Boolean).join(' · ') || `Source ${index + 1}`,
+    detail: [item.audioLanguage, item.sourceType].filter(Boolean).join(' · '), selected: index === tvSourceIndex,
+  }));
   const player = isLoading ? (
     <div
       role="status"
@@ -336,6 +344,30 @@ export default function CustomWatchPage() {
           language={activeEmbed.audioLanguage}
           referer={activeEmbed.headers?.Referer || activeEmbed.headers?.referer}
           onError={() => setFailed(true)}
+        />
+      ) : isTV() && isMobileApp ? (
+        <NativeTorrentPlayer
+          key={tvSources[tvSourceIndex]?.id}
+          mediaId={namespace}
+          episodeId={episodeId}
+          url={playbackSources[0].url}
+          mimeType={playbackSources[0].isM3U8 ? 'application/x-mpegURL' : undefined}
+          streamKind={activeSources[0]?.sourceType === 'torrent' ? 'torrent' : activeSources[0]?.sourceType === 'debrid' ? 'debrid' : 'hls'}
+          title={info?.title}
+          poster={info?.image}
+          subtitles={subtitles}
+          headers={activeSources[0]?.headers}
+          initialSeekSeconds={progress.initialPosition}
+          onProgressUpdate={progress.save}
+          onEpisodeEnd={next ? () => goEntry(next.id) : undefined}
+          onBack={() => navigate(`${base}/info/${encodeURIComponent(id || '')}`)}
+          onError={() => setFailed(true)}
+          sources={tvSources}
+          onSourceRequest={index => {
+            if (index !== undefined && sources[index]) { setTVSourceIndex(index); setFailed(false); }
+            else document.querySelector<HTMLElement>('[data-tv-source-picker]')?.click();
+          }}
+          onQueueRequest={() => document.querySelector<HTMLElement>('[data-tv-episode-picker]')?.click()}
         />
       ) : isMobileApp &&
         (activeSources[0]?.sourceType === "debrid" ||
@@ -406,6 +438,19 @@ export default function CustomWatchPage() {
       )}
     </>
   );
+  if (isTV()) return <TVWatchView
+    title={info?.title || source?.name || t('animeDetail.watch')}
+    episodeTitle={currentLabel}
+    poster={info?.image}
+    player={player}
+    sources={tvSources}
+    episodes={entries.map((entry, index) => ({ number: entry.number ?? index + 1, title: entry.label, episodeId: entry.id, isFiller: false }))}
+    currentEpisodeId={episodeId || ''}
+    loading={isLoading || isFetching}
+    onSource={index => { if (sources[index]) { setTVSourceIndex(index); setFailed(false); } }}
+    onEpisode={goEntry}
+    onRefresh={retry}
+  />;
   return (
     <div className="min-h-screen overflow-x-hidden bg-background text-foreground">
       <Background />

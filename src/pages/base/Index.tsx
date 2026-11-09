@@ -1,4 +1,6 @@
 import { FriendsActivity } from '@/components/home/FriendsActivity';
+import '@/components/layout/catalog-polish.css';
+import { HomeCustomization } from '@/components/customization/HomeCustomization';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useHomeData } from "@/hooks/api/useAnimeData";
@@ -34,7 +36,7 @@ import {  ReleaseV6Banner } from "@/components/layout/MangaBanner";
 import { IndexMangaShowcase } from "@/components/manga/IndexMangaShowcase";
 import { LastReadMangaSection } from "@/components/manga/LastReadMangaSection";
 import { LastReadNovelSection } from "@/components/novel/LastReadNovelSection";
-import { Heart, RefreshCw, Sparkles } from "lucide-react";
+import { Heart, RefreshCw } from "lucide-react";
 import { DiscordSection } from "@/components/home/DiscordSection";
 import { DownloadSection } from "@/components/home/DownloadSection";
 import { AppDownloadBanner } from "@/components/layout/AppDownloadBanner";
@@ -101,7 +103,7 @@ const Index = () => {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center px-6">
         <div className="text-center">
-          <h1 className="text-2xl font-bold mb-2">{uiI18n.t('app.failed_to_load_af14db26')}</h1>
+          <h1 className="text-2xl font-medium mb-2">{uiI18n.t('app.failed_to_load_af14db26')}</h1>
           <p className="text-muted-foreground mb-6">{uiI18n.t('app.something_went_wrong_loading_your_home_feed_e34817d4')}</p>
           <Button onClick={() => refetch()} disabled={isFetching}>
             <RefreshCw className={cn("mr-2 h-4 w-4", isFetching && "animate-spin")} />
@@ -113,17 +115,16 @@ const Index = () => {
   }
 
   return (
-    <div className="relative min-h-screen bg-background text-foreground overflow-x-clip">
+    <div className="catalog-page relative min-h-screen bg-background text-foreground overflow-x-clip">
       {refreshed && <MobileHomeBackdrop anime={data?.spotlightAnimes.find(anime => anime.id === activeSpotlight?.id) || data?.spotlightAnimes[0]} />}
-      {!isMobile && <Background />}
+      {!isMobile && <Background quiet />}
       {showSidebar && <Sidebar />}
 
-      <main data-mobile-home className={cn(
-        "app-page relative z-10 pr-6 py-6 max-w-[1800px] mx-auto pb-24 md:pb-6",
+      <main data-mobile-home data-spotlight-page className={cn(
+        "app-page relative z-10 pr-6 py-6 max-w-[1600px] mx-auto pb-24 md:pb-6",
         isDesktopApp ? "pl-24" : "pl-6 md:pl-32" // Desktop app sidebar is fixed w-20, so content needs larger offset
       )}>
-        <Header />
-        <div className="hidden md:block h-4 lg:h-6" aria-hidden />
+        <Header alignWithPage />
 
         {/* Extension mount point — top of home. */}
 
@@ -138,77 +139,34 @@ const Index = () => {
             </div>
           </>
         ) : data ? (
-          <div data-home-sections className="space-y-14 md:space-y-20 [&>section]:!mb-0 [&>div]:!mb-0">
-            {/* Hero — Spotlight */}
-            {data.spotlightAnimes.length > 0 && (
-              <HeroSection
-                spotlight={data.spotlightAnimes[0]}
-                spotlights={data.spotlightAnimes}
-                onActiveSpotlightChange={setActiveSpotlight}
-              />
-            )}
-
-            {/* <ReleaseV6Banner /> */}
-
-            {/* ── Pick up where you left off ── */}
-            <ContinueWatching />
-            <LocalContinueWatching />
-                    <ExtensionSlot slotId="home-top" />
-        <ExtensionContinue kind="watch" />
-            <TorrentSessionBanner />
-            <LastReadMangaSection />
-            <LastReadNovelSection />
-            <FriendsActivity />
-
-            {/* ── New from what you follow — exact EP/CH deep-links ── */}
-            <RevealSection><FollowedAnimeEpisodes /></RevealSection>
-            <RevealSection><FollowedMangaUpdates /></RevealSection>
-            <RevealSection><FollowedNovelUpdates /></RevealSection>
-
-            {/* ── Fresh & trending ── */}
-            <RevealSection><LatestEpisodes animes={data.latestEpisodeAnimes} /></RevealSection>
-            <RevealSection><TrendingGrid animes={data.trendingAnimes} /></RevealSection>
-
-            {/* ── Made for you ── */}
-            {deferredCount >= 1 && (<RevealSection><BecauseYouWatched /></RevealSection>)}
-            {deferredCount >= 2 && (<RevealSection><AIRecommendationBanner /></RevealSection>)}
-
-            {/* ── Rankings & curated ── */}
-            {deferredCount >= 3 && (<RevealSection>
-              <TopAnimeSection
-                today={data.top10Animes.today}
-                week={data.top10Animes.week}
-                month={data.top10Animes.month}
-              />
-            </RevealSection>)}
-            {deferredCount >= 4 && (<RevealSection><UpcomingAnimeSection /></RevealSection>)}
-            {deferredCount >= 5 && (<RevealSection>
-              <AnimeGrid
-                animes={data.mostPopularAnimes.slice(0, 6)}
-                title={uiI18n.t('app.most_popular_385b4b23')}
-                icon={<Heart className="w-5 h-5 text-destructive fill-destructive" />}
-              />
-            </RevealSection>)}
-            {deferredCount >= 6 && (<RevealSection>
-              <AnimeGrid
-                animes={data.mostFavoriteAnimes.slice(0, 6)}
-                title={uiI18n.t('app.most_favorite_cbe5ea81')}
-                icon={<Sparkles className="w-5 h-5 text-amber" />}
-              />
-            </RevealSection>)}
-
-            {/* ── Explore across media ── */}
-            {deferredCount >= 7 && (<RevealSection><IndexMangaShowcase /></RevealSection>)}
-            {deferredCount >= 8 && (<RevealSection><GenreCloud genres={data.genres} /></RevealSection>)}
-
-            {/* ── Community ── */}
-            {deferredCount >= 9 && (<RevealSection><CommunitySection /></RevealSection>)}
-
-            {/* ── Get more out of Tatakai ── */}
-            {deferredCount >= 10 && (<RevealSection><DiscordSection /></RevealSection>)}
-
-            {/* Infinite genre feed */}
-            {deferredCount >= 11 && (showInfiniteEarly ? <MobileInfiniteHomeSections /> : <InfiniteHomeSections />)}
+          <div data-home-sections className="space-y-12 md:space-y-16 [&>section]:!mb-0 [&>div]:!mb-0">
+            <HomeCustomization pageId="anime-home" sections={[
+              { id: 'spotlight', label: 'Spotlight', available: data.spotlightAnimes.length > 0, node: data.spotlightAnimes.length > 0 ? <HeroSection spotlight={data.spotlightAnimes[0]} spotlights={data.spotlightAnimes} onActiveSpotlightChange={setActiveSpotlight} /> : null },
+              { id: 'continue-watching', label: 'Continue watching', collection: true, node: <ContinueWatching /> },
+              { id: 'local-continue', label: 'Local continue watching', collection: true, node: <LocalContinueWatching /> },
+              { id: 'extension-home-top', label: 'Extension widgets', node: <ExtensionSlot slotId="home-top" /> },
+              { id: 'extension-continue', label: 'Provider continue watching', collection: true, node: <ExtensionContinue kind="watch" /> },
+              { id: 'torrent-session', label: 'Torrent session', node: <TorrentSessionBanner /> },
+              { id: 'last-read-manga', label: 'Continue manga', collection: true, node: <LastReadMangaSection /> },
+              { id: 'last-read-novel', label: 'Continue novels', collection: true, node: <LastReadNovelSection /> },
+              { id: 'friends-activity', label: 'Friends activity', node: <FriendsActivity /> },
+              { id: 'followed-anime', label: 'Followed anime updates', collection: true, node: <RevealSection><FollowedAnimeEpisodes /></RevealSection> },
+              { id: 'followed-manga', label: 'Followed manga updates', collection: true, node: <RevealSection><FollowedMangaUpdates /></RevealSection> },
+              { id: 'followed-novel', label: 'Followed novel updates', collection: true, node: <RevealSection><FollowedNovelUpdates /></RevealSection> },
+              { id: 'latest-episodes', label: 'Latest episodes', collection: true, node: <RevealSection><LatestEpisodes animes={data.latestEpisodeAnimes} /></RevealSection> },
+              { id: 'trending', layoutLocked: 'original', preservePresentation: true, label: 'Trending anime', collection: true, node: <RevealSection><TrendingGrid animes={data.trendingAnimes} /></RevealSection> },
+              { id: 'because-you-watched', label: 'Because you watched', collection: true, available: deferredCount >= 1, node: deferredCount >= 1 ? <RevealSection><BecauseYouWatched /></RevealSection> : null },
+              { id: 'ai-recommendations', label: 'Recommendations', available: deferredCount >= 2, node: deferredCount >= 2 ? <RevealSection><AIRecommendationBanner /></RevealSection> : null },
+              { id: 'top10', label: 'Top anime', collection: true, available: deferredCount >= 3, node: deferredCount >= 3 ? <RevealSection><TopAnimeSection today={data.top10Animes.today} week={data.top10Animes.week} month={data.top10Animes.month} /></RevealSection> : null },
+              { id: 'upcoming', label: 'Upcoming anime', collection: true, available: deferredCount >= 4, node: deferredCount >= 4 ? <RevealSection><UpcomingAnimeSection /></RevealSection> : null },
+              { id: 'most-popular', label: 'Most popular', collection: true, available: deferredCount >= 5, node: deferredCount >= 5 ? <RevealSection><AnimeGrid animes={data.mostPopularAnimes.slice(0, 6)} title={uiI18n.t('app.most_popular_385b4b23')} icon={<Heart className="w-[18px] h-[18px] text-muted-foreground" strokeWidth={1.5} />} /></RevealSection> : null },
+              { id: 'most-favorite', label: 'Most favorite', collection: true, available: deferredCount >= 6, node: deferredCount >= 6 ? <RevealSection><AnimeGrid animes={data.mostFavoriteAnimes.slice(0, 6)} title={uiI18n.t('app.most_favorite_cbe5ea81')} /></RevealSection> : null },
+              { id: 'manga-showcase', label: 'Manga showcase', collection: true, available: deferredCount >= 7, node: deferredCount >= 7 ? <RevealSection><IndexMangaShowcase /></RevealSection> : null },
+              { id: 'genres', label: 'Genres', available: deferredCount >= 8, node: deferredCount >= 8 ? <RevealSection><GenreCloud genres={data.genres} /></RevealSection> : null },
+              { id: 'community', label: 'Community', available: deferredCount >= 9, node: deferredCount >= 9 ? <RevealSection><CommunitySection /></RevealSection> : null },
+              { id: 'discord', label: 'Discord', available: deferredCount >= 10, node: deferredCount >= 10 ? <RevealSection><DiscordSection /></RevealSection> : null },
+              { id: 'genre-feed', label: 'Genre feed', feed: true, available: deferredCount >= 11, node: deferredCount >= 11 ? showInfiniteEarly ? <MobileInfiniteHomeSections /> : <InfiniteHomeSections /> : null },
+            ]} />
             {!showDeferredSections && <div className="min-h-[60vh]" aria-hidden />}
           </div>
         ) : null}

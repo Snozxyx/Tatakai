@@ -1,11 +1,12 @@
 import Dexie, { type Table } from 'dexie';
 import { extensionDeadline } from './deadline';
 import { extensionRequestId } from '../compatibility/request-id';
-import { detectEcosystem, normalizeManifestUrl, EXTENSION_INSTALLED_EVENT } from '../ecosystems';
+import { detectEcosystem, normalizeManifestUrl, EXTENSION_INSTALLED_EVENT, INSTALLED_MANIFESTS_KEY, migrateExtensionStorage } from '../ecosystems';
 import { fetchExtensionJson, extensionFetch } from './transport';
 import { buildSeanimeBundle, wrapSeanimeCode } from './seanime';
 import type { StremioManifest } from './stremio';
 import type { ExtensionManifest } from '../sdk/types';
+import uiI18n from '@/lib/uiI18n';
 
 export interface RemoteExtension {
   id: string; ecosystem: 'stremio' | 'seanime'; manifestUrl: string;
@@ -18,6 +19,26 @@ const table = remoteDb.table('extensions') as Table<RemoteExtension, string>;
 const notice = () => window.dispatchEvent(new CustomEvent(EXTENSION_INSTALLED_EVENT));
 export const listRemoteExtensions = () => table.toArray();
 
+/** Keep legacy catalogue readers aligned with the authoritative remote record. */
+function syncRemoteCatalogue(row: RemoteExtension): void {
+  migrateExtensionStorage();
+  const read = (key: string): any[] => {
+    try { const value = JSON.parse(localStorage.getItem(key) || '[]'); return Array.isArray(value) ? value : []; }
+    catch { return []; }
+  };
+  const records = read(INSTALLED_MANIFESTS_KEY);
+  const old = records.find(item => item?.id === row.id);
+  const manifest = { ...old, ...row.manifest, id: row.id, ecosystem: row.ecosystem, manifestUrl: row.manifestUrl,
+    payload: undefined, upstreamType: row.manifest.type, enabled: row.enabled,
+    author: row.manifest.author || old?.author || 'Community', icon: row.manifest.logo || row.manifest.icon,
+    banner: row.manifest.background || row.manifest.banner || row.manifest.bannerUrl,
+    type: row.ecosystem === 'stremio' || row.manifest.type === 'onlinestream-provider' ? 'onlinestream' : row.manifest.type === 'anime-torrent-provider' ? 'torrent' : 'custom',
+    description: row.manifest.description || '', categories: row.manifest.categories || [], permissions: row.manifest.permissions || [],
+    isApproved: true, status: 'approved' };
+  localStorage.setItem(INSTALLED_MANIFESTS_KEY, JSON.stringify([manifest, ...records.filter(item => item?.id !== row.id)]));
+  localStorage.setItem('tatakai_installed_extensions', JSON.stringify([...new Set([...read('tatakai_installed_extensions'), row.id])]));
+}
+
 export async function installRemoteExtension(input: string | Record<string, any>, origin?: string, existingId?: string, configuredPreferences?: Record<string, unknown>): Promise<RemoteExtension> {
   const manifestUrl = typeof input === 'string' ? normalizeManifestUrl(input) : origin ? normalizeManifestUrl(origin) : '';
   const manifest = typeof input === 'string' ? await fetchExtensionJson(manifestUrl) : input;
@@ -29,7 +50,8 @@ export async function installRemoteExtension(input: string | Record<string, any>
   if (ecosystem === 'stremio' && (manifest as StremioManifest).behaviorHints?.configurationRequired) throw new Error('Configure this addon first, then paste its configured manifest URL');
   if (ecosystem === 'seanime' && !['onlinestream-provider', 'anime-torrent-provider', 'manga-provider', 'custom-source'].includes(manifest.type)) throw new Error('This Seanime extension type requires Seanime');
   const all = await listRemoteExtensions();
-  const previous = all.find(row => row.id === existingId || (row.ecosystem === ecosystem && row.manifestUrl === manifestUrl && row.manifest.id === manifest.id));
+  const previous = existingId ? all.find(row => row.id === existingId) : all.find(row => row.ecosystem === ecosystem && row.manifestUrl === manifestUrl && row.manifest.id === manifest.id);
+  if (existingId && (!previous || previous.ecosystem !== ecosystem || previous.manifest.id !== manifest.id)) throw new Error(uiI18n.t('extensionSetup.wrongAddon'));
   const id = previous?.id || `${ecosystem}-${extensionRequestId()}`;
   let bundleCode: string | undefined;
   if (ecosystem === 'seanime') {
@@ -53,7 +75,7 @@ export async function installRemoteExtension(input: string | Record<string, any>
     catch (error) { await unmountRemote(row); throw error; }
     if (!row.manifest.customSettings?.supportsAnime && !row.manifest.customSettings?.supportsManga) { await unmountRemote(row); throw new Error('Custom source does not advertise anime or manga'); }
   }
-  await table.put(row); notice(); return row;
+  await table.put(row); syncRemoteCatalogue(row); notice(); return row;
 }
 export async function mountSeanime(row: RemoteExtension): Promise<void> {
   let browserDomains: string[] = [];
@@ -95,7 +117,7 @@ export async function invokeRemote(row: RemoteExtension, method: string, args: a
   try { return await Promise.race([invokeMobileExtension(row.id, method, [{ ...args, preferences: row.preferences }]), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Provider timed out')), 30000); })]); }
   finally { clearTimeout(timer!); }
 }
-export async function updateRemoteExtension(row: RemoteExtension, notify = true): Promise<void> { await table.put(row); if (notify) notice(); }
+export async function updateRemoteExtension(row: RemoteExtension, notify = true): Promise<void> { await table.put(row); syncRemoteCatalogue(row); if (notify) notice(); }
 export async function setRemoteEnabled(id: string, enabled: boolean): Promise<void> {
   const row = await table.get(id); if (!row) return;
   if (enabled && row.ecosystem === 'seanime') await mountSeanime(row);

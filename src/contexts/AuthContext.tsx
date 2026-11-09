@@ -7,7 +7,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { getLocalContinueWatching, clearLocalContinueWatching } from '@/lib/localStorage';
 import { notifyUserCreated } from '@/core/network/discord-webhook';
 import { resolveStaffRoles } from '@/lib/roles';
-import { setAccountTitleLanguage } from '@/lib/titleLanguage';
+import { setAccountTitleLanguage, setAccountReadingTitleLanguage } from '@/lib/titleLanguage';
+import { requestProtectedAuth } from '@/lib/api/protectedAuth';
 
 export interface Profile {
   id: string;
@@ -107,8 +108,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   useEffect(() => {
-    setAccountTitleLanguage(user && profile?.user_id === user.id ? profile.preferred_title_language : undefined);
-  }, [user?.id, profile?.preferred_title_language]);
+    setAccountTitleLanguage(user?.id && profile?.user_id === user.id ? profile.preferred_title_language : undefined);
+    setAccountReadingTitleLanguage(user?.id && profile?.user_id === user.id ? (profile.app_settings as Record<string, unknown> | null)?.readingTitleLanguage : undefined);
+  }, [user?.id, profile?.user_id, profile?.preferred_title_language, profile?.app_settings]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isModerator, setIsModerator] = useState(false);
   const [isBanned, setIsBanned] = useState(false);
@@ -311,52 +313,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = async (email: string, password: string, captchaToken?: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-      options: captchaToken ? { captchaToken } : undefined,
-    });
-    return { error };
+    try {
+      const data = await requestProtectedAuth('sign-in', { email, password, captchaToken });
+      const { error } = await supabase.auth.setSession(data.session!);
+      return { error };
+    } catch (error) {
+      return { error: error instanceof Error ? error : new Error('Sign in temporarily unavailable.') };
+    }
   };
 
   const signUp = async (email: string, password: string, displayName?: string, captchaToken?: string) => {
-    if (import.meta.env.VITE_OPERATIONS_AUTH_ENABLED === 'true') {
-      try {
-        const { resolveApiV3Base } = await import('@/lib/api/backendOrigin');
-        const response = await fetch(`${resolveApiV3Base()}/auth/signup`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password, displayName, captchaToken }),
-        });
-        const result = await response.json();
-        if (!response.ok) return { error: new Error(result.error || 'Registration unavailable') };
-        if (result.mode !== 'restricted' && result.mode !== 'otp_required') return { error: new Error(uiI18n.t('app.invalid_registration_response_2c1e735e')) };
-        return { error: null, mode: result.mode as 'restricted' | 'otp_required' };
-      } catch { return { error: new Error(uiI18n.t('app.registration_temporarily_unavailable_30b74395')) }; }
+    try {
+      const operationsSignup = import.meta.env.VITE_OPERATIONS_AUTH_ENABLED === 'true';
+      const data = await requestProtectedAuth('sign-up', {
+        email, password, displayName: displayName || email.split('@')[0], captchaToken,
+      }, operationsSignup);
+      if (data.session) {
+        const { error } = await supabase.auth.setSession(data.session);
+        if (error) return { error };
+      }
+      if (!operationsSignup) {
+        notifyUserCreated({ email, displayName: displayName || email.split('@')[0], provider: 'email' });
+      }
+      return { error: null, mode: data.mode };
+    } catch (error) {
+      return { error: error instanceof Error ? error : new Error(uiI18n.t('app.registration_temporarily_unavailable_30b74395')) };
     }
-    const redirectUrl = `${window.location.origin}/`;
-
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: redirectUrl,
-        data: {
-          display_name: displayName || email.split('@')[0],
-        },
-        ...(captchaToken ? { captchaToken } : {}),
-      },
-    });
-
-    // Notify Discord on successful signup
-    if (!error) {
-      notifyUserCreated({
-        email,
-        displayName: displayName || email.split('@')[0],
-        provider: 'email',
-      });
-    }
-
-    return { error };
   };
 
   // --- 6-digit email code flows -------------------------------------------
@@ -369,20 +351,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const resendSignupCode = async (email: string, captchaToken?: string) => {
-    const { error } = await supabase.auth.resend({
-      type: 'signup',
-      email,
-      ...(captchaToken ? { options: { captchaToken } } : {}),
-    });
-    return { error };
+    try {
+      await requestProtectedAuth('resend', { type: 'signup', email, captchaToken });
+      return { error: null };
+    } catch (error) {
+      return { error: error instanceof Error ? error : new Error('Email delivery temporarily unavailable.') };
+    }
   };
 
   const sendPasswordResetCode = async (email: string, captchaToken?: string) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(
-      email,
-      captchaToken ? { captchaToken } : undefined,
-    );
-    return { error };
+    try {
+      await requestProtectedAuth('recover', { email, captchaToken });
+      return { error: null };
+    } catch (error) {
+      return { error: error instanceof Error ? error : new Error('Email delivery temporarily unavailable.') };
+    }
   };
 
   const verifyPasswordResetCode = async (email: string, token: string) => {

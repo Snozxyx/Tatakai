@@ -11,6 +11,7 @@ import { ReaderToolButton as ToolBtn, ReaderTopbar, ReaderToolbar, ReaderSetting
 import { ThemedSelect } from '@/components/ui/themed-select';
 import { useReaderPinchZoom } from '@/pages/manga/hooks/useReaderPinchZoom';
 import uiI18n from '@/lib/uiI18n';
+import { selectReadingTitle } from '@/lib/titleLanguage';
 import { useTVReader } from '@/core/tv/useTVReader';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -70,6 +71,8 @@ import { triggerHaptic } from "@/lib/haptics";
 import { setReadingMangaRpc, clearDiscordRpc } from "@/lib/discordRpc";
 import { readerPageRenderKey } from "@/lib/reader/imageLifecycle";
 import { TranslateChapterButton } from '@/components/translate/TranslateChapterButton';
+import { MoreHorizontal } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import {
   nextMangaChapterSource,
   pickMangaChapterSource,
@@ -79,7 +82,7 @@ import {
 function ChapterDivider({ label, sub }: { label: string; sub?: string | null }) {
   useUiTranslation();
   return (
-    <div className="mx-auto my-6 flex w-full max-w-3xl items-center gap-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+    <div className="mx-auto my-6 flex w-full max-w-3xl items-center gap-3 text-xs font-medium normal-case tracking-normal text-muted-foreground">
       <span className="h-px flex-1 bg-white/10" />
       <span>{label}{sub ? uiI18n.t('app.i18n_value_0_92e4cd32', { value0: sub }) : ""}</span>
       <span className="h-px flex-1 bg-white/10" />
@@ -105,7 +108,7 @@ function ProviderFallbackNotice({
       <button
         type="button"
         onClick={onChange}
-        className="shrink-0 rounded-lg border border-amber-200/25 px-2.5 py-1 font-semibold hover:bg-amber-100/10"
+        className="shrink-0 rounded-lg border border-amber-200/25 px-2.5 py-1 font-medium hover:bg-amber-100/10"
       >
         {uiI18n.t('app.change_provider_85169368')}
       </button>
@@ -256,7 +259,7 @@ export default function MangaReaderPage() {
   const { data: detailResp } = useMangaDetail(mangaId);
   const detail = detailResp?.detail;
   const mangaTitle =
-    detail?.title?.english || detail?.title?.romaji || detail?.canonicalTitle || uiI18n.t('app.manga_87db0f99');
+    selectReadingTitle(detail) || uiI18n.t('app.manga_87db0f99');
   const mangaPoster = detail?.coverImage ?? null;
   const mangaFormat = detail?.format ?? null;
 
@@ -278,7 +281,7 @@ export default function MangaReaderPage() {
       mangaTitle,
       chapter: resolvedNumber,
       mangaImageUrl: mangaPoster,
-      mangaUrl: `https://tatakai.me/manga/${mangaId}`,
+      mangaUrl: `https://tatakai.app/manga/${mangaId}`,
     });
     return () => {
       clearDiscordRpc();
@@ -375,6 +378,7 @@ export default function MangaReaderPage() {
   const displayNumber = activeMeta ? activeMeta.number : resolvedNumber;
   const displayTitle = activeMeta ? activeMeta.title : title;
   const displayProvider = activeMeta ? activeMeta.provider : resolvedProvider;
+  const displayProviderName = alternatives.find(source => source.provider === displayProvider)?.providerName;
   const [chapterNotification, setChapterNotification] = useState<string | null>(null);
   const notifiedChapterRef = useRef<string | null>(null);
   const notificationChapterKey = activeMeta?.key || chapterKey;
@@ -850,6 +854,7 @@ export default function MangaReaderPage() {
   const [showCommentsDrawer, setShowCommentsDrawer] = useState(false);
   const [showInlineComments, setShowInlineComments] = useState(false);
   const [showReaderNavigator, setShowReaderNavigator] = useState(false);
+  const [readerToolsOpen, setReaderToolsOpen] = useState(false);
   const [chapterSearch, setChapterSearch] = useState("");
   useEffect(() => {
     if (!isFs) return;
@@ -965,7 +970,7 @@ export default function MangaReaderPage() {
 
   // Auto-scroll (vertical mode): advance the scroll position continuously.
   useEffect(() => {
-    if (!settings.autoScroll || settings.readingMode !== "vertical" || total === 0 || showSettings || showReaderNavigator || showCommentsDrawer) return;
+    if (!settings.autoScroll || settings.readingMode !== "vertical" || total === 0 || showSettings || showReaderNavigator || showCommentsDrawer || readerToolsOpen) return;
     const el = scrollRef.current;
     if (!el) return;
     let frame = 0;
@@ -977,7 +982,7 @@ export default function MangaReaderPage() {
     };
     frame = requestAnimationFrame(advance);
     return () => cancelAnimationFrame(frame);
-  }, [settings.autoScroll, settings.autoScrollSpeed, settings.readingMode, total, showSettings, showReaderNavigator, showCommentsDrawer]);
+  }, [settings.autoScroll, settings.autoScrollSpeed, settings.readingMode, total, showSettings, showReaderNavigator, showCommentsDrawer, readerToolsOpen]);
   const toggleDirection = useCallback(
     () => updateSetting("readingMode", settings.readingMode === "vertical" ? "paged" : "vertical"),
     [settings.readingMode, updateSetting],
@@ -1022,7 +1027,7 @@ export default function MangaReaderPage() {
     scrollDown: () => scrollReader(1), scrollUp: () => scrollReader(-1),
     nextChapter: () => navToChapter(nextChapter), prevChapter: () => navToChapter(prevChapter),
     toggleFullscreen, toggleDirection, zoomIn, zoomOut, toggleComments: isFs ? undefined : toggleComments, reload,
-  }, !showSettings && !showReaderNavigator && !showCommentsDrawer);
+  }, !showSettings && !showReaderNavigator && !showCommentsDrawer && !readerToolsOpen);
   useTVReader({ next: goNextPage, previous: goPrevPage, controls: () => setShowSettings(true) });
 
   const isCoarsePointer = useMemo(
@@ -1120,17 +1125,18 @@ export default function MangaReaderPage() {
       {chromeVisible && <ReaderTopbar>
         <button
           onClick={() => navigate(mangaId ? `/manga/${mangaId}` : "/manga")}
-          className="ui-button inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg border border-border px-2 sm:px-2.5 py-1.5 text-xs sm:text-sm font-semibold hover:bg-muted active:scale-95"
+          className="ui-button inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg border border-border px-2 sm:px-2.5 py-1.5 text-xs sm:text-sm font-medium hover:bg-muted active:scale-[0.98]"
           aria-label={uiI18n.t('app.back_to_manga_74b30d6b')}
         >
           <ArrowLeft className="h-4 w-4" />
         </button>
         <button
           disabled={!prevChapter}
+          aria-label={uiI18n.t('app.reader_previous_chapter')}
           onClick={() => navToChapter(prevChapter)}
-          className="ui-button inline-flex min-h-11 shrink-0 items-center gap-0.5 sm:gap-1 rounded-lg border border-border px-2 sm:px-2.5 py-1.5 text-xs sm:text-sm font-semibold hover:bg-muted active:scale-95 disabled:opacity-40"
+          className="ui-button inline-flex min-h-11 shrink-0 items-center gap-0.5 sm:gap-1 rounded-lg border border-border px-2 sm:px-2.5 py-1.5 text-xs sm:text-sm font-medium hover:bg-muted active:scale-[0.98] disabled:opacity-40"
         >
-          <ChevronLeft className="h-4 w-4" /><span className="hidden min-[380px]:inline">{uiI18n.t('app.prev_e96fea52')}</span>
+          <ChevronLeft className="h-4 w-4" /><span className="hidden sm:inline">{uiI18n.t('app.prev_e96fea52')}</span>
         </button>
         <button
           onClick={() => setShowReaderNavigator(true)}
@@ -1138,31 +1144,33 @@ export default function MangaReaderPage() {
           title={uiI18n.t('app.open_chapter_and_provider_navigator_cb69d7c3')}
           aria-label={uiI18n.t('app.open_chapter_and_provider_navigator_cb69d7c3')}
         >
-          <span className="w-full truncate text-xs sm:text-sm font-bold">
+          <span className="w-full truncate text-xs sm:text-sm font-medium">
             {mangaTitle}
             {isOfflineChapter ? (
-              <span className="ml-1.5 inline-block rounded-md border border-emerald-500/40 bg-emerald-500/10 px-1.5 py-px align-middle text-[10px] font-bold uppercase tracking-wide text-emerald-300">
+              <span className="ml-1.5 inline-block rounded-md border border-emerald-500/40 bg-emerald-500/10 px-1.5 py-px align-middle text-xs font-medium normal-case tracking-normal text-emerald-300">
                 {uiI18n.t('app.offline_e01fa717')}
               </span>
             ) : null}
           </span>
-          <span className="w-full truncate text-[11px] sm:text-xs text-muted-foreground">
-            {displayTitle}{displayProvider ? uiI18n.t('app.i18n_value_0_92e4cd32', { value0: alternatives.find(s => s.provider === displayProvider)?.providerName || displayProvider }) : ""}{total > 0 ? settings.progressIndicator === 'chapter' ? uiI18n.t('app.chapter_i18n_value_0_26b035da', { value0: displayNumber ?? navIndex + 1 }) : uiI18n.t('app.page_i18n_value_0_i18n_value_1_dd00d973', { value0: pageIndex + 1, value1: activeMeta?.total || total }) : ""}
+          <span className="flex w-full min-w-0 items-center justify-center gap-2 text-xs text-muted-foreground">
+            <span className="min-w-0 truncate">{displayTitle}{displayProviderName ? uiI18n.t('app.i18n_value_0_92e4cd32', { value0: displayProviderName }) : ""}</span>
+            {total > 0 && <span className="shrink-0 tabular-nums">{settings.progressIndicator === 'chapter' ? uiI18n.t('app.chapter_i18n_value_0_26b035da', { value0: displayNumber ?? navIndex + 1 }) : `${pageIndex + 1} / ${activeMeta?.total || total}`}</span>}
           </span>
         </button>
         <button
           onClick={() => { setShowReaderNavigator(true); void triggerHaptic('open'); }}
-          className="ui-button inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-border hover:bg-muted active:scale-95"
+          className="ui-button hidden md:inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-border hover:bg-muted active:scale-[0.98]"
           aria-label={uiI18n.t('app.open_chapter_and_provider_navigator_cb69d7c3')}
         >
           <span className="sr-only">{uiI18n.t('app.chapter_navigation_d3eff174')}</span><List className="h-4 w-4" />
         </button>
         <button
           disabled={!nextChapter}
+          aria-label={uiI18n.t('app.reader_next_chapter')}
           onClick={() => navToChapter(nextChapter)}
-          className="ui-button inline-flex min-h-11 shrink-0 items-center gap-0.5 sm:gap-1 rounded-lg border border-border px-2 sm:px-2.5 py-1.5 text-xs sm:text-sm font-semibold hover:bg-muted active:scale-95 disabled:opacity-40"
+          className="ui-button inline-flex min-h-11 shrink-0 items-center gap-0.5 sm:gap-1 rounded-lg border border-border px-2 sm:px-2.5 py-1.5 text-xs sm:text-sm font-medium hover:bg-muted active:scale-[0.98] disabled:opacity-40"
         >
-          <span className="hidden min-[380px]:inline">{uiI18n.t('app.next_bc981983')}</span> <ChevronRight className="h-4 w-4" />
+          <span className="hidden sm:inline">{uiI18n.t('app.next_bc981983')}</span> <ChevronRight className="h-4 w-4" />
         </button>
       </ReaderTopbar>}
 
@@ -1181,11 +1189,26 @@ export default function MangaReaderPage() {
         </ToolBtn>
         {chromeVisible && <>
         <ToolBtn label={uiI18n.t('app.reading_tools_74769f12')} onClick={() => setShowReaderNavigator(true)}><List className="h-5 w-5" /></ToolBtn>
+        {compactReader ? <DropdownMenu open={readerToolsOpen} onOpenChange={setReaderToolsOpen}>
+          <DropdownMenuTrigger asChild>
+            <button type="button" aria-label={uiI18n.t('app.reader_more_actions')} className="ui-button flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <MoreHorizontal className="h-5 w-5" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent side="top" align="end" sideOffset={8} className="min-w-48">
+            <DropdownMenuItem onSelect={() => navigate(`/manga/${mangaId}`)}><Info className="mr-2 h-4 w-4" />{uiI18n.t('app.manga_info_087808bc')}</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => navigate('/')}><Home className="mr-2 h-4 w-4" />{uiI18n.t('app.home_70f8bb9a')}</DropdownMenuItem>
+            {settings.showCaptureButton && <DropdownMenuItem onSelect={capture}><Camera className="mr-2 h-4 w-4" />{uiI18n.t('app.capture_page_b4c28650')}</DropdownMenuItem>}
+            {settings.showComments && <DropdownMenuItem onSelect={toggleComments}><MessageSquare className="mr-2 h-4 w-4" />{uiI18n.t('app.comments_fce06e20')}</DropdownMenuItem>}
+            {settings.showReloadButton && <DropdownMenuItem onSelect={reload}><RefreshCw className="mr-2 h-4 w-4" />{uiI18n.t('app.reload_cce71553')}</DropdownMenuItem>}
+          </DropdownMenuContent>
+        </DropdownMenu> : <>
         <ToolBtn label={uiI18n.t('app.manga_info_087808bc')} onClick={() => navigate(`/manga/${mangaId}`)}><Info className="h-5 w-5" /></ToolBtn>
         <ToolBtn label={uiI18n.t('app.home_70f8bb9a')} onClick={() => navigate("/")}><Home className="h-5 w-5" /></ToolBtn>
         {settings.showCaptureButton && <ToolBtn label={uiI18n.t('app.capture_page_b4c28650')} onClick={capture}><Camera className="h-5 w-5" /></ToolBtn>}
         {settings.showComments && <ToolBtn label={uiI18n.t('app.comments_fce06e20')} onClick={toggleComments} active={showCommentsDrawer}><MessageSquare className="h-5 w-5" /></ToolBtn>}
         {settings.showReloadButton && <ToolBtn label={uiI18n.t('app.reload_cce71553')} onClick={reload}><RefreshCw className={`h-5 w-5 ${isFetching ? "animate-spin" : ""}`} /></ToolBtn>}
+        </>}
         </>}
       </ReaderToolbar>
 
@@ -1231,7 +1254,7 @@ export default function MangaReaderPage() {
 
         {!isLoading && (!data?.success || total === 0) ? (
           <GlassPanel className="mx-auto max-w-xl border border-border p-6">
-            <h2 className="text-xl font-bold">{uiI18n.t('app.unable_to_load_chapter_03142a30')}</h2>
+            <h2 className="text-xl font-medium">{uiI18n.t('app.unable_to_load_chapter_03142a30')}</h2>
             <p className="mt-2 text-muted-foreground">
               {data?.guidance?.message || data?.message ||
                 (error instanceof Error ? error.message : uiI18n.t('app.no_pages_available_c08c7fce'))}
@@ -1239,7 +1262,7 @@ export default function MangaReaderPage() {
             <p className="mt-3 text-sm text-muted-foreground">
               {uiI18n.t('app.pick_an_extension_provider_from_the_chapter_list_01c2cdf5')}
             </p>
-            <div className="mt-5 flex flex-wrap gap-3"><button type="button" onClick={reload} className="ui-button inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground"><RefreshCw className="h-4 w-4" />{uiI18n.t('app.retry_chapter_b073485a')}</button><button type="button" onClick={() => setShowReaderNavigator(true)} className="ui-button min-h-11 rounded-xl border border-border px-4 text-sm font-semibold">{uiI18n.t('app.choose_provider_135a38f7')}</button></div>
+            <div className="mt-5 flex flex-wrap gap-3"><button type="button" onClick={reload} className="ui-button inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground"><RefreshCw className="h-4 w-4" />{uiI18n.t('app.retry_chapter_b073485a')}</button><button type="button" onClick={() => setShowReaderNavigator(true)} className="ui-button min-h-11 rounded-xl border border-border px-4 text-sm font-medium">{uiI18n.t('app.choose_provider_135a38f7')}</button></div>
           </GlassPanel>
         ) : null}
 
@@ -1387,7 +1410,7 @@ export default function MangaReaderPage() {
           <div className="mx-auto mt-10 w-full max-w-3xl">
             <button
               onClick={() => setShowInlineComments((v) => !v)}
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-white/5 px-4 py-3 text-sm font-semibold hover:bg-muted"
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-white/5 px-4 py-3 text-sm font-medium hover:bg-muted"
             >
               <MessageSquare className="h-4 w-4" />
                   {showInlineComments ? uiI18n.t('app.hide_comments_ac7a3920') : uiI18n.t('app.show_comments_44811513')}
@@ -1422,7 +1445,7 @@ export default function MangaReaderPage() {
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
             </div>
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-foreground">{displayTitle}</p>
+              <p className="truncate text-sm font-medium text-foreground">{displayTitle}</p>
               {isLoading ? (
                 <p className="mt-1 text-xs text-muted-foreground">{uiI18n.t('app.loading_pages_0c674f17')}</p>
               ) : (
@@ -1433,7 +1456,7 @@ export default function MangaReaderPage() {
             </div>
             {!isLoading && total > 0 && (
               <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
-                <div className="h-full bg-primary transition-all duration-300" style={{ width: `${Math.min(100, (entrySettledCount / Math.max(1, requiredEntryPages.length)) * 100)}%` }} />
+                <div className="h-full bg-primary transition-[color,background-color,border-color,opacity] duration-300" style={{ width: `${Math.min(100, (entrySettledCount / Math.max(1, requiredEntryPages.length)) * 100)}%` }} />
               </div>
             )}
           </div>
@@ -1445,7 +1468,7 @@ export default function MangaReaderPage() {
           (setup-before-enable), then the per-page count as the whole chapter is
           upscaled up front. Auto-hides when it finishes. */}
       {settings.upscaler !== 'off' && (engineSettingUp || (upscaleProgress.active && upscaleProgress.done < upscaleProgress.total)) ? (
-        <div role="status" className="pointer-events-none fixed right-4 top-20 z-[75] flex items-center gap-2 rounded-full border border-border bg-background/90 px-3 py-1.5 text-xs font-semibold text-muted-foreground shadow-lg backdrop-blur">
+        <div role="status" className="pointer-events-none fixed right-4 top-20 z-[75] flex items-center gap-2 rounded-full border border-border bg-background/90 px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-lg backdrop-blur">
           <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
           {engineSettingUp ? (
             <span>{uiI18n.t('app.setting_up_the_upscaler_52e51b11')}</span>
@@ -1460,7 +1483,7 @@ export default function MangaReaderPage() {
       {lockedProvider && unavailableChapter && (
         <div role="status" className="fixed inset-x-3 bottom-20 z-50 mx-auto flex max-w-xl flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-background p-4 text-sm shadow-lg">
           <p>No more sources available from {chapters.flatMap((c) => c.sources).find((s) => s.provider === lockedProvider)?.providerName || lockedProvider} for chapter {unavailableChapter.chapterNumber ?? unavailableChapter.canonicalOrder + 1}.</p>
-          <button type="button" onClick={() => setShowReaderNavigator(true)} className="ui-button min-h-11 rounded-lg bg-primary px-4 font-semibold text-primary-foreground">{uiI18n.t('app.change_provider_85169368')}</button>
+          <button type="button" onClick={() => setShowReaderNavigator(true)} className="ui-button min-h-11 rounded-lg bg-primary px-4 font-medium text-primary-foreground">{uiI18n.t('app.change_provider_85169368')}</button>
         </div>
       )}
 
@@ -1476,7 +1499,7 @@ export default function MangaReaderPage() {
               />
             </label>
             <section>
-              <h3 className="mb-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">{uiI18n.t('app.provider_7ceee3f3')}</h3>
+              <h3 className="mb-2 text-xs font-medium normal-case tracking-normal text-muted-foreground">{uiI18n.t('app.provider_7ceee3f3')}</h3>
               <div className="mb-3"><MangaSourceStatus count={new Set(navigatorSources.map(source => source.provider)).size} fetching={fetchingChapterSources || !!chaptersResp?.sourcesPending} /></div>
               <button type="button" aria-pressed={Boolean(lockedProvider)} disabled={!displayProvider} onClick={() => {
                 const params = new URLSearchParams(searchParams);
@@ -1496,7 +1519,7 @@ export default function MangaReaderPage() {
                 navigate(`${location.pathname}?${params}`, { replace: true, state: location.state });
               }} className="ui-button mb-3 flex min-h-11 w-full items-center gap-3 rounded-xl border border-border px-4 py-3 text-left text-sm disabled:opacity-50">
                 {lockedProvider ? <Lock className="h-4 w-4 shrink-0" /> : <Unlock className="h-4 w-4 shrink-0" />}
-                <span><span className="block font-semibold">Lock provider{lockedProvider ? ' · On' : ' · Off'}</span><span className="text-xs text-muted-foreground">Stay with your selected provider across chapters.</span></span>
+                <span><span className="block font-medium">Lock provider{lockedProvider ? ' · On' : ' · Off'}</span><span className="text-xs text-muted-foreground">Stay with your selected provider across chapters.</span></span>
               </button>
               <div className="max-h-48 space-y-2 overflow-y-auto pr-1 scrollbar-thin">
                 {navigatorSources.map((source) => {
@@ -1509,7 +1532,7 @@ export default function MangaReaderPage() {
               </div>
             </section>
             <section>
-              <h3 className="mb-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">{uiI18n.t('app.chapter_46b00590')}</h3>
+              <h3 className="mb-2 text-xs font-medium normal-case tracking-normal text-muted-foreground">{uiI18n.t('app.chapter_46b00590')}</h3>
               <div className="max-h-64 space-y-1 overflow-y-auto pr-1 scrollbar-thin">
                 {filteredChapters.map((chapter) => <button key={chapter.canonicalOrder} onClick={() => { navToChapter(chapter); setShowReaderNavigator(false); void triggerHaptic('select'); }} className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm ${chapter.canonicalOrder === currentIndex ? 'bg-primary/10 text-primary' : 'hover:bg-muted/60'}`}>
                   <span>{uiI18n.t('app.chapter_46b00590')} {chapter.chapterNumber ?? chapter.canonicalOrder + 1}</span><span className="max-w-[55%] truncate text-xs text-muted-foreground">{chapter.chapterTitle || ''}</span>

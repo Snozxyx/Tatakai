@@ -1,3 +1,5 @@
+import { selectReadingTitle } from '@/lib/titleLanguage';
+import { HomeCustomization } from '@/components/customization/HomeCustomization';
 import { WebNovelDiscovery } from '@/components/novel/WebNovelDiscovery';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
@@ -37,7 +39,7 @@ function toUnifiedNovelCard(
   options?: { isAdult?: boolean; blurAdult?: boolean },
 ): UnifiedMediaCardProps["item"] | null {
   const displayTitle =
-    novel.canonicalTitle || novel.title?.english || novel.title?.romaji || novel.title?.native;
+    selectReadingTitle(novel);
   const id = novel.id || (novel.anilistId ? `anilist:${novel.anilistId}` : novel.malId ? `mal:${novel.malId}` : "");
   if (!id || !displayTitle) return null;
 
@@ -144,11 +146,11 @@ export default function NovelHomePage() {
       {!isNative && !refreshed && <Background />}
       {!isMobile && <Sidebar />}
 
-      <main data-mobile-home data-novel-home className={cn(
+      <main data-mobile-home data-novel-home data-spotlight-page className={cn(
         "app-page relative z-10 pr-6 py-6 max-w-[1800px] mx-auto pb-24 md:pb-6",
         isDesktopApp ? "pl-6" : "pl-6 md:pl-32"
       )}>
-        <Header />
+        <Header alignWithPage />
 
         {isInitialLoading ? (
           <div className="space-y-12 mt-6 animate-pulse">
@@ -189,31 +191,17 @@ export default function NovelHomePage() {
               </div>
             </div>
           </div>
-        ) : (
-          <>
-            {spotlightCards.length > 0 && (
-              <NovelHeroSection
-                spotlight={spotlightCards[0]}
-                spotlights={spotlightCards}
-                onActiveSpotlightChange={setActiveSpotlight}
-              />
-            )}
-
-            <LastReadNovelSection />
-            <WebNovelDiscovery />
-
-            <FollowedNovelUpdates />
-
-            <NovelSmartDiscover />
-
-            <IndexNovelShowcase />
-
-            <NovelGenreSlider />
-
-            <NovelDiscoveryQuickFilters />
-
-
-            <section className="mb-12 md:mb-16">
+        ) : null}
+        <HomeCustomization pageId="novel-home" sections={[
+          { id: 'spotlight', label: 'Spotlight', available: !isInitialLoading, node: !isInitialLoading && spotlightCards.length > 0 ? <NovelHeroSection spotlight={spotlightCards[0]} spotlights={spotlightCards} onActiveSpotlightChange={setActiveSpotlight} /> : null },
+          { id: 'last-read', label: 'Continue reading', collection: true, available: !isInitialLoading, node: !isInitialLoading ? <LastReadNovelSection /> : null },
+          { id: 'web-novels', label: 'Web novel discovery', collection: true, available: !isInitialLoading, node: !isInitialLoading ? <WebNovelDiscovery /> : null },
+          { id: 'followed-updates', label: 'Followed updates', collection: true, available: !isInitialLoading, node: !isInitialLoading ? <FollowedNovelUpdates /> : null },
+          { id: 'smart-discover', label: 'Smart discovery', available: !isInitialLoading, node: !isInitialLoading ? <NovelSmartDiscover /> : null },
+          { id: 'showcase', label: 'Trending showcase', collection: true, available: !isInitialLoading, node: !isInitialLoading ? <IndexNovelShowcase /> : null },
+          { id: 'genre-slider', label: 'Genres', available: !isInitialLoading, node: !isInitialLoading ? <NovelGenreSlider /> : null },
+          { id: 'quick-filters', label: 'Quick filters', available: !isInitialLoading, node: !isInitialLoading ? <NovelDiscoveryQuickFilters /> : null },
+          { id: 'mature-zone', label: 'Mature picks', collection: true, available: !isInitialLoading, node: !isInitialLoading ? <section className="mb-12 md:mb-16">
               <div className="relative overflow-hidden rounded-3xl border border-destructive/30">
                 <img
                   src={`${import.meta.env.BASE_URL}assets/image/content/manga18+.jpg`}
@@ -286,22 +274,11 @@ export default function NovelHomePage() {
                   )}
                 </div>
               )}
-            </section>
-
-            {trendingCards.length > 0 && (
-              <NovelTrendingGrid items={trendingCards} />
-            )}
-
-            <NovelExtraLanes />
-          </>
-        )}
-
-        {/*
-          Outside the loading branch on purpose: the endless feed is its own
-          request and used to be gated behind the hero's queries, so the shelves
-          only started loading once the top of the page had already resolved.
-        */}
-        <InfiniteNovelSections />
+            </section> : null },
+          { id: 'trending', layoutLocked: 'original', preservePresentation: true, label: 'Trending', collection: true, available: !isInitialLoading, node: !isInitialLoading && trendingCards.length > 0 ? <NovelTrendingGrid items={trendingCards} /> : null },
+          { id: 'extra-lanes', label: 'More discovery', collection: true, group: true, available: !isInitialLoading, node: !isInitialLoading ? <NovelExtraLanes /> : null },
+          { id: 'genre-feed', label: 'Genre feed', feed: true, node: <InfiniteNovelSections /> },
+        ]} />
       </main>
 
       {/* MobileNav hides itself above `md` and on auth/error routes. */}

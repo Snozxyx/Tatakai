@@ -5,6 +5,7 @@ import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { ExternalPlayerButton } from './controls/ExternalPlayerButton';
 import { uploadSubtitle, fetchSubtitle, decodeSubtitle } from '@/core/player/subtitle-service';
 import { usePlaybackCoordinator } from '@/core/player/usePlaybackCoordinator';
+import { OptionalVidstackPlayer } from './OptionalVidstackPlayer';
 import { useMobileCloudProxy } from './hooks/useMobileCloudProxy';
 import { createPlaybackWatchdog } from '@/core/player/playback-watchdog';
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
@@ -166,7 +167,7 @@ export const MOBILE_PLAYER_FULLSCREEN_CLASS = 'mobile-player-fullscreen';
 export const MOBILE_PLAYER_FULLSCREEN_EVENT = 'tatakai-mobile-player-fullscreen';
 
 export function MobileVideoPlayer(props: MobileVideoPlayerProps) {
-  return <OptionalJWPlayer {...props}><BuiltinMobileVideoPlayer {...props} /></OptionalJWPlayer>;
+  return <OptionalVidstackPlayer {...props}><OptionalJWPlayer {...props}><BuiltinMobileVideoPlayer {...props} /></OptionalJWPlayer></OptionalVidstackPlayer>;
 }
 
 function BuiltinMobileVideoPlayer({
@@ -313,6 +314,7 @@ function BuiltinMobileVideoPlayer({
   const [videoError, setVideoError] = useState<string | null>(null);
   const [playbackAttempt, setPlaybackAttempt] = useState(0);
   const [isBuffering, setIsBuffering] = useState(false);
+  const isPlaybackLoading = (isLoading && !isPlaying) || (isBuffering && !videoError);
   const [retryCount, setRetryCount] = useState(0);
   const retryCountRef = useRef(0);
   // Recovery bookkeeping. `retryCountRef` is same-URL retries; the rest drive
@@ -412,6 +414,7 @@ function BuiltinMobileVideoPlayer({
   const [debridResolvedUrl, setDebridResolvedUrl] = useState<string | null>(null);
   useEffect(() => {
     setVideoError(null);
+    setIsPlaying(false);
     retryCountRef.current = 0;
     setRetryCount(0);
     setIsBuffering(false);
@@ -1293,7 +1296,15 @@ function BuiltinMobileVideoPlayer({
     const video = videoRef.current;
     if (!video) return;
 
+    let lastPlaybackTime = video.currentTime;
+    let wasSeeking = video.seeking;
     const handleTimeUpdate = () => {
+      // Recover the loading UI even when a server resumes without `playing`.
+      const advancing = !video.paused && !video.seeking && !wasSeeking && !video.ended
+        && video.readyState >= 2 && video.currentTime > lastPlaybackTime && video.currentTime - lastPlaybackTime < 5;
+      lastPlaybackTime = video.currentTime;
+      wasSeeking = video.seeking;
+      if (advancing) handlePlaying();
       setCurrentTime(video.currentTime);
       
       // Progress saving
@@ -1308,16 +1319,27 @@ function BuiltinMobileVideoPlayer({
     const handlePlay = () => setIsPlaying(true);
     const handlePause = () => {
       setIsPlaying(false);
+      setIsBuffering(false);
       // Save the exact position on stop so reopening resumes from here.
       const t = Math.floor(video.currentTime || 0);
       if (t > 0) reportProgress(t, Math.floor(video.duration || 0) || 0, false, true);
     };
     let bufferingStarted: number | null = null;
+    const handleLoadStart = () => {
+      lastPlaybackTime = video.currentTime;
+      wasSeeking = video.seeking;
+      bufferingStarted = null;
+      setIsPlaying(false);
+      setIsBuffering(Boolean(sourceUrlKey));
+    };
+    const handleCanPlay = () => {
+      if (video.readyState < 3 || video.seeking) return;
+      setIsBuffering(false);
+      setIsPlaying(!video.paused && !video.ended);
+    };
     const handleWaiting = () => {
       if (video.currentTime > 0 && !video.seeking && !video.paused) bufferingStarted ??= performance.now();
-      setIsBuffering(true);
-
-
+      if (!video.paused) setIsBuffering(true);
     };
     const handlePlaying = () => {
       if (bufferingStarted != null) {
@@ -1327,8 +1349,8 @@ function BuiltinMobileVideoPlayer({
         } }));
         bufferingStarted = null;
       }
+      setIsPlaying(!video.paused && !video.ended);
       setIsBuffering(false);
-
     };
     const handleProgress = () => {
       if (video.buffered.length > 0) {
@@ -1355,6 +1377,9 @@ function BuiltinMobileVideoPlayer({
 
     video.addEventListener('timeupdate', handleTimeUpdate);
     video.addEventListener('durationchange', handleDurationChange);
+    video.addEventListener('loadstart', handleLoadStart);
+    video.addEventListener('canplay', handleCanPlay);
+    video.addEventListener('canplaythrough', handleCanPlay);
     video.addEventListener('play', handlePlay);
     video.addEventListener('pause', handlePause);
     video.addEventListener('waiting', handleWaiting);
@@ -1363,9 +1388,15 @@ function BuiltinMobileVideoPlayer({
     video.addEventListener('ended', handleEnded);
     video.addEventListener('error', handleError);
 
+    // A cached source can already be ready when the listeners are attached.
+    handleCanPlay();
+
     return () => {
       video.removeEventListener('timeupdate', handleTimeUpdate);
       video.removeEventListener('durationchange', handleDurationChange);
+      video.removeEventListener('loadstart', handleLoadStart);
+      video.removeEventListener('canplay', handleCanPlay);
+      video.removeEventListener('canplaythrough', handleCanPlay);
       video.removeEventListener('play', handlePlay);
       video.removeEventListener('pause', handlePause);
       video.removeEventListener('waiting', handleWaiting);
@@ -1374,7 +1405,7 @@ function BuiltinMobileVideoPlayer({
       video.removeEventListener('ended', handleEnded);
       video.removeEventListener('error', handleError);
     };
-  }, [onEpisodeEnd, onProgressUpdate, onError, settings.autoNextEpisode, settings.autoNextCountdownSeconds, settings.sleepTimer]);
+  }, [sourceUrlKey, onEpisodeEnd, onProgressUpdate, onError, settings.autoNextEpisode, settings.autoNextCountdownSeconds, settings.sleepTimer]);
 
   // Up-Next countdown driver.
   useEffect(() => {
@@ -1959,7 +1990,7 @@ function BuiltinMobileVideoPlayer({
       )}
 
       {/* Loading Overlay */}
-      {(isLoading || isBuffering) && (!showControls || isLocked) && (
+      {isPlaybackLoading && (!showControls || isLocked) && (
         <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-black/30">
           <Loader2 className="w-16 h-16 text-primary animate-spin" />
         </div>
@@ -2073,10 +2104,10 @@ function BuiltinMobileVideoPlayer({
             <button
               onClick={togglePlay}
               aria-label={isPlaying ? t('player.pause') : t('player.play')}
-              aria-busy={isLoading || isBuffering}
+              aria-busy={isPlaybackLoading}
               className="p-5 rounded-full bg-primary backdrop-blur-md active:scale-95 transition-transform shadow-2xl border-2 border-white/20"
             >
-              {isLoading || isBuffering ? (
+              {isPlaybackLoading ? (
                 <Loader2 className="w-10 h-10 text-white animate-spin" aria-hidden="true" />
               ) : isPlaying ? (
                 <Pause className="w-10 h-10 text-white" />

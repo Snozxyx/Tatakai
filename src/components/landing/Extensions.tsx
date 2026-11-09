@@ -91,9 +91,9 @@ export function Extensions() {
         played = true;
         entrance = animate(rows, {
           opacity: [0, 1],
-          translateY: [20, 0],
-          delay: stagger(90),
-          duration: 620,
+          translateY: [12, 0],
+          delay: stagger(40),
+          duration: 400,
           ease: "out(3)",
         });
         io.disconnect();
@@ -120,7 +120,7 @@ export function Extensions() {
 
         <Reveal className="lg:order-2">
           <div>
-            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 backdrop-blur-md">
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 ">
               <Puzzle className="h-3.5 w-3.5 text-violet-300" />
               <span className="text-xs font-medium text-white/70">
                 {uiI18n.t("app.extensions_656bcfe2")}
@@ -180,7 +180,7 @@ export function Extensions() {
             <div
               key={s.name}
               data-ext
-              className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4 backdrop-blur-md transition-colors duration-300 hover:border-white/25 hover:bg-white/[0.05]"
+              className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4  transition-colors duration-300 hover:border-white/25 hover:bg-white/[0.05]"
             >
               <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5">
                 <Icon className={`h-5 w-5 ${s.accent}`} />
@@ -189,7 +189,7 @@ export function Extensions() {
                 <p className="truncate font-display text-sm font-medium text-white">
                   {s.name}
                 </p>
-                <p className="truncate text-xs text-white/50">{s.kind}</p>
+                <p className="truncate text-xs text-white/70">{s.kind}</p>
               </div>
               <span className="size-2 shrink-0 rounded-full bg-primary/60" aria-hidden="true" />
             </div>

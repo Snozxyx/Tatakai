@@ -8,8 +8,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/ui/useTheme';
 import { useAppLanguage } from '@/hooks/ui/useLanguage';
-import { usePreferredTitleLanguage } from '@/hooks/ui/useTitleLanguage';
-import { setPreferredTitleLanguage, setAccountTitleLanguage, type TitleLanguage } from '@/lib/titleLanguage';
+import { usePreferredTitleLanguage, usePreferredReadingTitleLanguage } from '@/hooks/ui/useTitleLanguage';
+import { setPreferredTitleLanguage, setAccountTitleLanguage, setPreferredReadingTitleLanguage, setAccountReadingTitleLanguage, type TitleLanguage } from '@/lib/titleLanguage';
+import { saveAccountSettingsRemote } from '@/lib/appSettingsPersistence';
 import { FeatureFlag, useFeatureFlag, toggleFlag } from '@/core/feature-flags';
 import {
   SettingRow,
@@ -39,6 +40,8 @@ export function DisplayPanel() {
   const { preference, setLanguage, supportedLanguages } = useAppLanguage();
 
   const preferredTitleLanguage = usePreferredTitleLanguage();
+  const readingTitleLanguage = usePreferredReadingTitleLanguage();
+  const [readingTitleSaving, setReadingTitleSaving] = useState(false);
   const [preferredMangaLanguage, setPreferredMangaLanguage] = useState<PreferredMangaLanguage>('auto');
 
   const ffContentGraph = useFeatureFlag(FeatureFlag.CONTENT_GRAPH);
@@ -94,6 +97,22 @@ export function DisplayPanel() {
       setPreferredMangaLanguage(previousValue);
       toast.error(t('display.titles.mangaUpdateFailed'));
     }
+  };
+
+  const handleReadingTitleChange = async (value: TitleLanguage) => {
+    const previous = readingTitleLanguage;
+    setPreferredReadingTitleLanguage(value);
+    if (!user?.id) return;
+    setAccountReadingTitleLanguage(value);
+    setReadingTitleSaving(true);
+    try {
+      await saveAccountSettingsRemote(user.id, { readingTitleLanguage: value });
+      await refreshProfile();
+    } catch {
+      setPreferredReadingTitleLanguage(previous);
+      setAccountReadingTitleLanguage(previous);
+      toast.error(t('display.titles.titleUpdateFailed'));
+    } finally { setReadingTitleSaving(false); }
   };
 
   const handleAppLanguageChange = (value: string) => {
@@ -207,6 +226,22 @@ export function DisplayPanel() {
                 <SelectContent>
                   <SelectItem value="romaji">{t('display.titles.romaji')}</SelectItem>
                   <SelectItem value="english">{t('display.titles.english')}</SelectItem>
+                  <SelectItem value="native">{t('display.titles.native')}</SelectItem>
+                </SelectContent>
+              </Select>
+            }
+          />
+          <SettingRow
+            title={t('display.titles.readingTitle')}
+            description={t('display.titles.readingTitleDescription')}
+            control={
+              <Select value={readingTitleLanguage} disabled={readingTitleSaving} onValueChange={(value: TitleLanguage) => void handleReadingTitleChange(value)}>
+                <SelectTrigger aria-label={t('display.titles.readingTitle')} className="h-9 w-36 rounded-lg text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="english">{t('display.titles.english')}</SelectItem>
+                  <SelectItem value="romaji">{t('display.titles.romaji')}</SelectItem>
                   <SelectItem value="native">{t('display.titles.native')}</SelectItem>
                 </SelectContent>
               </Select>

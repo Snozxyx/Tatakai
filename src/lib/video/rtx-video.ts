@@ -16,6 +16,25 @@ export interface RtxVideoBridge {
   onStatus(callback: (event: { session?: string; state: string; message: string }) => void): () => void;
 }
 
+/** Always finish the compatibility check, including with an older desktop bridge. */
+export async function checkRtxCapability(bridge?: Pick<RtxVideoBridge, 'capability'>, timeoutMs = 25000): Promise<RtxCapability> {
+  const unavailable = (reason: string): RtxCapability => ({ available: false, reason, maxOutputHeight: 1080 });
+  if (!bridge) return unavailable('RTX Video requires the Windows desktop app and a supported NVIDIA RTX GPU.');
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const result = await Promise.race([
+      Promise.resolve().then(() => bridge.capability()),
+      new Promise<RtxCapability>(resolve => {
+        timer = setTimeout(() => resolve(unavailable('The RTX Video compatibility check timed out. Try again or restart the desktop app.')), timeoutMs);
+      }),
+    ]);
+    if (!result || typeof result.available !== 'boolean' || typeof result.reason !== 'string') throw new Error('Invalid compatibility result');
+    return result;
+  } catch {
+    return unavailable('Could not check RTX Video. Restart the desktop app and try again.');
+  } finally { clearTimeout(timer); }
+}
+
 /** Pure performance policy, also used in hardware-independent regression tests. */
 export class RtxFrameBudget {
   quality: VideoEnhancementQuality;

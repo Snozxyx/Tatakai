@@ -13,10 +13,10 @@
 const SHARE_API_ORIGIN = (
   process.env.SHARE_API_ORIGIN ||
   process.env.VITE_BACKEND_ORIGIN ||
-  "https://api.tatakai.me"
+  "https://api.tatakai.app"
 ).replace(/\/+$/, "");
 
-const SITE_ORIGIN = (process.env.SITE_ORIGIN || "https://tatakai.me").replace(/\/+$/, "");
+const SITE_ORIGIN = (process.env.SITE_ORIGIN || "https://tatakai.app").replace(/\/+$/, "");
 
 const FETCH_TIMEOUT_MS = 2500;
 const CACHE_TTL_MS = 5 * 60 * 1000;

@@ -1,3 +1,4 @@
+import { selectReadingTitle } from '@/lib/titleLanguage';
 import { ThemedSelect } from '@/components/ui/themed-select';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
@@ -59,7 +60,7 @@ function stripHtml(value?: string | null) {
 
 function titleOf(item: NovelSearchItem) {
   return (
-    item.canonicalTitle || item.title?.english || item.title?.romaji || item.title?.native || "Untitled"
+    selectReadingTitle(item) || "Untitled"
   );
 }
 

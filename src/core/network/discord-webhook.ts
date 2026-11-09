@@ -461,7 +461,7 @@ export function notifyError(error: ErrorReport): boolean {
 export function notifyForumPost(post: { id: string; title: string; content: string; userId: string; userName?: string; imageUrl?: string | null; approved: boolean; isSpoiler?: boolean }) {
   const preview = post.content.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 900);
   void sendToDiscord({ channel: 'comment', username: 'Tatakai Community', embeds: [{
-    title: field(post.title || 'New community post', 200), url: `https://tatakai.me/forum/${encodeURIComponent(post.id)}`,
+    title: field(post.title || 'New community post', 200), url: `https://tatakai.app/forum/${encodeURIComponent(post.id)}`,
     description: post.isSpoiler ? `||${preview}||` : preview, color: COLORS.info,
     fields: [{ name: 'Author', value: field(post.userName || post.userId, 160) },
       { name: 'Status', value: post.approved ? 'Published' : 'Pending approval' },

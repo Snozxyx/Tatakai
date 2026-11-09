@@ -8,7 +8,7 @@ import {
 export function forumHandoffURL(postId: string, commentId?: string) {
   const url = new URL(
     `/community/forum/${encodeURIComponent(postId)}`,
-    "https://tatakai.me"
+    "https://tatakai.app"
   );
   url.searchParams.set("compose", "reply");
   if (commentId) {

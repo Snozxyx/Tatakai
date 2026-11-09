@@ -77,7 +77,7 @@ function resolveApiOrigin(): string {
   } catch {
     /* fall through */
   }
-  return 'https://api.tatakai.me';
+  return 'https://api.tatakai.app';
 }
 
 // ─── HTTP client ─────────────────────────────────────────────────────────────
@@ -275,7 +275,7 @@ class ContentGraph {
   // ── Search ────────────────────────────────────────────────────────────────
 
   async search(filters: SearchFilters): Promise<ContentSearchResult> {
-    const cacheKey = `search:v3:${JSON.stringify(filters)}`;
+    const cacheKey = `search:v4:${JSON.stringify(filters)}`;
     return this.cached(cacheKey, TTL.HOT, async () => {
       // Full results need pagination and alias-aware DB/AniList/Jikan matching.
       // The suggestions endpoint deliberately returns only a short, single page.
@@ -287,7 +287,8 @@ class ContentGraph {
         sort:     filters.sortBy,
         genres:   filters.genres?.join(','),
         tags:     filters.tags?.join(','),
-        format:   filters.format?.join(','),
+        // Blank text needs explicit formats to select the anime browse catalog.
+        format:   filters.format?.join(',') || (!filters.query?.trim() ? 'TV,TV_SHORT,MOVIE,SPECIAL,OVA,ONA,MUSIC' : undefined),
         status:   filters.status?.join(','),
         source:   filters.source?.join(','),
         studio:   filters.studio?.join(','),

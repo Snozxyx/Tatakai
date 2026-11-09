@@ -8,6 +8,10 @@ import { Button } from '@/components/ui/button';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 
 const DISCORD_INVITE = 'https://dsc.gg/tatakai';
+const DISCORD_GUILD_ID = '1465759865539526973';
+const DISCORD_WIDGET_URL = `https://discord.com/api/guilds/${DISCORD_GUILD_ID}/widget.json`;
+const DISCORD_INVITE_INFO_URL = 'https://discord.com/api/v10/invites/TWmbr7NYAW?with_counts=true';
+const DISCORD_REFRESH_INTERVAL = 60_000;
 
 const PERKS = [
   'home.discordPerk1',
@@ -16,8 +20,26 @@ const PERKS = [
 ];
 
 type Character = { url: string; source: string };
-// Bundled Tatakai art keeps the community panel independent of third-party CORS/rate limits.
-const CHARACTER_ART = ['yay','shy','sleepy'].map(name => `/assets/mascots/previews/${name}.webp`);
+type DiscordWidget = {
+  name: string;
+  presence_count: number;
+  members: Array<{ id: string; username: string; status?: string }>;
+  channels: Array<{ id: string; name: string }>;
+};
+type DiscordInviteInfo = {
+  approximate_member_count: number;
+  approximate_presence_count: number;
+};
+const CHARACTER_ART = [
+  'tech-savvy-anime-programmer-s-haven-backiee-HD.jpg',
+  'japan-background-digital-art.jpg',
+  'illustriation.jpg',
+  'anime-style-group-boys-spending-time-together-enjoying-their-friendship.jpg',
+  'anime-character-using-virtual-reality-glasses-metaverse.avif',
+  'ken-kaneki-the-mighty-av.jpg',
+  'mysterious-oni-girl-in-shadows-backiee-4K.jpg',
+  'samurai-girl-confronts-mythical-dragon-backiee-5K.jpg',
+].map((name) => `${import.meta.env.BASE_URL}assets/image/content/${name}`);
 
 // Decode off-screen first so the swap is a clean crossfade, never a pop-in.
 function preload(url: string) {
@@ -36,6 +58,34 @@ async function fetchCharacterImage(): Promise<Character | null> {
   return null;
 }
 
+async function fetchDiscordWidget(signal: AbortSignal): Promise<DiscordWidget | null> {
+  const response = await fetch(DISCORD_WIDGET_URL, { signal });
+  if (!response.ok) return null;
+  const data = (await response.json()) as Partial<DiscordWidget>;
+  if (
+    typeof data.name !== 'string' ||
+    typeof data.presence_count !== 'number' ||
+    !Array.isArray(data.members) ||
+    !Array.isArray(data.channels)
+  ) {
+    return null;
+  }
+  return data as DiscordWidget;
+}
+
+async function fetchDiscordInviteInfo(signal: AbortSignal): Promise<DiscordInviteInfo | null> {
+  const response = await fetch(DISCORD_INVITE_INFO_URL, { signal });
+  if (!response.ok) return null;
+  const data = (await response.json()) as Partial<DiscordInviteInfo>;
+  if (
+    typeof data.approximate_member_count !== 'number' ||
+    typeof data.approximate_presence_count !== 'number'
+  ) {
+    return null;
+  }
+  return data as DiscordInviteInfo;
+}
+
 function DiscordLogo({ className }: { className?: string }) {
   useUiTranslation();
   return (
@@ -51,6 +101,9 @@ export function DiscordSection() {
   const [character, setCharacter] = useState<Character | null>(null);
   const [isFetching, setIsFetching] = useState(true);
   const [hasAttempted, setHasAttempted] = useState(false);
+  const [discordWidget, setDiscordWidget] = useState<DiscordWidget | null>(null);
+  const [discordInviteInfo, setDiscordInviteInfo] = useState<DiscordInviteInfo | null>(null);
+  const [isWidgetLoading, setIsWidgetLoading] = useState(true);
 
   const refresh = useCallback(async () => {
     setIsFetching(true);
@@ -64,8 +117,39 @@ export function DiscordSection() {
     refresh();
   }, [refresh]);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    let active = true;
+
+    const refreshWidget = async () => {
+      if (active) setIsWidgetLoading(true);
+      try {
+        const [nextWidget, nextInviteInfo] = await Promise.all([
+          fetchDiscordWidget(controller.signal),
+          fetchDiscordInviteInfo(controller.signal),
+        ]);
+        if (active && nextWidget) setDiscordWidget(nextWidget);
+        if (active && nextInviteInfo) setDiscordInviteInfo(nextInviteInfo);
+      } catch {
+        // The card retains its fallback stats when the public widget is unavailable.
+      } finally {
+        if (active) setIsWidgetLoading(false);
+      }
+    };
+
+    refreshWidget();
+    const interval = window.setInterval(refreshWidget, DISCORD_REFRESH_INTERVAL);
+    return () => {
+      active = false;
+      controller.abort();
+      window.clearInterval(interval);
+    };
+  }, []);
+
   const showSkeleton = !character && !hasAttempted;
   const showFallback = !character && hasAttempted;
+  const onlineCount = discordWidget?.presence_count ?? discordInviteInfo?.approximate_presence_count;
+  const totalMemberCount = discordInviteInfo?.approximate_member_count;
 
   return (
     <GlassPanel className="relative overflow-hidden border border-[#5865F2]/20 bg-gradient-to-br from-[#5865F2]/[0.07] via-card to-card">
@@ -96,22 +180,20 @@ export function DiscordSection() {
           {/* Stats */}
           <div className="relative flex items-center gap-6">
             <div>
-              <p className="text-2xl font-semibold leading-none tabular-nums">100+</p>
+              <p className="text-2xl font-semibold leading-none tabular-nums">
+                {isWidgetLoading && !discordWidget ? '—' : onlineCount ?? '—'}
+              </p>
               <p className="mt-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                {t('home.discordMembers')}
+                Online now
               </p>
             </div>
             <div className="h-9 w-px bg-white/10" />
             <div>
-              <p className="flex items-center gap-2 text-2xl font-semibold leading-none">
-                <span className="relative flex h-2 w-2">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-40" />
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
-                </span>
-                24/7
+              <p className="text-2xl font-semibold leading-none tabular-nums">
+                {isWidgetLoading && !discordInviteInfo ? '—' : totalMemberCount ?? '—'}
               </p>
               <p className="mt-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                {t('home.discordAlwaysActive')}
+                Total members
               </p>
             </div>
           </div>
@@ -167,7 +249,7 @@ export function DiscordSection() {
                 <img
                   src={character.url}
                   alt={t('home.discordArtAlt')}
-                  className="h-full w-full object-contain p-6"
+                  className="h-full w-full object-cover"
                   onError={() => setCharacter(null)}
                 />
               </motion.div>

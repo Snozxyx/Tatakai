@@ -8,10 +8,12 @@ import { useQuery } from "@tanstack/react-query";
 import { Search, Film, BookOpen, Loader2, Clock, TrendingUp, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { resolveApiV3Base } from "@/lib/api/backendOrigin";
-import { getPreferredTitleLanguage, selectMediaTitle } from '@/lib/titleLanguage';
+import { getPreferredTitleLanguage, selectMediaTitle, getPreferredReadingTitleLanguage, selectReadingTitle } from '@/lib/titleLanguage';
 
 import { searchMangaTags } from '@/core/content/manga-tag-search';
 import { mergeCatalog, normalizeCatalogTitle } from '@/lib/catalogMerge';
+import { useContentSafetySettings } from '@/hooks/user/useContentSafetySettings';
+import { inferMangaAdultFlag } from '@/lib/contentSafety';
 
 interface Suggestion {
   anilistId?: number;
@@ -28,27 +30,32 @@ interface Suggestion {
   countryOfOrigin?: string | null;
 }
 
-async function fetchSuggestions(q: string): Promise<Suggestion[]> {
+async function fetchSuggestions(q: string, showAdult: boolean): Promise<Suggestion[]> {
   if (!q || q.trim().length < 2) return [];
-  const params = new URLSearchParams({ q: q.trim() });
-  const raw = await fetch(`${resolveApiV3Base()}/content/search/suggestions?${params}`, {
+  const params = new URLSearchParams({ q: q.trim(), perPage: '14', ...(showAdult ? {} : { isAdult: 'false' }) });
+  // The compact suggestions endpoint always excludes mature titles. The full
+  // catalogue honours the user's choice and also resolves English aliases.
+  const endpoint = showAdult ? 'search' : 'search/suggestions';
+  const raw = await fetch(`${resolveApiV3Base()}/content/${endpoint}?${params}`, {
     signal: AbortSignal.timeout(8000),
   }).then((response) => { if (!response.ok) throw new Error('Search unavailable'); return response.json(); });
 
   const results: Suggestion[] = [];
   const mediaArr = Array.isArray(raw?.data?.media) ? raw.data.media : [];
-  for (const m of mediaArr) {
-    const name = selectMediaTitle(m);
-    if (!name || name === 'Unknown') continue;
+  for (const row of mediaArr) {
+    const m = row.media ?? row;
     const formatUpper = String(m.format ?? "").toUpperCase();
     const isNovel = formatUpper === "NOVEL" || formatUpper === "LIGHT_NOVEL" || m.mediaType === "novel";
+    const isManga = m.mediaType === 'manga' || m.type === 'MANGA' || ['MANGA', 'MANHWA', 'MANHUA', 'OEL', 'ONE_SHOT'].includes(formatUpper);
+    const name = isNovel || isManga ? selectReadingTitle(m) : selectMediaTitle(m);
+    if (!name || name === 'Unknown') continue;
     results.push({
       id: m.anilistId ?? m.tatakaiId ?? (m.malId ? `mal:${m.malId}` : ''),
       anilistId: m.anilistId, malId: m.malId, canonicalTitle: name,
-      mediaType: isNovel ? 'novel' : m.mediaType === 'manga' ? 'manga' : 'anime',
+      mediaType: isNovel ? 'novel' : isManga ? 'manga' : 'anime',
       name,
       poster: m.coverImageLarge || m.coverImageMedium || null,
-      type: isNovel ? "novel" : m.mediaType === "manga" ? "manga" : "anime",
+      type: isNovel ? "novel" : isManga ? "manga" : "anime",
       year: m.startDate?.year ?? m.seasonYear ?? null,
       format: m.format ?? null,
       countryOfOrigin: m.countryOfOrigin ?? null,
@@ -82,6 +89,8 @@ function formatSuggestionType(item: Suggestion): string {
 export function HeaderSearchSuggestions({ query, visible, onSelect, onClose, inline = false }: Props) {
   useUiTranslation();
   const { t } = useTranslation();
+  const { settings } = useContentSafetySettings();
+  const showAdult = settings.showAdultEverywhere;
   const navigate = useNavigate();
   const containerRef = useRef<HTMLDivElement>(null);
   const [debouncedQuery, setDebouncedQuery] = useState(query);
@@ -102,20 +111,20 @@ export function HeaderSearchSuggestions({ query, visible, onSelect, onClose, inl
   });
 
   const { data: primary = [], isFetching: primaryFetching } = useQuery({
-    queryKey: ["header-suggestions", debouncedQuery, getPreferredTitleLanguage()],
-    queryFn: () => fetchSuggestions(debouncedQuery),
+    queryKey: ["header-suggestions", debouncedQuery, getPreferredTitleLanguage(), getPreferredReadingTitleLanguage(), showAdult],
+    queryFn: () => fetchSuggestions(debouncedQuery, showAdult),
     enabled: visible && debouncedQuery.trim().length >= 2,
     staleTime: 30_000,
     retry: false,
   });
 
   const { data: extra = [], isFetching: catalogFetching } = useQuery({
-    queryKey: ['header-mangabaka', debouncedQuery.trim(), getPreferredTitleLanguage()],
+    queryKey: ['header-mangabaka', debouncedQuery.trim(), getPreferredReadingTitleLanguage(), showAdult],
     queryFn: async (): Promise<Suggestion[]> => {
-      const catalog = await searchMangaTags(debouncedQuery.trim(), 1, 12, { tagSource: 'mangabaka' });
-      return catalog.results.map(item => ({
+      const catalog = await searchMangaTags(debouncedQuery.trim(), 1, 12, { tagSource: 'mangabaka', adult: showAdult });
+      return catalog.results.filter(item => showAdult || !inferMangaAdultFlag(item)).map(item => ({
         id: item.id!, anilistId: item.anilistId, malId: item.malId,
-        name: item.canonicalTitle, canonicalTitle: item.canonicalTitle,
+        name: selectReadingTitle(item), canonicalTitle: item.canonicalTitle,
         poster: item.poster, type: item.format === 'NOVEL' ? 'novel' : 'manga',
         mediaType: item.format === 'NOVEL' ? 'novel' : 'manga',
         href: item.href, year: item.year, format: item.format === 'NOVEL' ? 'NOVEL' : item.mediaType,

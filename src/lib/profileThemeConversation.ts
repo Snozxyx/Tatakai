@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import { parse } from 'postcss';
 import { readSekaiConfig, safeThemeImage } from '@/lib/profileThemes';
+import { profileThemeAssetUrl } from '@/lib/profileThemeAssets';
 import { MIDNIGHT_LOFI_ROOM, readMidnightLofiConfig } from '@/components/profile/themes/midnight-lofi/config';
 import { EMPRESS_POSTER } from '@/components/profile/themes/gothic-empress/config';
 
@@ -25,13 +26,13 @@ export function profileThemeConversation(theme: string, configuration?: unknown)
       [bg, ink, muted, surface, accent, line] = [colors['background-color'] || colors.background || colors['--bg'] || '#10111a', colors.color || colors['--ink'] || '#f0eef8', colors['--muted'] || '#aaa7be', colors['--surface'] || '#1a1d2b', colors['--accent'] || '#c4b5fd', colors['--border'] || '#3b3c50'];
       break;
     }
-    case 'uchiha': [bg, ink, muted, surface, accent, line] = ['#0c0d0f', '#ebe8e5', '#a9a5a1', '#151619', '#dd5f5f', '#292a2d']; image = '/assets/profile-themes/uchiha/itachi-rain-poster.webp'; break;
+    case 'uchiha': [bg, ink, muted, surface, accent, line] = ['#0c0d0f', '#ebe8e5', '#a9a5a1', '#151619', '#dd5f5f', '#292a2d']; image = profileThemeAssetUrl('/assets/profile-themes/uchiha/itachi-rain-poster.webp'); break;
     case 'gothic-empress': [bg, ink, muted, surface, accent, line] = ['#0b0b0f', '#eee8e6', '#aaa0a5', '#111116', '#ef667c', '#3c2932']; image = EMPRESS_POSTER; break;
     case 'midnight-lofi': {
       const c = readMidnightLofiConfig(configuration);
       [bg, ink, muted, surface, accent, line] = ['#060913', '#f1f5f9', '#b0bdcd', '#111b2c', c?.accent === 'amber' ? '#f1cc91' : c?.accent === 'violet' ? '#c5b8f3' : '#a9cce7', '#34445c']; image = MIDNIGHT_LOFI_ROOM; break;
     }
-    case 'komorebi': [bg, ink, muted, surface, accent, line] = ['#f7f5eb', '#302d22', '#6c644c', '#ede9d8', '#7d5b10', '#c6bd9c']; image = '/assets/profile-themes/komorebi/garden.webp'; break;
+    case 'komorebi': [bg, ink, muted, surface, accent, line] = ['#f7f5eb', '#302d22', '#6c644c', '#ede9d8', '#7d5b10', '#c6bd9c']; image = profileThemeAssetUrl('/assets/profile-themes/komorebi/garden.webp'); break;
     case 'sekaipop': {
       const c = readSekaiConfig(configuration);
       if (!c) return { style: {} };

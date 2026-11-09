@@ -1,3 +1,5 @@
+import { selectReadingTitle } from '@/lib/titleLanguage';
+import { HomeCustomization } from '@/components/customization/HomeCustomization';
 import { useScrollRestoration } from '@/hooks/ui/useScrollRestoration';
 import { MangaWhatsNew } from '@/components/manga/MangaUpdatesDiscovery';
 import uiI18n from '@/lib/uiI18n';
@@ -40,7 +42,7 @@ function toUnifiedMangaCard(
   options?: { isAdult?: boolean; blurAdult?: boolean },
 ): UnifiedMediaCardProps["item"] | null {
   const displayTitle =
-    manga.canonicalTitle || manga.title?.english || manga.title?.romaji || manga.title?.native;
+    selectReadingTitle(manga);
   const id = manga.id || (manga.anilistId ? `anilist:${manga.anilistId}` : manga.malId ? `mal:${manga.malId}` : "");
   if (!id || !displayTitle) return null;
 
@@ -159,11 +161,11 @@ export default function MangaHomePage() {
       {!isNative && !refreshed && <Background />}
       {!isMobile && <Sidebar />}
 
-      <main data-mobile-home data-manga-home className={cn(
+      <main data-mobile-home data-manga-home data-spotlight-page className={cn(
         "app-page relative z-10 pr-6 py-6 max-w-[1800px] mx-auto pb-24 md:pb-6",
         isDesktopApp ? "pl-6" : "pl-6 md:pl-32"
       )}>
-        <Header />
+        <Header alignWithPage />
 
         {isInitialLoading ? (
           <div className="space-y-12 mt-6 animate-pulse">
@@ -204,31 +206,17 @@ export default function MangaHomePage() {
               </div>
             </div>
           </div>
-        ) : (
-          <>
-            {spotlightCards.length > 0 && (
-              <MangaHeroSection 
-                spotlight={spotlightCards[0]} 
-                spotlights={spotlightCards} 
-                onActiveSpotlightChange={setActiveSpotlight}
-              />
-            )}
-
-            <LastReadMangaSection />
-            <MangaWhatsNew />
-
-            <FollowedMangaUpdates />
-
-            <MangaSmartDiscover />
-
-            <IndexMangaShowcase />
-
-            <MangaGenreSlider />
-
-            <MangaDiscoveryQuickFilters />
-
-
-            <section className="mb-12 md:mb-16">
+        ) : null}
+        <HomeCustomization pageId="manga-home" sections={[
+          { id: 'spotlight', label: 'Spotlight', available: !isInitialLoading, node: !isInitialLoading && spotlightCards.length > 0 ? <MangaHeroSection spotlight={spotlightCards[0]} spotlights={spotlightCards} onActiveSpotlightChange={setActiveSpotlight} /> : null },
+          { id: 'last-read', label: 'Continue reading', collection: true, available: !isInitialLoading, node: !isInitialLoading ? <LastReadMangaSection /> : null },
+          { id: 'whats-new', label: 'New manga updates', collection: true, available: !isInitialLoading, node: !isInitialLoading ? <MangaWhatsNew /> : null },
+          { id: 'followed-updates', label: 'Followed updates', collection: true, available: !isInitialLoading, node: !isInitialLoading ? <FollowedMangaUpdates /> : null },
+          { id: 'smart-discover', label: 'Smart discovery', available: !isInitialLoading, node: !isInitialLoading ? <MangaSmartDiscover /> : null },
+          { id: 'showcase', label: 'Trending showcase', collection: true, available: !isInitialLoading, node: !isInitialLoading ? <IndexMangaShowcase /> : null },
+          { id: 'genre-slider', label: 'Genres', available: !isInitialLoading, node: !isInitialLoading ? <MangaGenreSlider /> : null },
+          { id: 'quick-filters', label: 'Quick filters', available: !isInitialLoading, node: !isInitialLoading ? <MangaDiscoveryQuickFilters /> : null },
+          { id: 'mature-zone', label: 'Mature picks', collection: true, available: !isInitialLoading, node: !isInitialLoading ? <section className="mb-12 md:mb-16">
               <div className="relative overflow-hidden rounded-3xl border border-destructive/30">
                 <img
                   src={`${import.meta.env.BASE_URL}assets/image/content/manga18+.jpg`}
@@ -301,22 +289,11 @@ export default function MangaHomePage() {
                   )}
                 </div>
               )}
-            </section>
-            
-            {trendingCards.length > 0 && (
-              <MangaTrendingGrid items={trendingCards} />
-            )}
-
-            <MangaExtraLanes />
-          </>
-        )}
-
-        {/*
-          Outside the loading branch on purpose: the endless feed is its own
-          request and used to be gated behind the hero's queries, so the shelves
-          only started loading once the top of the page had already resolved.
-        */}
-        <InfiniteMangaSections />
+            </section> : null },
+          { id: 'trending', layoutLocked: 'original', preservePresentation: true, label: 'Trending', collection: true, available: !isInitialLoading, node: !isInitialLoading && trendingCards.length > 0 ? <MangaTrendingGrid items={trendingCards} /> : null },
+          { id: 'extra-lanes', label: 'More discovery', collection: true, group: true, available: !isInitialLoading, node: !isInitialLoading ? <MangaExtraLanes /> : null },
+          { id: 'genre-feed', label: 'Genre feed', feed: true, node: <InfiniteMangaSections /> },
+        ]} />
       </main>
 
       {/* MobileNav hides itself above `md` and on auth/error routes. */}

@@ -14,6 +14,35 @@ export interface ChangelogRelease {
 
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: "6.4.4",
+    date: "2026-11-09",
+    changes: [
+      "Promote the 6.4.4 beta work to the stable channel with coordinated desktop, Android, iOS and Android TV version metadata.",
+      "Add a redesigned manga reader with reusable reading presets, stable layout anchoring, continuous navigation, improved image loading and progress recovery.",
+      "Improve anime, manga and novel discovery with refreshed home shelves, calendar navigation, search suggestions, smart recommendations and better source/provider diagnostics.",
+      "Expand profile customization with themed profile worlds, responsive previews, saved-content organization, galleries, widgets and clearer badges and activity presentation.",
+      "Improve playback across desktop, mobile and TV with RTX video runtime packaging, external-player handling, video enhancement settings, resilient stream recovery and more reliable media controls.",
+      "Refresh extension and compatibility management with safer remote/custom provider handling, installed-runtime controls, Aniyomi Java support and mobile proxy improvements.",
+      "Improve authentication, content-safety, email-proof and backend-origin flows while improving error reporting and privacy controls.",
+      "Temporarily disable CAPTCHA on all devices so sign-in and account recovery do not wait for verification.",
+      "Restore the Hoko streaming proxy on the new domain with working CORS and HLS playlist delivery.",
+      "Refresh responsive layouts, landing pages, branding assets, splash screens, accessibility behavior and mobile navigation, with additional regression coverage for the affected flows."
+    ]
+  },
+  {
+    version: "6.4.4-beta.1",
+    date: "2026-11-01",
+    changes: [
+      "Add a redesigned manga reader with reusable reading presets, improved image loading, layout anchoring, continuous navigation and progress recovery.",
+      "Add calendar release navigation, richer favorites/watchlist organization, viewing history controls and improved readlist synchronization.",
+      "Improve manga discovery and provider handling by preserving provider display names, resolving legacy Atsu sources to readable labels and showing source diagnostics accurately.",
+      "Refresh extension management with installed-runtime controls, clearer cards and safer mobile proxy handling.",
+      "Improve search, media cards, accessibility controls, settings, profile themes and mobile navigation.",
+      "Include regression coverage for reader preferences, progress persistence, calendar links, favorites, episode merging, provider display names and Turnstile behavior.",
+      "This was a Beta-channel prerelease and was not delivered to Production users unless they opted in to Beta updates."
+    ]
+  },
+  {
     version: "6.4.3",
     date: "2026-10-29",
     changes: [
@@ -236,7 +265,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       "Native Mobile Loopback Proxy: High-performance local proxy on Android and iOS (127.0.0.1) matching desktop for video streaming, HLS playlists, headers replay, and offline media caching",
       "Quick Peek Sheet: Added long-press quick-peek and swipe-to-dismiss preview sheets for anime and manga cards on mobile",
       "Auto-Download Next: Automatic queuing of the next episode or chapter upon download completion, paired with Wi-Fi only constraints and auto-storage eviction for watched items",
-      "Deep Linking & Universal Links: Support for tatakai:// custom protocol and https://tatakai.me universal links jumping straight to anime, episodes, manga reader, and OAuth callbacks",
+      "Deep Linking & Universal Links: Support for tatakai:// custom protocol and https://tatakai.app universal links jumping straight to anime, episodes, manga reader, and OAuth callbacks",
       "Debrid & Torrent Hardening: Major overhaul for Real-Debrid and TorBox clients with token checks, query-cache bypass, tracker boosts, and a toggleable P2P torrent kill-switch",
       "Manga Reader Resilience: Fixed sticky cross-chapter page errors, added reliable provider sorting, and enhanced local-first progress sync that merges offline reading progress",
       "Download Modal Wizard: Refactored anime and manga download flows into an intuitive multi-step wizard with source, language, and scanlator selection",

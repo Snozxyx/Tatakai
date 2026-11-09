@@ -1,4 +1,6 @@
 import uiI18n from '@/lib/uiI18n';
+import { useCardDesign } from '@/components/customization/CardDesignContext';
+import { UnifiedMediaCard } from '@/components/UnifiedMediaCard';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { memo, useState } from "react";
 import { Trophy } from "lucide-react";
@@ -18,6 +20,7 @@ type Period = "today" | "week" | "month";
 
 export const TopAnimeSection = memo(function TopAnimeSection({ today, week, month }: TopAnimeSectionProps) {
   useUiTranslation();
+  const { design } = useCardDesign();
   const navigate = useNavigate();
   const [activePeriod, setActivePeriod] = useState<Period>("today");
 
@@ -46,7 +49,7 @@ export const TopAnimeSection = memo(function TopAnimeSection({ today, week, mont
     <section className="mb-14 md:mb-24" style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 600px' }}>
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-5 md:mb-8 px-1 md:px-2">
-        <h3 className="font-display text-xl md:text-2xl font-semibold tracking-tight flex items-center gap-2.5">
+        <h3 className="font-display text-xl md:text-2xl font-medium tracking-tight flex items-center gap-2.5">
           <div className="p-1.5 rounded-xl bg-amber/10 text-amber border border-amber/20">
             <Trophy className="w-5 h-5" />
           </div>
@@ -59,7 +62,7 @@ export const TopAnimeSection = memo(function TopAnimeSection({ today, week, mont
               key={period.key}
               onClick={() => setActivePeriod(period.key)}
               className={cn(
-                'shrink-0 min-h-[36px] px-3 md:px-4 py-1.5 rounded-full text-xs md:text-sm font-semibold transition-colors active:scale-95',
+                'shrink-0 min-h-[36px] px-3 md:px-4 py-1.5 rounded-full text-xs md:text-sm font-medium transition-colors active:scale-[0.98]',
                 activePeriod === period.key
                   ? "bg-white/15 text-white shadow-sm"
                   : "text-muted-foreground hover:text-white hover:bg-white/5"
@@ -73,7 +76,7 @@ export const TopAnimeSection = memo(function TopAnimeSection({ today, week, mont
 
       {/* Grid — plain cards on mobile (no backdrop-blur / hover scale) for 60fps scroll */}
       <div data-mobile-home-rail className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 md:gap-5">
-        {getAnimes().slice(0, 10).map((anime, idx) => (
+        {getAnimes().slice(0, 10).map((anime, idx) => design ? <UnifiedMediaCard key={anime.id} item={{ ...anime, mediaType: 'anime' }} rank={anime.rank ?? idx + 1} /> : (
           <Peekable key={anime.id} media={peekFromAnime(anime, `/anime/${anime.id}`)}>
           <button
             type="button"
@@ -85,7 +88,7 @@ export const TopAnimeSection = memo(function TopAnimeSection({ today, week, mont
               <img
                 src={getHighQualityPoster(anime.poster, anime.anilistId)}
                 alt={anime.name}
-                className="w-full h-full object-cover md:transition-transform md:duration-500 md:group-hover:scale-105"
+                className="w-full h-full object-cover md:transition-transform md:duration-200 md:"
                 loading="lazy"
                 decoding="async"
                 fetchPriority="low"
@@ -95,17 +98,17 @@ export const TopAnimeSection = memo(function TopAnimeSection({ today, week, mont
               <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
 
               {/* Rank Badge */}
-              <div className={`absolute top-2.5 left-2.5 md:top-3 md:left-3 rounded-lg flex items-center justify-center font-black ${getRankStyles(idx)}`}>
+              <div className={`absolute top-2.5 left-2.5 md:top-3 md:left-3 rounded-lg flex items-center justify-center font-medium ${getRankStyles(idx)}`}>
                 {anime.rank ?? idx + 1}
               </div>
 
               {/* Content */}
               <div className="absolute bottom-0 left-0 right-0 p-3 md:p-4 pt-10">
-                <h4 data-mobile-poster-title className="font-bold text-[13px] md:text-sm leading-tight line-clamp-2 drop-shadow-md md:group-hover:text-amber md:transition-colors">
+                <h4 data-mobile-poster-title className="font-medium text-[13px] md:text-sm leading-tight line-clamp-2 drop-shadow-md md:group-hover:text-amber md:transition-colors">
                   {anime.name}
                 </h4>
                 <div className="mt-1.5 md:mt-2 flex items-center gap-2">
-                  <span className="inline-flex items-center bg-black/50 border border-white/10 px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold uppercase tracking-wider text-white/80">
+                  <span className="inline-flex items-center bg-black/50 border border-white/10 px-2 py-0.5 rounded-md text-xs font-mono font-medium normal-case tracking-normal text-white/80">
                     {uiI18n.t('app.ep_00c1bff9')} {anime.episodes.sub}
                   </span>
                 </div>

@@ -46,7 +46,7 @@ export function useReaderResume({
     onPage(index);
     const root = rootRef.current;
     const entry = root?.querySelector<HTMLElement>("[data-reader-entry]");
-    if (!vertical || !root || !entry || index === 0) return;
+    if (!vertical || !root || !entry) return;
     restoring.current = true;
     let stopped = false;
     let frame = 0;
@@ -59,9 +59,10 @@ export function useReaderResume({
       )[index];
       if (!target) return;
       const top =
-        target.getBoundingClientRect().top -
-        root.getBoundingClientRect().top +
-        root.scrollTop;
+        index === 0 ? 0 :
+          target.getBoundingClientRect().top -
+          root.getBoundingClientRect().top +
+          root.scrollTop;
       root.scrollTo({ top, behavior: "instant" });
       onPage(index);
     };

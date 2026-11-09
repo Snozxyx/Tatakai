@@ -1,4 +1,5 @@
 import uiI18n from '@/lib/uiI18n';
+import { useCardDesign } from '@/components/customization/CardDesignContext';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { Star, Tv } from "lucide-react";
 import { memo, useMemo } from "react";
@@ -32,6 +33,7 @@ export const AnimeGrid = memo(function AnimeGrid({
   gridSize = "normal"
 }: AnimeGridProps) {
   useUiTranslation();
+  const { readOnly } = useCardDesign();
   const isMobile = useIsMobile();
   // BlurHash canvas decode per card is main-thread CPU — skip it on phones.
   const blurhashEnabled = useFeatureFlag(FeatureFlag.BLURHASH_IMAGES) && !isMobile;
@@ -68,7 +70,7 @@ export const AnimeGrid = memo(function AnimeGrid({
     <section className="mb-14 md:mb-24" style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 500px' }}>
       {title && (
         <div className="flex items-center justify-between mb-5 md:mb-8 px-1 md:px-2">
-          <h3 className="font-display text-xl md:text-2xl font-semibold tracking-tight flex items-center gap-2.5">
+          <h3 className="font-display text-xl md:text-2xl font-medium tracking-tight flex items-center gap-2.5">
             {icon || <Tv className="w-5 h-5 text-primary" />}
             <span className="line-clamp-1">{title}</span>
           </h3>
@@ -109,16 +111,18 @@ export const AnimeGrid = memo(function AnimeGrid({
           const posterClass = 'media-card-image h-full w-full object-cover';
           return <Peekable key={cardKey} media={(anime as any).mediaType === 'manga' ? peekFromManga(anime as any, cardRouteTo) : peekFromAnime(anime, cardRouteTo)}>
             <MediaCardFrame title={anime.name} href={cardRouteTo}
+              safetyBadges={inferAnimeAdultFlag(anime) ? <AdultBadge className="absolute left-2 top-2 z-40" /> : undefined}
+              slotContent={{ title: anime.name, rating: score, type: anime.type, year: anime.year, episodes: anime.episodes?.sub ? `${anime.episodes.sub} SUB${anime.episodes.dub ? ` · ${anime.episodes.dub} DUB` : ''}` : undefined, views: !readOnly && animeViewId ? <TatakaiAnimeViews animeId={animeViewId} /> : undefined }}
               poster={blurhashEnabled
                 ? <BlurhashImage src={getHighQualityPoster(anime.poster, anime.anilistId)} alt="" loading="lazy" decoding="async" onError={handlePosterError} blurhash={(anime as any).blurhash ?? undefined} className="h-full w-full" imgClassName={posterClass} />
                 : <img src={getHighQualityPoster(anime.poster, anime.anilistId)} alt="" aria-hidden loading="lazy" decoding="async" onError={handlePosterError} className={posterClass} />}
               badges={<>
                 {inferAnimeAdultFlag(anime) && <AdultBadge className="absolute left-2 top-2 z-20" />}
-                {score && <span className="media-card-score absolute right-2 top-2 z-20 inline-flex items-center gap-1 rounded-lg bg-black/75 px-2 py-1 text-xs font-semibold text-white"><Star aria-hidden className="h-3 w-3 fill-amber text-amber" />{score}</span>}
+                {score && <span className="media-card-score absolute right-2 top-2 z-20 inline-flex items-center gap-1 rounded-lg bg-black/75 px-2 py-1 text-xs font-medium text-white"><Star aria-hidden className="h-3 w-3 fill-amber text-amber" />{score}</span>}
               </>}
               metadata={<div className="flex flex-wrap gap-x-1.5"><span>{anime.type || uiI18n.t('app.anime_f1b32a19')}</span>
                 {anime.year && <span>· {anime.year}</span>}{!!anime.episodes?.sub && <span>· {anime.episodes.sub} {uiI18n.t('app.sub_5d85613a')}</span>}{!!anime.episodes?.dub && <span>· {anime.episodes.dub} {uiI18n.t('app.dub_1ca4b285')}</span>}{label && <span>· {label}</span>}
-                {animeViewId && <TatakaiAnimeViews animeId={animeViewId} />}
+                {!readOnly && animeViewId && <TatakaiAnimeViews animeId={animeViewId} />}
               </div>} />
           </Peekable>;
         })}

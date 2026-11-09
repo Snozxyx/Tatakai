@@ -13,9 +13,9 @@
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <!-- Match native chrome to Tatakai before the WebView/JS is ready. -->
-        <item name="android:windowBackground">#09090B</item>
-        <item name="android:statusBarColor">#09090B</item>
-        <item name="android:navigationBarColor">#09090B</item>
+        <item name="android:windowBackground">#0F0B0C</item>
+        <item name="android:statusBarColor">#0F0B0C</item>
+        <item name="android:navigationBarColor">#0F0B0C</item>
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowLightNavigationBar">false</item>
     </style>
@@ -32,6 +32,6 @@
              entirely via its own overlay/dialog, which works correctly on all APIs. -->
         <!-- A global android:background also paints selection menus and other
              framework views with the splash art. Only theme the window. -->
-        <item name="android:windowBackground">#09090B</item>
+        <item name="android:windowBackground">#0F0B0C</item>
     </style>
 </resources>

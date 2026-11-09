@@ -1,3 +1,4 @@
+import { ProfileBadges } from '@/components/profile/ProfileBadges';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { BookOpen, Flame, ImageIcon, Star } from 'lucide-react';
@@ -48,7 +49,7 @@ export default function SekaiProfileTab({ data, tab }: { data: ProfileThemeData;
     <section className="sp-section-card"><h3>About {data.owner.display_name || data.owner.username}</h3><p className="sp-bio">{data.owner.bio || 'Every story starts somewhere.'}</p></section>
     <div className="sp-overview-stats">{[[data.canViewLibrary ? data.stats.anime : '—', 'Anime'], [data.canViewLibrary ? data.stats.manga : '—', 'Reading'], [data.canViewHistory ? data.stats.episodes : '—', 'Episodes'], [data.canViewHistory ? `${data.stats.hours}h` : '—', 'Watch time'], [data.canViewLibrary ? data.stats.completed : '—', 'Completed'], [data.followers, 'Followers']].map(([value, label]) => <div className="sp-section-card" key={label}><BookOpen size={20} /><strong>{value}</strong><span>{label}</span></div>)}</div>
     <section className="sp-section-card"><h3>Favorite characters</h3><Collection label="Favorites" items={data.favorites} /></section>
-    <section className="sp-section-card"><h3>Badge collection</h3><div className="sp-badges">{data.badges.map(badge => <figure key={badge.key}><img src={badge.image} alt="" /><figcaption>{badge.label}</figcaption></figure>)}</div></section>
+    <section className="sp-section-card"><h3>Badge collection</h3><div className="sp-badges"><ProfileBadges badges={data.badges} size={26} grid={true} interactive={true} className="contents" /></div></section>
     {data.canViewHistory && <section className="sp-section-card"><h3>Recent activity</h3><Collection label="Recent activity" items={data.activity.slice(0, 12)} /></section>}
   </div>;
 }

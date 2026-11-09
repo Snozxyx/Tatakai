@@ -32,11 +32,14 @@ test("includes all provider IDs and extension settings without private credentia
   );
   assert.equal(serializeClientEnv(values).includes("private-fixture"), false);
   assert.equal(values.VITE_FORCE_NATIVE_APP, "false");
-  assert.equal(values.VITE_BACKEND_ORIGIN, "https://api.tatakai.me");
+  assert.equal(values.VITE_BACKEND_ORIGIN, "https://api.tatakai.app");
+  assert.equal(values.VITE_EXTENSION_API_URL, "https://extensions.tatakai.app/functions/v1/api");
   assert.equal(
     values.VITE_ANILIST_REDIRECT_URI,
-    "https://tatakai.me/integration/anilist/redirect"
+    "https://tatakai.app/integration/anilist/redirect"
   );
+  assert.equal(values.VITE_ANILIST_LEGACY_CLIENT_ID, '456');
+  assert.equal(values.VITE_ANILIST_LEGACY_REDIRECT_URI, 'https://tatakai.me/integration/anilist/redirect');
   assert.deepEqual(dotenv.parse(serializeClientEnv(values)), values);
 });
 test("desktop configuration does not inherit website-only mode switches", () => {

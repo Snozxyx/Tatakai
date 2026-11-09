@@ -101,7 +101,7 @@ const SOCIAL_HOSTS = [
   'youtube', 'youtu.be', 'discord', 'telegram', 't.me', 'tumblr', 'pinterest',
   'linkedin', 'twitch', 'whatsapp',
 ];
-const SITE_HOSTS = ['tatakai.me', 'api.tatakai.me'];
+const SITE_HOSTS = ['tatakai.app', 'tatakai.me'];
 
 /** Extract the hostname of a referrer URL (lowercased), or null. */
 export function referrerHostOf(referrer?: string | null): string | null {

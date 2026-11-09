@@ -10,10 +10,21 @@
 
 const { execFile, spawn } = require('child_process');
 const { promisify } = require('util');
+const path = require('path');
 const execFileAsync = promisify(execFile);
 
 const IS_WIN = process.platform === 'win32';
 const IS_MAC = process.platform === 'darwin';
+
+function windowsInstallPaths(...relativePaths) {
+    const roots = [...new Set([
+        process.env.ProgramW6432,
+        process.env.ProgramFiles || 'C:\\Program Files',
+        process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)',
+        process.env.LOCALAPPDATA && path.win32.join(process.env.LOCALAPPDATA, 'Programs'),
+    ].filter(Boolean))];
+    return roots.flatMap(root => relativePaths.map(relative => path.win32.join(root, relative)));
+}
 
 // ── Known player definitions ──────────────────────────────────────────────────
 // Each player carries per-platform install-path lists; `execNames` is used for
@@ -34,8 +45,7 @@ const PLAYERS = [
             ...(opts?.subtitles || []).map(sub => `--sub-file=${sub.url}`),
         ].filter(Boolean),
         windowsPaths: [
-            'C:\\Program Files\\mpv\\mpv.exe',
-            'C:\\Program Files (x86)\\mpv\\mpv.exe',
+            ...windowsInstallPaths('mpv\\mpv.exe'),
             process.env.APPDATA ? `${process.env.APPDATA}\\mpv\\mpv.exe` : null,
         ].filter(Boolean),
         macPaths: [
@@ -81,10 +91,7 @@ const PLAYERS = [
             opts?.headers?.['User-Agent'] ? `:http-user-agent=${opts.headers['User-Agent']}` : null,
             opts?.subtitles?.[0]?.url ? `--sub-file=${opts.subtitles[0].url}` : null,
         ].filter(Boolean),
-        windowsPaths: [
-            'C:\\Program Files\\VideoLAN\\VLC\\vlc.exe',
-            'C:\\Program Files (x86)\\VideoLAN\\VLC\\vlc.exe',
-        ],
+        windowsPaths: windowsInstallPaths('VideoLAN\\VLC\\vlc.exe'),
         macPaths: [
             '/Applications/VLC.app/Contents/MacOS/VLC',
         ],
@@ -104,12 +111,11 @@ const PLAYERS = [
             '/play',
             opts?.startTime ? `/start ${Math.round((opts.startTime || 0) * 1000)}` : null,
         ].filter(Boolean),
-        windowsPaths: [
-            'C:\\Program Files\\MPC-HC\\mpc-hc64.exe',
-            'C:\\Program Files\\MPC-HC\\mpc-hc.exe',
-            'C:\\Program Files (x86)\\MPC-HC\\mpc-hc64.exe',
-            'C:\\Program Files (x86)\\MPC-HC\\mpc-hc.exe',
-        ],
+        windowsPaths: windowsInstallPaths(
+            'MPC-HC\\mpc-hc64.exe', 'MPC-HC\\mpc-hc.exe',
+            'K-Lite Codec Pack\\MPC-HC64\\mpc-hc64.exe',
+            'K-Lite Codec Pack\\MPC-HC\\mpc-hc.exe',
+        ),
         execNames: ['mpc-hc64.exe', 'mpc-hc.exe'],
     },
     {
@@ -117,10 +123,9 @@ const PLAYERS = [
         name: 'MPC-BE',
         description: 'Media Player Classic - Black Edition',
         args: (url) => [url, '/play'],
-        windowsPaths: [
-            'C:\\Program Files\\MPC-BE x64\\mpc-be64.exe',
-            'C:\\Program Files (x86)\\MPC-BE\\mpc-be.exe',
-        ],
+        windowsPaths: windowsInstallPaths(
+            'MPC-BE x64\\mpc-be64.exe', 'MPC-BE\\mpc-be64.exe', 'MPC-BE\\mpc-be.exe',
+        ),
         execNames: ['mpc-be64.exe', 'mpc-be.exe'],
     },
 ];
@@ -165,12 +170,40 @@ async function findInPath(execName) {
     // `where` (Windows) and `which` (macOS/Linux) both print the resolved path.
     const finder = IS_WIN ? 'where' : 'which';
     try {
-        const { stdout } = await execFileAsync(finder, [execName], { timeout: 3000 });
+        const { stdout } = await execFileAsync(finder, [execName], { timeout: 3000, windowsHide: true });
         const first = stdout.trim().split('\n')[0]?.trim();
         return first || null;
     } catch {
         return null;
     }
+}
+
+/** Find installer-registered executables, including installs on another drive. */
+async function findInWindowsRegistry(player, fs) {
+    if (!IS_WIN) return null;
+    for (const name of player.execNames.filter(name => name.endsWith('.exe'))) {
+        const key = `Software\\Microsoft\\Windows\\CurrentVersion\\App Paths\\${name}`;
+        const candidates = await Promise.all([
+            [`HKCU\\${key}`, '/ve'],
+            [`HKLM\\${key}`, '/ve', '/reg:64'],
+            [`HKLM\\${key}`, '/ve', '/reg:32'],
+        ].map(async args => {
+            try {
+                const registryTool = path.win32.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'reg.exe');
+                const { stdout } = await execFileAsync(registryTool, ['query', ...args], { timeout: 3000, windowsHide: true });
+                const value = stdout.split(/\r?\n/).map(line => /\sREG_(?:EXPAND_)?SZ\s+(.+)$/.exec(line)?.[1]).find(Boolean);
+                if (!value) return null;
+                const executablePath = value.trim().replace(/^"(.*)"$/, '$1').replace(/%([^%]+)%/g, (match, key) => {
+                    const envKey = Object.keys(process.env).find(name => name.toLowerCase() === key.toLowerCase());
+                    return envKey ? process.env[envKey] : match;
+                });
+                return await fileExists(fs, executablePath) ? executablePath : null;
+            } catch { return null; }
+        }));
+        const match = candidates.find(Boolean);
+        if (match) return match;
+    }
+    return null;
 }
 
 // ── Detect installed players ──────────────────────────────────────────────────
@@ -182,15 +215,15 @@ async function findInPath(execName) {
  * @param {object} fs - Node.js fs module
  */
 async function detectExternalPlayers(fs) {
-    const detected = [];
-
-    for (const player of PLAYERS) {
+    const detected = await Promise.all(PLAYERS.map(async player => {
         let execPath = null;
 
         // Check known install paths for the current OS first
         for (const p of platformPaths(player)) {
             if (await fileExists(fs, p)) { execPath = p; break; }
         }
+
+        if (!execPath) execPath = await findInWindowsRegistry(player, fs);
 
         // Fall back to PATH search
         if (!execPath) {
@@ -201,16 +234,17 @@ async function detectExternalPlayers(fs) {
         }
 
         if (execPath) {
-            detected.push({
+            return {
                 id: player.id,
                 name: player.name,
                 description: player.description,
                 executablePath: execPath,
-            });
+            };
         }
-    }
+        return null;
+    }));
 
-    return detected;
+    return detected.filter(Boolean);
 }
 
 // ── Launch player ─────────────────────────────────────────────────────────────
@@ -231,9 +265,10 @@ function launchExternalPlayer(executablePath, streamUrl, options = {}, logger) {
     // Find the player definition for correct arg building. Match against every
     // OS's known paths (a stored pref may have been captured on any platform)
     // plus the exec-name suffix from a PATH-resolved binary.
+    const executableName = IS_WIN ? path.win32.basename(executablePath).toLowerCase() : path.basename(executablePath);
     const playerDef = PLAYERS.find((p) =>
         allKnownPaths(p).includes(executablePath) ||
-        p.execNames?.some((n) => executablePath.endsWith(n))
+        p.execNames?.some((n) => executableName === n)
     ) ?? PLAYERS[0]; // default to MPV-style if unknown
 
     const args = playerDef.args(streamUrl, options);

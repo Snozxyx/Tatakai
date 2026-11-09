@@ -1,3 +1,5 @@
+import { selectReadingTitle, type TitleLanguage } from '@/lib/titleLanguage';
+import { usePreferredReadingTitleLanguage } from '@/hooks/ui/useTitleLanguage';
 import { useMemo, useRef, useCallback } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { getMangaSections, getMangaSectionItems } from '@/core/content/manga-client';
@@ -48,7 +50,7 @@ function dedupeItems(items: UnifiedMediaCardProps["item"][]): UnifiedMediaCardPr
   });
 }
 
-function mapSearchRowsToItems(rawItems: any[], canShowAdult: boolean): UnifiedMediaCardProps["item"][] {
+function mapSearchRowsToItems(rawItems: any[], canShowAdult: boolean, language: TitleLanguage): UnifiedMediaCardProps["item"][] {
   return rawItems
     .filter(item => {
       const isAdult = inferMangaAdultFlag(item);
@@ -56,7 +58,7 @@ function mapSearchRowsToItems(rawItems: any[], canShowAdult: boolean): UnifiedMe
     })
     .map(item => ({
       id: String(item.anilistId || item.malId || item.id),
-      name: item.canonicalTitle || item.title?.english || item.title?.romaji || item.title?.native || "Unknown",
+      name: selectReadingTitle(item, language) || "Unknown",
       poster: item.poster || "",
       type: item.mediaType || "manga",
       status: item.status || undefined,
@@ -84,8 +86,9 @@ function mapSearchRowsToItems(rawItems: any[], canShowAdult: boolean): UnifiedMe
  * `"cultivation manga"`.
  */
 export function useInfiniteMangaSections({ showAdult }: { showAdult: boolean }) {
+  const titleLanguage = usePreferredReadingTitleLanguage();
   return useInfiniteQuery({
-    queryKey: ['infiniteMangaSections', showAdult],
+    queryKey: ['infiniteMangaSections', showAdult, titleLanguage],
     queryFn: async ({ pageParam = 1 }) => {
       const feed = await getMangaSections(pageParam, showAdult);
 
@@ -96,7 +99,7 @@ export function useInfiniteMangaSections({ showAdult }: { showAdult: boolean }) 
         layout: toLayout(section.layout),
         icon: SECTION_ICONS[section.icon],
         // Keep ALL fetched items — SectionContent paginates within each shelf.
-        items: dedupeItems(mapSearchRowsToItems(section.items, showAdult)),
+        items: dedupeItems(mapSearchRowsToItems(section.items, showAdult, titleLanguage)),
       }));
 
       return {
@@ -128,16 +131,17 @@ export function useMangaSectionItems(
   seedItems: UnifiedMediaCardProps["item"][] = [],
 ) {
   const { settings } = useContentSafetySettings();
+  const titleLanguage = usePreferredReadingTitleLanguage();
 
   const query = useInfiniteQuery({
-    queryKey: ['mangaSectionItems', sectionId, settings.showAdultEverywhere],
+    queryKey: ['mangaSectionItems', sectionId, settings.showAdultEverywhere, titleLanguage],
     queryFn: async ({ pageParam = 1 }) => {
       const data = await getMangaSectionItems(sectionId, pageParam, {
         adult: settings.showAdultEverywhere,
         perPage: SECTION_SCROLL_PAGE_SIZE,
       });
       if (!data) return null;
-      return data.items;
+      return mapSearchRowsToItems(data.items, settings.showAdultEverywhere, titleLanguage);
     },
     getNextPageParam: (lastPage, allPages) => {
       if (!lastPage || lastPage.length < SECTION_SCROLL_PAGE_SIZE) return undefined;

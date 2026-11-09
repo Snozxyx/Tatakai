@@ -1,3 +1,4 @@
+import { HomeCustomization } from '@/components/customization/HomeCustomization';
 import { TVLoadingScreen } from "@/components/tv/TVLoadingScreen";
 import { TVCinematicHero } from "@/components/tv/TVCinematicHero";
 import { TVDiscoveryGrid } from "@/components/tv/TVDiscoveryGrid";
@@ -132,7 +133,8 @@ export default function TVHomePage() {
     );
   return (
     <>
-      {hero ? (
+      <HomeCustomization pageId="anime-home" sections={[
+        { id: 'spotlight', label: 'Spotlight', node: hero ? (
         <TVCinematicHero
           title={hero.name}
           artwork={hero.banner || hero.poster}
@@ -163,32 +165,14 @@ export default function TVHomePage() {
           <h1>Welcome to Tatakai</h1>
           <p>Search for a title or connect your library in My Tatakai.</p>
         </div>
-      )}
-      <TVRail
-        title="Your Next Watch"
-        items={nextWatch}
-        onFocus={focusCard}
-      />
-      <TVRail
-        title="Trending This Season"
-        items={trendingCards}
-        onFocus={focusCard}
-      />
-      <TVRail
-        title="Live IPTV Channels"
-        items={liveCards}
-      />
-      <TVRail
-        title="Top 10 in Anime Today"
-        items={topCards}
-        onFocus={focusCard}
-      />
-      <TVRail
-        title="Popular on Tatakai"
-        items={data?.mostPopularAnimes || []}
-        onFocus={focusCard}
-      />
-      <TVDiscoveryGrid onFocus={focusCard} />
+      ) },
+        { id: 'next-watch', label: 'Your next watch', collection: true, node: <TVRail title="Your Next Watch" items={nextWatch} onFocus={focusCard} /> },
+        { id: 'trending-season', layoutLocked: 'original', preservePresentation: true, label: 'Trending this season', collection: true, node: <TVRail title="Trending This Season" items={trendingCards} onFocus={focusCard} /> },
+        { id: 'live-iptv', label: 'Live IPTV channels', collection: true, node: <TVRail title="Live IPTV Channels" items={liveCards} /> },
+        { id: 'top10-today', label: 'Top anime today', collection: true, node: <TVRail title="Top 10 in Anime Today" items={topCards} onFocus={focusCard} /> },
+        { id: 'popular', label: 'Popular on Tatakai', collection: true, node: <TVRail title="Popular on Tatakai" items={data?.mostPopularAnimes || []} onFocus={focusCard} /> },
+        { id: 'discovery', label: 'Keep exploring', collection: true, feed: true, node: <TVDiscoveryGrid onFocus={focusCard} /> },
+      ]} />
     </>
   );
 }

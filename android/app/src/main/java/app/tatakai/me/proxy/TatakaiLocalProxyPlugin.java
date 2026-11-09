@@ -85,7 +85,7 @@ public class TatakaiLocalProxyPlugin extends Plugin {
         "Access-Control-Allow-Origin: *\r\n"
         + "Access-Control-Allow-Methods: GET, HEAD, POST, OPTIONS\r\n"
         + "Access-Control-Allow-Headers: Range, Content-Type, Accept, Origin, Authorization, X-Requested-With\r\n"
-        // The WebView document uses the public https://tatakai.me origin while
+        // The WebView document uses the public https://tatakai.app origin while
         // this server is in Chromium's local address space. Newer WebView PNA
         // preflights require this explicit grant before hls.js may issue GETs.
         + "Access-Control-Allow-Private-Network: true\r\n"

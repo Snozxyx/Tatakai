@@ -109,11 +109,11 @@ async function initStatusBar(): Promise<void> {
   try {
     const { StatusBar, Style } = await import('@capacitor/status-bar');
     // Capacitor's naming follows the icon colour: `Light` means light icons.
-    // The app chrome is #09090b, so `Dark` would deliberately produce the
+    // The app chrome is #0f0b0c, so `Dark` would deliberately produce the
     // light status bar / dark icons combination we do not want.
     await StatusBar.setStyle({ style: Style.Light });
     if (isAndroid()) {
-      await StatusBar.setBackgroundColor({ color: '#09090b' });
+      await StatusBar.setBackgroundColor({ color: '#0f0b0c' });
     }
     // SystemBars supplies the safe-area inset and MainLayout applies it once.
     // Native status-bar clearance on top of that creates an empty header strip.

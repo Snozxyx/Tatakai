@@ -196,14 +196,14 @@ export const FollowedAnimeEpisodes = memo(function FollowedAnimeEpisodes() {
           <div className="flex items-center gap-2">
             <div className="hidden items-center gap-2 md:flex">
               <button
-                onClick={() => scroll("left")}
+                data-section-scroll-control onClick={() => scroll("left")}
                 aria-label={uiI18n.t('app.scroll_left_2c9e5a60')}
                 className="flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.02] text-white/60 transition-colors hover:bg-white/[0.08] hover:text-white"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
               <button
-                onClick={() => scroll("right")}
+                data-section-scroll-control onClick={() => scroll("right")}
                 aria-label={uiI18n.t('app.scroll_right_2994b49c')}
                 className="flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.02] text-white/60 transition-colors hover:bg-white/[0.08] hover:text-white"
               >
@@ -241,8 +241,8 @@ export const FollowedAnimeEpisodes = memo(function FollowedAnimeEpisodes() {
         </div>
       ) : (
         <div
+          data-mobile-home-rail
           ref={scrollRef}
-          data-mobile-home-rail="followed-episodes"
           className="flex gap-3 overflow-x-auto pb-4 pt-1 md:gap-4"
           style={{ scrollbarWidth: "none" }}
         >

@@ -10,7 +10,10 @@ const PRECACHE_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/assets/logo/tatakai-logo-square.png',
+  '/assets/branding/dark.png',
+  '/assets/branding/light.png',
+  '/assets/branding/monochrome.png',
+  '/assets/branding/legacy.png',
 ];
 
 // Install event - cache assets

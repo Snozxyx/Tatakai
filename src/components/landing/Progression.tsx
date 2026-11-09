@@ -65,12 +65,12 @@ export function Progression() {
           ));
         }
         if (chips.length) {
-          entrance = animate(chips, {
+          entrance = animate(chips.slice(0, 7), {
             opacity: [0, 1],
-            translateY: [16, 0],
+            translateY: [8, 0],
             scale: [0.95, 1],
-            delay: stagger(45),
-            duration: 520,
+            delay: stagger(40),
+            duration: 400,
             ease: "out(4)",
           });
         }
@@ -87,7 +87,7 @@ export function Progression() {
       <div className="grid items-center gap-8 lg:grid-cols-2 lg:gap-16">
         <Reveal>
           <div>
-            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 backdrop-blur-md">
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 ">
               <Trophy className="h-3.5 w-3.5 text-amber-300" />
               <span className="text-xs font-medium text-white/70">{uiI18n.t('app.progression_685e2622')}</span>
             </div>
@@ -106,7 +106,7 @@ export function Progression() {
         </Reveal>
 
         <div ref={rootRef}>
-          <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-md lg:p-8">
+          <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6  lg:p-8">
             {/* Current-rank hero — real Mitsu icon + per-rank name effect */}
             <div className="mb-6 flex items-center gap-4">
               <div className="relative shrink-0">
@@ -118,13 +118,13 @@ export function Progression() {
                 />
               </div>
               <div className="min-w-0">
-                <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-widest text-white/50">
+                <p className="mb-0.5 text-xs font-medium normal-case tracking-normal text-white/70">
                   {uiI18n.t('app.current_rank_affa548e')}
                 </p>
-                <h3 className={cn("font-display text-2xl font-bold tracking-tight", getRankClassForRank(current.rank))}>
+                <h3 className={cn("font-display text-2xl font-medium tracking-tight", getRankClassForRank(current.rank))}>
                   {current.name}
                 </h3>
-                <p className="font-mono text-xs text-white/40">
+                <p className="font-mono text-xs text-white/70">
                   {uiI18n.t('app.rank_dd48a114')} {current.rank} / 16 · {PREVIEW_SCORE.toLocaleString(uiI18n.language)} {uiI18n.t('app.rp_d31618d2')}
                 </p>
               </div>
@@ -134,14 +134,14 @@ export function Progression() {
             {next && (
               <div className="mb-6 space-y-1.5">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-white/55">{uiI18n.t('app.progress_to_bc5e6d58')} {next.tier.name}</span>
+                  <span className="text-white/70">{uiI18n.t('app.progress_to_bc5e6d58')} {next.tier.name}</span>
                   <span className="font-mono text-white/45">{next.needed} {uiI18n.t('app.rp_left_f7e9aa71')}</span>
                 </div>
                 <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
                   <div
                     ref={barRef}
                     style={{ width: `${pct}%`, transformOrigin: "left", transform: reduceMotion ? "scaleX(1)" : "scaleX(0)" }}
-                    className="h-full rounded-full bg-gradient-to-r from-violet-400 via-pink-400 to-cyan-400"
+                    className="h-full rounded-full bg-primary"
                   />
                 </div>
               </div>
@@ -151,7 +151,7 @@ export function Progression() {
             <div className="mb-3 flex items-center gap-2">
               <Trophy className="h-4 w-4 text-amber-300/80" />
               <span className="font-display text-sm font-medium text-white">{uiI18n.t('app.rank_badges_ba12d7d8')}</span>
-              <span className="text-xs text-white/40">{unlockedCount} / 16</span>
+              <span className="text-xs text-white/70">{unlockedCount} / 16</span>
             </div>
             <div className="grid grid-cols-8 gap-2">
               {RANK_TIERS.map((tier) => {
@@ -180,7 +180,7 @@ export function Progression() {
                       {unlocked ? (
                         <CheckCircle2 className="h-2.5 w-2.5 text-emerald-400" />
                       ) : (
-                        <Lock className="h-2 w-2 text-white/50" />
+                        <Lock className="h-2 w-2 text-white/70" />
                       )}
                     </span>
                   </div>

@@ -64,7 +64,7 @@ export default function CommunityFeedPage() {
   return (
     <div className="relative min-h-screen bg-background text-foreground antialiased selection:bg-primary/20 selection:text-primary">
       {/* ── Ambient Background Mesh ── */}
-      <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden transform-gpu">
+      <div data-app-route-background className="pointer-events-none fixed inset-0 -z-10 overflow-hidden transform-gpu">
         <div className="community-aurora-primary absolute -top-[12%] left-1/2 h-[640px] w-[1280px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,hsl(var(--primary)/0.14),hsl(var(--secondary)/0.08),transparent)] blur-3xl" />
         <div className="community-aurora-secondary absolute top-[24%] -left-[12%] h-[520px] w-[520px] rounded-full bg-[radial-gradient(closest-side,hsl(var(--secondary)/0.12),transparent)] blur-3xl" />
         <div className="community-aurora-secondary absolute -right-[8%] bottom-[8%] h-[460px] w-[460px] rounded-full bg-[radial-gradient(closest-side,hsl(347_100%_65%/0.08),transparent)] blur-3xl" />

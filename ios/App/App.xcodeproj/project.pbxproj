@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+        B17A00302F7C000100000001 /* TatakaiBrandingPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = B17A00312F7C000100000001 /* TatakaiBrandingPlugin.swift */; };
+        E17A00262F7C000100000001 /* TatakaiExtensionConfigPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = E17A00272F7C000100000001 /* TatakaiExtensionConfigPlugin.swift */; };
         E17A00242F7C000100000001 /* TatakaiExtensionHttpPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = E17A00252F7C000100000001 /* TatakaiExtensionHttpPlugin.swift */; };
 		D17A00012F7C000100000001 /* TatakaiDownloadsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = D17A00022F7C000100000001 /* TatakaiDownloadsPlugin.swift */; };
 		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
@@ -24,6 +26,8 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+        B17A00312F7C000100000001 /* TatakaiBrandingPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TatakaiBrandingPlugin.swift; sourceTree = "<group>"; };
+        E17A00272F7C000100000001 /* TatakaiExtensionConfigPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TatakaiExtensionConfigPlugin.swift; sourceTree = "<group>"; };
         E17A00252F7C000100000001 /* TatakaiExtensionHttpPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TatakaiExtensionHttpPlugin.swift; sourceTree = "<group>"; };
 		D17A00022F7C000100000001 /* TatakaiDownloadsPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TatakaiDownloadsPlugin.swift; sourceTree = "<group>"; };
 		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
@@ -76,8 +80,10 @@
 			children = (
 				9582B6822FE993A50072D4E8 /* SceneDelegate.swift */,
 				A17A001B2F7C000100000001 /* TatakaiBridgeViewController.swift */,
+                B17A00312F7C000100000001 /* TatakaiBrandingPlugin.swift */,
 				A17A001D2F7C000100000001 /* TatakaiLocalProxyPlugin.swift */,
                 E17A00252F7C000100000001 /* TatakaiExtensionHttpPlugin.swift */,
+                E17A00272F7C000100000001 /* TatakaiExtensionConfigPlugin.swift */,
 				A17A00212F7C000100000001 /* TatakaiMuxPlugin.swift */,
 				D17A00022F7C000100000001 /* TatakaiDownloadsPlugin.swift */,
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
@@ -176,8 +182,10 @@
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */,
 				A17A001A2F7C000100000001 /* TatakaiBridgeViewController.swift in Sources */,
+                B17A00302F7C000100000001 /* TatakaiBrandingPlugin.swift in Sources */,
 				A17A001C2F7C000100000001 /* TatakaiLocalProxyPlugin.swift in Sources */,
                 E17A00242F7C000100000001 /* TatakaiExtensionHttpPlugin.swift in Sources */,
+                E17A00262F7C000100000001 /* TatakaiExtensionConfigPlugin.swift in Sources */,
 				A17A00202F7C000100000001 /* TatakaiMuxPlugin.swift in Sources */,
 				D17A00012F7C000100000001 /* TatakaiDownloadsPlugin.swift in Sources */,
 			);
@@ -321,8 +329,10 @@
 			baseConfigurationReference = 958DCC722DB07C7200EA8C5F /* debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+                ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "AppIconLight AppIconDark AppIconMonochrome AppIconLegacy";
+                ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 6.4.401;
+				CURRENT_PROJECT_VERSION = 6.4.499;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -343,11 +353,13 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+                ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "AppIconLight AppIconDark AppIconMonochrome AppIconLegacy";
+                ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGNING_ALLOWED = NO;
 				CODE_SIGNING_REQUIRED = NO;
 				CODE_SIGN_IDENTITY = "";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 6.4.401;
+				CURRENT_PROJECT_VERSION = 6.4.499;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (

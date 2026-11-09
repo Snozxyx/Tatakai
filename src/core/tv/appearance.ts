@@ -1,6 +1,10 @@
 import { resolveTVTheme, type TVTheme } from "./themes";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { getCustomThemeSnapshot, subscribeCustomThemes } from '@/lib/customThemeRegistry';
 import { TV_WALLPAPERS, resolveTVWallpaper } from "./wallpapers";
+import { useCustomization } from '@/hooks/ui/useCustomization';
+import { useSystemDark } from '@/hooks/ui/useTheme';
+import { resolveThemeSelection } from '@/lib/themeSelection';
 export const DEFAULT_TV_WALLPAPER =
   TV_WALLPAPERS[0].src;
 const KEY = "tatakai-tv-appearance";
@@ -37,20 +41,24 @@ export function saveTVAppearance(value: TVAppearance) {
   window.dispatchEvent(new Event("tatakai-tv-appearance"));
 }
 export function useTVAppearance() {
+  useSyncExternalStore(subscribeCustomThemes, getCustomThemeSnapshot, getCustomThemeSnapshot);
+  const { settings } = useCustomization();
+  const systemDark = useSystemDark();
   const [appearance, setAppearance] = useState(readTVAppearance);
   const [reduced, setReduced] = useState(
-    () => matchMedia("(prefers-reduced-motion: reduce)").matches
+    () => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia("(prefers-reduced-motion: reduce)").matches
   );
   useEffect(() => {
     const update = () => setAppearance(readTVAppearance());
-    const media = matchMedia("(prefers-reduced-motion: reduce)");
-    const motion = () => setReduced(media.matches);
+    const media = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+    const motion = () => setReduced(media?.matches ?? false);
     window.addEventListener("tatakai-tv-appearance", update);
-    media.addEventListener("change", motion);
+    media?.addEventListener?.("change", motion);
     return () => {
       window.removeEventListener("tatakai-tv-appearance", update);
-      media.removeEventListener("change", motion);
+      media?.removeEventListener?.("change", motion);
     };
   }, []);
-  return { appearance, reduced: reduced || appearance.reducedMotion };
+  const theme = settings.tvSelection ? resolveTVTheme(resolveThemeSelection(settings.tvSelection, systemDark)) : appearance.theme;
+  return { appearance: { ...appearance, theme }, reduced: reduced || appearance.reducedMotion };
 }

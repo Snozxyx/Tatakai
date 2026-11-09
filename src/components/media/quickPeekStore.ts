@@ -6,6 +6,8 @@
  */
 
 export interface QuickPeekMedia {
+  /** Sidebar shortcuts can paint their label first, then use the fetched title/cover. */
+  enrichIdentity?: boolean;
   kind: "anime" | "manga" | "novel";
   /** Route id (`/anime/:id` / `/manga/:id` / `/novel/:id`) — also the detail-query key. */
   id: string;

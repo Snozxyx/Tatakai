@@ -1,3 +1,4 @@
+import { HomeCustomization } from '@/components/customization/HomeCustomization';
 import { TVLoadMore } from "@/components/tv/TVLoadMore";
 import { useState } from "react";
 import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
@@ -212,6 +213,7 @@ export default function TVBooksPage({
         <button onClick={() => navigate("/downloads")}>Offline library</button>
         <button onClick={() => navigate("/extensions")}>Reading sources</button>
       </div>
+      <HomeCustomization pageId={`${kind}-home`} sections={[{ id: 'discovery', label: 'Catalog', collection: true, feed: true, node: <>
       {catalog.isLoading && <p role="status">Loading stories…</p>}
       {catalog.error && (
         <button onClick={() => void catalog.refetch()}>Retry catalog</button>
@@ -252,6 +254,7 @@ export default function TVBooksPage({
         load={() => catalog.fetchNextPage()}
         label="More stories"
       />
+      </> }]} />
     </div>
   );
 }

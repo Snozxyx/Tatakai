@@ -3,9 +3,9 @@
   "identifier": "me.tatakai.altstore",
   "subtitle": "Extension-based anime & manga app for iOS",
   "description": "Official Tatakai source for AltStore, SideStore and StikStore. Tatakai is an extension-based otaku community for tracking anime & manga — install the iOS build with your own Apple ID. Free accounts must refresh every 7 days.",
-  "iconURL": "https://tatakai.me/assets/logo/tatakai-logo-square.png",
-  "headerURL": "https://tatakai.me/assets/logo/tatakaibanner.png",
-  "website": "https://tatakai.me",
+  "iconURL": "https://tatakai.app/assets/branding/dark.png",
+  "headerURL": "https://tatakai.app/assets/logo/tatakaibanner.png",
+  "website": "https://tatakai.app",
   "tintColor": "#a855f7",
   "featuredApps": [
     "app.tatakai.me"
@@ -17,7 +17,7 @@
       "developerName": "Snozxyx",
       "subtitle": "Discover, watch, and read — your way",
       "localizedDescription": "Tatakai brings anime discovery, streaming, manga reading, and community features together in one customizable app. Its extension-first design lets you choose your sources.\n\nTHIS IS AN UNSIGNED BUILD for sideloading only: it cannot be installed directly. Add this source in AltStore / SideStore (or open the IPA in TrollStore) to sign it with your own Apple ID. Tatakai does not host media files; users access media through third-party extensions and are responsible for complying with applicable laws.",
-      "iconURL": "https://tatakai.me/assets/logo/tatakai-logo-square.png",
+      "iconURL": "https://tatakai.app/assets/branding/dark.png",
       "tintColor": "#a855f7",
       "category": "entertainment",
       "version": "6.4.2",
@@ -36,7 +36,7 @@
       "caption": "Add this source in AltStore or SideStore to install on iPhone & iPad.",
       "date": "2026-10-27T17:34:12.565Z",
       "tintColor": "#a855f7",
-      "imageURL": "https://tatakai.me/assets/logo/tatakaibanner.png",
+      "imageURL": "https://tatakai.app/assets/logo/tatakaibanner.png",
       "notify": false,
       "url": "https://github.com/snozxyx/tatakai/releases/tag/v6.4.2",
       "appID": "app.tatakai.me"

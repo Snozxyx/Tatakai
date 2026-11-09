@@ -30,6 +30,8 @@ dist_electron
 *.sln
 *.sw?
 .env
+.env.*
+!.env.example
 
 src-tauri/target
 

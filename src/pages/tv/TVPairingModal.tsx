@@ -125,12 +125,12 @@ export function TVPairingModal({
         {pair && (
           <div className="tv-pair-code">
             <QRCodeSVG
-              value={`https://tatakai.me/link?pin=${pair.request.pin}`}
+              value={`https://tatakai.app/link?pin=${pair.request.pin}`}
               size={250}
               marginSize={4}
             />
             <div>
-              <p>Open tatakai.me/link</p>
+              <p>Open tatakai.app/link</p>
               <strong>{pair.request.pin}</strong>
               <p>Compare: {pair.request.phrase}</p>
               <p>Expires in five minutes</p>

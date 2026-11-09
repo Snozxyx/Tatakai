@@ -3,7 +3,7 @@ import { isDebridDirectUrl, isLoopbackProxyUrl } from './stream-resolver';
 import { isWatchPartyShareUrl } from './watch-party-url';
 import { isServerMediaUrl } from './server-media-url';
 
-export const HOKO_STREAM_PROXY = 'https://hoko.tatakai.me/api/v1/streamingProxy';
+export const HOKO_STREAM_PROXY = 'https://hoko.tatakai.app/api/v1/streamingProxy';
 
 /** Build only; callers honor the mobile cloud-proxy preference before use. */
 export function buildMobileCloudProxyUrl(source: {

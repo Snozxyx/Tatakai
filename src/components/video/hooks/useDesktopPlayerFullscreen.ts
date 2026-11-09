@@ -48,5 +48,10 @@ export function useDesktopPlayerFullscreen(
     if (!containerRef.current) return Promise.resolve();
     return controllerRef.current?.toggle() ?? Promise.resolve();
   }, [containerRef]);
-  return { isDesktop: !!desktopBridge()?.setFullscreen, toggle };
+  const enter = useCallback(() => {
+    if (!containerRef.current || controllerRef.current?.active) return Promise.resolve();
+    return controllerRef.current?.toggle() ?? Promise.resolve();
+  }, [containerRef]);
+  const exit = useCallback(() => controllerRef.current?.exit() ?? Promise.resolve(), []);
+  return { isDesktop: !!desktopBridge()?.setFullscreen, toggle, enter, exit };
 }

@@ -5,7 +5,7 @@ export function requestTVWriting(postId?: string, commentId?: string): boolean {
     postId
       ? `/community/forum/${encodeURIComponent(postId)}`
       : window.location.pathname,
-    "https://tatakai.me"
+    "https://tatakai.app"
   );
   url.searchParams.set("compose", "reply");
   if (commentId) {

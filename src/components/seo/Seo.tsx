@@ -16,7 +16,7 @@ import uiI18n from '@/lib/uiI18n';
 import { Helmet } from "react-helmet-async";
 
 const SITE_NAME = "Tatakai";
-const SITE_ORIGIN = "https://tatakai.me";
+const SITE_ORIGIN = "https://tatakai.app";
 const DEFAULT_IMAGE = `${SITE_ORIGIN}/assets/logo/tatakaibanner.png`;
 
 export type SeoKind = "website" | "video.other" | "book" | "article" | "profile";

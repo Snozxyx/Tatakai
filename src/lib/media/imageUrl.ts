@@ -1,4 +1,5 @@
 /// <reference types="vite/client" />
+import { isProfileThemeAssetPath, isProfileThemeAssetUrl, profileThemeAssetUrl } from '../../../shared/profile-theme-assets.mjs';
 
 // Cards, avatars and backgrounds revisit the same URLs on every React render.
 // Bound retained strings so long feeds cannot grow this cache indefinitely.
@@ -23,6 +24,13 @@ export function publicImageUrl(value?: string | null, width: number | null = 192
 }
 
 function buildPublicImageUrl(value: string, width: number | null, base?: string): string {
+  // Theme assets are already hosted/optimized by our VPS. Never proxy them to
+  // a third-party image service or turn packaged-app URLs back into local paths.
+  const assetBase = import.meta.env?.VITE_PROFILE_THEME_ASSET_BASE ||
+    (typeof process !== 'undefined' ? process.env?.VITE_PROFILE_THEME_ASSET_BASE : undefined);
+  const original = originalImageUrl(value);
+  if (isProfileThemeAssetPath(value) || isProfileThemeAssetUrl(value, assetBase)) return profileThemeAssetUrl(value, assetBase);
+  if (original !== value && isProfileThemeAssetUrl(original, assetBase)) return profileThemeAssetUrl(original, assetBase);
   try {
     const url = new URL(value, base);
     const host = url.hostname.toLowerCase();

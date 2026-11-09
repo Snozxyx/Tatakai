@@ -37,6 +37,8 @@ export interface ResumeCardProps {
   secondaryMeta?: ReactNode;
   /** 0–100. Omit to hide the bar entirely. */
   progress?: number;
+  /** Marks an actual saved reading position without changing progress logic. */
+  resumed?: boolean;
   /** Right-hand figure on the progress row, e.g. a download speed. */
   progressNote?: ReactNode;
   /** Shown when there is no progress bar, in the bar's place. */
@@ -64,6 +66,7 @@ export function ResumeCard({
   primaryMeta,
   secondaryMeta,
   progress,
+  resumed = false,
   progressNote,
   footer,
   overlayIcon: OverlayIcon = Play,
@@ -91,6 +94,7 @@ export function ResumeCard({
   const body = (
     <>
       <div className="pointer-events-none relative h-28 w-20 shrink-0 overflow-hidden rounded-xl border border-border bg-muted">
+        {resumed && <span aria-hidden className="resume-bookmark absolute left-2 top-2 z-10 h-4 w-2 bg-primary" />}
         {poster ? (
           <img
             src={poster}

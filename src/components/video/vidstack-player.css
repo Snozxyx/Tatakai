@@ -1,0 +1,27 @@
+.vidstack-player-container.is-player-fullscreen {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 99999 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+  max-width: none !important;
+  max-height: none !important;
+  display: flex;
+  flex-direction: column;
+  border-radius: 0 !important;
+  background: #000;
+}
+
+.vidstack-player-container.is-player-fullscreen [data-media-player] {
+  flex: 1;
+  width: 100% !important;
+  height: 100% !important;
+  max-height: none !important;
+  aspect-ratio: auto !important;
+  border-radius: 0 !important;
+}
+
+.vidstack-player-container.is-player-fullscreen [data-vidstack-toolbar] {
+  display: none;
+}

@@ -50,8 +50,8 @@ export function LastReadNovelSection() {
         }
         action={
           <Link
-            to="/profile?tab=novel-readlist"
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border/70 bg-card px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:border-foreground/20 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            to="/favorites?tab=history"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border/70 bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-foreground/20 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             aria-label={uiI18n.t('app.view_full_novel_reading_history_b6ffa25d')}
           >
             <History className="h-3.5 w-3.5" aria-hidden="true" />
@@ -116,6 +116,7 @@ export function LastReadNovelSection() {
                   </span>
                 }
                 progress={progressPercent}
+                resumed={(progressPercent ?? 0) > 0}
                 progressNote={
                   totalParas > 0 ? (
                     <span className="tabular-nums text-muted-foreground">{totalParas} {uiI18n.t('app.paragraphs_c9355d01')}</span>
@@ -129,28 +130,20 @@ export function LastReadNovelSection() {
           })}
         </div>
       ) : (
-        <div className="relative flex flex-col items-center justify-center overflow-hidden rounded-2xl border border-white/[0.05] bg-gradient-to-b from-white/[0.02] to-transparent px-6 py-16 text-center shadow-sm">
-          {/* Subtle top edge accent using primary color */}
-          <div className="absolute top-0 h-[1px] w-1/2 bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
-
-          <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 ring-1 ring-primary/20">
-            <BookMarked className="h-6 w-6 text-primary" />
+        <div className="reading-empty-state grid grid-cols-[40px_minmax(0,1fr)] gap-x-4 gap-y-3 rounded-xl border border-border bg-card p-5 sm:grid-cols-[40px_minmax(0,1fr)_auto] sm:items-center">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+            <BookMarked className="h-[18px] w-[18px]" />
           </div>
-
-          <h3 className="text-base font-semibold text-foreground">
-            {user ? uiI18n.t('app.no_reading_history_f0999143') : uiI18n.t('app.track_your_reading_8b2bfc61')}
-          </h3>
-          <p className="mt-2 max-w-sm text-sm text-muted-foreground leading-relaxed">
-            {user
-              ? uiI18n.t('app.open_a_novel_chapter_and_your_progress_will_auto_221ac378')
-              : uiI18n.t('app.sign_in_to_automatically_track_and_resume_your_l_1822b1f7')}
-          </p>
-
+          <div className="min-w-0">
+            <h3 className="text-base font-medium text-foreground">
+              {user ? uiI18n.t('app.no_reading_history_f0999143') : uiI18n.t('app.track_your_reading_8b2bfc61')}
+            </h3>
+            <p className="mt-1 max-w-[56ch] text-sm leading-5 text-muted-foreground">
+              {user ? uiI18n.t('app.open_a_novel_chapter_and_your_progress_will_auto_221ac378') : uiI18n.t('app.sign_in_to_automatically_track_and_resume_your_l_1822b1f7')}
+            </p>
+          </div>
           {!user && (
-            <Link
-              to="/auth"
-              className="mt-7 inline-flex h-10 items-center justify-center rounded-full bg-primary px-6 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            >
+            <Link to="/auth" className="col-span-2 inline-flex h-11 items-center justify-center rounded-lg border border-border bg-muted px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:col-span-1">
               {uiI18n.t('app.sign_in_or_register_bdd855e8')}
             </Link>
           )}

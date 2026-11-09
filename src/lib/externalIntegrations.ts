@@ -1,6 +1,8 @@
 import { supabase } from '@/integrations/supabase/client';
 import { disconnectMal, exchangeMalCode, getMalAuthUrl } from '@/lib/mal';
 import { ANILIST_GRAPHQL_ENDPOINT, resolveApiV3Base } from '@/lib/api/backendOrigin';
+import { currentPublicAniListApp } from '@/lib/anilistApp';
+import { getWebAnilistRedirectUri, isNativeOAuthApp } from '@/lib/desktopOAuth';
 
 export const ALL_GENRES = [
   "Action", "Adventure", "Comedy", "Drama", "Ecchi", "Fantasy", "Horror", "Mahou Shoujo", 
@@ -78,8 +80,6 @@ export async function updateMALAnimeStatus(
 // AniList Integration
 // ===========================================
 
-const ANILIST_CLIENT_ID = import.meta.env.VITE_ANILIST_CLIENT_ID;
-const ANILIST_REDIRECT_URI = String(import.meta.env.VITE_ANILIST_REDIRECT_URI || '').split(',')[0]?.trim() || (typeof window !== 'undefined' ? `${window.location.origin}/integration/anilist/redirect` : 'https://tatakai.me/integration/anilist/redirect');
 const ANILIST_AUTH_URL = 'https://anilist.co/api/v2/oauth/authorize';
 // AniList GraphQL is reached through the TatakaiAPI proxy (see anilistQuery).
 
@@ -91,6 +91,7 @@ const ANILIST_AUTH_URL = 'https://anilist.co/api/v2/oauth/authorize';
 // flow and read it back at exchange time.
 const ANILIST_REDIRECT_STORAGE_KEY = 'anilist_redirect_uri';
 const ANILIST_STATE_STORAGE_KEY = 'anilist_oauth_state';
+const ANILIST_CLIENT_STORAGE_KEY = 'anilist_client_id';
 
 /**
  * Random OAuth `state` for flows that do not carry the desktop marker.
@@ -99,7 +100,7 @@ const ANILIST_STATE_STORAGE_KEY = 'anilist_oauth_state';
  * at all, and the callback exchanged any `code` it was handed. That is a login
  * CSRF: an attacker who has an AniList authorization code for THEIR account can
  * send the victim to
- *   https://tatakai.me/integration/anilist/redirect?code=<attacker code>
+ *   https://tatakai.app/integration/anilist/redirect?code=<attacker code>
  * and the victim's Tatakai account silently links the attacker's AniList
  * profile. Every flow now mints a state, stores it, and the redirect page
  * verifies it before exchanging the code.
@@ -125,12 +126,10 @@ export function readAniListOAuthState(): string | null {
 // When no state is passed, a random one is minted and stored — the callback
 // page verifies it (AUTH-1).
 export function getAniListAuthUrl(redirectUri?: string, state?: string): string {
-  if (!ANILIST_CLIENT_ID) {
-    throw new Error('Missing VITE_ANILIST_CLIENT_ID');
-  }
-
-  const effectiveRedirect = String(redirectUri || ANILIST_REDIRECT_URI).split(',')[0]?.trim() || ANILIST_REDIRECT_URI;
-  if (String(redirectUri || ANILIST_REDIRECT_URI).includes(',')) {
+  const defaultRedirect = getWebAnilistRedirectUri();
+  const effectiveRedirect = String(redirectUri || defaultRedirect).split(',')[0]?.trim() || defaultRedirect;
+  const app = currentPublicAniListApp(isNativeOAuthApp(), typeof window === 'undefined' ? undefined : window.location.origin, effectiveRedirect);
+  if (String(redirectUri || defaultRedirect).includes(',')) {
     console.warn(
       '[OAuth] AniList redirect URI contained a comma-separated pair; using only the first URL. ' +
       'Register exactly one URL — a pair triggers a login prompt that loops.',
@@ -140,10 +139,11 @@ export function getAniListAuthUrl(redirectUri?: string, state?: string): string 
   try {
     localStorage.setItem(ANILIST_REDIRECT_STORAGE_KEY, effectiveRedirect);
     localStorage.setItem(ANILIST_STATE_STORAGE_KEY, effectiveState);
+    localStorage.setItem(ANILIST_CLIENT_STORAGE_KEY, app.clientId);
   } catch { /* localStorage unavailable — exchange falls back to default */ }
 
   const params = new URLSearchParams({
-    client_id: ANILIST_CLIENT_ID,
+    client_id: app.clientId,
     redirect_uri: effectiveRedirect,
     response_type: 'code',
     state: effectiveState,
@@ -160,9 +160,11 @@ export async function exchangeAniListCode(code: string, userId: string): Promise
   const bearer = session?.access_token;
   if (!bearer) throw new Error('Missing auth token for AniList exchange');
 
-  let redirectUri = ANILIST_REDIRECT_URI;
+  let redirectUri = getWebAnilistRedirectUri();
+  let clientId: string | undefined;
   try {
-    redirectUri = localStorage.getItem(ANILIST_REDIRECT_STORAGE_KEY) || ANILIST_REDIRECT_URI;
+    redirectUri = localStorage.getItem(ANILIST_REDIRECT_STORAGE_KEY) || redirectUri;
+    clientId = localStorage.getItem(ANILIST_CLIENT_STORAGE_KEY) || undefined;
   } catch { /* ignore */ }
 
   const res = await fetch(`${resolveApiV3Base()}/sync/exchange`, {
@@ -175,6 +177,7 @@ export async function exchangeAniListCode(code: string, userId: string): Promise
       integration: 'anilist',
       code,
       redirectUri,
+      clientId,
     })
   });
 
@@ -185,6 +188,7 @@ export async function exchangeAniListCode(code: string, userId: string): Promise
 
   try { localStorage.removeItem(ANILIST_REDIRECT_STORAGE_KEY); } catch { /* ignore */ }
   try { localStorage.removeItem(ANILIST_STATE_STORAGE_KEY); } catch { /* ignore */ }
+  try { localStorage.removeItem(ANILIST_CLIENT_STORAGE_KEY); } catch { /* ignore */ }
   return true;
 }
 

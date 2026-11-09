@@ -21,7 +21,7 @@ export interface StreamProxyConfig {
 }
 
 const CONFIG: StreamProxyConfig = {
-  remoteProxy: 'https://hoko.tatakai.me/api/v1/streamingProxy',
+  remoteProxy: 'https://hoko.tatakai.app/api/v1/streamingProxy',
   defaultPath: '/api/v1/streamingProxy',
   legacyPaths: [],
   password: String(
@@ -167,7 +167,7 @@ export function buildProxyBaseCandidates(): string[] {
   const isNative = !!cap && typeof cap.isNativePlatform === 'function' && cap.isNativePlatform();
   const proxyOrigin =
     isNative
-      ? (String(import.meta.env.VITE_BACKEND_ORIGIN || '').replace(/\/+$/, '') || 'https://api.tatakai.me')
+      ? (String(import.meta.env.VITE_BACKEND_ORIGIN || '').replace(/\/+$/, '') || 'https://api.tatakai.app')
       : (typeof window !== 'undefined' ? window.location.origin : '');
   if (proxyOrigin) {
     add(`${proxyOrigin}${CONFIG.defaultPath}`);

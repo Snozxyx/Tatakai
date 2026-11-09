@@ -22,6 +22,7 @@ import { handlePosterFallback, rankBadgeClass, rankRingClass, type PosterItem } 
 import { Peekable } from '@/components/media/MediaQuickPeek';
 import { peekFromHref } from '@/components/media/quickPeekStore';
 import { MediaCardFrame } from '@/components/MediaCardFrame';
+import { useCardDesign } from '@/components/customization/CardDesignContext';
 import { AdultBadge } from '@/components/MediaCardBadges';
 import { resolveTatakaiAnimeViewId, TatakaiAnimeViews } from '@/components/media/TatakaiAnimeViews';
 
@@ -43,13 +44,14 @@ interface PosterCardProps {
 
 export function PosterCard({ item, rank, eager, footer, preview, className }: PosterCardProps) {
   useUiTranslation();
+  const { design, readOnly } = useCardDesign();
   const showScoreOnPoster = rank !== undefined && rank <= 3;
-  const previewEnabled = Boolean(preview && !item.href.startsWith('/manga/'));
+  const previewEnabled = Boolean(preview && !readOnly && !item.href.startsWith('/manga/'));
   const animeRouteId = item.href.startsWith('/anime/')
     ? decodeURIComponent(item.href.slice('/anime/'.length).split(/[/?#]/, 1)[0] || '')
     : undefined;
   const readingRoute=/^\/(manga|novel)\/([^/?#]+)$/.exec(item.href.split('?')[0]);
-  const readingViews=readingRoute?<TatakaiReadingViews kind={readingRoute[1] as 'manga'|'novel'} id={decodeURIComponent(readingRoute[2])}/>:null;
+  const readingViews=!readOnly&&readingRoute?<TatakaiReadingViews kind={readingRoute[1] as 'manga'|'novel'} id={decodeURIComponent(readingRoute[2])}/>:null;
   const animeViewId = animeRouteId ? resolveTatakaiAnimeViewId(animeRouteId, item.anilistId) : undefined;
   const hover = useHoverPreview({
     anilistId: item.anilistId,
@@ -57,8 +59,10 @@ export function PosterCard({ item, rank, eager, footer, preview, className }: Po
     enabled: previewEnabled,
   });
 
-  if (rank === undefined) return <Peekable media={peekFromHref(item.href, item)}>
+  if (rank === undefined || design) return <Peekable media={peekFromHref(item.href, item)}>
     <MediaCardFrame title={item.title} href={item.href} className={className}
+      safetyBadges={item.isAdult ? <AdultBadge className="absolute left-2 top-2 z-40" /> : undefined}
+      slotContent={{ title: item.title, rating: item.score, type: item.meta, rank: rank !== undefined ? `#${rank}` : undefined, views: readOnly ? undefined : readingViews || (animeViewId ? <TatakaiAnimeViews animeId={animeViewId} /> : undefined) }}
       onMouseEnter={previewEnabled ? hover.onEnter : undefined} onMouseLeave={previewEnabled ? hover.onLeave : undefined}
       poster={<>
         <img src={getHighQualityPoster(item.poster, item.anilistId)} alt="" aria-hidden loading={eager ? 'eager' : 'lazy'} decoding="async"
@@ -68,8 +72,8 @@ export function PosterCard({ item, rank, eager, footer, preview, className }: Po
           muted loop playsInline crossOrigin="anonymous" onError={hover.onError} />}
         {hover.unavailable && <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center"><span className="rounded-lg bg-black/75 px-3 py-2 text-xs text-white">{uiI18n.t('app.preview_unavailable_36d31d45')}</span></div>}
       </>}
-      badges={<>{item.isAdult && <AdultBadge className="absolute left-2 top-2 z-20" />}{item.score && <span className="media-card-score absolute right-2 top-2 z-20 inline-flex items-center gap-1 rounded-lg bg-black/75 px-2 py-1 text-xs font-semibold text-white"><Star aria-hidden className="h-3 w-3 fill-amber text-amber" />{item.score}</span>}</>}
-      metadata={<>{item.meta}{readingViews}{animeViewId && <TatakaiAnimeViews animeId={animeViewId} />}</>} footer={footer} />
+      badges={<>{item.isAdult && <AdultBadge className="absolute left-2 top-2 z-20" />}{item.score && <span className="media-card-score absolute right-2 top-2 z-20 inline-flex items-center gap-1 rounded-lg bg-black/75 px-2 py-1 text-xs font-medium text-white"><Star aria-hidden className="h-3 w-3 fill-amber text-amber" />{item.score}</span>}</>}
+      metadata={<>{item.meta}{readingViews}{!readOnly && animeViewId && <TatakaiAnimeViews animeId={animeViewId} />}</>} footer={footer} />
   </Peekable>;
 
   return (
@@ -97,7 +101,7 @@ export function PosterCard({ item, rank, eager, footer, preview, className }: Po
             decoding="async"
             className={cn(
               'h-full w-full object-cover transition-[opacity,transform] duration-200',
-              hover.isActive ? 'opacity-0' : 'opacity-100 motion-safe:group-hover:scale-[1.025]',
+              hover.isActive ? 'opacity-0' : 'opacity-100 ',
             )}
             onError={(event) => handlePosterFallback(event, item.poster)}
           />
@@ -135,14 +139,14 @@ export function PosterCard({ item, rank, eager, footer, preview, className }: Po
           )}
 
           {showScoreOnPoster && item.score && (
-            <div className="absolute bottom-2 left-2 flex items-center gap-1 rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm">
+            <div className="absolute bottom-2 left-2 flex items-center gap-1 rounded-full bg-black/70 px-2 py-0.5 text-xs font-medium text-white backdrop-blur-sm">
               <Star className="h-2.5 w-2.5 fill-amber text-amber" />
               {item.score}
             </div>
           )}
         </div>
 
-        <h3 data-mobile-poster-title className="mt-3 line-clamp-2 min-h-10 text-sm font-semibold leading-5 text-foreground transition-colors group-hover:text-primary">
+        <h3 data-mobile-poster-title className="mt-3 line-clamp-2 min-h-10 text-sm font-medium leading-5 text-foreground transition-colors group-hover:text-primary">
           {item.title}
         </h3>
 
@@ -156,7 +160,7 @@ export function PosterCard({ item, rank, eager, footer, preview, className }: Po
                 {item.score}
               </span>
             )}
-            {readingViews}{animeViewId && <TatakaiAnimeViews animeId={animeViewId} />}
+            {readingViews}{!readOnly && animeViewId && <TatakaiAnimeViews animeId={animeViewId} />}
           </p>
         )}
       </Link>
@@ -164,7 +168,7 @@ export function PosterCard({ item, rank, eager, footer, preview, className }: Po
       {rank !== undefined && (
         <span
           className={cn(
-            'pointer-events-none absolute -left-2 -top-2 z-10 flex items-center justify-center rounded-full font-black tabular-nums',
+            'pointer-events-none absolute -left-2 -top-2 z-10 flex items-center justify-center rounded-full font-medium tabular-nums',
             rank <= 3 ? 'h-9 w-9 text-base' : 'h-7 w-7 text-xs',
             rankBadgeClass(rank),
           )}

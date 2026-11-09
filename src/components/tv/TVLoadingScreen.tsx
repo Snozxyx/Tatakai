@@ -1,3 +1,4 @@
+import { BrandLogo } from '@/components/branding/BrandLogo';
 import { useTVAppearance } from "@/core/tv/appearance";
 import "./tv-loading-screen.css";
 
@@ -11,7 +12,7 @@ export function TVLoadingScreen({ message = "Getting everything ready…", compa
       <div className="tv-loading-hero">
         <div className="tv-loading-copy">
           <div className="tv-loading-identity">
-            <img src="/assets/logo/tatakai-logo-square.png" alt="" />
+            <BrandLogo  alt="" />
             <span>tatakai</span>
           </div>
           <p className="tv-loading-message" role="status" aria-live="polite">{message}</p>

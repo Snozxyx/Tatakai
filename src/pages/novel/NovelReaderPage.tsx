@@ -1,3 +1,4 @@
+import { selectReadingTitle } from '@/lib/titleLanguage';
 import { usePublishSocialActivity } from '@/hooks/community/useSocialActivity';
 import { useReadingViewTracker } from '@/hooks/user/useReadingViews';
 import { readingViewId } from '@/lib/readingViewId';
@@ -145,7 +146,7 @@ export default function NovelReaderPage() {
 
   const { data: detailResp } = useNovelDetail(novelId);
   const detail = (detailResp as any)?.detail;
-  const novelTitle = detail?.canonicalTitle || detail?.title?.english || detail?.title?.romaji || uiI18n.t('app.novel_1a9fdb91');
+  const novelTitle = selectReadingTitle(detail) || uiI18n.t('app.novel_1a9fdb91');
   const novelPoster = detail?.coverImage ?? null;
 
   const resolvedNumber = useMemo(() => {
@@ -164,7 +165,7 @@ export default function NovelReaderPage() {
       novelTitle,
       chapter: resolvedNumber,
       novelImageUrl: novelPoster,
-      novelUrl: `https://tatakai.me/novel/${novelId}`,
+      novelUrl: `https://tatakai.app/novel/${novelId}`,
     });
     return () => {
       clearDiscordRpc();

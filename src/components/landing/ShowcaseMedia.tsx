@@ -78,11 +78,11 @@ export function ShowcaseMedia({
   return (
     <div
       ref={containerRef}
-      className={`group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] shadow-[0_24px_70px_-24px_rgba(0,0,0,0.85)] backdrop-blur-md transition-transform duration-200 motion-safe:[@media(hover:hover)]:hover:scale-[1.015] ${className}`}
+      className={`group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] transition-transform duration-200  ${className}`}
       style={{ aspectRatio: ratio }}
     >
       {/* Soft gradient glow, strengthens on hover */}
-      <div className="pointer-events-none absolute -inset-px z-0 rounded-2xl bg-gradient-to-br from-violet-500/20 via-transparent to-cyan-500/20 opacity-40 transition-opacity duration-500 group-hover:opacity-100" />
+
       {/* Top-edge highlight */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent" />
 

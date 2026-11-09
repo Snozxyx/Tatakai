@@ -1,3 +1,5 @@
+import { selectReadingTitle, type TitleLanguage } from '@/lib/titleLanguage';
+import { usePreferredReadingTitleLanguage } from '@/hooks/ui/useTitleLanguage';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
@@ -49,9 +51,9 @@ const DESCRIPTION: Record<NovelTab, string> = {
 /** Recency is not a ranking, so the badge stays off that tab. */
 const RANKED: Record<NovelTab, boolean> = { trending: true, top: true, new: false };
 
-function novelToPosterItem(item: NovelSearchItem, index = 0): PosterItem | null {
+function novelToPosterItem(item: NovelSearchItem, index: number, language: TitleLanguage): PosterItem | null {
   const title =
-    item.canonicalTitle || item.title?.english || item.title?.romaji || item.title?.native || '';
+    selectReadingTitle(item, language) || '';
   const id = String(item.id || item.anilistId || item.malId || '').trim();
   if (!title || !id) return null;
   const score = item.score && item.score > 0 ? (item.score / 10).toFixed(1) : undefined;
@@ -81,6 +83,7 @@ export function NovelTrendingSection({
 }: NovelTrendingSectionProps) {
   useUiTranslation();
   const [activeTab, setActiveTab] = useState<NovelTab>(defaultTab);
+  const titleLanguage = usePreferredReadingTitleLanguage();
 
   const wants = (tab: NovelTab) => showTabs || activeTab === tab;
 
@@ -118,9 +121,9 @@ export function NovelTrendingSection({
     () =>
       active
         .slice(0, limit)
-        .map((novel, index) => novelToPosterItem(novel, index))
+        .map((novel, index) => novelToPosterItem(novel, index, titleLanguage))
         .filter((x): x is PosterItem => Boolean(x)),
-    [active, limit],
+    [active, limit, titleLanguage],
   );
 
   return (

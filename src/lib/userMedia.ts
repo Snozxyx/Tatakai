@@ -38,7 +38,7 @@ export interface UserMediaFile {
   url: string;
   path: string;
   bucket: string;
-  category: UserMediaCategory | 'other' | 'private_chat';
+  category: UserMediaCategory | 'appearance' | 'other' | 'private_chat';
   size: number | null;
   createdAt: string | null;
 }
@@ -157,6 +157,7 @@ export async function listUserMedia(userId: string, includePrivate = false): Pro
     listFolder(USER_MEDIA_BUCKET, `${userId}/avatar`, 'avatar'),
     listFolder(USER_MEDIA_BUCKET, `${userId}/banner`, 'banner'),
     listFolder(USER_MEDIA_BUCKET, `${userId}/gallery`, 'gallery'),
+    listFolder(USER_MEDIA_BUCKET, `${userId}/appearance`, 'appearance'),
     listFolder('comment-media', `comments/${userId}`, 'comment'),
     listFolder('forum', 'forum_images', 'forum_image', `${userId}-`),
   ]);

@@ -2,6 +2,7 @@ import { Fragment, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { MoreHorizontal, Heart } from "lucide-react";
+import '@/components/customization/customization.css';
 import { useAuth } from "@/contexts/AuthContext";
 import {
   useAddToWatchlist,
@@ -19,12 +20,7 @@ import {
   useCharacterFavorites,
   useToggleCharacterFavorite,
 } from "@/hooks/user/useCharacterFavorites";
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu";
+import { openMediaQuickPeek } from '@/components/media/quickPeekStore';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -47,7 +43,7 @@ export interface LibraryMenuItem {
  * corner instead of floating it over the title/meta row below.
  */
 export const LIBRARY_BUTTON_CLASS =
-  "absolute top-2 right-2 z-40 grid size-11 place-items-center rounded-full border border-border bg-card text-card-foreground shadow-sm pointer-events-auto";
+  "media-library-glass absolute top-2 right-2 z-40 grid size-11 place-items-center rounded-full pointer-events-auto";
 
 export function CharacterQuickFavorite({
   item,
@@ -90,7 +86,7 @@ export function CharacterQuickFavorite({
   );
 }
 
-/** Watchlist/readlist status mutations shared by the kebab and the context menu. */
+/** Watchlist/readlist status mutations for the three-dot button. */
 function useStatusActions(item: LibraryMenuItem) {
   const { t } = useTranslation();
   const { user } = useAuth();
@@ -187,38 +183,27 @@ function StatusKebab({
   );
 }
 
-function StatusMenu({
+function QuickViewSurface({
   item,
   children,
 }: {
   item: LibraryMenuItem;
   children: ReactNode;
 }) {
-  const { statuses, setStatus, label } = useStatusActions(item);
-  return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>
-        <div className="relative min-w-0">{children}</div>
-      </ContextMenuTrigger>
-      <ContextMenuContent
-        onPointerDown={(e) => e.stopPropagation()}
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.stopPropagation()}
-      >
-        {statuses.map((status) => (
-          <ContextMenuItem key={status} onSelect={() => setStatus(status)}>
-            {label(status)}
-          </ContextMenuItem>
-        ))}
-      </ContextMenuContent>
-    </ContextMenu>
-  );
+  return <div data-quick-peek-trigger={item.kind} className="relative min-w-0" onContextMenu={event => {
+    if (event.defaultPrevented || item.kind === 'character') return;
+    event.preventDefault(); event.stopPropagation();
+    const target = event.target instanceof Element ? event.target.closest('a[href]') : null;
+    const link = target ?? event.currentTarget.querySelector('a[href]');
+    openMediaQuickPeek({ kind: item.kind, id: item.id, name: item.name, poster: item.poster || '', anilistId: item.anilistId,
+      type: item.format, routeTo: link?.getAttribute('href') || `/${item.kind}/${encodeURIComponent(item.id)}` });
+  }}>{children}</div>;
 }
 
 /**
  * The quick-action button for a library card, positioned by the caller. Render
  * it inside the poster image so it sits on the art instead of covering the
- * title/meta row. Pair with `MediaLibraryMenu` for right-click status access.
+ * title/meta row. `MediaLibraryMenu` opens Quick View on right-click.
  */
 export function LibraryMenuButton({
   item,
@@ -249,5 +234,5 @@ export function MediaLibraryMenu({
   if (!item) return <Fragment>{children}</Fragment>;
   if (item.kind === "character")
     return <div className="relative min-w-0">{children}</div>;
-  return <StatusMenu item={item}>{children}</StatusMenu>;
+  return <QuickViewSurface item={item}>{children}</QuickViewSurface>;
 }

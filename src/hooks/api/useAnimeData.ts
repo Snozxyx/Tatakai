@@ -65,6 +65,7 @@ const SORT_MAP: Record<string, SearchFilters['sortBy']> = {
   score: 'SCORE_DESC',
   score_desc: 'SCORE_DESC',
   title_asc: 'TITLE_ROMAJI',
+  title_romaji: 'TITLE_ROMAJI',
   start_date_desc: 'START_DATE_DESC',
   popularity_desc: 'POPULARITY_DESC',
   trending_desc: 'TRENDING_DESC',

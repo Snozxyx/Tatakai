@@ -1,0 +1,29 @@
+/* Only route canvases become transparent. Panels, dialogs, cards and local
+   section backgrounds retain their own surfaces and contrast. */
+html[data-app-background] [data-main-layout] #main-content > .min-h-screen.bg-background,
+html[data-app-background] [data-main-layout] #main-content > .h-screen.bg-background,
+html[data-app-background] [data-main-layout] #main-content > .min-h-dvh.bg-background,
+html[data-app-background] [data-main-layout] #main-content > .h-dvh.bg-background,
+html[data-app-background] [data-main-layout] #main-content > .route-enter > .min-h-screen.bg-background,
+html[data-app-background] [data-main-layout] #main-content > .route-enter > .h-screen.bg-background,
+html[data-app-background] [data-main-layout] #main-content > .route-enter > .min-h-dvh.bg-background,
+html[data-app-background] [data-main-layout] #main-content > .route-enter > .h-dvh.bg-background,
+html[data-app-background] [data-app-page-surface],
+html.tatakai-tv[data-app-background] > body .tv-shell {
+  background-color: transparent !important;
+}
+html[data-app-background="custom"] [data-app-route-background],
+html[data-app-background="custom"] [data-mobile-home-backdrop] {
+  display: none !important;
+}
+
+/* The native material is drawn by Electron; only canvas tint is composed here. */
+html.desktop-system-blur,
+html.desktop-system-blur body,
+html.desktop-system-blur #root,
+html.desktop-system-blur [data-main-layout] { background-color: transparent !important; }
+html.desktop-system-blur [data-sidebar] { background-color: transparent !important; }
+html.desktop-system-blur [data-titlebar] { background-color: transparent !important; }
+html.titlebar-hidden [data-sidebar-rail="desktop"] { top: 0; padding-top: 1.5rem; }
+/* Plain native transparency does not use an OS material or chrome blur. */
+html[data-desktop-backdrop="transparent"] :is([data-sidebar],[data-titlebar],[data-desktop-header],[data-mobile-header]) { backdrop-filter:none !important; -webkit-backdrop-filter:none !important; }

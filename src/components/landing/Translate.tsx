@@ -17,8 +17,8 @@ export function Translate() {
     <section className="border-t border-border py-16 lg:py-28" aria-labelledby="translate-heading">
       <Reveal>
         <div className="mb-10 flex max-w-3xl flex-col gap-4">
-          <p className="text-xs font-bold uppercase tracking-widest text-primary">Tatakai Translate</p>
-          <h2 id="translate-heading" className="font-display text-3xl font-bold tracking-tight sm:text-5xl">{uiI18n.t('extensionUpdate.translateTitle')}</h2>
+          <p className="text-xs font-medium normal-case tracking-normal text-primary">Tatakai Translate</p>
+          <h2 id="translate-heading" className="font-display text-3xl font-medium tracking-tight sm:text-5xl">{uiI18n.t('extensionUpdate.translateTitle')}</h2>
           <p className="text-lg text-muted-foreground">{uiI18n.t('extensionUpdate.translateBody')}</p>
         </div>
         <img
@@ -33,8 +33,8 @@ export function Translate() {
         <ol className="grid gap-6 md:grid-cols-3">
           {steps.map(({ icon: Icon, title, body }, index) => (
             <li key={title} className="flex flex-col gap-3 border-t border-border pt-6">
-              <div className="flex items-center gap-3 text-primary"><Icon className="size-6" aria-hidden="true" /><span className="text-xs font-bold">0{index + 1}</span></div>
-              <h3 className="text-lg font-bold">{uiI18n.t(`extensionUpdate.${title}`)}</h3>
+              <div className="flex items-center gap-3 text-primary"><Icon className="size-6" aria-hidden="true" /><span className="text-xs font-medium">0{index + 1}</span></div>
+              <h3 className="text-lg font-medium">{uiI18n.t(`extensionUpdate.${title}`)}</h3>
               <p className="text-sm leading-relaxed text-muted-foreground">{uiI18n.t(`extensionUpdate.${body}`)}</p>
             </li>
           ))}

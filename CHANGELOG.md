@@ -4,6 +4,19 @@ All notable changes to Tatakai are documented here.
 
 ---
 
+## [6.4.4] - 2026-11-09
+
+- Promote the 6.4.4 beta work to the stable channel with coordinated desktop, Android, iOS and Android TV version metadata.
+- Add a redesigned manga reader with reusable reading presets, stable layout anchoring, continuous navigation, improved image loading and progress recovery.
+- Improve anime, manga and novel discovery with refreshed home shelves, calendar navigation, search suggestions, smart recommendations and better source/provider diagnostics.
+- Expand profile customization with themed profile worlds, responsive previews, saved-content organization, galleries, widgets and clearer badges and activity presentation.
+- Improve playback across desktop, mobile and TV with RTX video runtime packaging, external-player handling, video enhancement settings, resilient stream recovery and more reliable media controls.
+- Refresh extension and compatibility management with safer remote/custom provider handling, installed-runtime controls, Aniyomi Java support and mobile proxy improvements.
+- Improve authentication, content-safety, email-proof and backend-origin flows while improving error reporting and privacy controls.
+- Temporarily disable CAPTCHA on all devices so sign-in and account recovery do not wait for verification.
+- Restore the Hoko streaming proxy on the new domain with working CORS and HLS playlist delivery.
+- Refresh responsive layouts, landing pages, branding assets, splash screens, accessibility behavior and mobile navigation, with additional regression coverage for the affected flows.
+
 ## [6.4.4-beta.1] - 2026-11-01
 
 - Add a redesigned manga reader with reusable reading presets, improved image loading, layout anchoring, continuous navigation and progress recovery.

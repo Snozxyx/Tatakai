@@ -23,3 +23,30 @@
     scroll-padding-bottom: calc(5.5rem + var(--sab));
   }
 }
+
+@media (max-width: 767px) {
+  [data-reader-chrome] .reader-topbar {
+    gap: 8px;
+    padding-left: max(12px, var(--sal));
+    padding-right: max(12px, var(--sar));
+  }
+
+  [data-reader-chrome] .reader-tools {
+    top: auto;
+    right: auto;
+    bottom: calc(12px + var(--sab));
+    left: calc(50% + (var(--sal) - var(--sar)) / 2);
+    transform: translateX(-50%);
+    flex-direction: row;
+    gap: 8px;
+    max-width: calc(100vw - 24px - var(--sal) - var(--sar));
+    padding: 8px;
+    border-radius: 16px;
+    backdrop-filter: none;
+  }
+
+  [data-reader-chrome="true"] [data-reader-scroll] {
+    padding-bottom: calc(6rem + var(--sab));
+    scroll-padding-bottom: calc(6rem + var(--sab));
+  }
+}

@@ -121,7 +121,7 @@ export function V6AnnouncementPopup() {
             >
 
                 <div className="relative h-32 w-full overflow-hidden sm:h-52">
-                    <img src={`${import.meta.env.BASE_URL}assets/logo/tatakaibanner.png`} alt={uiI18n.t('app.tatakai_v6_42b962e7')} className="absolute inset-0 w-full h-full object-cover" />
+                    <img src={`${import.meta.env.BASE_URL}assets/logo/tatakaibanner-app.webp`} alt={uiI18n.t('app.tatakai_v6_42b962e7')} className="absolute inset-0 w-full h-full object-cover" />
                     <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/40 to-transparent" />
                     <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-4 sm:p-6">
                         

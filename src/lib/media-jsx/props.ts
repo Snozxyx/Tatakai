@@ -1,9 +1,15 @@
 import type { ImgHTMLAttributes, SyntheticEvent } from 'react';
 import { optimizedBackground, optimizedImageUrl } from '../media/imageUrl';
+import { isProfileThemeAssetPath, isProfileThemeAssetUrl } from '../../../shared/profile-theme-assets.mjs';
 
 /** Used by both JSX factories; host elements remain host elements (refs still work). */
 export function mediaProps(type: unknown, props: Record<string, any> | null) {
-  if (typeof type !== 'string' || !props || props['data-image-original']) return props;
+  if (typeof type !== 'string' || !props) return props;
+  if (props['data-image-original']) {
+    return type === 'img' && typeof props.src === 'string' &&
+      (isProfileThemeAssetPath(props.src) || isProfileThemeAssetUrl(props.src, import.meta.env?.VITE_PROFILE_THEME_ASSET_BASE))
+      ? { ...props, referrerPolicy: props.referrerPolicy ?? 'no-referrer' } : props;
+  }
   let result = props;
   if (props.style) {
     for (const key of ['backgroundImage', 'background'] as const) {
@@ -25,12 +31,12 @@ export function mediaProps(type: unknown, props: Record<string, any> | null) {
       const cached = new URL(props.src);
       if (cached.hostname === 'wsrv.nl') original = cached.searchParams.get('url') || original;
     } catch { /* Relative/offline asset. */ }
-    if (src !== original) {
+    if (src !== props.src || src !== original) {
       result = { ...result, src, decoding: props.decoding ?? 'async',
         onError(event: SyntheticEvent<HTMLImageElement>) {
           const image = event.currentTarget;
           // One direct retry before the caller's placeholder/candidate failover.
-          if (image.getAttribute('src') === src) {
+          if (src !== original && image.getAttribute('src') === src) {
             image.src = original;
             return;
           }
@@ -38,6 +44,10 @@ export function mediaProps(type: unknown, props: Record<string, any> | null) {
         },
       };
     }
+  }
+  if (type === 'img' && typeof result.src === 'string' &&
+      (isProfileThemeAssetPath(result.src) || isProfileThemeAssetUrl(result.src, import.meta.env?.VITE_PROFILE_THEME_ASSET_BASE))) {
+    result = { ...result, referrerPolicy: props.referrerPolicy ?? 'no-referrer' };
   }
   return result;
 }

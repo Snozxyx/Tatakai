@@ -1,5 +1,6 @@
+import { BrandLogo } from '@/components/branding/BrandLogo';
 import { HeaderSocialActions } from '@/components/layout/HeaderSocialActions';
-import { CosmeticAvatar, CosmeticName } from '@/components/profile/IdentityCosmetics';
+import { CosmeticAvatar } from '@/components/profile/IdentityCosmetics';
 import { fetchBetterStackStatus, type BetterStackHealth } from '@/lib/betterStackStatus';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
@@ -91,11 +92,13 @@ function formatTs(secs: number) {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export interface HeaderProps {
-  providerSearch?: { name: string; query: string; onSearch: (query: string) => void };
+  /** Home content and its header share the same outer gutter. */
+  alignWithPage?: boolean;
+  providerSearch?: { name: string; query: string; onSearch: (query: string) => void; supportsSearch?: boolean };
   providerControls?: React.ReactNode;
 }
 
-export function Header({ providerSearch, providerControls }: HeaderProps = {}) {
+export function Header({ providerSearch, providerControls, alignWithPage = false }: HeaderProps = {}) {
   useUiTranslation();
   const { t } = useTranslation();
   const refreshed = useMobileAppearance();
@@ -146,7 +149,7 @@ export function Header({ providerSearch, providerControls }: HeaderProps = {}) {
     const trimmed = term.trim();
     if (providerSearch) {
       setShowSuggestions(false);
-      providerSearch.onSearch(trimmed);
+      if (providerSearch.supportsSearch !== false) providerSearch.onSearch(trimmed);
       return;
     }
     if (!trimmed) return;
@@ -309,10 +312,9 @@ export function Header({ providerSearch, providerControls }: HeaderProps = {}) {
               onClick={() => navigate('/')}
               aria-label={t('migration.goHome')}
               title={t('nav.home')}
-              className="relative z-10 flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] shadow-sm transition-[transform,background-color,border-color,color,box-shadow,filter] duration-150 hover:border-primary/40 hover:bg-white/[0.1] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+              className="relative z-10 flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] shadow-sm transition-[transform,background-color,border-color,color,box-shadow,filter] duration-150 hover:border-primary/40 hover:bg-white/[0.1] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
             >
-              <img
-                src={`${import.meta.env.BASE_URL}assets/logo/tatakai-logo-square.png`}
+              <BrandLogo
                 alt=""
                 aria-hidden
                 className="h-6 w-6 rounded-md object-contain"
@@ -330,7 +332,7 @@ export function Header({ providerSearch, providerControls }: HeaderProps = {}) {
             onPointerLeave={clearLongPressTimer}
             onPointerCancel={clearLongPressTimer}
             onContextMenu={(e) => e.preventDefault()}
-            className="inline-flex h-9 touch-manipulation select-none items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3.5 text-xs font-bold tracking-wide text-foreground shadow-sm transition-[transform,background-color,border-color,color,box-shadow,filter] duration-150 [-webkit-touch-callout:none] hover:border-primary/40 hover:bg-white/[0.1] active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+            className="inline-flex h-9 touch-manipulation select-none items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3.5 text-xs font-medium tracking-normal text-foreground shadow-sm transition-[transform,background-color,border-color,color,box-shadow,filter] duration-150 [-webkit-touch-callout:none] hover:border-primary/40 hover:bg-white/[0.1] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
             aria-label={catalog === 'anime' ? t('migration.switchManga') : catalog === 'manga' ? t('migration.switchNovels') : t('migration.switchAnime')}
             title={t('migration.catalogHint')}
             aria-haspopup="menu"
@@ -375,10 +377,10 @@ export function Header({ providerSearch, providerControls }: HeaderProps = {}) {
             ) : user && !isBanned ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button aria-label={t('migration.profileMenu')} className="flex h-11 w-11 items-center justify-center rounded-full outline-none transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-primary/60">
+                  <button aria-label={t('migration.profileMenu')} className="flex h-11 w-11 items-center justify-center rounded-full outline-none transition-transform active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-primary/60">
                     <CosmeticAvatar userId={profile?.user_id} className="h-9 w-9 ring-1 ring-white/20 transition-shadow hover:ring-primary/40">
                       <AvatarImage src={profile?.avatar_url || undefined} alt={profile?.display_name || t('settings.groups.User')} />
-                      <AvatarFallback className="bg-gradient-to-br from-primary to-secondary text-xs font-bold text-primary-foreground">{profile?.display_name?.[0]?.toUpperCase() || user.email?.[0]?.toUpperCase() || 'U'}</AvatarFallback>
+                      <AvatarFallback className="bg-muted text-xs font-medium text-primary-foreground">{profile?.display_name?.[0]?.toUpperCase() || user.email?.[0]?.toUpperCase() || 'U'}</AvatarFallback>
                     </CosmeticAvatar>
                   </button>
                 </DropdownMenuTrigger>
@@ -390,7 +392,7 @@ export function Header({ providerSearch, providerControls }: HeaderProps = {}) {
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <Link to="/auth" className="inline-flex h-9 items-center rounded-full bg-primary px-4 text-xs font-bold text-primary-foreground shadow-lg shadow-primary/25 transition-[transform,background-color,border-color,color,box-shadow,filter] duration-150 hover:brightness-110 active:scale-95">{t('migration.signIn')}</Link>
+              <Link to="/auth" className="inline-flex h-9 items-center rounded-full bg-primary px-4 text-xs font-medium text-primary-foreground shadow-none transition-[transform,background-color,border-color,color,box-shadow,filter] duration-150 hover:brightness-110 active:scale-[0.98]">{t('migration.signIn')}</Link>
             )}
           </div>
         </div>
@@ -399,19 +401,20 @@ export function Header({ providerSearch, providerControls }: HeaderProps = {}) {
 
       {providerSearch && <div className={cn(refreshed ? 'block' : 'md:hidden', 'relative z-40 space-y-3 border-b border-border/40 py-3 mb-4')}>
         {providerControls}
-        <form onSubmit={handleSearch} className="flex min-w-0 items-center gap-3 rounded-full border border-border bg-muted/50 px-4 h-11">
+        {providerSearch.supportsSearch !== false && <form onSubmit={handleSearch} className="flex min-w-0 items-center gap-3 rounded-full border border-border bg-muted/50 px-4 h-11">
           <Search className="size-4 shrink-0 text-muted-foreground" />
           <input id="tatakai-provider-search" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder={`Search ${providerSearch.name}…`} aria-label="Search provider" className="min-w-0 flex-1 bg-transparent text-sm outline-none" />
           {searchQuery && <button type="button" aria-label="Clear provider search" onClick={() => { setSearchQuery(''); providerSearch.onSearch(''); }}><X className="size-4" /></button>}
-          <button type="submit" aria-label="Submit provider search" className="rounded-full px-2 py-1 text-sm font-semibold text-primary">Search</button>
-        </form>
+          <button type="submit" aria-label="Submit provider search" className="rounded-full px-2 py-1 text-sm font-medium text-primary">Search</button>
+        </form>}
       </div>}
-      <header data-desktop-header className={cn(refreshed ? 'hidden' : 'hidden md:flex', "relative items-center mb-4 z-50 backdrop-blur-md py-2", providerSearch ? 'px-0' : 'px-6')}>
+      <header data-desktop-header data-page-aligned={alignWithPage} className={cn(refreshed ? 'hidden' : 'hidden md:flex', 'relative items-center z-50 backdrop-blur-md py-2', alignWithPage ? 'mb-8' : 'mb-4', providerSearch || alignWithPage ? 'px-0' : 'px-6')}>
         <div className="flex items-center justify-between w-full gap-8">
-        {/* Left: welcome + status */}
+        {/* Current catalog and service status */}
         {providerControls ? <div className="min-w-0 flex-1">{providerControls}</div> : <div className="flex items-center gap-3">
-          <h2 className="text-muted-foreground text-sm font-medium tracking-wider uppercase">
-            {t("header.welcomeBack")} <span className="text-foreground"><CosmeticName userId={profile?.user_id}>{profile?.display_name || t("header.traveler")}</CosmeticName></span>
+          <h2 className="catalog-heading inline-flex items-center gap-2.5 font-display text-lg font-semibold text-foreground">
+            <span aria-hidden="true" className="catalog-heading-marker" />
+            {providerSearch?.name || (catalog === 'anime' ? uiI18n.t('app.anime_f1b32a19') : catalog === 'manga' ? t('nav.manga') : t('nav.novels'))}
           </h2>
           {isBanned && (
             <span className="px-2 py-0.5 rounded-full bg-destructive/20 text-destructive text-xs font-medium animate-pulse">{t("header.banned")}</span>
@@ -429,7 +432,7 @@ export function Header({ providerSearch, providerControls }: HeaderProps = {}) {
         {/* Right: search + user */}
         <div className="flex items-center gap-4 md:gap-6">
           {/* Search form with live suggestions */}
-          <div ref={searchWrapperRef} className="relative">
+          {providerSearch?.supportsSearch !== false && <div ref={searchWrapperRef} className="relative">
             <form
               onSubmit={handleSearch}
               className="flex items-center gap-3 bg-muted/50 border border-border/30 rounded-full px-4 py-2 hover:bg-muted transition-colors cursor-pointer group"
@@ -470,10 +473,10 @@ export function Header({ providerSearch, providerControls }: HeaderProps = {}) {
               >
                 <Camera className="w-4 h-4 text-muted-foreground hover:text-foreground transition-colors" />
               </button>}
-              {providerSearch && <button type="submit" aria-label="Submit provider search" className="text-sm font-semibold text-primary">Search</button>}
+              {providerSearch && <button type="submit" aria-label="Submit provider search" className="text-sm font-medium text-primary">Search</button>}
               <div className="hidden lg:flex gap-1 ml-2">
-                <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">⌘</span>
-                <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">K</span>
+                <span className="text-xs bg-muted px-1.5 py-0.5 rounded text-muted-foreground">⌘</span>
+                <span className="text-xs bg-muted px-1.5 py-0.5 rounded text-muted-foreground">K</span>
               </div>
             </form>
 
@@ -483,7 +486,7 @@ export function Header({ providerSearch, providerControls }: HeaderProps = {}) {
               onSelect={(name) => { setSearchQuery(name); setShowSuggestions(false); }}
               onClose={() => setShowSuggestions(false)}
             />}
-          </div>
+          </div>}
 
           <div className="hidden shrink-0 sm:flex"><HeaderSocialActions /></div>
 
@@ -492,10 +495,10 @@ export function Header({ providerSearch, providerControls }: HeaderProps = {}) {
           ) : user && !isBanned ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus:ring-offset-2 focus:ring-offset-background rounded-full active:scale-95 transition-transform">
+                <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus:ring-offset-2 focus:ring-offset-background rounded-full active:scale-[0.98] transition-transform">
                   <CosmeticAvatar userId={profile?.user_id} className="w-10 h-10 cursor-pointer hover:ring-2 hover:ring-primary/50 transition-[transform,background-color,border-color,color,box-shadow,filter] duration-150">
                     <AvatarImage src={profile?.avatar_url || undefined} alt={profile?.display_name || t('settings.groups.User')} />
-                    <AvatarFallback className="bg-gradient-to-br from-primary to-secondary text-primary-foreground font-bold">
+                    <AvatarFallback className="bg-muted text-primary-foreground font-medium">
                       {profile?.display_name?.[0]?.toUpperCase() || user.email?.[0]?.toUpperCase() || "U"}
                     </AvatarFallback>
                   </CosmeticAvatar>
@@ -565,7 +568,7 @@ export function Header({ providerSearch, providerControls }: HeaderProps = {}) {
               <button
                 onClick={handleImageSearch}
                 disabled={!selectedFile || isSearchingImage}
-                className="px-6 h-12 rounded-xl bg-primary text-primary-foreground font-semibold hover:brightness-110 active:scale-95 transition-[transform,background-color,border-color,color,box-shadow,filter] duration-150 shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center min-w-[110px] gap-2"
+                className="px-6 h-12 rounded-xl bg-primary text-primary-foreground font-medium hover:brightness-110 active:scale-[0.98] transition-[transform,background-color,border-color,color,box-shadow,filter] duration-150 shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center min-w-[110px] gap-2"
               >
                 {isSearchingImage ? (
                   <><Loader2 className="w-4 h-4 animate-spin" /> {t("header.scanning")}</>
@@ -596,7 +599,7 @@ export function Header({ providerSearch, providerControls }: HeaderProps = {}) {
 
             {imageResults && imageResults.length > 0 && (
               <div className="space-y-3">
-                <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground px-0.5">
+                <p className="text-xs font-medium normal-case tracking-normal text-muted-foreground px-0.5">
                   {t(imageResults.length === 1 ? "header.matchesFound" : "header.matchesFound_plural", { count: imageResults.length })}
                 </p>
 
@@ -646,16 +649,16 @@ export function Header({ providerSearch, providerControls }: HeaderProps = {}) {
                           </>
                         )}
                         {/* Overlays */}
-                        <div className={cn("absolute top-2 right-2 px-2 py-0.5 rounded-full bg-black/70 text-xs font-black backdrop-blur-sm", simColor)}>
+                        <div className={cn("absolute top-2 right-2 px-2 py-0.5 rounded-full bg-black/70 text-xs font-medium backdrop-blur-sm", simColor)}>
                           {pct}%
                         </div>
                         {result.episode != null && (
-                          <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-black/70 text-xs font-bold text-white backdrop-blur-sm">
+                          <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-black/70 text-xs font-medium text-white backdrop-blur-sm">
                             {t('migration.episodeShort')} {result.episode}
                           </div>
                         )}
                         {result.at != null && (
-                          <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/70 text-[10px] text-white font-mono backdrop-blur-sm">
+                          <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/70 text-xs text-white font-mono backdrop-blur-sm">
                             {formatTs(result.at)}
                           </div>
                         )}
@@ -671,11 +674,11 @@ export function Header({ providerSearch, providerControls }: HeaderProps = {}) {
                           />
                         )}
                         <div className="flex-1 min-w-0">
-                          <p className="font-bold text-sm line-clamp-1">{title}</p>
-                          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground mt-0.5">
-                            {result.episode != null && <span className="font-semibold text-foreground/70">{t("header.episode", { number: result.episode })}</span>}
+                          <p className="font-medium text-sm line-clamp-1">{title}</p>
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground mt-0.5">
+                            {result.episode != null && <span className="font-medium text-foreground/70">{t("header.episode", { number: result.episode })}</span>}
                             {result.at != null && <span>{t("header.atTime", { time: formatTs(result.at) })}</span>}
-                            <span className={cn("font-black", simColor)}>{t("header.matchPercent", { pct })}</span>
+                            <span className={cn("font-medium", simColor)}>{t("header.matchPercent", { pct })}</span>
                           </div>
                           <div className="flex gap-2 mt-2.5">
                             <button
@@ -683,7 +686,7 @@ export function Header({ providerSearch, providerControls }: HeaderProps = {}) {
                                 setShowImageSearch(false);
                                 navigate(`/anime/${result.anilist}`);
                               }}
-                              className="flex-1 py-1.5 rounded-lg bg-primary/15 hover:bg-primary/30 text-[11px] font-bold text-primary transition-[transform,background-color,border-color,color,box-shadow,filter] duration-150 border border-primary/20 hover:border-primary/40"
+                              className="flex-1 py-1.5 rounded-lg bg-primary/15 hover:bg-primary/30 text-xs font-medium text-primary transition-[transform,background-color,border-color,color,box-shadow,filter] duration-150 border border-primary/20 hover:border-primary/40"
                             >
                               {t("header.viewAnime")}
                             </button>
@@ -692,7 +695,7 @@ export function Header({ providerSearch, providerControls }: HeaderProps = {}) {
                                 setShowImageSearch(false);
                                 navigate(`/search?q=${encodeURIComponent(title)}`);
                               }}
-                              className="flex-1 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-[11px] font-bold text-muted-foreground hover:text-foreground transition-[transform,background-color,border-color,color,box-shadow,filter] duration-150 border border-white/5"
+                              className="flex-1 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-medium text-muted-foreground hover:text-foreground transition-[transform,background-color,border-color,color,box-shadow,filter] duration-150 border border-white/5"
                             >
                               {t("header.search")}
                             </button>

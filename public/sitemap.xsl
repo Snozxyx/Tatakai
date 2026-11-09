@@ -241,7 +241,7 @@
                 <h1 class="title">XML Sitemap Index</h1>
                 <p class="description">
                   This sitemap index lists all sub-sitemaps dynamically generated for
-                  <a href="https://tatakai.me">tatakai.me</a>.
+                  <a href="https://tatakai.app">tatakai.me</a>.
                   Search engines like Google and Bing crawl these files to discover and index anime, manga, and community content.
                 </p>
                 <div class="meta-bar">
@@ -255,7 +255,7 @@
                 <h1 class="title">XML Sitemap</h1>
                 <p class="description">
                   This XML sitemap lists URLs available for crawling on
-                  <a href="https://tatakai.me">tatakai.me</a>.
+                  <a href="https://tatakai.app">tatakai.me</a>.
                 </p>
                 <div class="meta-bar">
                   <div class="breadcrumb">
@@ -349,7 +349,7 @@
           </div>
 
           <div class="footer">
-            <p>Generated dynamically for <a href="https://tatakai.me">Tatakai</a> &bull; Otaku Anime &amp; Manga Community</p>
+            <p>Generated dynamically for <a href="https://tatakai.app">Tatakai</a> &bull; Otaku Anime &amp; Manga Community</p>
           </div>
         </div>
       </body>

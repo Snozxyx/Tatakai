@@ -1,3 +1,4 @@
+import { BrandLogo } from '@/components/branding/BrandLogo';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useIsNativeApp, useIsMacOS } from "@/hooks/ui/useIsNativeApp";
@@ -68,8 +69,7 @@ export function TitleBar() {
       {/* Left: App Icon + Title (hidden on mac — traffic lights + system menu sit here) */}
       <div className="flex items-center gap-2.5">
         {!isMac && (
-          <img
-            src={`${import.meta.env.BASE_URL}assets/logo/icon-32.png`}
+          <BrandLogo
             alt={uiI18n.t('app.tatakai_28bda6bd')}
             className="w-4 h-4"
             onError={(e) => {

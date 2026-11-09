@@ -2,31 +2,31 @@
 <?xml-stylesheet type="text/xsl" href="/sitemap.xsl"?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <sitemap>
-    <loc>https://tatakai.me/sitemap-static.xml</loc>
+    <loc>https://tatakai.app/sitemap-static.xml</loc>
     <lastmod>2026-10-06</lastmod>
   </sitemap>
   <sitemap>
-    <loc>https://tatakai.me/sitemap-anime-1.xml</loc>
+    <loc>https://tatakai.app/sitemap-anime-1.xml</loc>
     <lastmod>2026-10-06</lastmod>
   </sitemap>
   <sitemap>
-    <loc>https://tatakai.me/sitemap-manga-1.xml</loc>
+    <loc>https://tatakai.app/sitemap-manga-1.xml</loc>
     <lastmod>2026-10-06</lastmod>
   </sitemap>
   <sitemap>
-    <loc>https://tatakai.me/sitemap-profiles.xml</loc>
+    <loc>https://tatakai.app/sitemap-profiles.xml</loc>
     <lastmod>2026-10-06</lastmod>
   </sitemap>
   <sitemap>
-    <loc>https://tatakai.me/sitemap-tierlists.xml</loc>
+    <loc>https://tatakai.app/sitemap-tierlists.xml</loc>
     <lastmod>2026-10-06</lastmod>
   </sitemap>
   <sitemap>
-    <loc>https://tatakai.me/sitemap-playlists.xml</loc>
+    <loc>https://tatakai.app/sitemap-playlists.xml</loc>
     <lastmod>2026-10-06</lastmod>
   </sitemap>
   <sitemap>
-    <loc>https://tatakai.me/sitemap-posts.xml</loc>
+    <loc>https://tatakai.app/sitemap-posts.xml</loc>
     <lastmod>2026-10-06</lastmod>
   </sitemap>
 </sitemapindex>

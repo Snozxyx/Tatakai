@@ -2,6 +2,7 @@ const WatchlistPage = lazy(() => import('../pages/base/WatchlistPage'));
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { useRoutePreload } from '@/hooks/ui/useRoutePreload';
 import TVLinkPage from '@/pages/tv/TVLinkPage';
+const TVLayoutCustomizationPage = lazy(() => import('@/pages/tv/TVLayoutCustomizationPage'));
 import { Routes, Route, Navigate, useLocation, useParams, useNavigate, useNavigationType } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -461,6 +462,7 @@ const AppRoutes = () => {
     <Suspense key={routeSection} fallback={<PageLoader />}>
       <div key={routeSection} className="route-enter">
       <Routes>
+        <Route path="/customize-tv/:page" element={<TVLayoutCustomizationPage />} />
         <Route path="/translate" element={<TranslatePage />} />
         <Route path="/maintenance" element={<StatusPageGuard allowedWhen={isMaintenanceMode}><MaintenancePage /></StatusPageGuard>} />
         <Route path="/banned" element={<StatusPageGuard allowedWhen={isBanned}><BannedPage /></StatusPageGuard>} />

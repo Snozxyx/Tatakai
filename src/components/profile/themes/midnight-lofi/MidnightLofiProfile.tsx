@@ -1,3 +1,4 @@
+import { ProfileBadges } from '@/components/profile/ProfileBadges';
 import { formatWatchHours } from '@/lib/formatWatchHours';
 import ProfileThemeDetails from '../ProfileThemeDetails';
 import { ProfilePresence } from '@/components/profile/ProfilePresence';
@@ -273,9 +274,7 @@ export default function MidnightLofiProfile({ data, configuration, onBack }: The
             {/* Badges */}
             {data.badges.length > 0 && (
               <div className="ml-identity-badges">
-                {data.badges.map(b => (
-                  <img key={b.key} src={b.image} alt={b.label} title={b.label} />
-                ))}
+                <ProfileBadges badges={data.badges} size={26} grid={false} interactive={true} className="contents" />
               </div>
             )}
 

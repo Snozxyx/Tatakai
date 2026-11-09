@@ -1,5 +1,5 @@
-import { ThemedSelect } from '@/components/ui/themed-select';
-import { useEffect, useRef, useState } from "react";
+import { TVIPTVPlaylistForm, type TVIPTVPlaylistValues } from '@/components/tv/TVIPTVPlaylistForm';
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useSearchParams } from "react-router-dom";
@@ -9,6 +9,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { db } from "@/core/db/tatakai-db";
 import {
@@ -27,7 +28,8 @@ import {
   registerNativeSource,
   ensureNativeProxy,
 } from "@/core/mobile/localProxyNative";
-import type { IPTVChannel, IPTVPlaylist, IPTVProgram } from "@/core/iptv/types";
+import type { IPTVChannel, IPTVProgram } from "@/core/iptv/types";
+import '@/components/tv/tv-iptv.css';
 
 export default function TVIPTVPage() {
   const client = useQueryClient(),
@@ -35,13 +37,10 @@ export default function TVIPTVPage() {
   const [group, setGroup] = useState("All"),
     [kind, setKind] = useState("live"),
     [favorites, setFavorites] = useState(false);
-  const [adding, setAdding] = useState(false),
-    [name, setName] = useState(""),
-    [url, setUrl] = useState(""),
-    [epgURL, setEPGURL] = useState(""),
-    [username, setUsername] = useState(""),
-    [password, setPassword] = useState(""),
-    [sourceKind, setSourceKind] = useState("m3u");
+  const [adding, setAdding] = useState(false);
+  const [playlistForm, setPlaylistForm] = useState<TVIPTVPlaylistValues>({ name: '', url: '', epgURL: '', username: '', password: '', sourceKind: 'm3u' });
+  const { name, url, epgURL, username, password, sourceKind } = playlistForm;
+  const addPlaylistButton = useRef<HTMLButtonElement>(null);
   const [message, setMessage] = useState(""),
     [busy, setBusy] = useState(false),
     [programs, setPrograms] = useState<IPTVProgram[]>([]),
@@ -65,7 +64,7 @@ export default function TVIPTVPage() {
     queryKey: ["iptv-favorites"],
     queryFn: () => db.iptvFavorites.toArray(),
   });
-  const all = channels.data || [];
+  const all = useMemo(() => channels.data || [], [channels.data]);
   const filtered = all.filter(
     (c) =>
       c.kind === kind &&
@@ -92,9 +91,11 @@ export default function TVIPTVPage() {
     setMessage("Working…");
     try {
       await action(controller.signal);
+      if (controller.signal.aborted) { setMessage('Import cancelled.'); return; }
       setMessage("Updated.");
       await invalidate();
     } catch (e) {
+      if (controller.signal.aborted) { setMessage('Import cancelled.'); return; }
       setMessage(
         e instanceof Error
           ? e.message
@@ -102,6 +103,8 @@ export default function TVIPTVPage() {
       );
     } finally {
       setBusy(false);
+      // Channels may already have committed before an optional EPG request is cancelled.
+      if (controller.signal.aborted) await invalidate();
     }
   }
   useEffect(() => {
@@ -236,8 +239,8 @@ export default function TVIPTVPage() {
           );
         }
       }),
-    [channels.data]
-  ); // eslint-disable-line react-hooks/exhaustive-deps
+    [all]
+  );
   useEffect(() => {
     const target = params.get("channel");
     const channel = all.find((c) => c.id === target);
@@ -254,9 +257,10 @@ export default function TVIPTVPage() {
   }
   return (
     <>
+      <section className="tv-iptv-page">
       <h1>Live TV &amp; IPTV</h1>
       <div className="tv-iptv-controls">
-        <button onClick={() => setAdding(true)}>Add playlist</button>
+        <button ref={addPlaylistButton} data-tv-key="iptv-add-playlist" onClick={() => { setMessage(''); setAdding(true); }}>Add playlist</button>
         {(["live", "vod", "series"] as const).map((value) => (
           <button
             key={value}
@@ -402,55 +406,18 @@ export default function TVIPTVPage() {
           </div>
         </div>
       </div>
-      <Dialog open={adding} onOpenChange={setAdding}>
-        <DialogContent className="tv-dialog">
+      </section>
+      <Dialog open={adding} onOpenChange={open => { if (!open) abort.current?.abort(); setAdding(open); }}>
+        <DialogContent className="tv-dialog tv-iptv-playlist-dialog" showCloseButton={false}
+          onOpenAutoFocus={event => { event.preventDefault(); document.getElementById('tv-iptv-playlist-name')?.focus(); }}
+          onCloseAutoFocus={event => { event.preventDefault(); addPlaylistButton.current?.focus(); }}>
           <DialogHeader>
             <DialogTitle>Add IPTV playlist</DialogTitle>
+            <DialogDescription>Add your M3U playlist or Xtream account.</DialogDescription>
           </DialogHeader>
-          <label>
-            Name
-            <input value={name} onChange={(e) => setName(e.target.value)} />
-          </label>
-          <label>
-            Type
-            <ThemedSelect
-              value={sourceKind}
-              onChange={(e) => setSourceKind(e.target.value)}
-            >
-              <option value="m3u">M3U</option>
-              <option value="xtream">Xtream Codes</option>
-            </ThemedSelect>
-          </label>
-          <label>
-            {sourceKind === "m3u" ? "Playlist URL" : "Server URL"}
-            <input value={url} onChange={(e) => setUrl(e.target.value)} />
-          </label>
-          {sourceKind === "xtream" && (
-            <>
-              <label>
-                Username
-                <input
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                />
-              </label>
-              <label>
-                Password
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-              </label>
-            </>
-          )}
-          <label>
-            XMLTV guide URL (optional)
-            <input value={epgURL} onChange={(e) => setEPGURL(e.target.value)} />
-          </label>
-          <button
-            disabled={busy || !url}
-            onClick={() =>
+          <TVIPTVPlaylistForm values={playlistForm} onChange={setPlaylistForm} busy={busy} message={message}
+            onCancel={() => { abort.current?.abort(); setAdding(false); }}
+            onImport={() =>
               void run(async (signal) => {
                 const playlist = await savePlaylist(
                   name,
@@ -465,14 +432,12 @@ export default function TVIPTVPage() {
                   signal
                 );
                 if (epgURL) await importEPG(epgURL, playlist.id, signal);
+                if (signal.aborted) return;
                 setAdding(false);
-                setPassword("");
+                setPlaylistForm(current => ({ ...current, password: '' }));
               })
             }
-          >
-            Import
-          </button>
-          <p role="status">{message}</p>
+          />
         </DialogContent>
       </Dialog>
       <Dialog

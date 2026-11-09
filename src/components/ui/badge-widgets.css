@@ -1,0 +1,31 @@
+.badge-widget-dialog[data-state='open'] {
+  animation: badge-widget-open var(--duration-fast) var(--ease-smooth-out);
+}
+.badge-widget-dialog[data-state='closed'] {
+  animation: badge-widget-close var(--duration-quick) var(--ease-smooth-out);
+}
+@keyframes badge-widget-open {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(var(--scale-large)); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes badge-widget-close {
+  from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  to { opacity: 0; transform: translate(-50%, -50%) scale(var(--scale-large)); }
+}
+.badge-widget-tooltip { z-index: 160; }
+.badge-widget-tooltip[data-state='delayed-open'],
+.badge-widget-tooltip[data-state='instant-open'],
+.badge-widget-tooltip[data-state='open'] {
+  animation: badge-tooltip-open var(--duration-quick) var(--ease-out);
+}
+.badge-widget-tooltip[data-state='closed'] { animation: ui-fade-out 50ms var(--ease-out); }
+@keyframes badge-tooltip-open {
+  from { opacity: 0; transform: scale(var(--scale-small)); }
+  to { opacity: 1; transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .badge-widget-dialog[data-state='open'] { animation: ui-fade-in 150ms ease-out; }
+  .badge-widget-dialog[data-state='closed'] { animation: ui-fade-out 150ms ease-out; }
+}
+html[data-reduced-motion='true'] .badge-widget-dialog[data-state='open'] { animation: ui-fade-in 150ms ease-out; }
+html[data-reduced-motion='true'] .badge-widget-dialog[data-state='closed'] { animation: ui-fade-out 150ms ease-out; }

@@ -1,10 +1,13 @@
 import { supabase } from "@/integrations/supabase/client";
+import { mergeCustomizationValue, type CustomizationSettings } from '@/lib/customization';
 
 const GUEST_SETTINGS_COOKIE_KEY = "tatakai_guest_settings_v1";
 const GUEST_SETTINGS_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 const ACCOUNT_SETTINGS_LOCAL_PREFIX = "tatakai_account_settings_v1:";
 
 export interface PersistedAppSettings {
+  readingTitleLanguage?: import('./titleLanguage').TitleLanguage;
+  customization?: CustomizationSettings;
   locale?: string;
   readerPresets?: import('@/hooks/media/useReaderPresets').ReaderPresets;
   sidebar?: Record<string, unknown>;
@@ -18,6 +21,9 @@ export interface PersistedAppSettings {
   novelReader?: Record<string, unknown>;
   theme?: {
     theme?: string;
+    mode?: 'manual' | 'system';
+    lightTheme?: string;
+    darkTheme?: string;
     reduceMotion?: boolean;
     highContrast?: boolean;
   };
@@ -37,12 +43,15 @@ const isMissingAppSettingsColumnError = (error: any) => {
   );
 };
 
-const mergeSettings = (
+export const mergeAppSettings = (
   base: PersistedAppSettings,
   patch: Partial<PersistedAppSettings>,
 ): PersistedAppSettings => ({
   ...base,
   ...patch,
+  ...((base.customization || patch.customization) ? {
+    customization: mergeCustomizationValue(base.customization, patch.customization ?? {}) as CustomizationSettings,
+  } : {}),
   ...(typeof patch.locale === 'string' ? { locale: patch.locale } : {}),
   contentSafety: {
     ...(isObject(base.contentSafety) ? base.contentSafety : {}),
@@ -65,6 +74,8 @@ const mergeSettings = (
     ...(isObject(patch.theme) ? patch.theme : {}),
   },
 });
+
+const mergeSettings = mergeAppSettings;
 
 const getCookieValue = (name: string): string | null => {
   if (typeof document === "undefined") return null;
@@ -97,6 +108,8 @@ export function writeGuestSettingsCookie(
 ): PersistedAppSettings {
   const current = readGuestSettingsFromCookie();
   const next = mergeSettings(current, patch);
+  // Large appearance maps and binary references are local/account-only.
+  delete next.customization;
 
   if (typeof document !== "undefined") {
     document.cookie = `${GUEST_SETTINGS_COOKIE_KEY}=${encodeURIComponent(JSON.stringify(next))}; path=/; max-age=${GUEST_SETTINGS_COOKIE_MAX_AGE}; SameSite=Lax`;
@@ -114,7 +127,7 @@ function getAccountSettingsLocalKey(userId: string): string {
   return `${ACCOUNT_SETTINGS_LOCAL_PREFIX}${userId}`;
 }
 
-function readAccountSettingsFromLocal(userId: string): PersistedAppSettings {
+export function readAccountSettingsFromLocal(userId: string): PersistedAppSettings {
   if (typeof window === "undefined") return {};
 
   try {
@@ -146,6 +159,20 @@ function writeAccountSettingsToLocal(
 }
 
 const pendingSettingsWrites = new Map<string, Promise<PersistedAppSettings>>();
+/** Retire one preference family without dropping unrelated queued settings. */
+export function discardPendingAccountSettingsField(userId: string, field: 'customization' | 'theme' | 'sidebar'): void {
+  if (typeof localStorage === 'undefined') return;
+  const key = `${ACCOUNT_SETTINGS_LOCAL_PREFIX}pending:${userId}`;
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return;
+    const pending = JSON.parse(raw);
+    if (!isObject(pending) || !(field in pending)) return;
+    delete pending[field];
+    if (Object.keys(pending).length) localStorage.setItem(key, JSON.stringify(pending));
+    else localStorage.removeItem(key);
+  } catch { /* Do not change unrelated malformed outbox data. */ }
+}
 export function saveAccountSettingsPatch(userId: string, patch: Partial<PersistedAppSettings>): Promise<PersistedAppSettings> {
   // Persist before starting I/O; serialize read/merge/write to avoid lost patches.
   const local = writeAccountSettingsToLocal(userId, patch);
@@ -173,12 +200,13 @@ if (typeof window !== 'undefined') window.addEventListener('online', () => {
     try { const value = localStorage.getItem(key); if (value) void saveAccountSettingsPatch(data.user.id, JSON.parse(value)).catch(() => undefined); } catch { /* storage unavailable */ }
   }).catch(() => undefined);
 });
-async function saveAccountSettingsRemote(
+export async function saveAccountSettingsRemote(
   userId: string,
   patch: Partial<PersistedAppSettings>,
+  client: { from: (table: string) => any } = supabase as any,
 ): Promise<PersistedAppSettings> {
-  const profileTable = (supabase as any).from("profiles");
-
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+  const profileTable = client.from("profiles");
   const { data: profileRow, error: selectError } = await profileTable
     .select("app_settings")
     .eq("user_id", userId)
@@ -199,9 +227,13 @@ async function saveAccountSettingsRemote(
 
   const next = mergeSettings(current, patch);
 
-  const { error: updateError } = await profileTable
+  let update = client.from("profiles")
     .update({ app_settings: next })
     .eq("user_id", userId);
+  update = profileRow.app_settings == null
+    ? update.is('app_settings', null)
+    : update.eq('app_settings', JSON.stringify(profileRow.app_settings));
+  const { data: updated, error: updateError } = await update.select('app_settings').maybeSingle();
 
   if (updateError) {
     if (isMissingAppSettingsColumnError(updateError)) {
@@ -210,5 +242,7 @@ async function saveAccountSettingsRemote(
     throw updateError;
   }
 
-  return next;
+  if (updated) return next;
+  }
+  throw new Error('Account settings changed while saving. Your changes are queued for retry.');
 }

@@ -1,0 +1,116 @@
+/* Tabs recipe from Transitions.dev, copyright 2026 Jakub Antalik.
+   Integrated under its free personal/commercial use license. */
+:root {
+  --duration-micro: 80ms;
+  --duration-quick: 150ms;
+  --duration-fast: 250ms;
+  --duration-medium: 350ms;
+  --duration-slow: 400ms;
+  --ease-smooth-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-out: ease-out;
+  --distance-base: 8px;
+  --scale-large: 0.96;
+  --scale-small: 0.98;
+  --tabs-dur: 250ms;
+  --tabs-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --tabs-text-muted: rgba(15, 15, 15, 0.8);
+  --tabs-text-active: #0f0f0f;
+  --tabs-bar-bg: #f1f1f1;
+  --tabs-pill-bg: #ffffff;
+}
+
+/* The bar is just a flex container with padding for the pill
+   to sit inside. Tabs sit on z-index: 1, the pill on z-index: 0,
+   so labels read above the pill background. */
+.t-tabs {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 48px;
+  background: var(--tabs-bar-bg);
+}
+.t-tab {
+  position: relative;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  height: 30px;
+  padding: 4px 12px;
+  color: var(--tabs-text-muted);
+  cursor: pointer;
+  border-radius: 48px;
+  z-index: 1;
+  transition: color var(--tabs-dur) var(--tabs-ease);
+}
+.t-tab:not([aria-selected="true"]):hover,
+.t-tab[aria-selected="true"] {
+  color: var(--tabs-text-active);
+}
+
+/* The pill: width + transform are written inline by JS so
+   the transition tweens between the previous and next
+   measured positions. */
+.t-tabs-pill {
+  position: absolute;
+  top: 3px;
+  left: 0;
+  height: 30px;
+  width: 0;
+  background: var(--tabs-pill-bg);
+  border-radius: 48px;
+  transform: translateX(0);
+  transition:
+    transform var(--tabs-dur) var(--tabs-ease),
+    width     var(--tabs-dur) var(--tabs-ease);
+  will-change: transform, width;
+  z-index: 0;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .t-tabs-pill, .t-tab { transition: none !important; }
+}
+
+:root {
+  --dropdown-open-dur: 250ms;
+  --dropdown-close-dur: 150ms;
+  --dropdown-pre-scale: 0.97;
+  --dropdown-closing-scale: 0.99;
+  --dropdown-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Keep Tatakai's selected palette and its desktop/touch target sizes. */
+.catalog-tabs {
+  --tabs-bar-bg: hsl(var(--muted) / .5);
+  --tabs-pill-bg: hsl(var(--primary));
+  --tabs-text-muted: hsl(var(--muted-foreground));
+  --tabs-text-active: hsl(var(--primary-foreground));
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 12px;
+}
+.catalog-tabs .t-tab {
+  height: auto;
+  border-radius: 8px;
+}
+.catalog-tabs .t-tabs-pill { border-radius: 8px; }
+.catalog-tabs .t-tab:not([aria-selected="true"]):hover { color: hsl(var(--foreground)); }
+.ui-popup.t-menu-popup[data-state="open"] {
+  animation-duration: var(--dropdown-open-dur);
+  animation-timing-function: var(--dropdown-ease);
+}
+.ui-popup.t-menu-popup[data-state="closed"] {
+  animation-duration: var(--dropdown-close-dur);
+  animation-timing-function: var(--dropdown-ease);
+}
+html[data-reduced-motion="true"] .t-tabs-pill,
+html[data-reduced-motion="true"] .t-tab,
+.reduce-motion .t-tabs-pill,
+.reduce-motion .t-tab { transition: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  .ui-popup.t-menu-popup[data-state] { animation-duration: 150ms; }
+}
+html[data-reduced-motion="true"] .ui-popup.t-menu-popup[data-state] { animation-duration: 150ms; }

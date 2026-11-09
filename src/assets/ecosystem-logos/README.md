@@ -1,0 +1,1 @@
+Ecosystem logos are used to identify their respective projects. Original branding belongs to those projects. Download URLs and content hashes are recorded in sources.json. Raster files are optimized without changing their aspect ratio.

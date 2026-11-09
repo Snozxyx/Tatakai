@@ -2,6 +2,7 @@ import { parse } from 'postcss';
 import type { ProfileThemeData, ThemeMediaItem } from '@/components/profile/themes/types';
 import type { SocialPresence } from '@/lib/socialActivity';
 import { isAllowedImageUrl } from '@/lib/imageHosts';
+import { isProfileThemeAssetPath, isProfileThemeAssetUrl, profileThemeAssetUrl, rewriteProfileThemeCss } from './profileThemeAssets';
 
 export interface CustomProfileTheme {
   version: 1; theme_name: string; enabled: boolean; html: string; css: string;
@@ -66,6 +67,7 @@ export const DEFAULT_CUSTOM_THEME: CustomProfileTheme = { version: 1, theme_name
 export const escapeProfileText = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 export function safeTemplateImage(value: unknown): string {
   if (typeof value !== 'string') return '';
+  if (isProfileThemeAssetPath(value) || isProfileThemeAssetUrl(value)) return profileThemeAssetUrl(value);
   if (/^\/assets\/[a-zA-Z0-9_./-]+$/.test(value) && !value.includes('..')) return value;
   if (!isAllowedImageUrl(value)) return '';
   try { const url = new URL(value); return !url.username && !url.password ? url.href : ''; } catch { return ''; }
@@ -84,7 +86,7 @@ export function compileCustomThemeCss(input: string, reducedMotion = false) {
   const warnings = new Set<string>();
   if (input.length > 20000) return { css: '', warnings: ['CSS must be 20,000 characters or fewer.'] };
   try {
-    const root = parse(input);
+    const root = parse(rewriteProfileThemeCss(input));
     root.walkAtRules(rule => {
       if (!['media', 'supports', 'keyframes', '-webkit-keyframes', 'container'].includes(rule.name.toLowerCase())) { warnings.add(`@${rule.name} is not supported.`); rule.remove(); }
     });
@@ -114,7 +116,7 @@ export function renderProfileTemplate(html: string, data: ProfileTemplateData, p
     completed: count(data.canViewLibrary, data.stats.completed), streak: count(data.canViewHistory, data.stats.streak), longest_streak: count(data.canViewHistory, data.stats.longestStreak),
     status: e(presence?.online ? 'Online' : presence?.last_seen ? `Last online ${new Date(presence.last_seen).toLocaleDateString()}` : ''),
     activity: e(presence?.online && presence.title ? `${presence.kind === 'watching' ? 'Watching' : 'Reading'} ${presence.title}` : ''),
-    badges: data.badges.slice(0, 12).map(badge => safeTemplateImage(badge.image) ? `<img class="tatakai-badge" src="${e(safeTemplateImage(badge.image))}" alt="${e(badge.label)}" title="${e(badge.label)}">` : '').join(''),
+    badges: data.badges.slice(0, 12).map(badge => safeTemplateImage(badge.image) ? `<img class="tatakai-badge" src="${e(safeTemplateImage(badge.image))}" alt="${e(badge.label)}" aria-label="${e(badge.label)}" data-profile-badge="${e(badge.key)}" role="button" tabindex="0">` : '').join(''),
     watchlist: media(data.sections?.watchlist ?? data.library, data.canViewLibrary), manga_list: media(data.sections?.manga ?? [], data.canViewLibrary),
     novel_list: media(data.sections?.novels ?? [], data.isOwner && data.canViewLibrary), recent_activity: media(data.activity, data.canViewHistory), reading_history: media(data.sections?.readingHistory ?? [], data.canViewHistory),
     favorites: media(data.favorites), social_links: data.links.map(link => { const href = safeTemplateLink(link.url); return href ? `<a href="${e(href)}" target="_blank" rel="noopener noreferrer">${e(link.label)}</a>` : ''; }).join(' '),

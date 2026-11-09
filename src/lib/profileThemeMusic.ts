@@ -1,3 +1,5 @@
+import { isProfileThemeAssetPath, isProfileThemeAssetUrl, profileThemeAssetUrl } from './profileThemeAssets';
+
 export interface LyricLine { time: number; text: string }
 /** LRC timestamps, including repeated timestamps on one line and millisecond offsets. */
 export function parseProfileLyrics(source: string): LyricLine[] {
@@ -12,6 +14,7 @@ export function parseProfileLyrics(source: string): LyricLine[] {
 }
 export function safeProfileAudio(value: unknown): string {
   if (typeof value !== 'string' || value.length > 2048) return '';
+  if (isProfileThemeAssetPath(value) || isProfileThemeAssetUrl(value)) return profileThemeAssetUrl(value);
   try { const url = new URL(value.trim()); return url.protocol === 'https:' && !url.username && !url.password ? url.href : ''; } catch { return ''; }
 }
 

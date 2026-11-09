@@ -92,7 +92,8 @@ const ContinueCard = memo(function ContinueCard({ item }: { item: ContinueItem }
         to={`/watch/${encodeURIComponent(item.episode_id)}?t=${Math.floor(progressSeconds)}`}
         aria-label={percent !== null ? t('discover.resumeLabelWithPercent', { name: item.anime_name, episode: item.episode_number, percent }) : t('discover.resumeLabel', { name: item.anime_name, episode: item.episode_number })}
         data-mobile-poster-card
-        className="group flex w-full flex-col overflow-hidden rounded-2xl border border-white/[0.07] bg-white/[0.02] transition-all duration-300 hover:border-primary/40 hover:bg-white/[0.04] hover:shadow-[0_0_28px_-10px_hsl(var(--primary)/0.5)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-[0.99]"
+        data-resume-card={progressSeconds > 0 || undefined}
+        className="group flex w-full flex-col overflow-hidden rounded-2xl border border-white/[0.07] bg-white/[0.02] transition-[color,background-color,border-color,opacity] duration-300 hover:border-primary/40 hover:bg-white/[0.04]  focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-[0.99]"
       >
         {/* Landscape episode thumbnail — the actual screencap when resolved */}
         <div className="relative aspect-video w-full overflow-hidden bg-white/[0.04]">
@@ -101,7 +102,7 @@ const ContinueCard = memo(function ContinueCard({ item }: { item: ContinueItem }
             alt={epTitle ? t('migration.episodeTitle', { number: item.episode_number, title: epTitle }) : t('migration.animeEpisode', { name: item.anime_name, number: item.episode_number })}
             loading="lazy"
             decoding="async"
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+            className="h-full w-full object-cover transition-transform duration-200 "
             onError={(e) => {
               const img = e.currentTarget;
               if (img.dataset.fallback === '1') return;
@@ -111,11 +112,11 @@ const ContinueCard = memo(function ContinueCard({ item }: { item: ContinueItem }
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
 
-          <span className="absolute left-2 top-2 rounded-md bg-black/70 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-white backdrop-blur-sm">
+          <span className="absolute left-2 top-2 rounded-md bg-black/70 px-2 py-1 text-xs font-medium normal-case tracking-normal text-white backdrop-blur-sm">
             {t('migration.episodeShort')} {item.episode_number}
           </span>
           {timeLeft && (
-            <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-black/70 px-2 py-1 text-[10px] font-bold text-white/85 backdrop-blur-sm">
+            <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-black/70 px-2 py-1 text-xs font-medium text-white/85 backdrop-blur-sm">
               <Clock className="h-3 w-3" aria-hidden="true" />
               {timeLeft}
             </span>
@@ -128,7 +129,7 @@ const ContinueCard = memo(function ContinueCard({ item }: { item: ContinueItem }
           </span>
 
           {epTitle && (
-            <p className="absolute inset-x-2 bottom-6 line-clamp-1 text-[11px] font-semibold text-white/90 drop-shadow-md">
+            <p className="absolute inset-x-2 bottom-6 line-clamp-1 text-xs font-medium text-white/90 drop-shadow-md">
               {epTitle}
             </p>
           )}
@@ -137,7 +138,7 @@ const ContinueCard = memo(function ContinueCard({ item }: { item: ContinueItem }
           {percent !== null && (
             <div className="absolute inset-x-0 bottom-0 h-1 bg-white/15" aria-hidden="true">
               <div
-                className="h-full bg-gradient-to-r from-primary to-secondary transition-[width] duration-500"
+                className="h-full bg-gradient-to-r from-primary to-secondary transition-[width] duration-200"
                 style={{ width: `${percent}%` }}
               />
             </div>
@@ -153,19 +154,19 @@ const ContinueCard = memo(function ContinueCard({ item }: { item: ContinueItem }
             className="h-10 w-8 shrink-0 rounded-md object-cover"
           />
           <div className="min-w-0 flex-1">
-            <h3 className="line-clamp-1 text-[13px] font-bold leading-tight text-white/90 transition-colors group-hover:text-primary">
+            <h3 className="line-clamp-1 text-[13px] font-medium leading-tight text-white/90 transition-colors group-hover:text-primary">
               {item.anime_name}
             </h3>
-            <div className="mt-0.5 flex items-center justify-between gap-2 text-[11px] text-white/50">
+            <div className="mt-0.5 flex items-center justify-between gap-2 text-xs text-white/50">
               <span className="truncate">
                 {t('anime.episode')} {item.episode_number}
                 {epTitle ? uiI18n.t('app.i18n_value_0_723b674d', { value0: epTitle }) : ''}
               </span>
               {percent !== null && (
-                <span className="shrink-0 tabular-nums font-bold text-white/60">{percent}%</span>
+                <span className="shrink-0 tabular-nums font-medium text-white/60">{percent}%</span>
               )}
             </div>
-            <span className="mt-1.5 inline-flex items-center gap-1 text-xs font-semibold text-primary">
+            <span className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-primary">
               {t('discover.resume')}
               <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
             </span>
@@ -207,8 +208,8 @@ export function ContinueWatching() {
               {t('discover.pickUpWhereLeftOff')}
             </p>
             <Link
-              to="/profile?tab=history"
-              className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-card px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:border-foreground/20 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              to="/favorites?tab=history"
+              className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-foreground/20 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               aria-label={t('discover.viewFullHistory')}
             >
               <History className="h-3.5 w-3.5" aria-hidden="true" />

@@ -67,7 +67,7 @@ const SUPABASE_ORIGIN = (() => {
 
 const API_ORIGIN = (() => {
   const raw = String(import.meta.env.VITE_API_ORIGIN || '').trim();
-  return raw || 'https://api.tatakai.me';
+  return raw || 'https://api.tatakai.app';
 })();
 
 /** Origins probed for reachability. Empty entries are filtered out. */

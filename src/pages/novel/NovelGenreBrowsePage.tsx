@@ -1,3 +1,4 @@
+import { selectReadingTitle } from '@/lib/titleLanguage';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { normalizeCatalogSort, preservesCatalogPageOrder } from '@/core/content/catalog-sort';
@@ -271,7 +272,7 @@ async function fetchNovelCatalogPage(args: CatalogPageArgs): Promise<NovelSearch
 
 function novelToPosterItem(item: NovelSearchResult['results'][number], index = 0): PosterItem | null {
   const title =
-    item.canonicalTitle || item.title?.english || item.title?.romaji || item.title?.native || '';
+    selectReadingTitle(item) || '';
   const id = String(item.id || item.anilistId || item.malId || '').trim();
   if (!title || !id) return null;
 

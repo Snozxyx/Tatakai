@@ -13,7 +13,18 @@ export interface ElectronThemePersistPayload {
   card: string;
 }
 
+export type ElectronBackdropMode = 'solid' | 'system-blur' | 'transparent';
+export interface ElectronBackdropCapabilities { supported: boolean; transparentSupported: boolean; platform: string; material?: 'acrylic' | 'under-window'; reason?: string }
+export interface ElectronBackdropSelection { mode: ElectronBackdropMode; activeMode?: ElectronBackdropMode; opacity: number; supported: boolean; restartRequired?: boolean; material?: 'acrylic' | 'under-window' }
+export interface ElectronBackdropBridge {
+  getCapabilities(): Promise<ElectronBackdropCapabilities>;
+  getSelection(): Promise<ElectronBackdropSelection>;
+  setSelection(input: { mode: ElectronBackdropMode; opacity?: number }): Promise<ElectronBackdropSelection & { success: boolean; error?: string }>;
+}
+
 export interface ElectronBridge {
+  backdrop?: ElectronBackdropBridge;
+  branding?: import('@/lib/branding').BrandingBridge;
   upscaler?: import('@/lib/upscaling').UpscalerBridge;
   rtxVideo?: import('@/lib/video/rtx-video').RtxVideoBridge;
   pickExtensionPackage?: () => Promise<{ name: string; bytes: Uint8Array } | null>;

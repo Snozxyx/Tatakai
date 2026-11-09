@@ -58,4 +58,4 @@ Crawl-delay: 1
 
 # Sitemap index (served from the web origin, proxied to the live backend
 # generator that enumerates the full catalogue + public profiles).
-Sitemap: https://tatakai.me/sitemap.xml
+Sitemap: https://tatakai.app/sitemap.xml

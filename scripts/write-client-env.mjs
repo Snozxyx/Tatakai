@@ -6,8 +6,8 @@ import dotenv from "dotenv";
 // Public browser/app configuration only. Never copy every VITE_* key blindly.
 const publicKeys = new Set(
   `SUPABASE_URL SUPABASE_ANON_KEY BACKEND_ORIGIN TATAKAI_API_URL API_ORIGIN API_V3_ORIGIN API_BASE_URL
-MAL_CLIENT_ID MAL_REDIRECT_URI MAL_DESKTOP_REDIRECT_URI ANILIST_CLIENT_ID ANILIST_REDIRECT_URI ANILIST_DESKTOP_REDIRECT_URI MANGABAKA_CLIENT_ID MANGABAKA_REDIRECT_URI
-EXTENSION_API_URL EXTENSION_ASSET_BASE EXTENSION_PORTAL_URL OPERATIONS_AUTH_ENABLED TURNSTILE_SITE_KEY POSTHOG_KEY POSTHOG_HOST
+MAL_CLIENT_ID MAL_REDIRECT_URI MAL_DESKTOP_REDIRECT_URI ANILIST_CLIENT_ID ANILIST_REDIRECT_URI ANILIST_LEGACY_CLIENT_ID ANILIST_LEGACY_REDIRECT_URI ANILIST_DESKTOP_REDIRECT_URI MANGABAKA_CLIENT_ID MANGABAKA_REDIRECT_URI
+EXTENSION_API_URL EXTENSION_ASSET_BASE EXTENSION_PORTAL_URL PROFILE_THEME_ASSET_BASE OPERATIONS_AUTH_ENABLED CAPTCHA_ENABLED POSTHOG_KEY POSTHOG_HOST
 DD_CLIENT_TOKEN DD_SITE GA_MEASUREMENT_ID GIPHY_API_KEY DISCORD_CLIENT_ID DISCORD_GUILD_ID DISCORD_INVITE PUBLIC_DOMAIN
 SENTRY_DSN SENTRY_ENV SENTRY_TRACES_SAMPLE_RATE ALWAYS_FRESH_MANGA_READS ENABLE_COMBINED_SOURCE_CACHE LOG_FRONTEND_ERRORS_TO_DB
 PROXY_CF_URL PROXY_NODE_URL PROXY_BUN_URL PROXY_PASSWORD SINGLE_STREAM_PROXY_URL STREAM_PROXY_URL STREAM_PROXY_PASSWORD`
@@ -30,6 +30,7 @@ export function clientBuildEnv(source, profile = "web", overrides = {}) {
       ([key, value]) => publicKeys.has(key) && value.trim()
     )
   );
+  values.VITE_CAPTCHA_ENABLED = raw.VITE_CAPTCHA_ENABLED === 'true' ? 'true' : 'false';
   for (const key of [
     "VITE_SUPABASE_URL",
     "VITE_SUPABASE_ANON_KEY",
@@ -39,22 +40,34 @@ export function clientBuildEnv(source, profile = "web", overrides = {}) {
     if (!values[key] || /^(your_|replace_)/i.test(values[key]))
       throw Error("Missing required public build setting: " + key);
   }
+  const anilistCallbacks = String(raw.VITE_ANILIST_REDIRECT_URI || '').split(/[\s,]+/);
+  if (raw.VITE_ANILIST_REDIRECT_URI && !anilistCallbacks.some((uri) =>
+    uri === 'https://tatakai.app/integration/anilist/redirect' ||
+    uri === 'https://tatakai.me/integration/anilist/redirect'))
+    throw Error('Invalid production callback: VITE_ANILIST_REDIRECT_URI');
+  for (const [key, value] of Object.entries(values)) {
+    if (key === 'VITE_ANILIST_LEGACY_REDIRECT_URI' || !/URL|ORIGIN|BASE|REDIRECT|DOMAIN/.test(key)) continue;
+    values[key] = value.replace(/\b(?:https?|wss?):\/\/(?:[a-z0-9-]+\.)*tatakai\.me(?=[:/?#,]|$)/gi,
+      (url) => url.replace(/tatakai\.me$/i, 'tatakai.app'));
+    if (key === 'VITE_PUBLIC_DOMAIN' && value === 'tatakai.me') values[key] = 'tatakai.app';
+  }
   // Production artifacts must never inherit local development origins.
   Object.assign(values, {
-    VITE_SUPABASE_URL: "https://db.tatakai.me",
-    VITE_BACKEND_ORIGIN: "https://api.tatakai.me",
-    VITE_API_ORIGIN: "https://api.tatakai.me",
-    VITE_API_V3_ORIGIN: "https://api.tatakai.me",
-    VITE_API_BASE_URL: "https://api.tatakai.me/api/v3",
-    VITE_TATAKAI_API_URL: "https://api.tatakai.me/api/v3",
+    VITE_SUPABASE_URL: "https://db.tatakai.app",
+    VITE_BACKEND_ORIGIN: "https://api.tatakai.app",
+    VITE_API_ORIGIN: "https://api.tatakai.app",
+    VITE_API_V3_ORIGIN: "https://api.tatakai.app",
+    VITE_API_BASE_URL: "https://api.tatakai.app/api/v3",
+    VITE_TATAKAI_API_URL: "https://api.tatakai.app/api/v3",
   });
-  values.VITE_MAL_REDIRECT_URI = "https://tatakai.me/api/mal/redirect";
-  values.VITE_ANILIST_REDIRECT_URI =
-    values.VITE_ANILIST_REDIRECT_URI ||
-    "https://tatakai.me/integration/anilist/redirect";
+  values.VITE_MAL_REDIRECT_URI = "https://tatakai.app/api/mal/redirect";
+  values.VITE_ANILIST_LEGACY_CLIENT_ID = values.VITE_ANILIST_LEGACY_CLIENT_ID ||
+    (String(raw.VITE_ANILIST_REDIRECT_URI || '').includes('https://tatakai.me/') ? raw.VITE_ANILIST_CLIENT_ID : '36420');
+  values.VITE_ANILIST_LEGACY_REDIRECT_URI = "https://tatakai.me/integration/anilist/redirect";
+  values.VITE_ANILIST_REDIRECT_URI = "https://tatakai.app/integration/anilist/redirect";
   values.VITE_MANGABAKA_REDIRECT_URI =
     values.VITE_MANGABAKA_REDIRECT_URI ||
-    "https://tatakai.me/integration/mangabaka/redirect";
+    "https://tatakai.app/integration/mangabaka/redirect";
   for (const key of [
     "VITE_ANILIST_REDIRECT_URI",
     "VITE_MANGABAKA_REDIRECT_URI",
@@ -64,7 +77,7 @@ export function clientBuildEnv(source, profile = "web", overrides = {}) {
       try {
         return (
           new URL(value).protocol === "https:" &&
-          new URL(value).hostname === "tatakai.me"
+          new URL(value).hostname === "tatakai.app"
         );
       } catch {
         return false;

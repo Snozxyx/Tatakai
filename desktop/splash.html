@@ -20,7 +20,7 @@
   <style>
     /* ── Design tokens (mirrors src/index.css) ─────────────────────────── */
     :root {
-      --bg:          hsl(0 0% 4%);
+      --bg:          hsl(340 15% 5%);
       --surface:     hsl(340 12% 8%);
       --border:      hsl(340 10% 20%);
       --fg:          hsl(340 5% 95%);
@@ -252,6 +252,10 @@
   <script>
     (function applySplashThemeFromQuery() {
       var params = new URLSearchParams(window.location.search || '');
+        var logoVariant = params.get('logoVariant');
+        if (['dark', 'light', 'monochrome', 'legacy'].indexOf(logoVariant) >= 0) {
+          document.querySelector('.logo-wrap img').src = '../resources/branding/' + logoVariant + '.png';
+        }
       function hsl(token) {
         if (!token) return null;
         var t = decodeURIComponent(String(token)).trim();

@@ -6,6 +6,8 @@
  */
 
 const DEFAULT_THEME = 'cherry-blossom';
+const BUILTIN_THEMES = new Set(['midnight', 'cherry-blossom', 'neon-tokyo', 'aurora-borealis', 'deep-ocean', 'cyberpunk', 'zen-garden', 'light-minimal', 'light-sakura', 'brutalism-dark', 'obsidian', 'solar', 'caffeine', 'brutalism-plus', 'dark-matter', 'royal-gold', 'emerald-forest', 'blood-moon', 'frostbite', 'synthwave', 'vampire', 'matcha-light', 'ocean-breeze', 'brutalist-concrete', 'dark-lite', 'ultra-lite', 'lite', 'amoled']);
+function validTheme(id) { return typeof id === 'string' && (BUILTIN_THEMES.has(id) || /^[A-Za-z0-9][A-Za-z0-9._-]*:[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(id)); }
 
 /** Fallback when no file — cherry-blossom from useTheme.ts */
 const DEFAULT_TOKENS = {
@@ -29,6 +31,7 @@ function readThemeForSplash(app, fs, path) {
     try {
         if (fs.existsSync(fp)) {
             const raw = JSON.parse(fs.readFileSync(fp, 'utf8'));
+            if (!validTheme(raw?.theme)) return { ...DEFAULT_TOKENS };
             return {
                 theme: typeof raw.theme === 'string' ? raw.theme : DEFAULT_THEME,
                 primary: raw.primary || DEFAULT_TOKENS.primary,
@@ -51,6 +54,7 @@ function writeTheme(app, fs, path, payload) {
     const fp = themeFilePath(app, path);
     const dir = path.dirname(fp);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    if (payload.theme && !validTheme(payload.theme)) payload = {};
     const merged = {
         theme: payload.theme || DEFAULT_THEME,
         primary: payload.primary || DEFAULT_TOKENS.primary,

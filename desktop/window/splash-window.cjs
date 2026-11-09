@@ -8,13 +8,14 @@ const pathModule = require('path');
  * @param {Record<string,string>} query - theme tokens for splash.html
  */
 function createSplashWindow(BrowserWindow, desktopDir, query = {}) {
+    const variant = ['dark', 'light', 'monochrome', 'legacy'].includes(query.logoVariant) ? query.logoVariant : null;
     const splash = new BrowserWindow({
         width: 400,
         height: 400,
         transparent: true,
         frame: false,
         alwaysOnTop: true,
-        icon: pathModule.join(desktopDir, '..', 'resources', 'icon-512.png'),
+        icon: variant ? pathModule.join(desktopDir, '..', 'resources', 'branding', `${variant}.png`) : pathModule.join(desktopDir, '..', 'resources', 'icon-512.png'),
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,

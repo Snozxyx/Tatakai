@@ -1,4 +1,7 @@
-import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
+import { useCallback } from 'react';
+import { usePreferredReadingTitleLanguage } from '@/hooks/ui/useTitleLanguage';
+import { withReadingTitle, projectReadingHomeTitles } from '@/lib/titleLanguage';
 import {
   searchNovels,
   getNovelDetail,
@@ -15,9 +18,12 @@ export function useNovelSearch(
   limit = 20,
   options: NovelSearchOptions = {},
 ) {
+  const titleLanguage = usePreferredReadingTitleLanguage();
+  const select = useCallback((data: Awaited<ReturnType<typeof searchNovels>>) => ({ ...data, results: data.results.map(row => withReadingTitle(row, titleLanguage)) }), [titleLanguage]);
   return useQuery({
     queryKey: ['novel-search', query, page, limit, JSON.stringify(options)],
     queryFn: () => searchNovels(query, page, limit, options),
+    select,
     enabled: query.trim().length > 0,
     staleTime: 2 * 60 * 1000,
   });
@@ -29,9 +35,12 @@ export function useInfiniteNovelSearch(
   enabled = true,
   options: NovelSearchOptions = {},
 ) {
+  const titleLanguage = usePreferredReadingTitleLanguage();
+  const select = useCallback((data: InfiniteData<Awaited<ReturnType<typeof searchNovels>>>) => ({ ...data, pages: data.pages.map(page => ({ ...page, results: page.results.map(row => withReadingTitle(row, titleLanguage)) })) }), [titleLanguage]);
   return useInfiniteQuery({
     queryKey: ['novel-search', query, limit, JSON.stringify(options)],
     queryFn: ({ pageParam = 1 }) => searchNovels(query, pageParam as number, limit, options),
+    select,
     getNextPageParam: (lastPage) =>
       lastPage.hasNextPage ? (lastPage.currentPage ?? 1) + 1 : undefined,
     initialPageParam: 1,
@@ -41,9 +50,12 @@ export function useInfiniteNovelSearch(
 }
 
 export function useNovelDetail(novelId: string | undefined) {
+  const titleLanguage = usePreferredReadingTitleLanguage();
+  const select = useCallback((data: Awaited<ReturnType<typeof getNovelDetail>>) => ({ ...data, detail: withReadingTitle(data.detail, titleLanguage) }), [titleLanguage]);
   return useQuery({
     queryKey: ['novel-detail', novelId],
     queryFn: () => getNovelDetail(String(novelId)),
+    select,
     enabled: Boolean(novelId),
     staleTime: MEDIA_METADATA_STALE_TIME,
   });
@@ -74,10 +86,13 @@ export function useNovelChapters(novelId: string | undefined, title?: string, fu
 export function useNovelHome() {
   const { settings } = useContentSafetySettings();
   const adult = settings.showAdultEverywhere;
+  const titleLanguage = usePreferredReadingTitleLanguage();
+  const select = useCallback((feed: Awaited<ReturnType<typeof getNovelHome>>) => projectReadingHomeTitles(feed, titleLanguage), [titleLanguage]);
 
   const query = useQuery({
     queryKey: ['novel-home', adult],
     queryFn: () => getNovelHome(adult),
+    select,
     refetchInterval: query => query.state.data?.trendingPending ? 5000 : false,
     staleTime: 10 * 60 * 1000,
     gcTime: 30 * 60 * 1000,

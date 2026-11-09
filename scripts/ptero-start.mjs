@@ -46,14 +46,14 @@ const MIME_TYPES = {
 // them from vercel.json. Keep the two in sync when either changes.
 const SITE_CSP = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.google-analytics.com https://challenges.cloudflare.com",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https://www.googletagmanager.com https://www.google-analytics.com https://cdn.jsdelivr.net",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https:",
   "font-src 'self' data:",
-  "connect-src 'self' blob: https: http: http://localhost:* http://127.0.0.1:* http://[::1]:* https://*.supabase.co https://*.tatakai.me https://api.tatakai.me https://api.jikan.moe https://api.trace.moe https://graphql.anilist.co https://api.myanimelist.net https://api.mangabaka.org https://www.google-analytics.com https://*.datadoghq.com https://challenges.cloudflare.com https://huggingface.co https://*.huggingface.co https://*.hf.co",
+  "connect-src 'self' blob: https: http: http://localhost:* http://127.0.0.1:* http://[::1]:* https://*.supabase.co https://*.tatakai.app https://api.tatakai.app https://api.jikan.moe https://api.trace.moe https://graphql.anilist.co https://api.myanimelist.net https://api.mangabaka.org https://www.google-analytics.com https://*.datadoghq.com https://huggingface.co https://*.huggingface.co https://*.hf.co",
   "media-src 'self' blob: https:",
   "worker-src 'self' blob:",
-  "frame-src 'self' https: https://challenges.cloudflare.com",
+  "frame-src 'self' https:",
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",
@@ -67,9 +67,9 @@ const SITE_CSP = [
  */
 function applySecurityHeaders(res, opts = {}) {
   if (!res.headersSent) {
-    if (opts.html !== false) res.setHeader('Content-Security-Policy', opts.verification ? SITE_CSP.replace("frame-ancestors 'none'", "frame-ancestors capacitor://tatakai.me capacitor://localhost https://tatakai.me") : SITE_CSP);
+    if (opts.html !== false) res.setHeader('Content-Security-Policy', SITE_CSP);
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    if (!opts.verification) res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
     res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
@@ -191,7 +191,7 @@ function startStaticServer() {
       if (serveStaticMedia(req, res, filePath)) return;
       const contentType = MIME_TYPES[extname(filePath).toLowerCase()] || 'application/octet-stream';
       res.setHeader('Content-Type', contentType);
-      applySecurityHeaders(res, { verification: reqPath === '/security/turnstile.html' });
+      applySecurityHeaders(res);
       createReadStream(filePath)
         .on('error', () => {
           res.statusCode = 500;

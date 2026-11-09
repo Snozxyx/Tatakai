@@ -163,7 +163,7 @@ export function installSpatialNavigation(
     // Rails already encode horizontal order. Avoid laying out the entire page
     // for each repeat from a remote, including cards hundreds of rows away.
     const rail = active?.closest('.tv-rail-items');
-    if (rail && getScope() === root && ["ArrowLeft", "ArrowRight"].includes(event.key)) {
+    if (rail && !rail.closest('[data-section-layout="grid"]') && getScope() === root && ["ArrowLeft", "ArrowRight"].includes(event.key)) {
       const row = [...rail.querySelectorAll<HTMLElement>(selector)];
       const step = event.key === 'ArrowRight' ? 1 : -1;
       for (let index = row.indexOf(active) + step; index >= 0 && index < row.length; index += step) {

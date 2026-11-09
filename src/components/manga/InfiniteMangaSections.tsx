@@ -1,3 +1,4 @@
+import { HomeSectionGroup } from '@/components/customization/HomeCustomization';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMemo, useRef, useCallback, useEffect } from 'react';
@@ -13,6 +14,7 @@ import { useContentSafetySettings } from '@/hooks/user/useContentSafetySettings'
 import { ChevronLeft, ChevronRight, ArrowRight, BookOpen, Layers, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { HomeSectionHeading } from '@/components/home/HomeSectionHeading';
+import { useCardDesign } from '@/components/customization/CardDesignContext';
 
 function SectionSkeleton({ layout }: { layout: SectionLayout }) {
   useUiTranslation();
@@ -40,8 +42,9 @@ function SectionSkeleton({ layout }: { layout: SectionLayout }) {
   );
 }
 
-function SectionContent({ section, isMobile }: { section: MangaSection; isMobile: boolean }) {
+export function MangaSectionContent({ section, isMobile }: { section: MangaSection; isMobile: boolean }) {
   useUiTranslation();
+  const { design } = useCardDesign();
   const scrollRef = useRef<HTMLDivElement>(null);
   const {
     items: sectionItems,
@@ -67,14 +70,14 @@ function SectionContent({ section, isMobile }: { section: MangaSection; isMobile
         {!isMobile && listItems.length > 4 && (
           <>
             <button
-              onClick={() => scroll('left')}
+              data-section-scroll-control onClick={() => scroll('left')}
               className="absolute -left-3.5 top-[40%] -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/80 border border-white/15 text-white/90 shadow-xl backdrop-blur-md flex items-center justify-center opacity-0 group-hover/section:opacity-100 hover:scale-110 hover:bg-black transition-all"
               aria-label={uiI18n.t('app.scroll_left_2c9e5a60')}
             >
               <ChevronLeft className="w-5 h-5" />
             </button>
             <button
-              onClick={() => scroll('right')}
+              data-section-scroll-control onClick={() => scroll('right')}
               className="absolute -right-3.5 top-[40%] -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/80 border border-white/15 text-white/90 shadow-xl backdrop-blur-md flex items-center justify-center opacity-0 group-hover/section:opacity-100 hover:scale-110 hover:bg-black transition-all"
               aria-label={uiI18n.t('app.scroll_right_2994b49c')}
             >
@@ -86,12 +89,15 @@ function SectionContent({ section, isMobile }: { section: MangaSection; isMobile
         <div
           ref={scrollRef}
           data-mobile-home-rail
-          className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0 scroll-smooth"
+          data-card-collection="shelf"
+          data-fixed-card-row
+          className="flex flex-nowrap gap-4 overflow-x-auto pb-4 scrollbar-hide scroll-smooth"
         >
           {listItems.map((item, i) => (
             <motion.div
               key={`${item.id}-${i}`}
               className="media-card-rail-item"
+              style={{ width: design?.style?.width ?? (isMobile ? 144 : 192) }}
               initial={isMobile ? false : { opacity: 0, y: 10 }}
               animate={isMobile ? {} : { opacity: 1, y: 0 }}
               transition={{ delay: Math.min(i * 0.03, 0.3), duration: 0.3 }}
@@ -177,7 +183,7 @@ export function InfiniteMangaSections() {
 
   return (
     <div className="space-y-8 md:space-y-12 mt-8 md:mt-12">
-      {sections.map((section) => (
+      <HomeSectionGroup groupId="genre-feed" sections={sections.map((section) => ({ id: `feed-${section.id}`, label: section.title, collection: true, layoutLocked: 'shelf' as const, node: (
         <section key={section.id} className="relative w-full">
           {(() => {
             const genreSlug = section.genre
@@ -202,9 +208,9 @@ export function InfiniteMangaSections() {
             );
           })()}
 
-          <SectionContent section={section} isMobile={isMobile} />
+          <MangaSectionContent section={section} isMobile={isMobile} />
         </section>
-      ))}
+      ) }))} />
 
       <div ref={loadMoreRef} className="h-16 flex items-center justify-center">
         {isFetchingNextPage ? (

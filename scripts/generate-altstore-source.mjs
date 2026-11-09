@@ -5,12 +5,12 @@
  * AltStore, SideStore and StikStore all consume the same "source" format, so a
  * single hosted file covers all three. Users add it via:
  *
- *   AltStore  -> Sources tab -> + -> paste https://tatakai.me/altstore/apps.json
+ *   AltStore  -> Sources tab -> + -> paste https://tatakai.app/altstore/apps.json
  *   SideStore -> same flow (identical format)
  *
  * The file is served as a static asset: `public/altstore/apps.json` is copied to
  * `dist/altstore/apps.json` by Vite, which Vercel then serves at
- * https://tatakai.me/altstore/apps.json.
+ * https://tatakai.app/altstore/apps.json.
  *
  * Usage:
  *   node scripts/generate-altstore-source.mjs [--out public/altstore/apps.json]
@@ -85,8 +85,8 @@ const versionDescription =
   args.notes ??
   `Tatakai ${VERSION} for iPhone & iPad. Unsigned build: sideload with AltStore, SideStore or TrollStore using your own Apple ID, then refresh before the 7-day free-account expiry. See the GitHub release notes for the full changelog.`;
 
-const ICON_URL = 'https://tatakai.me/assets/logo/tatakai-logo-square.png';
-const BANNER_URL = 'https://tatakai.me/assets/logo/tatakaibanner.png';
+const ICON_URL = 'https://tatakai.app/assets/branding/dark.png';
+const BANNER_URL = 'https://tatakai.app/assets/logo/tatakaibanner.png';
 
 const source = {
   name: 'Tatakai',
@@ -98,7 +98,7 @@ const source = {
     'install the iOS build with your own Apple ID. Free accounts must refresh every 7 days.',
   iconURL: ICON_URL,
   headerURL: BANNER_URL,
-  website: 'https://tatakai.me',
+  website: 'https://tatakai.app',
   tintColor: '#a855f7',
   featuredApps: [APPLE_BUNDLE_ID],
   apps: [

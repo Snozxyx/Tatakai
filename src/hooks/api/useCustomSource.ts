@@ -43,7 +43,12 @@ export function useCustomSources() {
   const queryClient = useQueryClient();
   useEffect(() => {
     const refresh = () => {
-      void queryClient.invalidateQueries({ queryKey: ["custom-sources"] });
+      // Discard lookups that started before installation, including the first
+      // lookup whose empty snapshot React Query would otherwise keep running.
+      for (const queryKey of [["custom-sources"], ["custom"]]) {
+        const filters = { queryKey };
+        void queryClient.cancelQueries(filters).then(() => queryClient.invalidateQueries(filters));
+      }
     };
     window.addEventListener('tatakai-extensions-changed', refresh);
     window.addEventListener('tatakai:extension-installed', refresh);
@@ -89,6 +94,7 @@ export function useCustomSearch(
   filters?: CustomSearchFilters,
 ) {
   const trimmed = query.trim();
+  const { source } = useCustomSource(namespace, sourceId);
   const { settings: safety } = useContentSafetySettings();
   const filterKey = filters ? JSON.stringify(filters) : "";
   const hasFilters = Boolean(
@@ -101,7 +107,7 @@ export function useCustomSearch(
     queryFn: ({ signal }) => extensionDeadline(deadline => fetchCustomSearch(namespace!, sourceId!, trimmed, page, filters, deadline), 45000, signal),
     retry: false,
     select: data => safety.showAdultEverywhere ? data : { ...data, results: data.results.filter(item => !isExplicitExtensionContent(item)) },
-    enabled: Boolean(namespace && sourceId && (trimmed || hasFilters)),
+    enabled: Boolean(namespace && sourceId && (trimmed || hasFilters) && (!namespace.startsWith('stremio-') || (source && source.supportsSearch !== false))),
     staleTime: 2 * 60 * 1000,
     gcTime: 15 * 60 * 1000,
     refetchOnWindowFocus: false,

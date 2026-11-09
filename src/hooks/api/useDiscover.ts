@@ -204,7 +204,7 @@ export interface RankedBoard {
 export const RANKED_BOARDS: ReadonlyArray<RankedBoard> = [
   {
     id: 'popular',
-    eyebrow: 'This week',
+    get eyebrow() { return uiI18n.t('discover.rankedLabel'); },
     get heading() { return uiI18n.t('app.popular_worldwide_b0f24f2d'); },
     get description() { return uiI18n.t('app.this_week_s_most_watched_across_the_anime_commun_ec5cb2ae'); },
     cta: { get label() { return uiI18n.t('app.see_the_board_33295d16'); }, to: '/trending' },

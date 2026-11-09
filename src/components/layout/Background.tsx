@@ -1,8 +1,16 @@
 import { useTheme } from "@/hooks/ui/useTheme";
 import { cn } from "@/lib/utils";
+import { useAppThemeBackground, useAppSystemBlur } from './AppThemeBackground';
 
-export function Background() {
+export function Background({ quiet = false }: { quiet?: boolean } = {}) {
   const { isLightTheme, themes, theme } = useTheme();
+  const custom = useAppThemeBackground();
+  const systemBlur = useAppSystemBlur();
+  if (custom || systemBlur) return null;
+
+  if (quiet) {
+    return <div aria-hidden className="fixed inset-0 z-0 pointer-events-none bg-background" />;
+  }
 
   return (
     <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">

@@ -1,6 +1,7 @@
 import {
   MediaLibraryMenu,
   LibraryMenuButton,
+  LIBRARY_BUTTON_CLASS,
   type LibraryMenuItem,
 } from "@/components/media/MediaLibraryMenu";
 import type { HTMLAttributes, ReactNode } from "react";
@@ -10,6 +11,10 @@ import {
   useMediaCardStyle,
   type MediaCardStyle,
 } from "@/hooks/ui/useMediaCardStyle";
+import { MoreHorizontal } from 'lucide-react';
+import { useCardDesign } from '@/components/customization/CardDesignContext';
+import { CustomCardLayout, type CardSlotContent } from '@/components/customization/CustomCardLayout';
+import '@/components/customization/customization.css';
 
 interface MediaCardFrameProps extends HTMLAttributes<HTMLDivElement> {
   title: string;
@@ -21,6 +26,8 @@ interface MediaCardFrameProps extends HTMLAttributes<HTMLDivElement> {
   badges?: ReactNode;
   actions?: ReactNode;
   variant?: MediaCardStyle;
+  slotContent?: CardSlotContent;
+  safetyBadges?: ReactNode;
 }
 
 /** Shared geometry and interaction treatment; media-specific behavior stays with callers. */
@@ -34,27 +41,31 @@ export function MediaCardFrame({
   badges,
   actions,
   variant,
+  slotContent,
+  safetyBadges,
   className,
   ...props
 }: MediaCardFrameProps) {
   const { style } = useMediaCardStyle();
+  const { design, readOnly } = useCardDesign();
   const linkClass = "media-card-link absolute inset-0 z-30 rounded-2xl";
-  const hasStatusMenu = libraryItem && libraryItem.kind !== "character";
   // Anchor every quick action to the same poster corner, independent of title height.
-  const libraryButtonClass =
-    "absolute right-2 top-2 z-40 grid size-11 place-items-center rounded-full border border-border bg-card text-card-foreground shadow-sm pointer-events-auto";
+  const libraryButtonClass = LIBRARY_BUTTON_CLASS;
+  if (design) return <MediaLibraryMenu item={readOnly ? undefined : libraryItem}>
+    <div {...(readOnly ? {} : props)} data-mobile-poster-card className={cn('group relative min-w-0 w-full', className)}>
+      <CustomCardLayout design={design} title={title} href={href} poster={poster} footer={footer} safety={safetyBadges ?? (!slotContent ? badges : undefined)} readOnly={readOnly}
+        slots={{ title, ...(!slotContent && metadata ? { type: metadata } : {}), ...slotContent, ...(libraryItem ? { menu: readOnly ? <span className="media-library-glass grid size-11 place-items-center rounded-full"><MoreHorizontal className="size-5" /></span> : <LibraryMenuButton item={libraryItem} className="media-library-glass grid size-11 place-items-center rounded-full pointer-events-auto" /> } : {}) }} />
+    </div>
+  </MediaLibraryMenu>;
   return (
-    <MediaLibraryMenu item={libraryItem}>
+    <MediaLibraryMenu item={readOnly ? undefined : libraryItem}>
       <div
-        {...props}
+        {...(readOnly ? {} : props)}
         onContextMenu={(event) => {
-          if (hasStatusMenu && event.button === 2) return;
           props.onContextMenu?.(event);
         }}
         onPointerDown={(event) => {
           props.onPointerDown?.(event);
-          if (hasStatusMenu && event.pointerType !== "mouse")
-            event.stopPropagation();
         }}
         data-mobile-poster-card
         data-card-style={variant || style}
@@ -80,7 +91,7 @@ export function MediaCardFrame({
               {metadata}
             </div>
           </div>
-          {href &&
+          {!readOnly && href &&
             (/^https?:\/\//i.test(href) ? (
               <a
                 href={href}
@@ -92,7 +103,7 @@ export function MediaCardFrame({
             ) : (
               <Link to={href} className={linkClass} aria-label={title} />
             ))}
-          {libraryItem && (
+          {!readOnly && libraryItem && (
             <LibraryMenuButton
               item={libraryItem}
               className={libraryButtonClass}
@@ -104,6 +115,7 @@ export function MediaCardFrame({
           <div
             data-media-controls
             className="relative z-40 mt-2 pointer-events-auto"
+            {...(readOnly ? { inert: '', style: { pointerEvents: 'none' } } as any : {})}
             onPointerDown={(event) => event.stopPropagation()}
             onClick={(event) => event.stopPropagation()}
             onKeyDown={(event) => event.stopPropagation()}

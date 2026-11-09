@@ -3,6 +3,8 @@ import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
+import { createPortal } from 'react-dom';
+import { useAppThemeBackground, useAppSystemBlur, useAppBackdropPortal } from './AppThemeBackground';
 
 const VIDEO_SOURCES = ['1.mp4', '2.webm', '3.mp4', '5.mp4', '6.mp4'].map(backgroundVideo);
 
@@ -14,6 +16,9 @@ export function StatusVideoBackground({
   overlayColor = "from-background/95 via-background/90 to-background/80" 
 }: StatusVideoBackgroundProps) {
   useUiTranslation();
+  const custom = useAppThemeBackground();
+  const systemBlur = useAppSystemBlur();
+  const portal = useAppBackdropPortal();
   const videoRef = useRef<HTMLVideoElement>(null);
   const [source, setSource] = useState<string>('');
 
@@ -23,8 +28,9 @@ export function StatusVideoBackground({
     setSource(randomVideo);
   }, []);
 
-  return (
-    <div className="fixed inset-0 w-full h-full overflow-hidden" style={{ zIndex: -1 }}>
+  if (custom || (systemBlur && !portal)) return null;
+  const background = (
+    <div data-app-route-background className="fixed inset-0 w-full h-full overflow-hidden" style={{ zIndex: systemBlur ? 0 : -1 }}>
       {source && (
         <video
           ref={videoRef}
@@ -47,4 +53,5 @@ export function StatusVideoBackground({
       />
     </div>
   );
+  return systemBlur ? createPortal(background, portal!) : background;
 }

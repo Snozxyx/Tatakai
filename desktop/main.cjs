@@ -167,8 +167,17 @@ const {
 
 registerProtocolClient(app, path);
 
-const winState = { mainWindow: null, splash: null };
+const winState = { mainWindow: null, splash: null, tray: null };
 const getMainWindow = () => winState.mainWindow;
+const brandingRuntime = require('./services/branding-runtime.cjs').createBrandingRuntime({
+    app, shell, getMainWindow, getTray: () => winState.tray,
+    resources: path.join(DESKTOP_DIR, '..', 'resources', 'branding'), logger,
+});
+ipcMain.handle('branding:get-capabilities', () => brandingRuntime.getCapabilities());
+ipcMain.handle('branding:get-selection', () => brandingRuntime.getSelection());
+ipcMain.handle('branding:set-selection', (_event, payload) => brandingRuntime.setSelection(payload));
+const windowBackdrop = require('./services/window-backdrop.cjs').createWindowBackdropRuntime({ app, BrowserWindow, getMainWindow, fs, path, logger });
+require('./ipc/ipc-backdrop.cjs')(ipcMain, windowBackdrop, getMainWindow);
 
 // ── PerfMonitor, PlatformAdapter, UpdateManager ───────────────────────────────
 // Constructed after winState so getMainWindow closure is valid.
@@ -287,7 +296,7 @@ require('./services/kitten-tts.cjs')(ipcMain, app, fs, path, logger, getMainWind
 const torrentRuntimeApi = require('./ipc/ipc-torrent.cjs')(ipcMain, app, fs, path, logger, getMainWindow);
 require('./ipc/ipc-system.cjs')(ipcMain, app, dialog, autoUpdater, fs, path, logger, getMainWindow, appCID, isDev);
 require('./ipc/ipc-translate.cjs')({ ipcMain, app, dialog, getMainWindow });
-require('./ipc/ipc-theme.cjs')(ipcMain, app, fs, path);
+require('./ipc/ipc-theme.cjs')(ipcMain, app, fs, path, windowBackdrop);
 require('./ipc/ipc-media.cjs')(ipcMain, app, logger);
 require('./ipc/ipc-debrid.cjs')(ipcMain);
 require('./ipc/ipc-home-server.cjs')(ipcMain, app, fs, path, logger, getMainWindow, {
@@ -392,12 +401,12 @@ app.on('ready', () => {
         }
     });
 
-    const splashTokens = themeBridge.toSplashQuery(themeBridge.readThemeForSplash(app, fs, path));
+    brandingRuntime.restore();
+    const splashTokens = { ...themeBridge.toSplashQuery(themeBridge.readThemeForSplash(app, fs, path)), logoVariant: brandingRuntime.getSelection().variant };
     winState.splash = createSplashWindow(BrowserWindow, DESKTOP_DIR, splashTokens);
 
     // ── Start production services ─────────────────────────────────────────────
     perfMonitor.start();
-    platformAdapter.ensureDesktopEntry();  // Linux only; no-op on other platforms
     platformAdapter.registerProtocol('tatakai');
 
     setTimeout(() => {
@@ -410,12 +419,13 @@ app.on('ready', () => {
             isDev,
             logger,
             desktopDir: DESKTOP_DIR,
+            windowBackdrop,
         });
 
         discordRpc.init();
 
         const trayIconPath = path.join(DESKTOP_DIR, '..', 'resources', 'icon-512.png');
-        createTray({
+        winState.tray = createTray({
             Tray,
             Menu,
             app,
@@ -424,6 +434,7 @@ app.on('ready', () => {
             getMainWindow,
             logger,
         });
+        brandingRuntime.restore();
 
         // ── Post-window production services ──────────────────────────────────
         // These need the main window to exist so crash IPC push can reach the renderer.
@@ -453,6 +464,7 @@ app.on('activate', () => {
             isDev,
             logger,
             desktopDir: DESKTOP_DIR,
+            windowBackdrop,
         });
     }
 });

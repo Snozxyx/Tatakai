@@ -21,7 +21,7 @@ const sharp = require('sharp')
 
 const ROOT    = path.join(__dirname, '..')
 const OUT_DIR = path.join(ROOT, 'build')
-const LOGO    = path.join(ROOT, 'public', 'assets', 'logo', 'tatakai-logo-square.png')
+const LOGO    = path.join(ROOT, 'public', 'assets', 'branding', 'dark.png')
 
 // ── Brand tokens (mirror desktop/splash.html / src/index.css) ──────────────────
 const BG        = '#08060a'

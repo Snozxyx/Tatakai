@@ -1,6 +1,9 @@
 import { TVLoadMore } from "@/components/tv/TVLoadMore";
 import { CompatibilityExtensionsPanel } from '@/components/extensions/CompatibilityExtensionsPanel';
 import { InstalledCompatibilityExtensions } from '@/components/extensions/InstalledCompatibilityExtensions';
+import { AddExtensionModal } from '@/components/extensions/SideloadExtensionModal';
+import { RemoteExtensionsPanel } from '@/components/extensions/RemoteExtensionsPanel';
+import uiI18n from '@/lib/uiI18n';
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Download, Check, Trash2, Puzzle } from "lucide-react";
@@ -17,10 +20,11 @@ export default function TVExtensionsPage({
   const [tab, setTab] = useState("all");
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(0);
+  const [adding, setAdding] = useState(false);
   const catalog = useStoreCatalogue();
   const installer = useExtensionInstaller();
   const busy = installer.install.isPending || installer.uninstall.isPending;
-  const items = catalog.items.filter(
+  const matchedItems = catalog.items.filter(
     (item) =>
       (!extensionId || item.id === extensionId || item.slug === extensionId) &&
       `${item.name} ${item.description} ${item.author}`
@@ -29,6 +33,7 @@ export default function TVExtensionsPage({
       (tab === "all" ||
         (tab === "installed" ? installer.isInstalled(item) : item.type === tab))
   );
+  const items = matchedItems.filter(item => !(['stremio', 'seanime'].includes(item.ecosystem || '') && installer.isInstalled(item)));
   return (
     <div className="tv-page">
       <div className="tv-page-heading">
@@ -36,12 +41,16 @@ export default function TVExtensionsPage({
           <h1>Extensions</h1>
           <p>Choose where your next story comes from.</p>
         </div>
+        <div className="tv-actions">
+        <button data-tv-key="add-extension" onClick={() => setAdding(true)}>{uiI18n.t('app.add_extension_11500bcc')}</button>
         <input
+          data-tv-key="search-extensions"
           aria-label="Search extensions"
           placeholder="Find an extension"
           value={query}
           onChange={(event) => (setQuery(event.target.value), setPage(0))}
         />
+        </div>
       </div>
       <div className="tv-filter-tabs">
         {[
@@ -65,6 +74,7 @@ export default function TVExtensionsPage({
         ))}
       </div>
       {!extensionId && <InstalledCompatibilityExtensions search={query} ecosystem="all" type={tab === 'installed' ? 'all' : tab === 'custom' ? 'manga' : tab} compatibility="all" />}
+      <RemoteExtensionsPanel search={query} type={tab === 'installed' ? 'all' : tab} extensionId={extensionId} tv />
       {catalog.isLoading && <p role="status">Loading extensions…</p>}
       {catalog.serviceError && (
         <div role="status">
@@ -158,9 +168,10 @@ export default function TVExtensionsPage({
         label="More extensions"
       />
       <CompatibilityExtensionsPanel />
-      {!catalog.isLoading && !items.length && (
+      {!catalog.isLoading && !matchedItems.length && (
         <p>No extensions match this filter.</p>
       )}
+      {adding && <AddExtensionModal isOpen onClose={() => setAdding(false)} />}
     </div>
   );
 }

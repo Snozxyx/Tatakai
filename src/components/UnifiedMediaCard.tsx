@@ -20,12 +20,14 @@ import { cn } from "@/lib/utils";
 import { splitRating } from "@/lib/mediaRating";
 import { AdultBadge, ScoreBadge, MetaBadge } from "@/components/MediaCardBadges";
 import { useMediaCardStyle } from '@/hooks/ui/useMediaCardStyle';
+import { useCardDesign } from '@/components/customization/CardDesignContext';
 import { useLongPress } from "@/hooks/ui/useLongPress";
 import { openMediaQuickPeek, type QuickPeekMedia } from "@/components/media/quickPeekStore";
 import { useHoverPreview } from '@/hooks/useHoverPreview';
 import { useIsMobile } from '@/hooks/ui/use-mobile';
 import { Loader2 } from 'lucide-react';
 import { resolveTatakaiAnimeViewId, TatakaiAnimeViews } from '@/components/media/TatakaiAnimeViews';
+import { readableBadgeLabel } from '@/lib/media/badgeLabel';
 
 export interface UnifiedMediaCardProps {
   item: {
@@ -51,6 +53,7 @@ export interface UnifiedMediaCardProps {
   };
   variant?: 'poster' | 'overlay';
   rank?: number;
+  resumed?: boolean;
   className?: string;
   /**
    * `'none'` suppresses the card's own corner badges (overlay media-type pill
@@ -59,6 +62,8 @@ export interface UnifiedMediaCardProps {
    * other. Everything else (poster, metadata, score) stays identical.
    */
   topBadges?: 'auto' | 'none';
+  /** Provider identities and unreleased titles retain their own save/navigation behavior. */
+  libraryActions?: boolean;
 }
 
 /** Normalize a manga `type` into its display label ("manhwa", "comics", …). */
@@ -71,7 +76,7 @@ function mangaFormatLabel(type?: string | null, mediaType = 'manga'): string {
   return normalized;
 }
 
-export const UnifiedMediaCard = memo(function UnifiedMediaCard({ item, variant, rank, className = "", topBadges = 'auto' }: UnifiedMediaCardProps) {
+export const UnifiedMediaCard = memo(function UnifiedMediaCard({ item, variant, rank, resumed = false, className = "", topBadges = 'auto', libraryActions = true }: UnifiedMediaCardProps) {
   useUiTranslation();
   const isAnime = item.mediaType === 'anime';
   const isManga = item.mediaType === 'manga';
@@ -81,9 +86,10 @@ export const UnifiedMediaCard = memo(function UnifiedMediaCard({ item, variant, 
   const shouldBlurAdult = Boolean(isAdultItem && item.blurAdult);
   const { score, label } = splitRating(item.rating);
   const { style } = useMediaCardStyle();
-  const overlay = (variant || style) === 'overlay';
+  const { design, readOnly } = useCardDesign();
+  const overlay = (design?.base || variant || style) === 'overlay';
   const mobile = useIsMobile();
-  const previewEnabled = isAnime && !mobile;
+  const previewEnabled = isAnime && !mobile && !readOnly && libraryActions;
   const preview = useHoverPreview({ anilistId: item.anilistId, malId: item.malId, title: item.name, enabled: previewEnabled && !shouldBlurAdult });
   const animeViewId = isAnime ? resolveTatakaiAnimeViewId(item.id, item.anilistId) : undefined;
   // Phones: no hover states exist, so drop the GPU-heavy hover overlays,
@@ -134,10 +140,10 @@ export const UnifiedMediaCard = memo(function UnifiedMediaCard({ item, variant, 
     onLongPress: () => {
       if (peekMedia) openMediaQuickPeek(peekMedia);
     },
-    disabled: !peekMedia,
+    disabled: !peekMedia || readOnly || !libraryActions,
   });
 
-  return <MediaCardFrame libraryItem={isAnime || isManga || isNovel || isCharacter ? { kind: isCharacter ? 'character' : isAnime ? 'anime' : isNovel ? 'novel' : 'manga', id: item.id, name: item.name, poster: item.poster, anilistId: item.anilistId, format: isNovel ? 'novel' : item.type } : undefined} title={item.name} href={routeTo} variant={variant} className={className} {...longPress}
+  return <MediaCardFrame libraryItem={libraryActions && (isAnime || isManga || isNovel || isCharacter) ? { kind: isCharacter ? 'character' : isAnime ? 'anime' : isNovel ? 'novel' : 'manga', id: item.id, name: item.name, poster: item.poster, anilistId: item.anilistId, format: isNovel ? 'novel' : item.type } : undefined} title={item.name} href={routeTo} variant={variant} className={className} data-resume-card={resumed || undefined} {...longPress}
     onMouseEnter={previewEnabled ? preview.onEnter : undefined} onMouseLeave={previewEnabled ? preview.onLeave : undefined}
     poster={<><img src={getProxiedImageUrl(item.poster || '')} alt="" aria-hidden loading="lazy" decoding="async" fetchPriority="low"
       className={cn('media-card-image h-full w-full object-cover object-top', preview.isActive && !shouldBlurAdult && 'opacity-0', shouldBlurAdult && 'blur-md scale-105')}
@@ -157,22 +163,27 @@ export const UnifiedMediaCard = memo(function UnifiedMediaCard({ item, variant, 
         <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/90 text-primary-foreground">{isManga || isNovel ? <BookOpen className="h-6 w-6" /> : isCharacter ? <Star className="h-6 w-6" /> : <Play className="ml-1 h-6 w-6" />}</span>
       </div>}
     </>}
+    safetyBadges={<>{isAdultItem && <AdultBadge className="absolute left-2 top-2 z-40" />}{shouldBlurAdult && <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/50"><span className="rounded-full bg-black/80 px-3 py-1 text-xs font-medium text-white">{uiI18n.t('app.sensitive_preview_16bb7f14')}</span></div>}</>}
+    slotContent={{ title: item.name, rating: score ? <ScoreBadge score={score} /> : undefined, type: mediaBadgeLabel, status: item.status, year: item.year, rank: rank !== undefined ? `#${rank}` : undefined,
+      episodes: isAnime && item.episodes?.sub ? `${item.episodes.sub} ${uiI18n.t('app.sub_5d85613a')}${item.episodes.dub ? ` · ${item.episodes.dub} ${uiI18n.t('app.dub_1ca4b285')}` : ''}` : undefined,
+      chapters: (isManga || isNovel) && item.chapters ? `${item.chapters} ${uiI18n.t('app.ch_482bd64c')}` : undefined,
+      views: readOnly ? undefined : (isManga || isNovel) ? <TatakaiReadingViews kind={isNovel ? 'novel' : 'manga'} id={item.id} anilistId={item.anilistId} /> : animeViewId ? <TatakaiAnimeViews animeId={animeViewId} /> : undefined }}
     badges={<>
-      {rank !== undefined && <span className="absolute left-2 top-2 z-20 rounded-lg bg-black/75 px-2 py-1 text-xs font-semibold tabular-nums text-white" aria-label={uiI18n.t('app.rank_i18n_value_0_f4f41943', { value0: rank })}>#{rank}</span>}
+      {rank !== undefined && <span className="absolute left-2 top-2 z-20 rounded-lg bg-black/75 px-2 py-1 text-xs font-medium tabular-nums text-white" aria-label={uiI18n.t('app.rank_i18n_value_0_f4f41943', { value0: rank })}>#{rank}</span>}
       {isAdultItem && <AdultBadge className={cn('absolute left-2 z-20', rank !== undefined ? 'top-10' : 'top-2')} />}
-      {shouldBlurAdult && <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/50"><span className="rounded-full bg-black/80 px-3 py-1 text-xs font-semibold text-white">{uiI18n.t('app.sensitive_preview_16bb7f14')}</span></div>}
-      {overlay && topBadges !== 'none' && <span className={cn('absolute left-2 z-20 inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-black/60 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white', rank !== undefined || isAdultItem ? 'top-10' : 'top-2')}>
-        {isManga || isNovel ? <BookOpen aria-hidden className="h-3 w-3" /> : isAnime ? <Film aria-hidden className="h-3 w-3" /> : <Star aria-hidden className="h-3 w-3" />}{mediaBadgeLabel}
+      {shouldBlurAdult && <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/50"><span className="rounded-full bg-black/80 px-3 py-1 text-xs font-medium text-white">{uiI18n.t('app.sensitive_preview_16bb7f14')}</span></div>}
+      {overlay && topBadges !== 'none' && <span className={cn('media-card-format absolute left-2 z-20 inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-black/70 px-2 py-1 text-xs font-semibold tracking-normal text-white', rank !== undefined && isAdultItem ? 'top-16' : rank !== undefined || isAdultItem ? 'top-10' : 'top-2')}>
+        {isManga || isNovel ? <BookOpen aria-hidden className="h-3.5 w-3.5" /> : isAnime ? <Film aria-hidden className="h-3.5 w-3.5" /> : <Star aria-hidden className="h-3.5 w-3.5" />}{readableBadgeLabel(mediaBadgeLabel)}
       </span>}
-      {overlay && topBadges !== 'none' && item.status && !isCharacter && !isAdultItem && <span className="absolute left-2 top-10 z-20 max-w-[calc(100%-1rem)] truncate rounded-full border border-white/10 bg-black/60 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white/85">{item.status}</span>}
-      {!overlay && score && <span className="media-card-score absolute right-16 top-2 z-20 inline-flex items-center gap-1 rounded-lg bg-black/75 px-2 py-1 text-xs font-semibold text-white"><Star aria-hidden className="h-3 w-3 fill-amber text-amber" />{score}</span>}
+      {overlay && topBadges !== 'none' && item.status && !isCharacter && !isAdultItem && <span data-status={item.status} className={cn('media-card-status absolute left-2 z-20 inline-flex max-w-[calc(100%-1rem)] items-center gap-1.5 rounded-md bg-black/65 px-2 py-1 text-xs text-white/85', rank !== undefined ? 'top-16' : 'top-10')}><span aria-hidden className="custom-card-status-dot" /><span className="truncate">{readableBadgeLabel(item.status)}</span></span>}
+      {!overlay && score && <span className="media-card-score absolute right-16 top-2 z-20 inline-flex items-center gap-1 rounded-lg bg-black/75 px-2 py-1 text-xs font-medium text-white"><Star aria-hidden className="h-3 w-3 fill-amber text-amber" />{score}</span>}
     </>}
     metadata={overlay ? <div className="flex flex-wrap items-center gap-2">
       {score && <ScoreBadge score={score} />}{label && <MetaBadge className="text-white/85">{label}</MetaBadge>}
       {isAnime && !!item.episodes?.sub && <MetaBadge className="text-white/85">{item.episodes.sub} {uiI18n.t('app.sub_5d85613a')} {item.episodes.dub ? uiI18n.t('app.i18n_value_0_dub_f85b5df5', { value0: item.episodes.dub }) : ''}</MetaBadge>}
       {(isManga || isNovel) && !!item.chapters && <MetaBadge className="text-white/85">{item.chapters} {uiI18n.t('app.ch_482bd64c')}</MetaBadge>}
-      {(isManga||isNovel)&&<TatakaiReadingViews kind={isNovel?"novel":"manga"} id={item.id} anilistId={item.anilistId}/>}
-      {animeViewId && <TatakaiAnimeViews animeId={animeViewId} className="text-white/85" />}
+      {!readOnly&&(isManga||isNovel)&&<TatakaiReadingViews kind={isNovel?"novel":"manga"} id={item.id} anilistId={item.anilistId}/>}
+      {!readOnly && animeViewId && <TatakaiAnimeViews animeId={animeViewId} className="text-white/85" />}
     </div> : <div className="flex flex-wrap items-center gap-x-1.5">
       <span className="capitalize">{isAnime ? item.type || uiI18n.t('app.anime_f1b32a19') : mediaBadgeLabel}</span>
       {item.year && <span>· {item.year}</span>}
@@ -181,7 +192,7 @@ export const UnifiedMediaCard = memo(function UnifiedMediaCard({ item, variant, 
       {isAnime && !!item.episodes?.dub && <span>· {item.episodes.dub} {uiI18n.t('app.dub_1ca4b285')}</span>}
       {label && <span>· {label}</span>}
       {item.status && !isCharacter && <span>· {item.status}</span>}
-      {(isManga||isNovel)&&<TatakaiReadingViews kind={isNovel?"novel":"manga"} id={item.id} anilistId={item.anilistId}/>}
-      {animeViewId && <TatakaiAnimeViews animeId={animeViewId} />}
+      {!readOnly&&(isManga||isNovel)&&<TatakaiReadingViews kind={isNovel?"novel":"manga"} id={item.id} anilistId={item.anilistId}/>}
+      {!readOnly && animeViewId && <TatakaiAnimeViews animeId={animeViewId} />}
     </div>} />;
 });

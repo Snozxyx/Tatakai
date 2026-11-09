@@ -2,9 +2,10 @@ import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import type { Database } from '@/integrations/supabase/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { notifySuggestion } from '@/core/network/discord-webhook';
+import { requestSecurity } from '@/lib/security/captcha';
 
 export interface Suggestion {
   id: string;
@@ -98,34 +99,13 @@ export function useCreateSuggestion() {
       description: string;
       category: Suggestion['category'];
       image_url?: string;
+      captchaToken?: string;
     }) => {
       if (!user) throw new Error(uiI18n.t('app.must_be_logged_in_9cf435d8'));
 
-      const { data, error } = await supabase
-        .from('user_suggestions')
-        .insert({
-          user_id: user.id,
-          ...suggestion,
-          status: 'pending',
-          priority: 'normal',
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      // Best-effort Discord notification (server-side forwarded; never blocks).
-      try {
-        notifySuggestion({
-          title: suggestion.title,
-          description: suggestion.description,
-          category: suggestion.category,
-          priority: 'normal',
-          userId: user.id,
-          userName: user.user_metadata?.display_name || user.email || undefined,
-          imageUrl: suggestion.image_url,
-        });
-      } catch { /* ignore */ }
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error(uiI18n.t('app.must_be_logged_in_9cf435d8'));
+      const data = await requestSecurity<Suggestion>('submissions/suggestion', suggestion, { accessToken: session.access_token });
 
       return data;
     },
@@ -146,7 +126,7 @@ export function useUpdateSuggestion() {
   const { user } = useAuth();
 
   return useMutation({
-    mutationFn: async ({ id, updates }: { id: string; updates: Partial<Suggestion> }) => {
+    mutationFn: async ({ id, updates }: { id: string; updates: Database['public']['Tables']['user_suggestions']['Update'] }) => {
       const { error } = await supabase
         .from('user_suggestions')
         .update(updates)

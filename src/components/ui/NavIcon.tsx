@@ -11,13 +11,16 @@ interface NavIconProps {
    * instead of as an absolute hover tooltip. The parent controls the flag.
    */
   expanded?: boolean;
+  /** Scrollable narrow rails use a native hint without an overflowing label box. */
+  nativeTooltip?: boolean;
 }
 
-export function NavIcon({ icon: Icon, active, onClick, label, expanded = false }: NavIconProps) {
+export function NavIcon({ icon: Icon, active, onClick, label, expanded = false, nativeTooltip = false }: NavIconProps) {
   return (
     <button
       onClick={onClick}
       aria-label={label}
+      title={nativeTooltip ? label : undefined}
       aria-current={active ? "page" : undefined}
       className={cn(
         "nav-icon group relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
@@ -25,11 +28,11 @@ export function NavIcon({ icon: Icon, active, onClick, label, expanded = false }
         active ? "nav-icon-active" : "nav-icon-inactive"
       )}
     >
-      <Icon className="h-5 w-5 shrink-0" />
+      <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.5} />
       {label &&
         (expanded ? (
           <span className="truncate text-sm font-semibold">{label}</span>
-        ) : (
+        ) : nativeTooltip ? null : (
           <span className="pointer-events-none absolute left-full ml-4 whitespace-nowrap rounded-lg border border-border bg-card px-3 py-1.5 text-sm font-medium text-card-foreground opacity-0 shadow-md transition-opacity duration-150 ease-out group-hover:opacity-100 group-focus-visible:opacity-100">
             {label}
           </span>

@@ -1,5 +1,6 @@
 import { safeProfileAudio } from "@/lib/profileThemeMusic";
-export const MIDNIGHT_LOFI_ASSETS = "/assets/profile-themes/midnight-lofi/";
+import { profileThemeAssetUrl } from '@/lib/profileThemeAssets';
+export const MIDNIGHT_LOFI_ASSETS = profileThemeAssetUrl('/assets/profile-themes/midnight-lofi/');
 export const MIDNIGHT_LOFI_ROOM = `${MIDNIGHT_LOFI_ASSETS}midnight-room.webp`;
 
 export type MidnightLofiAccent = "cyan" | "amber" | "violet";

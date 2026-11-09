@@ -1,4 +1,6 @@
 import uiI18n from '@/lib/uiI18n';
+import { useCardDesign } from '@/components/customization/CardDesignContext';
+import { UnifiedMediaCard } from '@/components/UnifiedMediaCard';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { Calendar, ChevronLeft, ChevronRight, Star } from "lucide-react";
 import { GlassPanel } from "@/components/ui/GlassPanel";
@@ -25,8 +27,9 @@ function formatAirDate(media: UpcomingAnimeItem): string | null {
   return String(year);
 }
 
-function UpcomingAnimeCard({ anime }: { anime: UpcomingAnimeItem }) {
+export function UpcomingAnimeCard({ anime }: { anime: UpcomingAnimeItem }) {
   useUiTranslation();
+  const { design } = useCardDesign();
   const imageUrl = anime.coverImage?.large || anime.coverImage?.medium || "/placeholder.svg";
   const title = anime.title?.english || anime.title?.romaji || anime.title?.native || uiI18n.t('app.unknown_title_bceca39d');
   const airDate = formatAirDate(anime);
@@ -47,6 +50,7 @@ function UpcomingAnimeCard({ anime }: { anime: UpcomingAnimeItem }) {
     `/search?q=${encodeURIComponent(title)}`,
   );
 
+  if (design) return <div className="media-card-rail-item snap-start" style={design.style?.width ? { width: design.style.width } : undefined}><UnifiedMediaCard libraryActions={false} item={{ id: `anilist:${anime.id}`, name: title, poster: imageUrl, mediaType: 'anime', type: anime.format, year: anime.seasonYear ?? anime.startDate?.year ?? undefined, rating: score ?? undefined, href: `/search?q=${encodeURIComponent(title)}` }} /></div>;
   return (
     <Peekable media={peekMedia ? { ...peekMedia, canSave: false } : null}>
     <GlassPanel
@@ -57,7 +61,7 @@ function UpcomingAnimeCard({ anime }: { anime: UpcomingAnimeItem }) {
         <img
           src={imageUrl}
           alt={title}
-          className="w-full h-full object-cover transition-all duration-700 ease-out group-hover:scale-105 group-hover:brightness-110"
+          className="w-full h-full object-cover transition-[color,background-color,border-color,opacity] duration-200 ease-out  group-hover:brightness-110"
           loading="lazy"
         />
 
@@ -66,33 +70,33 @@ function UpcomingAnimeCard({ anime }: { anime: UpcomingAnimeItem }) {
 
         {/* Type */}
         {anime.format && (
-          <div className="absolute top-3 left-3 px-2 py-0.5 rounded-md bg-purple-500/90 text-white text-[10px] font-bold uppercase tracking-wider shadow-lg shadow-purple-500/20">
+          <div className="absolute top-3 left-3 px-2 py-0.5 rounded-md bg-purple-500/90 text-white text-xs font-medium normal-case tracking-normal shadow-lg shadow-purple-500/20">
             {anime.format}
           </div>
         )}
 
         {/* Score */}
         {score && (
-          <div className="absolute top-3 right-3 flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-black/50 backdrop-blur-md border border-white/10 text-[10px] font-bold text-white">
+          <div className="absolute top-3 right-3 flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-black/50 backdrop-blur-md border border-white/10 text-xs font-medium text-white">
             <Star className="w-3 h-3 fill-amber text-amber" />
             {score}
           </div>
         )}
 
         <div className="absolute bottom-0 left-0 right-0 p-3.5 pt-10">
-          <h4 data-mobile-poster-title className="font-bold text-sm leading-tight line-clamp-2 drop-shadow-md group-hover:text-purple-300 transition-colors duration-300">
+          <h4 data-mobile-poster-title className="font-medium text-sm leading-tight line-clamp-2 drop-shadow-md group-hover:text-purple-300 transition-colors duration-300">
             {title}
           </h4>
 
           <div className="flex flex-col gap-1.5 mt-2">
             {airDate && (
-              <span className="inline-flex items-center gap-1 w-fit bg-white/10 backdrop-blur-sm border border-white/5 px-1.5 py-0.5 rounded-md text-[10px] font-medium text-white/80">
+              <span className="inline-flex items-center gap-1 w-fit bg-white/10 backdrop-blur-sm border border-white/5 px-1.5 py-0.5 rounded-md text-xs font-medium text-white/80">
                 <Calendar className="w-3 h-3 text-purple-400" />
                 {airDate}
               </span>
             )}
             {studio && (
-              <span className="text-[10px] text-white/50 line-clamp-1 font-medium tracking-wide">
+              <span className="text-xs text-white/50 line-clamp-1 font-medium tracking-normal">
                 {studio}
               </span>
             )}
@@ -125,7 +129,7 @@ export function UpcomingAnimeSection() {
     return (
       <section className="mb-24">
         <div className="flex items-center justify-between mb-8 px-2">
-          <h3 className="font-display text-2xl font-semibold tracking-tight flex items-center gap-2.5">
+          <h3 className="font-display text-2xl font-medium tracking-tight flex items-center gap-2.5">
             <div className="p-1.5 rounded-lg bg-purple-500/10 text-purple-400">
               <Calendar className="w-5 h-5" />
             </div>
@@ -149,7 +153,7 @@ export function UpcomingAnimeSection() {
   return (
     <section className="mb-24">
       <div className="flex items-center justify-between mb-8 px-2">
-        <h3 className="font-display text-2xl font-semibold tracking-tight flex items-center gap-2.5">
+        <h3 className="font-display text-2xl font-medium tracking-tight flex items-center gap-2.5">
           <div className="p-1.5 rounded-lg bg-purple-500/10 text-purple-400">
             <Calendar className="w-5 h-5" />
           </div>
@@ -158,16 +162,16 @@ export function UpcomingAnimeSection() {
 
         <div className="flex gap-1 p-1 rounded-full bg-white/5 border border-white/10">
           <button
-            onClick={() => scroll("left")}
+            data-section-scroll-control onClick={() => scroll("left")}
             aria-label={uiI18n.t('app.scroll_left_2c9e5a60')}
-            className="p-2 rounded-full text-muted-foreground hover:text-white hover:bg-white/10 transition-all duration-300"
+            className="p-2 rounded-full text-muted-foreground hover:text-white hover:bg-white/10 transition-[color,background-color,border-color,opacity] duration-300"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
           <button
-            onClick={() => scroll("right")}
+            data-section-scroll-control onClick={() => scroll("right")}
             aria-label={uiI18n.t('app.scroll_right_2994b49c')}
-            className="p-2 rounded-full text-muted-foreground hover:text-white hover:bg-white/10 transition-all duration-300"
+            className="p-2 rounded-full text-muted-foreground hover:text-white hover:bg-white/10 transition-[color,background-color,border-color,opacity] duration-300"
           >
             <ChevronRight className="w-4 h-4" />
           </button>
@@ -180,8 +184,9 @@ export function UpcomingAnimeSection() {
         <div className="pointer-events-none absolute right-0 top-0 bottom-4 w-8 bg-gradient-to-l from-background to-transparent z-10" />
 
         <div
-          ref={scrollRef}
           data-mobile-home-rail
+          data-card-collection="shelf"
+          ref={scrollRef}
           className="flex gap-4 overflow-x-auto pb-4 px-2 scrollbar-hide scroll-smooth snap-x snap-mandatory"
           style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
         >

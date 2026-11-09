@@ -2,23 +2,30 @@
  * backendOrigin.ts — canonical resolver for the TatakaiAPI backend URL.
  *
  * The renderer runs from different origins depending on the build:
- *   - web dev / https://tatakai.me — `/api/*` is proxied to the backend, so a
+ *   - web dev / https://tatakai.app — `/api/*` is proxied to the backend, so a
  *     relative path works.
  *   - desktop `app://tatakai.me` — a relative `/api/…` is intercepted by the
  *     app:// scheme handler and SPA-falls-back to `index.html`, so the fetch
  *     silently returns HTML (200) and the caller's `res.json()` throws.
  *
- * A bare relative `/api/v3/…` therefore breaks on desktop. Always resolve an
- * absolute origin (from `VITE_BACKEND_ORIGIN`, then the origin of
- * `VITE_TATAKAI_API_URL`, then the http page origin) so every build hits the
- * real backend. Mirrors the resolvers already used by marketplace-client.ts and
- * turnstile.ts.
+ * Browser development uses Vite's same-origin proxy. Other builds resolve
+ * `VITE_BACKEND_ORIGIN`, then the origin of `VITE_TATAKAI_API_URL`, with a
+ * production fallback for native shells. Authentication and AniList calls
+ * share this resolver.
  */
 
-import { isCapacitor } from "@/lib/platform/platform";
+import { isCapacitor, isElectron } from "@/lib/platform/platform";
+
+/** Vite owns API proxying for browser development, including localhost/tunnels. */
+export function usesDevelopmentApiProxy(): boolean {
+  return import.meta.env.DEV === true && !isCapacitor() && !isElectron()
+    && typeof window !== 'undefined' && /^https?:$/i.test(window.location.protocol);
+}
 
 /** Absolute backend origin with no trailing slash, or "" when none is known. */
 export function resolveBackendOrigin(): string {
+  // Production .env values must not send local browsers around Vite's proxy.
+  if (usesDevelopmentApiProxy()) return window.location.origin;
   const explicit = String(import.meta.env.VITE_BACKEND_ORIGIN || "").trim();
   if (/^https?:\/\//i.test(explicit)) return explicit.replace(/\/+$/, "");
 
@@ -33,11 +40,14 @@ export function resolveBackendOrigin(): string {
   // `https://localhost`), which is NOT the backend and can't proxy `/api/*`.
   // A relative base there would hit the shell and return the SPA HTML, so an
   // explicit origin is required. Use the production backend as the last resort.
-  if (isCapacitor()) return "https://api.tatakai.me";
+  if (isCapacitor()) return "https://api.tatakai.app";
 
-  // A real http(s) web origin proxies `/api/*` (Vite dev proxy or the deployed
-  // reverse proxy), so a relative base works — return "" so callers fall back
-  // to a relative `/api/v3`. Preserves the original web behavior exactly.
+  // Packaged desktop shells cannot proxy relative requests to the API.
+  if (typeof window !== 'undefined' && /^(app:|file:|tauri:)$/.test(window.location.protocol)) {
+    return 'https://api.tatakai.app';
+  }
+
+  // Without an explicit backend, HTTP pages use their same-origin API proxy.
   if (typeof window !== "undefined" && window.location.protocol.startsWith("http")) {
     return window.location.origin;
   }

@@ -1,0 +1,148 @@
+.catalog-page {
+  --catalog-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+:is(.catalog-page, .landing-page) .lucide {
+  stroke-width: 1.5;
+}
+
+.catalog-page [data-sidebar] button > .lucide,
+.catalog-page .premium-search-field > .lucide {
+  width: 18px;
+  height: 18px;
+  color: hsl(var(--muted-foreground));
+}
+
+.catalog-page [data-sidebar] .nav-icon-active > .lucide {
+  color: inherit;
+}
+
+.catalog-page .balanced-spotlight .spotlight-heading {
+  font-size: clamp(40px, 4.4vw, 64px);
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 600;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+}
+
+.catalog-page .balanced-spotlight .spotlight-heading[data-long-title='true'] {
+  font-size: clamp(32px, 3.4vw, 52px);
+}
+
+.catalog-page .balanced-spotlight [data-spotlight-description] {
+  font-size: 16px;
+  line-height: 26px;
+}
+
+.catalog-page [data-spotlight-metadata] {
+  font-variant-numeric: tabular-nums;
+}
+
+.catalog-page .media-card-title {
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.catalog-page .cinematic-title {
+  font-weight: 500;
+}
+
+.landing-hero-content {
+  min-height: 100svh;
+}
+
+.landing-hero {
+  --background: 0 0% 0%;
+  --foreground: 0 0% 96%;
+  --muted-foreground: 0 0% 70%;
+  --card: 0 0% 8%;
+}
+
+.landing-scene-shade {
+  background:
+    linear-gradient(90deg, #000 0%, rgb(0 0 0 / 0.96) 26%, rgb(0 0 0 / 0.68) 48%, rgb(0 0 0 / 0.12) 78%),
+    linear-gradient(0deg, #000 0%, rgb(0 0 0 / 0.15) 30%, transparent 65%);
+}
+
+.catalog-heading-marker {
+  width: 3px;
+  height: 20px;
+  flex: 0 0 auto;
+  border-radius: 2px;
+  background: hsl(var(--primary));
+}
+
+.catalog-heading {
+  letter-spacing: -0.01em;
+}
+
+:is(.catalog-page, .landing-page) :is(button, a) {
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.catalog-page .media-card-link:focus-visible {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 4px;
+}
+
+.catalog-page [data-desktop-header] a[href='/auth'] {
+  border: 1px solid hsl(var(--border));
+  border-radius: 10px;
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  box-shadow: none;
+}
+
+.catalog-page .premium-search-field {
+  box-shadow: none;
+}
+
+.catalog-page .media-card[data-resume-card='true'] .media-card-poster::after,
+.catalog-page [data-resume-card='true'] > .aspect-video::after {
+  content: '';
+  position: absolute;
+  z-index: 20;
+  top: 44px;
+  left: 12px;
+  width: 8px;
+  height: 16px;
+  background: hsl(var(--primary));
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 75%, 0 100%);
+  pointer-events: none;
+}
+
+.resume-bookmark {
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 75%, 0 100%);
+}
+
+.discover-controls > button {
+  min-height: 40px;
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+.landing-page .landing-copy button,
+.landing-page .landing-copy a[role='button'] {
+  border-radius: 10px;
+}
+
+@media (max-width: 767px) {
+  .discover-controls > button {
+    min-height: 48px;
+  }
+
+  .landing-scene-shade {
+    background: linear-gradient(180deg, rgb(0 0 0 / 0.65), rgb(0 0 0 / 0.88) 55%, #000 95%);
+  }
+}
+
+@media (max-width: 767px) {
+  .catalog-page .cinematic-hero .cinematic-title.spotlight-heading {
+    font-weight: 500;
+  }
+
+  .catalog-page .balanced-spotlight [data-spotlight-description] {
+    font-size: 14px;
+    line-height: 22px;
+  }
+}

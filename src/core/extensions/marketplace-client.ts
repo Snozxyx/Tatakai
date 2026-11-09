@@ -31,7 +31,7 @@ function resolveBackendOrigin(): string {
   }
   // Capacitor serves from a virtual host (tatakai.me/localhost) that is NOT the
   // backend, so window.location.origin can't reach the marketplace API.
-  if (isCapacitorOrigin()) return "https://api.tatakai.me";
+  if (isCapacitorOrigin()) return "https://api.tatakai.app";
   if (typeof window !== "undefined" && window.location.protocol.startsWith("http")) {
     return window.location.origin;
   }

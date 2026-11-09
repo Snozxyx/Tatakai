@@ -1,3 +1,5 @@
+import '@/components/anime/detail-polish.css';
+import '@/components/layout/catalog-polish.css';
 import { CharacterQuickFavorite } from '@/components/media/MediaLibraryMenu';
 import { MobileDetailQuickActions } from '@/components/anime/MobileDetailQuickActions';
 import '@/components/anime/mobile-detail.css';
@@ -36,7 +38,6 @@ import { VideoBackground } from "@/components/anime/VideoBackground";
 import { AnimeDetailHero, AnimeDetailPoster, AnimeDetailContent, AnimeDetailTitle, AnimeDetailDescription, AnimeDetailFacts, AnimeDetailActions, AnimeDetailPrimaryAction } from '@/components/anime/AnimeDetailLayout';
 import { EpisodeComments } from "@/components/video/EpisodeComments";
 import { RatingsSection } from "@/components/anime/RatingsSection";
-import { AnimeCommunityPosts } from "@/components/anime/AnimeCommunityPosts";
 import { WatchlistButton } from "@/components/anime/WatchlistButton";
 import { ShareButton } from "@/components/anime/ShareButton";
 import { AddToPlaylistButton } from "@/components/playlist/AddToPlaylistButton";
@@ -116,7 +117,7 @@ function RelationTree({ relations }: { relations: MediaRelation[] }) {
         type="button"
         onClick={() => scroll('left')}
         aria-label={uiI18n.t('app.scroll_series_tree_left_b8db9779')}
-        className="absolute -left-3 top-1/2 -translate-y-8 z-20 w-10 h-10 rounded-full bg-black/80 hover:bg-black text-white border border-white/10 hidden md:flex items-center justify-center opacity-0 group-hover/rail:opacity-100 transition-all shadow-xl backdrop-blur-md"
+        className="absolute -left-3 top-1/2 -translate-y-8 z-20 w-10 h-10 rounded-full bg-black/80 hover:bg-black text-white border border-white/10 hidden md:flex items-center justify-center opacity-0 group-hover/rail:opacity-100 transition-[color,background-color,border-color,opacity] shadow-xl backdrop-blur-md"
       >
         <ChevronLeft className="w-5 h-5" />
       </button>
@@ -137,25 +138,25 @@ function RelationTree({ relations }: { relations: MediaRelation[] }) {
             to={to}
             className="group flex-shrink-0 w-60 sm:w-64 md:w-72 block transition-transform"
           >
-            <div className="relative aspect-[16/9] w-full rounded-2xl overflow-hidden bg-muted/40 transition-all duration-300 hover:scale-[1.03] hover:ring-2 hover:ring-white/40">
+            <div className="relative aspect-[16/9] w-full rounded-2xl overflow-hidden bg-muted/40 transition-[color,background-color,border-color,opacity] duration-300  hover:ring-2 hover:ring-white/40">
               <img
                 src={getProxiedImageUrl(rel.coverImage || '')}
                 alt={title}
                 loading="lazy"
-                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                className="w-full h-full object-cover transition-transform duration-500 "
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/30" />
 
               {/* Relation type badge — top-left */}
               <div className="absolute top-2.5 left-2.5">
-                <span className="px-2.5 py-1 rounded-md bg-black/80 text-white text-[11px] font-bold uppercase tracking-wider backdrop-blur-md border border-white/10 shadow-md">
+                <span className="px-2.5 py-1 rounded-md bg-black/80 text-white text-xs font-medium normal-case tracking-normal backdrop-blur-md border border-white/10 shadow-md">
                   {relLabel}
                 </span>
               </div>
 
               {/* Episode count badge — bottom-right */}
               {rel.episodes ? (
-                <div className="absolute bottom-2.5 right-2.5 px-2 py-0.5 rounded-md bg-black/80 text-white text-[10px] font-bold uppercase tracking-wider backdrop-blur-md border border-white/10 shadow-md">
+                <div className="absolute bottom-2.5 right-2.5 px-2 py-0.5 rounded-md bg-black/80 text-white text-xs font-medium normal-case tracking-normal backdrop-blur-md border border-white/10 shadow-md">
                   {rel.episodes} {uiI18n.t('app.eps_65884e31')}
                 </div>
               ) : null}
@@ -164,7 +165,7 @@ function RelationTree({ relations }: { relations: MediaRelation[] }) {
             {/* Title & Metadata below card */}
             <div className="mt-2.5 px-1">
               <h4
-                className="text-sm font-semibold truncate text-foreground group-hover:text-primary transition-colors"
+                className="text-sm font-medium truncate text-foreground group-hover:text-primary transition-colors"
                 title={title}
               >
                 {title}
@@ -188,7 +189,7 @@ function RelationTree({ relations }: { relations: MediaRelation[] }) {
         type="button"
         onClick={() => scroll('right')}
         aria-label={uiI18n.t('app.scroll_series_tree_right_37e703d6')}
-        className="absolute -right-3 top-1/2 -translate-y-8 z-20 w-10 h-10 rounded-full bg-black/80 hover:bg-black text-white border border-white/10 hidden md:flex items-center justify-center opacity-0 group-hover/rail:opacity-100 transition-all shadow-xl backdrop-blur-md"
+        className="absolute -right-3 top-1/2 -translate-y-8 z-20 w-10 h-10 rounded-full bg-black/80 hover:bg-black text-white border border-white/10 hidden md:flex items-center justify-center opacity-0 group-hover/rail:opacity-100 transition-[color,background-color,border-color,opacity] shadow-xl backdrop-blur-md"
       >
         <ChevronRight className="w-5 h-5" />
       </button>
@@ -500,7 +501,7 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
     setViewingRpc({
       animeTitle: title,
       animeImageUrl: animeData?.info?.poster,
-      animeUrl: `https://tatakai.me/anime/${contentAnimeId}`,
+      animeUrl: `https://tatakai.app/anime/${contentAnimeId}`,
     });
     return () => {
       clearDiscordRpc();
@@ -690,10 +691,10 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
   if (loadingInfo) {
     return (
       <div className="min-h-screen bg-background text-foreground">
-        <Background />
+        <Background quiet />
         <main
           className={cn(
-            "relative z-10 pr-6 py-6 max-w-[1800px] mx-auto",
+            "relative z-10 pr-6 py-6 max-w-[1600px] mx-auto",
             isDesktopApp ? "pl-6" : "pl-6 md:pl-32",
           )}
         >
@@ -729,7 +730,7 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold mb-2">{uiI18n.t('app.anime_details_not_available_c1c40973')}</h1>
+          <h1 className="text-2xl font-medium mb-2">{uiI18n.t('app.anime_details_not_available_c1c40973')}</h1>
           <p className="text-muted-foreground mb-4">{uiI18n.t('app.we_couldn_t_retrieve_the_information_for_this_an_81c6f502')}</p>
           {import.meta.env.DEV && animeError instanceof Error && (
             <pre className="text-xs text-destructive/80 max-w-md mx-auto mb-4 whitespace-pre-wrap break-words">
@@ -768,8 +769,8 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
 
   if (requiresAdultWarning) {
     return (
-      <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
-        <Background />
+      <div className="catalog-page detail-page min-h-screen bg-background text-foreground overflow-x-hidden">
+        <Background quiet />
         <main
           className={cn(
             "relative z-10 py-8 max-w-[980px] mx-auto pb-24",
@@ -779,7 +780,7 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
           <AdultWarningGate
             title={info.name}
             mediaLabel="anime"
-            onBack={() => navigate(-1)}
+            onBack={() => navigate('/browse')}
             onContinue={() => setAllowAdultForSession(true)}
             onAlwaysShow={() => {
               updateContentSafetySettings({
@@ -820,12 +821,12 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
             url: `${window.location.origin}/anime/${contentAnimeId}`,
             ...(info.description ? { description: info.description.slice(0, 5000) } : {}),
             ...(info.poster ? { image: info.poster } : {}),
-            isPartOf: { "@type": "WebSite", name: "Tatakai", url: "https://tatakai.me" },
+            isPartOf: { "@type": "WebSite", name: "Tatakai", url: "https://tatakai.app" },
           })}
         </script>
       </Helmet>
 
-      <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
+      <div className="catalog-page detail-page min-h-screen bg-background text-foreground overflow-x-hidden">
         {/* Video Background Hero */}
         <VideoBackground
           animeId={contentAnimeId!}
@@ -834,13 +835,13 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
           titles={previewTitles}
         >
           <main className={cn(
-            "relative z-10 pr-6 py-6 max-w-[1800px] mx-auto pb-24 md:pb-6",
+            "relative z-10 pr-6 py-6 max-w-[1600px] mx-auto pb-24 md:pb-6",
             isDesktopApp ? "pl-6" : "pl-6 md:pl-32" // Original web padding
           )}>
             {sourceContext?.header}
             {/* Back Button */}
             <button
-              onClick={() => navigate(-1)}
+              onClick={() => navigate('/browse')}
               className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors min-h-11 md:min-h-0 mb-4 md:mb-8"
             >
               <ArrowLeft className="w-5 h-5" />
@@ -950,7 +951,7 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
                     {info.stats.rating && (
                       <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber/20 text-amber">
                         <Star className="w-4 h-4 fill-amber" />
-                        <span className="font-bold">{info.stats.rating}</span>
+                        <span className="font-medium">{info.stats.rating}</span>
                       </div>
                     )}
                     <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted">
@@ -989,7 +990,7 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
                   {/* Tags */}
                   {animeTags.length > 0 && (
                     <div className="flex flex-wrap items-center gap-1.5 mb-6">
-                      <span className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mr-1 flex items-center gap-1">
+                      <span className="text-xs normal-case tracking-normal text-muted-foreground font-medium mr-1 flex items-center gap-1">
                         <Tag className="w-3 h-3 text-primary" />
                         {uiI18n.t('app.tags_b5ddd4e8')}
                       </span>
@@ -998,12 +999,12 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
                           key={tag.id || tag.name}
                           type="button"
                           onClick={() => navigate(`/search?animeTag=${encodeURIComponent(tag.name)}&type=anime`)}
-                          className="px-2.5 py-0.5 rounded-full bg-white/5 hover:bg-primary/20 border border-white/10 hover:border-primary/40 text-xs text-muted-foreground hover:text-primary transition-all flex items-center gap-1 group"
+                          className="px-2.5 py-0.5 rounded-full bg-white/5 hover:bg-primary/20 border border-white/10 hover:border-primary/40 text-xs text-muted-foreground hover:text-primary transition-[color,background-color,border-color,opacity] flex items-center gap-1 group"
                           title={tag.category ? uiI18n.t('app.i18n_value_0_click_to_search_befc3ac0', { value0: tag.category }) : uiI18n.t('app.click_to_search_8e81d4fa')}
                         >
                           <span>{tag.name}</span>
                           {typeof tag.rank === 'number' && (
-                            <span className="text-[10px] text-muted-foreground/60 group-hover:text-primary/70">
+                            <span className="text-xs text-muted-foreground/60 group-hover:text-primary/70">
                               {tag.rank}%
                             </span>
                           )}
@@ -1022,9 +1023,9 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
                       15+ aliases and they would otherwise bury the synopsis. */}
                   {titleAliases.length > 0 && (
                     <details className="mt-4 group">
-                      <summary className="text-xs uppercase tracking-wider text-muted-foreground cursor-pointer hover:text-foreground transition-colors list-none inline-flex items-center gap-1">
+                      <summary className="text-xs normal-case tracking-normal text-muted-foreground cursor-pointer hover:text-foreground transition-colors list-none inline-flex items-center gap-1">
                         {uiI18n.t('app.also_known_as_3ffda41e')}
-                        <span className="text-[10px] opacity-60">({titleAliases.length})</span>
+                        <span className="text-xs opacity-60">({titleAliases.length})</span>
                       </summary>
                       <div className="mt-2 flex flex-wrap gap-1.5">
                         {titleAliases.map((alias) => (
@@ -1044,7 +1045,7 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
                 <AnimeDetailFacts>
                   {moreInfo.aired && (
                     <div>
-                      <span className="text-xs text-muted-foreground uppercase tracking-wider">{uiI18n.t('app.aired_7487695a')}</span>
+                      <span className="text-xs text-muted-foreground normal-case tracking-normal">{uiI18n.t('app.aired_7487695a')}</span>
                       <p className="font-medium flex items-center gap-2 mt-1">
                         <Calendar className="w-4 h-4" />
                         {moreInfo.aired}
@@ -1053,13 +1054,13 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
                   )}
                   {moreInfo.status && (
                     <div>
-                      <span className="text-xs text-muted-foreground uppercase tracking-wider">{uiI18n.t('app.status_bae7d5be')}</span>
+                      <span className="text-xs text-muted-foreground normal-case tracking-normal">{uiI18n.t('app.status_bae7d5be')}</span>
                       <p className="font-medium mt-1">{moreInfo.status}</p>
                     </div>
                   )}
                   {moreInfo.studios && (
                     <div>
-                      <span className="text-xs text-muted-foreground uppercase tracking-wider">{uiI18n.t('app.studios_97f7c6f7')}</span>
+                      <span className="text-xs text-muted-foreground normal-case tracking-normal">{uiI18n.t('app.studios_97f7c6f7')}</span>
                       <p 
                         className="font-medium mt-1 hover:text-primary cursor-pointer transition-colors"
                         onClick={() => navigate(`/search/producer/${encodeURIComponent(moreInfo.studios)}`)}
@@ -1070,55 +1071,55 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
                   )}
                   {(moreInfo.season || moreInfo.year) && (
                     <div>
-                      <span className="text-xs text-muted-foreground uppercase tracking-wider">{uiI18n.t('app.season_62255f56')}</span>
+                      <span className="text-xs text-muted-foreground normal-case tracking-normal">{uiI18n.t('app.season_62255f56')}</span>
                       <p className="font-medium mt-1 capitalize">{moreInfo.season} {moreInfo.year}</p>
                     </div>
                   )}
                   {moreInfo.source && (
                     <div>
-                      <span className="text-xs text-muted-foreground uppercase tracking-wider">{uiI18n.t('app.source_6da13add')}</span>
+                      <span className="text-xs text-muted-foreground normal-case tracking-normal">{uiI18n.t('app.source_6da13add')}</span>
                       <p className="font-medium mt-1 capitalize">{String(moreInfo.source).toLowerCase().replace(/_/g, " ")}</p>
                     </div>
                   )}
                   {moreInfo.duration && moreInfo.duration !== "Unknown" && (
                     <div>
-                      <span className="text-xs text-muted-foreground uppercase tracking-wider">{uiI18n.t('app.duration_1370004d')}</span>
+                      <span className="text-xs text-muted-foreground normal-case tracking-normal">{uiI18n.t('app.duration_1370004d')}</span>
                       <p className="font-medium mt-1 flex items-center gap-2"><Clock className="w-4 h-4" />{moreInfo.duration}</p>
                     </div>
                   )}
                   {moreInfo.countryOfOrigin && (
                     <div>
-                      <span className="text-xs text-muted-foreground uppercase tracking-wider">{uiI18n.t('app.country_d523ebbd')}</span>
+                      <span className="text-xs text-muted-foreground normal-case tracking-normal">{uiI18n.t('app.country_d523ebbd')}</span>
                       <p className="font-medium mt-1">{moreInfo.countryOfOrigin}</p>
                     </div>
                   )}
                   {typeof moreInfo.meanScore === "number" && moreInfo.meanScore > 0 && (
                     <div>
-                      <span className="text-xs text-muted-foreground uppercase tracking-wider">{uiI18n.t('app.mean_score_7062f0d8')}</span>
+                      <span className="text-xs text-muted-foreground normal-case tracking-normal">{uiI18n.t('app.mean_score_7062f0d8')}</span>
                       <p className="font-medium mt-1">{moreInfo.meanScore}%</p>
                     </div>
                   )}
                   {typeof moreInfo.popularity === "number" && moreInfo.popularity > 0 && (
                     <div>
-                      <span className="text-xs text-muted-foreground uppercase tracking-wider">{uiI18n.t('app.popularity_be6c200f')}</span>
+                      <span className="text-xs text-muted-foreground normal-case tracking-normal">{uiI18n.t('app.popularity_be6c200f')}</span>
                       <p className="font-medium mt-1">#{moreInfo.popularity.toLocaleString(uiI18n.language)}</p>
                     </div>
                   )}
                   {typeof moreInfo.favourites === "number" && moreInfo.favourites > 0 && (
                     <div>
-                      <span className="text-xs text-muted-foreground uppercase tracking-wider">{uiI18n.t('app.favourites_e6ccc0fd')}</span>
+                      <span className="text-xs text-muted-foreground normal-case tracking-normal">{uiI18n.t('app.favourites_e6ccc0fd')}</span>
                       <p className="font-medium mt-1">{moreInfo.favourites.toLocaleString(uiI18n.language)}</p>
                     </div>
                   )}
                   {moreInfo.endDate && (
                     <div>
-                      <span className="text-xs text-muted-foreground uppercase tracking-wider">{uiI18n.t('app.ended_90303d8d')}</span>
+                      <span className="text-xs text-muted-foreground normal-case tracking-normal">{uiI18n.t('app.ended_90303d8d')}</span>
                       <p className="font-medium mt-1 flex items-center gap-2"><Calendar className="w-4 h-4" />{moreInfo.endDate}</p>
                     </div>
                   )}
                   {producerNames.length > 0 && (
                     <div className="col-span-2 md:col-span-3">
-                      <span className="text-xs text-muted-foreground uppercase tracking-wider">{uiI18n.t('app.producers_a44fa04f')}</span>
+                      <span className="text-xs text-muted-foreground normal-case tracking-normal">{uiI18n.t('app.producers_a44fa04f')}</span>
                       <div className="mt-2 flex flex-wrap gap-2">
                         {producerNames.map((producer) => (
                           <button
@@ -1145,7 +1146,7 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
                       .map((ranking) => (
                         <span
                           key={ranking.id}
-                          className="inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary capitalize"
+                          className="inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-xs font-medium text-primary capitalize"
                           title={ranking.context}
                         >
                           {ranking.type === 'RATED' ? <Star className="w-3.5 h-3.5" /> : <Sparkles className="w-3.5 h-3.5" />}
@@ -1189,17 +1190,17 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
                   <OpenInAppButton size="lg" className="h-12 sm:h-14 rounded-full" label={uiI18n.t('app.open_in_app_07d911ac')} />
                   <button
                     onClick={() => navigate(`/isshoni?anime=${encodeURIComponent(contentAnimeId!)}&title=${encodeURIComponent(info.name)}&poster=${encodeURIComponent(info.poster)}`)}
-                    className="group flex h-14 w-14 items-center justify-center rounded-full bg-[hsl(var(--isshoni-accent))] text-black ring-1 ring-inset ring-white/25 shadow-[0_10px_30px_-8px_hsl(var(--isshoni-accent)/0.6)] transition-all hover:scale-105 hover:bg-[hsl(var(--isshoni-accent)/0.9)] hover:shadow-[0_0_28px_hsl(var(--isshoni-accent)/0.5)] active:scale-95"
+                    className="group flex h-14 w-14 items-center justify-center rounded-full bg-[hsl(var(--isshoni-accent))] text-black ring-1 ring-inset ring-white/25 shadow-[0_10px_30px_-8px_hsl(var(--isshoni-accent)/0.6)] transition-[color,background-color,border-color,opacity]  hover:bg-[hsl(var(--isshoni-accent)/0.9)] hover:shadow-[0_0_28px_hsl(var(--isshoni-accent)/0.5)] active:scale-95"
                     title={uiI18n.t('app.watch_together_195732a6')}
                     aria-label={uiI18n.t('app.start_a_watch_together_party_c96182e8')}
                   >
-                    <Users className="w-5 h-5 transition-transform group-hover:scale-110" />
+                    <Users className="w-5 h-5 transition-transform " />
                   </button>
 
                   {(isMobileNative || isDesktopApp) && (
                     <button
                       onClick={() => setIsDownloadModalOpen(true)}
-                      className="h-14 w-14 rounded-full bg-primary/20 hover:bg-primary/30 text-primary flex items-center justify-center transition-all hover:scale-105"
+                      className="h-14 w-14 rounded-full bg-primary/20 hover:bg-primary/30 text-primary flex items-center justify-center transition-[color,background-color,border-color,opacity] "
                       title={uiI18n.t('app.download_season_37e47278')}
                     >
                       <Download className="w-6 h-6" />
@@ -1213,7 +1214,7 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
 
         <main
           className={cn(
-            "relative z-10 pr-6 max-w-[1800px] mx-auto pb-24 md:pb-6",
+            "relative z-10 pr-6 max-w-[1600px] mx-auto pb-24 md:pb-6",
             isDesktopApp ? "pl-6" : "pl-6 md:pl-32",
           )}
         >
@@ -1238,7 +1239,7 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
 {sourceContext ? sourceContext.entries : (          <section className="mb-16">
             <div className="flex flex-col gap-4 mb-6">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="font-display text-2xl font-semibold">{uiI18n.t('app.episodes_49d641ba')}</h2>
+                <h2 className="font-display text-2xl font-medium">{uiI18n.t('app.episodes_49d641ba')}</h2>
                 <div className="flex w-full flex-wrap items-center gap-3 md:w-auto">
                   <span className="text-sm text-muted-foreground">
                     {isFilteringEpisodes
@@ -1306,7 +1307,7 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
                         key={`${start}-${end}-${index}`}
                         onClick={() => setSelectedEpisodeGroup(index)}
                         aria-pressed={isActive}
-                        className={`px-4 py-2 rounded-full text-sm font-semibold transition-all border ${isActive
+                        className={`px-4 py-2 rounded-full text-sm font-medium transition-[color,background-color,border-color,opacity] border ${isActive
                           ? "bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20"
                           : "bg-muted/50 text-muted-foreground border-border hover:bg-muted hover:text-foreground"}`}
                       >
@@ -1330,7 +1331,7 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
                 ))}
               </div>
             ) : !episodesData ? null : visibleEpisodes.length === 0 ? (
-              <GlassPanel className="p-6 text-center text-sm text-muted-foreground">
+              <GlassPanel quiet className="p-6 text-center text-sm text-muted-foreground">
                 {uiI18n.t('app.no_episode_matches_60efd06a')}{episodeQuery.trim()}".
               </GlassPanel>
             ) : episodeLayout === "grid" ? (
@@ -1346,7 +1347,7 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
                         disabled={ep.hasAired === false}
                         aria-disabled={ep.hasAired === false}
                         className={cn(
-                          "group w-full text-left rounded-xl overflow-hidden border bg-muted/30 transition-all hover:border-primary/60 hover:bg-muted/60 disabled:cursor-not-allowed disabled:hover:border-white/15 disabled:hover:bg-muted/30",
+                          "group w-full text-left rounded-xl overflow-hidden border bg-muted/30 transition-[color,background-color,border-color,opacity] hover:border-primary/60 hover:bg-muted/60 disabled:cursor-not-allowed disabled:hover:border-white/15 disabled:hover:bg-muted/30",
                           ep.isFiller
                             ? "border-orange/40"
                             : ep.hasAired === false
@@ -1360,7 +1361,7 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
                               src={ep.image}
                               alt={ep.title}
                               loading="lazy"
-                              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                              className="w-full h-full object-cover transition-transform duration-300 "
                               onError={(event) => {
                                 event.currentTarget.style.visibility = "hidden";
                               }}
@@ -1371,16 +1372,16 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
                             </div>
                           )}
                           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-                          <span className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-black/70 text-white text-xs font-bold backdrop-blur-sm">
+                          <span className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-black/70 text-white text-xs font-medium backdrop-blur-sm">
                             {uiI18n.t('app.ep_00c1bff9')} {ep.number}
                           </span>
                           {ep.isFiller && (
-                            <span className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-orange/90 text-black text-[10px] font-bold uppercase tracking-wide">
+                            <span className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-orange/90 text-black text-xs font-medium normal-case tracking-normal">
                               {uiI18n.t('app.filler_e0a62127')}
                             </span>
                           )}
                           {ep.hasAired === false ? (
-                            <span className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-primary/90 text-primary-foreground text-[10px] font-bold uppercase tracking-wide">
+                            <span className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-primary/90 text-primary-foreground text-xs font-medium normal-case tracking-normal">
                               {uiI18n.t('app.upcoming_523baab9')}
                             </span>
                           ) : (
@@ -1392,7 +1393,7 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
                           )}
                         </div>
                         <div className="p-3 space-y-1.5">
-                          <p className="text-sm font-semibold leading-snug line-clamp-2 group-hover:text-primary transition-colors">
+                          <p className="text-sm font-medium leading-snug line-clamp-2 group-hover:text-primary transition-colors">
                             {ep.title}
                           </p>
                           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
@@ -1441,7 +1442,7 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
                             onClick={() => handleEpisodeClick(ep.episodeId)}
                             disabled={ep.hasAired === false}
                             aria-disabled={ep.hasAired === false}
-                            className={`h-12 w-full rounded-lg font-medium transition-all hover:scale-105 relative disabled:cursor-not-allowed disabled:hover:scale-100 ${ep.isFiller
+                            className={`h-12 w-full rounded-lg font-medium transition-[color,background-color,border-color,opacity]  relative disabled:cursor-not-allowed disabled: ${ep.isFiller
                               ? "bg-orange/20 text-orange hover:bg-orange/30"
                               : ep.hasAired === false
                                 // Dated in the future: still listed (ani.zip knows
@@ -1464,7 +1465,7 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
                             />
                           )}
                           <div className="p-3 space-y-1.5">
-                            <p className="text-sm font-semibold leading-snug">
+                            <p className="text-sm font-medium leading-snug">
                               {ep.number}. {ep.title}
                             </p>
                             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
@@ -1522,7 +1523,7 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
             <section className="mb-16">
               <div className="flex items-center gap-2.5 mb-5">
                 <div className="w-1.5 h-5 md:h-6 rounded-full bg-primary" />
-                <h2 className="font-display text-xl md:text-2xl font-bold tracking-tight text-white flex items-center gap-2">
+                <h2 className="font-display text-xl md:text-2xl font-medium tracking-tight text-white flex items-center gap-2">
                   {uiI18n.t('app.watch_order_7aadca87')}
                 </h2>
               </div>
@@ -1535,7 +1536,7 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
                     watchOrderScrollRef.current?.scrollBy({ left: -450, behavior: 'smooth' });
                   }}
                   aria-label={uiI18n.t('app.scroll_left_2c9e5a60')}
-                  className="absolute -left-3 top-1/2 -translate-y-8 z-20 w-10 h-10 rounded-full bg-black/80 hover:bg-black text-white border border-white/10 flex items-center justify-center opacity-0 group-hover/rail:opacity-100 transition-all shadow-xl backdrop-blur-md"
+                  className="absolute -left-3 top-1/2 -translate-y-8 z-20 w-10 h-10 rounded-full bg-black/80 hover:bg-black text-white border border-white/10 flex items-center justify-center opacity-0 group-hover/rail:opacity-100 transition-[color,background-color,border-color,opacity] shadow-xl backdrop-blur-md"
                 >
                   <ChevronLeft className="w-5 h-5" />
                 </button>
@@ -1555,16 +1556,16 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
                       )}
                     >
                       <div className={cn(
-                        "relative aspect-[16/9] w-full rounded-2xl overflow-hidden bg-muted/40 transition-all duration-300",
+                        "relative aspect-[16/9] w-full rounded-2xl overflow-hidden bg-muted/40 transition-[color,background-color,border-color,opacity] duration-300",
                         season.isCurrent
                           ? "ring-2 ring-white ring-offset-2 ring-offset-background"
-                          : "hover:scale-[1.03] hover:ring-2 hover:ring-white/40"
+                          : " hover:ring-2 hover:ring-white/40"
                       )}>
                         <img
                           src={getProxiedImageUrl(season.poster)}
                           alt={season.name}
                           loading="lazy"
-                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                          className="w-full h-full object-cover transition-transform duration-500 "
                         />
                         {/* Dark gradient overlay */}
                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/30" />
@@ -1572,11 +1573,11 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
                         {/* Classification / Status badge — top-left */}
                         <div className="absolute top-2.5 left-2.5">
                           {season.isCurrent ? (
-                            <span className="px-2.5 py-1 rounded-md bg-white text-black text-[11px] font-black uppercase tracking-wider shadow-md">
+                            <span className="px-2.5 py-1 rounded-md bg-white text-black text-xs font-medium normal-case tracking-normal shadow-md">
                               {uiI18n.t('app.current_e6303ccf')}
                             </span>
                           ) : (
-                            <span className="px-2.5 py-1 rounded-md bg-black/80 text-white text-[11px] font-bold uppercase tracking-wider backdrop-blur-md border border-white/10 shadow-md">
+                            <span className="px-2.5 py-1 rounded-md bg-black/80 text-white text-xs font-medium normal-case tracking-normal backdrop-blur-md border border-white/10 shadow-md">
                               {season.classification || uiI18n.t('app.season_i18n_value_0_cf2c99e5', { value0: season.seasonNumber })}
                             </span>
                           )}
@@ -1584,7 +1585,7 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
 
                         {/* Episode count badge — bottom-right */}
                         {season.episodeCount && (
-                          <div className="absolute bottom-2.5 right-2.5 px-2 py-0.5 rounded-md bg-black/80 text-white text-[10px] font-bold uppercase tracking-wider backdrop-blur-md border border-white/10 shadow-md">
+                          <div className="absolute bottom-2.5 right-2.5 px-2 py-0.5 rounded-md bg-black/80 text-white text-xs font-medium normal-case tracking-normal backdrop-blur-md border border-white/10 shadow-md">
                             {season.episodeCount} {uiI18n.t('app.eps_65884e31')}
                           </div>
                         )}
@@ -1594,7 +1595,7 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
                       <div className="mt-2.5 px-1">
                         <h4
                           className={cn(
-                            "text-sm font-semibold truncate transition-colors",
+                            "text-sm font-medium truncate transition-colors",
                             season.isCurrent ? "text-primary" : "text-foreground group-hover:text-primary"
                           )}
                           title={season.name}
@@ -1631,7 +1632,7 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
                     watchOrderScrollRef.current?.scrollBy({ left: 450, behavior: 'smooth' });
                   }}
                   aria-label={uiI18n.t('app.scroll_right_2994b49c')}
-                  className="absolute -right-3 top-1/2 -translate-y-8 z-20 w-10 h-10 rounded-full bg-black/80 hover:bg-black text-white border border-white/10 flex items-center justify-center opacity-85 group-hover/rail:opacity-100 transition-all shadow-xl backdrop-blur-md"
+                  className="absolute -right-3 top-1/2 -translate-y-8 z-20 w-10 h-10 rounded-full bg-black/80 hover:bg-black text-white border border-white/10 flex items-center justify-center opacity-85 group-hover/rail:opacity-100 transition-[color,background-color,border-color,opacity] shadow-xl backdrop-blur-md"
                 >
                   <ChevronRight className="w-5 h-5" />
                 </button>
@@ -1645,7 +1646,7 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
             <section className="mb-16">
               <div className="flex items-center gap-2.5 mb-5">
                 <div className="w-1.5 h-5 md:h-6 rounded-full bg-primary" />
-                <h2 className="font-display text-xl md:text-2xl font-bold tracking-tight text-white flex items-center gap-2">
+                <h2 className="font-display text-xl md:text-2xl font-medium tracking-tight text-white flex items-center gap-2">
                   {uiI18n.t('app.official_streams_70f0a531')}
                 </h2>
               </div>
@@ -1668,7 +1669,7 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
                             src={ep.thumbnail}
                             alt={ep.title || ''}
                             loading="lazy"
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                            className="w-full h-full object-cover  transition-transform"
                           />
                           <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/30 transition-colors">
                             <Play className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 fill-white transition-opacity" />
@@ -1682,7 +1683,7 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
                       <div className="p-2.5">
                         <p className="text-xs font-medium line-clamp-2">{ep.title || uiI18n.t('app.episode_8669aa56')}</p>
                         {ep.site && (
-                          <p className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground">
+                          <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
                             <ExternalLinkIcon className="w-3 h-3" />
                             {ep.site}
                           </p>
@@ -1699,7 +1700,7 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
             <section className="mb-16">
               <div className="flex items-center gap-2.5 mb-5">
                 <div className="w-1.5 h-5 md:h-6 rounded-full bg-primary" />
-                <h2 className="font-display text-xl md:text-2xl font-bold tracking-tight text-white flex items-center gap-2">
+                <h2 className="font-display text-xl md:text-2xl font-medium tracking-tight text-white flex items-center gap-2">
                   {uiI18n.t('app.series_tree_31ecaced')}
                 </h2>
               </div>
@@ -1710,31 +1711,31 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
           {/* Characters */}
           {info.characterVoiceActor && info.characterVoiceActor.length > 0 && (
             <section className="mb-16">
-              <h2 className="font-display text-2xl font-semibold mb-6 flex items-center gap-2">
+              <h2 className="font-display text-2xl font-medium mb-6 flex items-center gap-2">
                 <Users className="w-5 h-5 text-primary" />
                 {uiI18n.t('app.characters_b6f59f08')}
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {info.characterVoiceActor.slice(0, 12).map((cva, index) => (
-                  <GlassPanel 
+                  <GlassPanel quiet
                     key={`${cva.character.id}-${index}`} 
-                    className="p-3 flex items-center gap-3 hover:bg-white/10 transition-all cursor-pointer group"
+                    className="p-3 flex items-center gap-3 hover:bg-white/10 transition-[color,background-color,border-color,opacity] cursor-pointer group"
                     onClick={() => navigate(`/character/${cva.character.id}?name=${encodeURIComponent(cva.character.name)}`)}
                   >
                     <img 
                       src={getProxiedImageUrl(cva.character.poster) || "/placeholder.svg"} 
                       alt={cva.character.name}
-                      className="w-14 h-14 rounded-full object-cover border border-white/10 group-hover:scale-110 transition-transform"
+                      className="w-14 h-14 rounded-full object-cover border border-white/10  transition-transform"
                     />
                     <div className="min-w-0 flex-1">
-                      <p className="font-bold text-sm truncate group-hover:text-primary transition-colors">{cva.character.name}</p>
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{cva.character.cast || uiI18n.t('app.character_ee9946c8')}</p>
+                      <p className="font-medium text-sm truncate group-hover:text-primary transition-colors">{cva.character.name}</p>
+                      <p className="text-xs text-muted-foreground normal-case tracking-normal">{cva.character.cast || uiI18n.t('app.character_ee9946c8')}</p>
                     </div>
                     <CharacterQuickFavorite item={{ kind:'character', id:String(cva.character.id), name:cva.character.name, poster:cva.character.poster }} className="relative z-40 grid size-9 shrink-0 place-items-center rounded-full border border-border bg-card text-card-foreground" />
                     {cva.voiceActor.name !== "Unknown" && (
                        <div className="text-right border-l border-white/10 pl-3 hidden sm:block">
-                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{uiI18n.t('app.voice_3091c844')}</p>
-                          <p className="text-[11px] font-medium truncate max-w-[80px]">{cva.voiceActor.name}</p>
+                          <p className="text-xs text-muted-foreground normal-case tracking-normal">{uiI18n.t('app.voice_3091c844')}</p>
+                          <p className="text-xs font-medium truncate max-w-[80px]">{cva.voiceActor.name}</p>
                        </div>
                     )}
                   </GlassPanel>
@@ -1746,21 +1747,21 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
           {/* Staff */}
           {moreInfo.staff && moreInfo.staff.length > 0 && (
             <section className="mb-16">
-              <h2 className="font-display text-2xl font-semibold mb-6 flex items-center gap-2">
+              <h2 className="font-display text-2xl font-medium mb-6 flex items-center gap-2">
                 <PenTool className="w-5 h-5 text-primary" />
                 {uiI18n.t('app.staff_a4730a22')}
               </h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                 {moreInfo.staff.map((s, index) => (
-                  <GlassPanel key={`${s.id}-${index}`} className="p-3 flex items-center gap-3 hover:bg-white/10 transition-colors">
+                  <GlassPanel quiet key={`${s.id}-${index}`} className="p-3 flex items-center gap-3 hover:bg-white/10 transition-colors">
                     <img 
                       src={getProxiedImageUrl(s.imageUrl) || "/placeholder.svg"} 
                       alt={s.name}
                       className="w-10 h-10 rounded-full object-cover border border-white/10"
                     />
                     <div className="min-w-0">
-                      <p className="font-bold text-xs truncate">{s.name}</p>
-                      <p className="text-[9px] text-muted-foreground uppercase tracking-wider">{s.role || uiI18n.t('app.staff_a4730a22')}</p>
+                      <p className="font-medium text-xs truncate">{s.name}</p>
+                      <p className="text-xs text-muted-foreground normal-case tracking-normal">{s.role || uiI18n.t('app.staff_a4730a22')}</p>
                     </div>
                   </GlassPanel>
                 ))}
@@ -1781,15 +1782,6 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
               fallbackEpisodeId={episodesData?.episodes?.[0]?.episodeId}
             />
           </section>
-
-          {/* Community posts about this anime */}
-          {contentAnimeId && (
-            <AnimeCommunityPosts
-              animeId={contentAnimeId}
-              animeName={info.name}
-              animePoster={info.poster}
-            />
-          )}
 
           {/* Producer Catalog */}
           {producerAnimes.length > 0 && (

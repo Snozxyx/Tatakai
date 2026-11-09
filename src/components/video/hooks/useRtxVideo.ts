@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type RefObject } from 'react';
-import { RtxFrameBudget, type RtxFrameResult, type RtxVideoBridge } from '@/lib/video/rtx-video';
+import { checkRtxCapability, RtxFrameBudget, type RtxFrameResult, type RtxVideoBridge } from '@/lib/video/rtx-video';
 import type { VideoEnhancementQuality } from '@/lib/video/enhancement-settings';
 
 export function useRtxVideo(videoRef: RefObject<HTMLVideoElement>, enabled: boolean, quality: VideoEnhancementQuality, sourceKey: string | undefined) {
@@ -80,7 +80,7 @@ export function useRtxVideo(videoRef: RefObject<HTMLVideoElement>, enabled: bool
       hide(); report('Checking RTX Video…');
       if (!bridge) { fail('RTX Video requires the Windows desktop app.'); return; }
       try {
-        const capability = await bridge.capability();
+        const capability = await checkRtxCapability(bridge);
         if (disposed) return;
         if (!capability.available) { fail(capability.reason); return; }
         if (typeof VideoFrame === 'undefined' || typeof video.requestVideoFrameCallback !== 'function') { fail('This runtime cannot capture decoded frames.'); return; }

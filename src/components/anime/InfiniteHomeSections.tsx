@@ -1,3 +1,4 @@
+import { HomeSectionGroup } from '@/components/customization/HomeCustomization';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useEffect, useRef, useCallback, useMemo, memo } from 'react';
@@ -18,6 +19,7 @@ import { Peekable } from '@/components/media/MediaQuickPeek';
 import { peekFromAnime } from '@/components/media/quickPeekStore';
 import { buildPreferredAnimeRouteId } from '@/lib/animeIdMapping';
 import { inferAnimeAdultFlag } from '@/lib/contentSafety';
+import { useCardDesign } from '@/components/customization/CardDesignContext';
 
 // Hard cap so the DOM can't grow forever. Adjust to taste.
 const MAX_SECTIONS = 30;
@@ -45,18 +47,9 @@ function SectionSkeleton({ layout }: { layout: SectionLayout }) {
         </div>
         <div className="h-8 bg-white/5 animate-pulse rounded-full w-20" />
       </div>
-      <div className={cn(
-        "grid gap-4 md:gap-5",
-        layout === 'grid' && "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6",
-        layout === 'carousel' && "flex overflow-hidden",
-        layout === 'featured' && "grid-cols-1 md:grid-cols-3",
-        layout === 'compact' && "grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8",
-        layout === 'masonry' && "grid-cols-2 md:grid-cols-4 lg:grid-cols-6"
-      )}>
+      <div className="flex flex-nowrap gap-4 md:gap-5 overflow-hidden">
         {[...Array(layout === 'compact' ? 8 : 6)].map((_, i) => (
-          <CardSkeleton key={i} className={cn(
-            layout === 'carousel' ? "media-card-rail-item" : "w-full",
-          )} />
+          <CardSkeleton key={i} className="media-card-rail-item" />
         ))}
       </div>
     </div>
@@ -64,7 +57,7 @@ function SectionSkeleton({ layout }: { layout: SectionLayout }) {
 }
 
 const scrollContainerStyles =
-  "flex gap-4 md:gap-5 overflow-x-auto pb-4 pt-2 -mx-4 px-4 sm:mx-0 sm:px-0 snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]";
+  "flex flex-nowrap gap-4 md:gap-5 overflow-x-auto pb-4 pt-2 snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]";
 
 // ----------------------------------------------------------------------
 // Layouts — plain divs, no per-card motion
@@ -76,23 +69,14 @@ const Card = ({ anime, isMobile }: { anime: AnimeCard; isMobile: boolean }) =>
     ? <MobileAnimeCard anime={anime} />
     : <AnimeCardWithPreview anime={anime} showPreview={true} />;
 
-const GridLayout = memo(function GridLayout({ animes, isMobile }: LayoutProps) {
-  useUiTranslation();
-  const items = animes.slice(0, isMobile ? 4 : 6);
-  return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 md:gap-5">
-      {items.map((anime) => <Card key={anime.id} anime={anime} isMobile={isMobile} />)}
-    </div>
-  );
-});
-
 const CarouselLayout = memo(function CarouselLayout({ animes, isMobile }: LayoutProps) {
   useUiTranslation();
+  const { design } = useCardDesign();
   const items = animes.slice(0, isMobile ? 8 : 12);
   return (
-    <div className={scrollContainerStyles}>
+    <div className={scrollContainerStyles} data-card-collection="shelf" data-fixed-card-row>
       {items.map((anime) => (
-        <div key={anime.id} className="media-card-rail-item snap-start">
+        <div key={anime.id} className="media-card-rail-item snap-start" style={{ width: design?.style?.width ?? (isMobile ? 144 : 192) }}>
           <Card anime={anime} isMobile={isMobile} />
         </div>
       ))}
@@ -101,101 +85,13 @@ const CarouselLayout = memo(function CarouselLayout({ animes, isMobile }: Layout
   );
 });
 
-const FeaturedLayout = memo(function FeaturedLayout({ animes, isMobile }: LayoutProps) {
-  useUiTranslation();
-  const navigate = useNavigate();
-  if (animes.length === 0) return null;
-  const featured = animes[0];
-  const rest = animes.slice(1, 5);
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-      <div className="md:col-span-1 lg:row-span-2 h-full min-h-[400px]">
-        <Peekable media={peekFromAnime(featured, `/anime/${featured.id}`)}>
-        <div
-          onClick={() => navigate(`/anime/${featured.id}`)}
-          className="group relative h-full w-full rounded-2xl overflow-hidden cursor-pointer border border-white/10 bg-neutral-900"
-        >
-          <img
-            src={getHighQualityPoster(featured.poster, featured.anilistId)}
-            alt={featured.name}
-            loading="lazy"
-            decoding="async"
-            className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 brightness-[0.8]"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
-          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-            <div className="w-16 h-16 rounded-full bg-white/15 border border-white/20 flex items-center justify-center text-white">
-              <Play className="w-6 h-6 ml-1 fill-white" />
-            </div>
-          </div>
-          <div className="absolute bottom-0 inset-x-0 p-6 md:p-8">
-            <span className="inline-block px-2.5 py-1 mb-4 rounded-md bg-primary/30 border border-primary/30 text-primary-foreground text-[10px] font-black uppercase tracking-widest">
-              {uiI18n.t('app.featured_pick_634ec104')}
-            </span>
-            <h3 className="font-display font-bold text-2xl md:text-3xl text-white mb-3 leading-tight line-clamp-3">{featured.name}</h3>
-            <div className="flex items-center gap-3 text-xs font-semibold text-white/70">
-              {featured.type && <span className="flex items-center gap-1.5"><LayoutGrid className="w-3.5 h-3.5" />{featured.type}</span>}
-              {featured.rating && (
-                <span className="flex items-center gap-1.5 text-amber-400">
-                  <Star className="w-3.5 h-3.5 fill-current" />{featured.rating}
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-        </Peekable>
-      </div>
-      <div className="md:col-span-1 lg:col-span-2 grid grid-cols-2 gap-4 md:gap-5">
-        {rest.map((anime) => <Card key={anime.id} anime={anime} isMobile={isMobile} />)}
-      </div>
-    </div>
-  );
-});
-
-const CompactLayout = memo(function CompactLayout({ animes, isMobile }: LayoutProps) {
-  useUiTranslation();
-  const items = animes.slice(0, isMobile ? 6 : 8);
-  return (
-    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3 md:gap-4">
-      {items.map((anime) => <Card key={anime.id} anime={anime} isMobile={isMobile} />)}
-    </div>
-  );
-});
-
-const MasonryLayout = memo(function MasonryLayout({ animes, isMobile }: LayoutProps) {
-  useUiTranslation();
-  if (animes.length < 6) return <GridLayout animes={animes} isMobile={isMobile} />;
-  const items = animes.slice(0, isMobile ? 4 : 6);
-  return (
-    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 md:gap-5">
-      {items.map((anime, i) => (
-        <div key={anime.id} className={cn((i === 0 || i === 3) && 'row-span-2 col-span-1 md:col-span-2 h-full')}>
-          <Card anime={anime} isMobile={isMobile} />
-        </div>
-      ))}
-    </div>
-  );
-});
-
-function getLayoutComponent(layout: SectionLayout) {
-  switch (layout) {
-    case 'carousel': return CarouselLayout;
-    case 'featured': return FeaturedLayout;
-    case 'compact': return CompactLayout;
-    case 'masonry': return MasonryLayout;
-    default: return GridLayout;
-  }
-}
-
 // ----------------------------------------------------------------------
 // Section — memoized, CSS entrance, content-visibility
 // ----------------------------------------------------------------------
-const HomeSectionBlock = memo(function HomeSectionBlock({ section }: { section: HomeSection }) {
+export const HomeSectionBlock = memo(function HomeSectionBlock({ section }: { section: HomeSection }) {
   useUiTranslation();
   const isMobile = useIsMobile();
   const navigate = useNavigate();
-  const LayoutComponent = getLayoutComponent(section.layout);
   const IconComponent = section.icon || Compass;
   const hasGenreRoute = String(section.genre || '').trim().length > 0;
 
@@ -220,7 +116,7 @@ const HomeSectionBlock = memo(function HomeSectionBlock({ section }: { section: 
           ) : undefined
         }
       />
-      <LayoutComponent animes={section.animes} isMobile={isMobile} />
+      <CarouselLayout animes={section.animes} isMobile={isMobile} />
     </section>
   );
 });
@@ -359,12 +255,12 @@ export function InfiniteHomeSections() {
         </div>
       )}
 
-      {visibleSections.map((section, index) => (
+      <HomeSectionGroup groupId="genre-feed" sections={visibleSections.map((section, index) => ({ id: `feed-${section.genre || section.id}`, label: section.title, collection: true, layoutLocked: 'shelf' as const, node: (
         <div key={section.id}>
           <HomeSectionBlock section={section} />
           {(index + 1) % 3 === 0 && <SuggestionBanner />}
         </div>
-      ))}
+      ) }))} />
 
       <div ref={loadMoreRef} className="py-10 flex items-center justify-center min-h-[100px]">
         {isFetchingNextPage ? (

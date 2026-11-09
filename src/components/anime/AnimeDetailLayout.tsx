@@ -11,7 +11,7 @@ export function AnimeDetailHero({
   return (
     <div
       {...props}
-      className={cn("grid grid-cols-1 lg:grid-cols-3 gap-8 mb-16 pt-12 md:pt-24", className)}
+      className={cn("grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12 pt-4 md:pt-8", className)}
     >
       {children}
     </div>
@@ -19,7 +19,7 @@ export function AnimeDetailHero({
 }
 export function AnimeDetailPoster({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <GlassPanel className={cn("overflow-hidden self-start", className)}>{children}</GlassPanel>
+    <GlassPanel quiet className={cn("overflow-hidden self-start", className)}>{children}</GlassPanel>
   );
 }
 export function AnimeDetailContent({ children }: { children: ReactNode }) {
@@ -29,7 +29,7 @@ export function AnimeDetailContent({ children }: { children: ReactNode }) {
 }
 export function AnimeDetailTitle({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <h1 className={cn("font-display text-4xl md:text-5xl font-bold mb-4", className)}>
+    <h1 className={cn("font-display text-4xl md:text-5xl font-semibold mb-4", className)}>
       {children}
     </h1>
   );
@@ -56,7 +56,7 @@ export function AnimeDetailPrimaryAction({
     <button
       {...props}
       className={cn(
-        "h-12 sm:h-14 px-6 sm:px-8 rounded-full bg-foreground text-background font-bold text-base sm:text-lg hover:scale-105 active:scale-95 transition-all flex items-center gap-2 glow-primary disabled:opacity-50",
+        "h-12 px-6 rounded-[10px] bg-foreground text-background font-medium text-sm motion-safe:active:scale-[0.98] transition-colors flex items-center gap-2 disabled:opacity-50",
         className
       )}
     >

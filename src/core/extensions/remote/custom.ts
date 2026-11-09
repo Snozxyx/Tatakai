@@ -5,7 +5,7 @@ import { proxyRemoteSources, proxyRemoteUrl } from './media';
 import { matchRemoteTitle } from './resolve';
 import { recordSourceReport } from './diagnostics';
 import { isExplicitExtensionContent } from '@/lib/contentSafety';
-import type { CustomSourceEntry, CustomHomeData, CustomSearchData, CustomInfoData, CustomWatchData } from '@/core/content/custom-source-runtime';
+import type { CustomSourceEntry, CustomHomeData, CustomCatalogPage, CustomSearchData, CustomInfoData, CustomWatchData } from '@/core/content/custom-source-runtime';
 
 export function customDescriptors(row: RemoteExtension): CustomSourceEntry[] {
   if (row.enabled && row.ecosystem === 'seanime' && row.manifest.type === 'custom-source') {
@@ -17,6 +17,7 @@ export function customDescriptors(row: RemoteExtension): CustomSourceEntry[] {
   return [...new Set<string>(row.manifest.catalogs.map((c: any) => c.type).filter(Boolean))].map(type => ({
     namespace: row.id, extensionId: row.id, id: type, kind: 'watch', name: `${row.manifest.name} · ${type}`,
     icon: row.manifest.logo, description: row.manifest.description, nsfw: isExplicitExtensionContent(row.manifest),
+    supportsSearch: row.manifest.catalogs.some((c: any) => c.type === type && c.extra?.some((e: any) => e.name === 'search') && !c.extra.some((e: any) => e.isRequired && e.name !== 'search')),
   }));
 }
 export async function listRemoteCustomSources() {
@@ -27,20 +28,33 @@ export async function remoteCustomRow(namespace: string): Promise<RemoteExtensio
   return (await listRemoteExtensions()).find(r => r.id === namespace && r.enabled && customDescriptors(r).length) || null;
 }
 const card = (meta: any) => ({ id: String(meta.id), title: String(meta.name || meta.id), image: meta.poster, subtitle: meta.releaseInfo, badge: meta.type, nsfw: isExplicitExtensionContent(meta), genres: meta.genres });
-async function catalog(row: RemoteExtension, type: string, entry: any, query?: string, page = 1) {
+async function catalog(row: RemoteExtension, type: string, entry: any, query?: string, skip = 0, signal?: AbortSignal): Promise<CustomCatalogPage> {
   const extras = [];
   if (query) extras.push(`search=${encodeURIComponent(query)}`);
-  if (page > 1 && entry.extra?.some((e: any) => e.name === 'skip')) extras.push(`skip=${(page - 1) * 100}`);
+  const paginated = entry.extra?.some((e: any) => e.name === 'skip');
+  if (skip > 0 && paginated) extras.push(`skip=${skip}`);
   const url = new URL(stremioResourceUrl(row.manifestUrl, 'catalog', type, entry.id));
   if (extras.length) url.pathname = url.pathname.replace(/\.json$/, `/${extras.join('&')}.json`);
-  const result = await fetchExtensionJson(url.href);
+  const result = await fetchExtensionJson(url.href, signal);
   if (!Array.isArray(result.metas)) throw Error('Invalid custom catalog response');
-  return result.metas.filter((m: any) => m?.id && m?.name).map(card);
+  return { items: result.metas.filter((m: any) => m?.id && m?.name).map(card), nextSkip: paginated && result.metas.length > 0 ? skip + result.metas.length : null };
 }
-export async function remoteCustomHome(row: RemoteExtension, type: string): Promise<CustomHomeData> {
+export async function remoteCustomCatalogPage(row: RemoteExtension, type: string, catalogId: string, skip = 0, signal?: AbortSignal): Promise<CustomCatalogPage> {
+  if (row.ecosystem !== 'stremio' || !row.enabled) throw Error('This source has no hosted catalog');
+  if (!Number.isSafeInteger(skip) || skip < 0) throw Error('Invalid catalog offset');
+  const entry = row.manifest.catalogs?.find((c: any) => c.type === type && c.id === catalogId && !c.extra?.some((e: any) => e.isRequired));
+  if (!entry || (skip > 0 && !entry.extra?.some((e: any) => e.name === 'skip'))) throw Error('This catalog does not support browsing this page');
+  return catalog(row, type, entry, undefined, skip, signal);
+}
+export async function remoteCustomHome(row: RemoteExtension, type: string, signal?: AbortSignal): Promise<CustomHomeData> {
   if (row.ecosystem === 'seanime') { const response = await remoteCustomSearch(row, type, '', 1); return { sections: [{ title: row.manifest.name, items: response.results }] }; }
   const catalogs = row.manifest.catalogs.filter((c: any) => c.type === type && !c.extra?.some((e: any) => e.isRequired));
-  const sections = await Promise.allSettled(catalogs.map(async (c: any) => ({ title: c.name || row.manifest.name, items: await catalog(row, type, c) })));
+  const sections = await Promise.allSettled(catalogs.map(async (c: any) => {
+    const page = await catalog(row, type, c, undefined, 0, signal);
+    return { id: String(c.id), title: c.name || row.manifest.name, items: page.items,
+      ...(c.extra?.some((e: any) => e.name === 'skip') ? { pagination: { catalogId: c.id, nextSkip: page.nextSkip } } : {}) };
+  }));
+  signal?.throwIfAborted();
   const usable = sections.flatMap(r => r.status === 'fulfilled' ? [r.value] : []);
   if (!usable.length && sections.some(r => r.status === 'rejected')) throw (sections.find(r => r.status === 'rejected') as PromiseRejectedResult).reason;
   return { sections: usable };
@@ -50,10 +64,15 @@ export async function remoteCustomSearch(row: RemoteExtension, type: string, que
     if (!Array.isArray(result?.media)) throw Error('Invalid Seanime custom-source list');
     return { results: result.media.filter((m: any) => m?.id != null).map(seanimeCard), hasNextPage: result.page < result.totalPages }; }
   const catalogs = row.manifest.catalogs.filter((c: any) => c.type === type && c.extra?.some((e: any) => e.name === 'search') && (page === 1 || c.extra.some((e: any) => e.name === 'skip')));
-  const results = await Promise.allSettled(catalogs.map((c: any) => catalog(row, type, c, query, page)));
-  const items = results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
+  const results = await Promise.allSettled(catalogs.map(async (c: any) => {
+    let result = await catalog(row, type, c, query);
+    // Providers choose their own page size. Advance by raw response counts.
+    for (let current = 1; current < page && result.nextSkip !== null; current++) result = await catalog(row, type, c, query, result.nextSkip);
+    return result;
+  }));
+  const items = results.flatMap(r => r.status === 'fulfilled' ? r.value.items : []);
   if (!items.length && results.some(r => r.status === 'rejected')) throw (results.find(r => r.status === 'rejected') as PromiseRejectedResult).reason;
-  return { results: [...new Map(items.map(m => [m.id, m])).values()], hasNextPage: items.length >= 100 && catalogs.some((c: any) => c.extra?.some((e: any) => e.name === 'skip')) };
+  return { results: [...new Map(items.map(m => [m.id, m])).values()], hasNextPage: results.some(r => r.status === 'fulfilled' && r.value.nextSkip !== null) };
 }
 export async function remoteCustomInfo(row: RemoteExtension, type: string, id: string): Promise<CustomInfoData | null> {
   if (row.ecosystem === 'seanime') return seanimeCustomInfo(row, type, id);

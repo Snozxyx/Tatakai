@@ -1,4 +1,5 @@
 import { BRAND_ASSET_BASE } from '@/lib/assets';
+import './landing-sections.css';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 "use client";
@@ -14,6 +15,8 @@ import { Integrations } from "@/components/landing/Integrations";
 import { Extensions } from "@/components/landing/Extensions";
 import { Progression } from "@/components/landing/Progression";
 import { Translate } from "@/components/landing/Translate";
+import { Enhancers } from "@/components/landing/Enhancers";
+import { CustomizationShowcase } from "@/components/landing/CustomizationShowcase";
 
 import {
   ArrowRight,
@@ -52,19 +55,17 @@ interface Flagship {
   points: string[];
   media: string;
   accent: string;
-  glow: string;
 }
 
 const flagships: Flagship[] = [
   {
-    icon: Sparkles,
+    icon: BookMarked,
     kicker: "Recommendations",
     get title() { return uiI18n.t('app.picks_that_actually_get_you_e15e6e8d'); },
     get body() { return uiI18n.t('app.a_hybrid_recommendation_engine_learns_from_every_6651bc2c'); },
     points: ["Personalized daily", "Learns as you go", "Anime & manga"],
     media: `${BRAND}/Recommendation.mp4`,
-    accent: "text-violet-200",
-    glow: "bg-violet-500/20",
+    accent: "text-muted-foreground",
   },
   {
     icon: Clapperboard,
@@ -73,8 +74,7 @@ const flagships: Flagship[] = [
     get body() { return uiI18n.t('app.a_clean_player_for_episodes_you_own_custom_subti_169631c6'); },
     points: ["Custom subtitles", "Background playback", "Remembers progress"],
     media: `${BRAND}/Videoplayer.mp4`,
-    accent: "text-cyan-200",
-    glow: "bg-cyan-500/20",
+    accent: "text-muted-foreground",
   },
   {
     icon: BookOpen,
@@ -83,8 +83,7 @@ const flagships: Flagship[] = [
     get body() { return uiI18n.t('app.a_fast_comic_style_reader_with_per_device_settin_05aa8296'); },
     points: ["Custom keybinds", "Saved progress", "Manga · Manhwa · Comics"],
     media: `${BRAND}/MangaReader.mp4`,
-    accent: "text-pink-200",
-    glow: "bg-pink-500/20",
+    accent: "text-muted-foreground",
   },
   {
     icon: BookMarked,
@@ -93,8 +92,7 @@ const flagships: Flagship[] = [
     get body() { return uiI18n.t('app.a_focused_light_novel_reader_with_a_calm_reading_dd724057'); },
     points: ["Light novel support", "Custom keybinds", "Saved progress"],
     media: `${BRAND}/NovelReader.mp4`,
-    accent: "text-fuchsia-200",
-    glow: "bg-fuchsia-500/20",
+    accent: "text-muted-foreground",
   },
   {
     icon: BarChart3,
@@ -103,8 +101,7 @@ const flagships: Flagship[] = [
     get body() { return uiI18n.t('app.activity_heatmaps_taste_breakdowns_and_rich_insi_88ac2d3a'); },
     points: ["Activity heatmaps", "Taste breakdown", "Shareable profile"],
     media: `${BRAND}/Profile_with_stats.mp4`,
-    accent: "text-amber-200",
-    glow: "bg-amber-500/20",
+    accent: "text-muted-foreground",
   },
 ];
 
@@ -151,12 +148,14 @@ interface Tile {
   eyebrow: string;
   layout: string;
   featured?: boolean;
+  description?: string;
 }
 
 const community: Tile[] = [
   {
     icon: Users,
     get title() { return uiI18n.t('app.a_feed_that_feels_alive_2fdd9fb5'); },
+    get description() { return uiI18n.t('landingCommunity.feedDescription'); },
     img: `${BRAND}/Community.png`,
     eyebrow: "Social feed",
     layout: "col-span-2 row-span-2",
@@ -165,6 +164,7 @@ const community: Tile[] = [
   {
     icon: BarChart3,
     get title() { return uiI18n.t('app.profiles_worth_following_fec2e75b'); },
+    get description() { return uiI18n.t('landingCommunity.profileDescription'); },
     img: `${BRAND}/Profile.png`,
     eyebrow: "Profiles",
     layout: "col-span-2",
@@ -172,6 +172,7 @@ const community: Tile[] = [
   {
     icon: MessageSquare,
     get title() { return uiI18n.t('app.discuss_every_episode_e300a508'); },
+    get description() { return uiI18n.t('landingCommunity.commentsDescription'); },
     img: `${BRAND}/Comment.png`,
     eyebrow: "Conversations",
     layout: "",
@@ -220,6 +221,24 @@ const community: Tile[] = [
   },
 ];
 
+function CommunityPreview({ tile, onPreview, variant = 'compact' }: { tile: Tile; onPreview(tile: Tile): void; variant?: 'lead' | 'support' | 'compact' }) {
+  const Icon = tile.icon;
+  const lead = variant === 'lead';
+  return <button type="button" data-community-preview={variant} onClick={() => onPreview(tile)} aria-label={uiI18n.t('app.preview_i18n_value_0_fc87427b', { value0: tile.title })}
+    className={`community-preview group relative w-full overflow-hidden rounded-2xl border border-white/10 bg-[#111011] text-left transition-colors hover:border-white/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary ${lead ? 'flex h-full flex-col' : 'grid grid-cols-[96px_minmax(0,1fr)] items-center gap-4 p-4 sm:p-5'}`}>
+    <div className={lead ? 'relative aspect-[16/10] min-h-0 overflow-hidden border-b border-white/10 lg:flex-1' : 'relative overflow-hidden rounded-lg border border-white/10'}>
+      <img src={tile.img} alt="" loading="lazy" decoding="async" draggable={false} className={lead ? 'absolute inset-0 h-full w-full object-cover object-top' : `w-full object-cover object-top ${variant === 'support' ? 'aspect-[2/3]' : 'aspect-[4/3]'}`} />
+      {lead && <span className="absolute right-4 top-4 flex size-9 items-center justify-center rounded-lg border border-white/15 bg-black/70 text-white/80"><Maximize2 aria-hidden className="size-4" /></span>}
+    </div>
+    <div className={`min-w-0 ${lead ? 'p-5 sm:p-6' : ''}`}>
+      <p className="mb-2 inline-flex items-center gap-2 text-xs font-medium text-white/60"><Icon aria-hidden className="size-4" />{tile.eyebrow}</p>
+      <h3 className={`font-display font-medium text-white ${lead ? 'text-2xl' : variant === 'support' ? 'text-xl' : 'text-base'}`}>{tile.title}</h3>
+      {tile.description && <p className="mt-3 max-w-xl text-sm leading-relaxed text-white/70">{tile.description}</p>}
+      {!lead && <ArrowUpRight aria-hidden className="mt-3 size-4 text-white/50 transition-colors group-hover:text-white" />}
+    </div>
+  </button>;
+}
+
 interface HighlightedFeature {
   icon: LucideIcon;
   eyebrow: string;
@@ -235,7 +254,7 @@ const highlightedFeatures: HighlightedFeature[] = [
     eyebrow: "Watch",
     get title() { return uiI18n.t('app.anime_support_81e29ece'); },
     get body() { return uiI18n.t('app.track_episodes_discover_what_to_watch_next_and_k_ccd83305'); },
-    accent: "text-violet-200",
+    accent: "text-muted-foreground",
     iconBackground: "bg-violet-400/10",
   },
   {
@@ -243,7 +262,7 @@ const highlightedFeatures: HighlightedFeature[] = [
     eyebrow: "Read",
     get title() { return uiI18n.t('app.manga_support_9519cf8b'); },
     get body() { return uiI18n.t('app.follow_chapters_and_keep_every_series_close_from_26474c4f'); },
-    accent: "text-cyan-200",
+    accent: "text-muted-foreground",
     iconBackground: "bg-cyan-400/10",
   },
   {
@@ -251,7 +270,7 @@ const highlightedFeatures: HighlightedFeature[] = [
     eyebrow: "Discover",
     get title() { return uiI18n.t('app.novel_support_6ba427ff'); },
     get body() { return uiI18n.t('app.build_one_library_for_the_stories_you_watch_read_fd2ad593'); },
-    accent: "text-pink-200",
+    accent: "text-muted-foreground",
     iconBackground: "bg-pink-400/10",
   },
   {
@@ -259,7 +278,7 @@ const highlightedFeatures: HighlightedFeature[] = [
     eyebrow: "Performance",
     get title() { return uiI18n.t('app.fast_by_default_1a0e792e'); },
     get body() { return uiI18n.t('app.a_focused_interface_that_gets_out_of_the_way_and_79debffc'); },
-    accent: "text-amber-200",
+    accent: "text-muted-foreground",
     iconBackground: "bg-amber-400/10",
   },
   {
@@ -267,7 +286,7 @@ const highlightedFeatures: HighlightedFeature[] = [
     eyebrow: "Experience",
     get title() { return uiI18n.t('app.easy_to_use_a949e723'); },
     get body() { return uiI18n.t('app.simple_controls_clear_progress_and_thoughtful_de_81d959a4'); },
-    accent: "text-emerald-200",
+    accent: "text-muted-foreground",
     iconBackground: "bg-emerald-400/10",
   },
   {
@@ -275,7 +294,7 @@ const highlightedFeatures: HighlightedFeature[] = [
     eyebrow: "Community",
     get title() { return uiI18n.t('app.find_your_people_69ec6132'); },
     get body() { return uiI18n.t('app.share_recommendations_discuss_favorites_and_foll_dcfdf409'); },
-    accent: "text-blue-200",
+    accent: "text-muted-foreground",
     iconBackground: "bg-blue-400/10",
   },
 ];
@@ -294,7 +313,7 @@ function SectionHeading({
   useUiTranslation();
   return (
     <div className="mb-12 max-w-3xl lg:mb-16">
-      <div className="mb-5 flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.18em] text-violet-200/80">
+      <div className="mb-5 flex items-center gap-3 text-xs font-medium normal-case tracking-normal text-violet-200/80">
         <span className="h-px w-8 bg-violet-300/60" />
         {eyebrow}
       </div>
@@ -307,7 +326,7 @@ function SectionHeading({
       </h2>
 
       {sub ? (
-        <p className="mt-5 max-w-2xl text-base leading-relaxed text-white/55 lg:text-lg">
+        <p className="mt-5 max-w-2xl text-base leading-relaxed text-white/70 lg:text-lg">
           {sub}
         </p>
       ) : null}
@@ -342,14 +361,7 @@ export function FeatureShowcase() {
   }, [previewTile]);
 
   return (
-    <div className="relative isolate w-full overflow-hidden">
-      {/* Ambient background lighting */}
-      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-        <div className="absolute left-[-14%] top-[4%] h-[480px] w-[480px] rounded-full bg-violet-600/10 blur-[150px]" />
-        <div className="absolute right-[-12%] top-[31%] h-[560px] w-[560px] rounded-full bg-pink-500/10 blur-[170px]" />
-        <div className="absolute bottom-[6%] left-[25%] h-[500px] w-[500px] rounded-full bg-cyan-500/10 blur-[160px]" />
-      </div>
-
+    <div className="landing-sections relative isolate w-full overflow-hidden">
       <div className="relative mx-auto w-full max-w-[1440px] px-6 pb-28 pt-8 lg:px-16">
         {/* ============================================================
             FLAGSHIP FEATURES
@@ -374,24 +386,22 @@ export function FeatureShowcase() {
 
               return (
                 <Reveal key={feature.title} delay={index * 0.04}>
-                  <article className="group relative overflow-hidden rounded-[30px] border border-white/[0.1] bg-[#0d0c13]/80 shadow-[0_32px_90px_-45px_rgba(0,0,0,0.95)]">
-                    <div
-                      className={`pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full blur-[100px] transition-opacity duration-700 group-hover:opacity-100 ${feature.glow}`}
-                    />
+                  <article className="group relative overflow-hidden rounded-2xl border border-white/[0.1] bg-[#0d0c13]/80 ">
+
 
                     <div className="relative grid overflow-hidden lg:grid-cols-[0.9fr_1.1fr]">
                       <div
-                        className={`relative overflow-hidden p-7 sm:p-10 lg:p-12 ${reversed ? "lg:order-2" : ""}`}
+                          className={`relative overflow-hidden p-6 sm:p-8 lg:p-10 ${reversed ? "lg:order-2" : ""}`}
                       >
                         <span
                           aria-hidden="true"
-                          className="pointer-events-none absolute -right-1 top-1 font-display text-7xl font-semibold tracking-[-0.08em] text-white/[0.035] sm:text-8xl"
+                          className="pointer-events-none absolute -right-1 top-1 font-display text-7xl font-medium tracking-[-0.08em] text-white/[0.035] sm:text-8xl"
                         >
                           0{index + 1}
                         </span>
 
                         <div className="relative">
-                          <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.045] px-3 py-1.5 backdrop-blur-md">
+                          <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.045] px-3 py-1.5">
                             <Icon
                               className={`h-3.5 w-3.5 ${feature.accent}`}
                             />
@@ -443,10 +453,10 @@ export function FeatureShowcase() {
                             type="video"
                             src={feature.media}
                             label={uiI18n.t('app.i18n_value_0_preview_86615b54', { value0: feature.title })}
-                            className="rounded-[18px] border-white/10 bg-black/30 shadow-2xl"
+                            className="rounded-[18px] border-white/10 bg-black/30 "
                           />
 
-                          <div className="pointer-events-none absolute bottom-4 left-4 rounded-full border border-white/10 bg-black/45 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-white/60 backdrop-blur-md">
+                          <div className="pointer-events-none absolute bottom-4 left-4 rounded-full border border-white/10 bg-black/45 px-3 py-1 text-xs font-medium normal-case tracking-normal text-white/60">
                             {uiI18n.t('app.feature_preview_2ef2eb94')}
                           </div>
                         </div>
@@ -475,50 +485,21 @@ export function FeatureShowcase() {
             />
           </Reveal>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
-            {highlightedFeatures.map((feature, index) => {
+          <div className="grid gap-x-8 gap-y-6 md:grid-cols-2 lg:grid-cols-3">
+            {highlightedFeatures.map(feature => {
               const Icon = feature.icon;
-              const isPrimary = index === 0;
-
-              return (
-                <Reveal
-                  key={feature.title}
-                  delay={index * 0.05}
-                  className={isPrimary ? "lg:col-span-2 lg:row-span-2" : "lg:col-span-2"}
-                >
-                  <article
-                    className={`group relative flex h-full min-h-[220px] flex-col overflow-hidden rounded-[24px] border border-white/[0.1] bg-white/[0.035] p-6 shadow-[0_20px_60px_-35px_rgba(0,0,0,0.9)] transition-all duration-300 hover:-translate-y-1 hover:border-white/20 hover:bg-white/[0.055] ${isPrimary ? "lg:min-h-[456px] lg:p-8" : ""}`}
-                  >
-                    <div className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-white/[0.04] blur-3xl transition-opacity duration-500 group-hover:opacity-80" />
-
-                    <div className="relative flex items-start justify-between gap-4">
-                      <div
-                        className={`flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 ${feature.iconBackground}`}
-                      >
-                        <Icon className={`h-5 w-5 ${feature.accent}`} aria-hidden="true" />
-                      </div>
-                      <span className="font-mono text-[10px] font-medium tracking-[0.18em] text-white/25">
-                        0{index + 1}
-                      </span>
-                    </div>
-
-                    <div className="relative mt-auto pt-12">
-                      <p className={`mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] ${feature.accent} opacity-80`}>
-                        {feature.eyebrow}
-                      </p>
-                      <h3 className="font-display text-xl font-medium leading-tight tracking-[-0.03em] text-white lg:text-2xl">
-                        {feature.title}
-                      </h3>
-                      <p className="mt-3 max-w-sm text-sm leading-relaxed text-white/50">
-                        {feature.body}
-                      </p>
-                    </div>
-                  </article>
-                </Reveal>
-              );
+              return <article key={feature.title} data-landing-capability className="flex items-start gap-4 border-t border-white/10 pt-6">
+                <Icon aria-hidden className="mt-1 size-[18px] shrink-0 text-white/60" />
+                <div><p className="mb-2 text-xs font-medium text-white/60">{feature.eyebrow}</p>
+                  <h3 className="font-display text-xl font-medium text-white">{feature.title}</h3>
+                  <p className="mt-3 text-sm leading-relaxed text-white/70">{feature.body}</p>
+                </div>
+              </article>;
             })}
           </div>
         </section>
+
+        <Enhancers />
 
         {/* ============================================================
             MOBILE APP
@@ -543,15 +524,15 @@ export function FeatureShowcase() {
             />
           </Reveal>
 
-          <div className="grid gap-5 md:grid-cols-3">
+          <div data-landing-offline className="grid gap-6 md:grid-cols-[1.2fr_1fr_1fr]">
             {offline.map((card, index) => {
               const Icon = card.icon;
 
               return (
                 <Reveal key={card.title} delay={index * 0.08}>
-                  <article className="group h-full overflow-hidden rounded-2xl border border-white/[0.1] bg-white/[0.035] shadow-[0_20px_60px_-35px_rgba(0,0,0,0.9)] transition-all duration-300 hover:-translate-y-1 hover:border-white/20 hover:bg-white/[0.055]">
+                  <article className="group h-full overflow-hidden rounded-2xl border border-white/[0.1] bg-white/[0.035]  transition-[color,background-color,border-color,opacity] duration-300  hover:border-white/20 hover:bg-white/[0.055]">
                     <div className="relative overflow-hidden border-b border-white/[0.08] p-2.5">
-                      <div className="transition-transform duration-700 group-hover:scale-[1.025]">
+                      <div className="transition-transform duration-200 ">
                         <ShowcaseMedia
                           type={card.kind}
                           src={card.media}
@@ -561,7 +542,7 @@ export function FeatureShowcase() {
                         />
                       </div>
 
-                      <span className="absolute left-5 top-5 rounded-full border border-white/10 bg-black/50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/70 backdrop-blur-md">
+                      <span className="absolute left-5 top-5 rounded-full border border-white/10 bg-black/50 px-2.5 py-1 text-xs font-medium normal-case tracking-normal text-white/70">
                         {card.tag}
                       </span>
                     </div>
@@ -577,7 +558,7 @@ export function FeatureShowcase() {
                         </h3>
                       </div>
 
-                      <p className="text-sm leading-relaxed text-white/55">
+                      <p className="text-sm leading-relaxed text-white/70">
                         {card.body}
                       </p>
                     </div>
@@ -600,264 +581,31 @@ export function FeatureShowcase() {
               id="community-heading"
               eyebrow="More than a library"
               title={uiI18n.t('app.built_for_the_community_93d55238')}
-              sub="Follow people, talk about what you're into, and bring your MyAnimeList or AniList history along."
+              sub={uiI18n.t('landingCommunity.description')}
             />
           </Reveal>
 
-          <div
-            className="
-              grid
-              auto-rows-[155px]
-              grid-cols-2
-              gap-3.5
-              sm:auto-rows-[185px]
-              sm:gap-4
-              lg:auto-rows-[200px]
-              lg:gap-5
-            "
-          >
-            {community.map((tile, index) => {
-              const Icon = tile.icon;
-
-              return (
-                <Reveal
-                  key={`${tile.title}-${index}`}
-                  delay={(index % 4) * 0.05}
-                  className={tile.layout}
-                >
-                  <button
-                    type="button"
-                    aria-label={uiI18n.t('app.preview_i18n_value_0_fc87427b', { value0: tile.title })}
-                    onClick={() => setPreviewTile(tile)}
-                    className="
-                      group
-                      relative
-                      block
-                      h-full
-                      w-full
-                      cursor-zoom-in
-                      overflow-hidden
-                      rounded-[22px]
-                      border
-                      border-white/[0.1]
-                      bg-[#0d0c13]
-                      text-left
-                      shadow-[0_20px_65px_-35px_rgba(0,0,0,0.9)]
-                      outline-none
-                      transition-all
-                      duration-500
-                      hover:-translate-y-1
-                      hover:border-white/[0.18]
-                      hover:shadow-[0_30px_80px_-30px_rgba(0,0,0,0.95)]
-                      focus-visible:ring-2
-                      focus-visible:ring-violet-300/60
-                      focus-visible:ring-offset-2
-                      focus-visible:ring-offset-[#08070c]
-                    "
-                  >
-                    {/* Main image */}
-                    <img
-                      src={tile.img}
-                      alt={tile.title}
-                      loading={index < 2 ? "eager" : "lazy"}
-                      decoding="async"
-                      draggable={false}
-                      sizes={
-                        tile.featured
-                          ? "(max-width: 1024px) 100vw, 50vw"
-                          : tile.layout.includes("col-span-2")
-                            ? "(max-width: 1024px) 100vw, 50vw"
-                            : "(max-width: 1024px) 50vw, 25vw"
-                      }
-                      className="
-                        absolute
-                        inset-0
-                        h-full
-                        w-full
-                        object-cover
-                        object-top
-                        opacity-[0.9]
-                        transition-all
-                        duration-700
-                        ease-[cubic-bezier(0.22,1,0.36,1)]
-                        group-hover:scale-[1.045]
-                        group-hover:opacity-100
-                      "
-                    />
-
-                    {/* Base image contrast */}
-                    <div className="absolute inset-0 bg-black/[0.08]" />
-
-                    {/* Cinematic bottom gradient */}
-                    <div
-                      className="
-                        absolute
-                        inset-0
-                        bg-gradient-to-t
-                        from-[#050509]
-                        via-[#050509]/35
-                        to-transparent
-                        opacity-95
-                      "
-                    />
-
-                    {/* Violet ambient glow */}
-                    <div
-                      className="
-                        pointer-events-none
-                        absolute
-                        inset-0
-                        bg-[radial-gradient(circle_at_15%_0%,rgba(167,139,250,0.16),transparent_42%)]
-                        opacity-60
-                        transition-opacity
-                        duration-500
-                        group-hover:opacity-100
-                      "
-                    />
-
-                    {/* Glass border */}
-                    <div
-                      className="
-                        pointer-events-none
-                        absolute
-                        inset-0
-                        rounded-[22px]
-                        ring-1
-                        ring-inset
-                        ring-white/[0.04]
-                        transition-all
-                        duration-500
-                        group-hover:ring-violet-200/[0.12]
-                      "
-                    />
-
-                    {/* Top metadata */}
-                    <div className="absolute inset-x-0 top-0 flex items-start justify-between p-4 sm:p-5">
-                      <div
-                        className="
-                          inline-flex
-                          items-center
-                          gap-2
-                          rounded-full
-                          border
-                          border-white/[0.12]
-                          bg-black/[0.36]
-                          px-2.5
-                          py-1.5
-                          backdrop-blur-xl
-                          shadow-[0_8px_24px_rgba(0,0,0,0.2)]
-                        "
-                      >
-                        <Icon className="h-3.5 w-3.5 text-white/85" />
-
-                        <span className="max-w-[150px] truncate text-[9px] font-semibold uppercase tracking-[0.15em] text-white/70 sm:text-[10px]">
-                          {tile.eyebrow}
-                        </span>
-                      </div>
-
-                      {/* Expand icon */}
-                      <span
-                        className="
-                          flex
-                          h-8
-                          w-8
-                          items-center
-                          justify-center
-                          rounded-full
-                          border
-                          border-white/[0.12]
-                          bg-black/[0.3]
-                          text-white/65
-                          opacity-0
-                          translate-y-1
-                          backdrop-blur-xl
-                          transition-all
-                          duration-300
-                          group-hover:translate-y-0
-                          group-hover:opacity-100
-                        "
-                      >
-                        <Maximize2 className="h-3.5 w-3.5" />
-                      </span>
-                    </div>
-
-                    {/* Bottom content */}
-                    <div className="absolute inset-x-0 bottom-0 p-4 sm:p-5">
-                      <div className="flex items-end justify-between gap-4">
-                        <div className="min-w-0">
-                          <div className="mb-2 flex items-center gap-2">
-                            <span className="h-1 w-1 rounded-full bg-white/50" />
-
-                            <span className="text-[9px] font-medium uppercase tracking-[0.16em] text-white/45">
-                              {uiI18n.t('app.tatakai_community_6adae502')}
-                            </span>
-                          </div>
-
-                          <h3
-                            className={`font-display font-medium leading-[1.05] tracking-[-0.03em] text-white ${tile.featured
-                                ? "max-w-xl text-xl sm:text-2xl lg:text-[2rem]"
-                                : tile.layout.includes("col-span-2")
-                                  ? "max-w-md text-lg sm:text-xl"
-                                  : "max-w-[95%] text-sm sm:text-base"}`}
-                          >
-                            {tile.title}
-                          </h3>
-                        </div>
-
-                        {/* Arrow */}
-                        <span
-                          className="
-                            hidden
-                            h-9
-                            w-9
-                            shrink-0
-                            items-center
-                            justify-center
-                            rounded-full
-                            border
-                            border-white/[0.12]
-                            bg-white/[0.07]
-                            text-white/70
-                            backdrop-blur-xl
-                            transition-all
-                            duration-300
-                            group-hover:translate-x-0.5
-                            group-hover:bg-white/[0.12]
-                            sm:flex
-                          "
-                        >
-                          <ArrowUpRight className="h-4 w-4" />
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Hover shine */}
-                    <div
-                      className="
-                        pointer-events-none
-                        absolute
-                        inset-y-0
-                        -left-1/2
-                        w-1/3
-                        -skew-x-12
-                        bg-white/[0.04]
-                        opacity-0
-                        blur-2xl
-                        transition-all
-                        duration-700
-                        group-hover:left-[115%]
-                        group-hover:opacity-100
-                      "
-                    />
-                  </button>
-                </Reveal>
-              );
-            })}
+          <div className="community-showcase grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+            <CommunityPreview tile={community[0]} onPreview={setPreviewTile} variant="lead" />
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-1">
+              {community.slice(1, 3).map(tile => <CommunityPreview key={tile.img} tile={tile} onPreview={setPreviewTile} variant="support" />)}
+              <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-white/10 bg-[#111011] p-5 sm:col-span-2 lg:col-span-1">
+                <p className="max-w-xs text-sm text-white/70">{uiI18n.t('landingCommunity.invitation')}</p>
+                <Button onClick={() => navigate('/community')} className="h-11 shrink-0 rounded-lg bg-white px-4 text-sm font-medium text-black hover:bg-white/90">
+                  {uiI18n.t('landingCommunity.openCommunity')}<ArrowRight aria-hidden className="ml-2 size-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {community.slice(3).map(tile => <CommunityPreview key={tile.img} tile={tile} onPreview={setPreviewTile} />)}
           </div>
         </section>
 
+        <CustomizationShowcase />
+
         {/* ============================================================
-            INTEGRATIONS (trackers + Seanime/Stremio ecosystems)
+            INTEGRATIONS
         ============================================================ */}
         <Integrations />
         <Translate />
@@ -889,19 +637,14 @@ export function FeatureShowcase() {
         ============================================================ */}
         <section className="border-t border-white/[0.08] py-16 lg:py-28">
           <Reveal>
-            <div className="relative overflow-hidden rounded-[32px] border border-white/[0.12] bg-[#0c0b12] px-6 py-12 text-center shadow-[0_35px_100px_-45px_rgba(0,0,0,1)] sm:px-10 lg:px-16 lg:py-20">
-              <div className="pointer-events-none absolute left-1/2 top-0 h-64 w-64 -translate-x-1/2 -translate-y-1/2 rounded-full bg-violet-500/25 blur-[100px]" />
+            <div data-landing-final-cta className="relative overflow-hidden rounded-2xl border border-white/[0.12] bg-[#111011] px-6 py-12 sm:px-10 lg:px-16 lg:py-16">
 
-              <div className="pointer-events-none absolute -bottom-24 -right-24 h-64 w-64 rounded-full bg-cyan-500/15 blur-[100px]" />
 
-              <div className="pointer-events-none absolute -left-24 -top-24 h-64 w-64 rounded-full bg-pink-500/10 blur-[100px]" />
+
+
+
 
               <div className="relative mx-auto max-w-2xl">
-                <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5 text-xs font-medium text-white/70 backdrop-blur-md">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-300 shadow-[0_0_12px_rgba(110,231,183,0.9)]" />
-                  {uiI18n.t('app.ready_when_you_are_aec13223')}
-                </div>
-
                 <h2 className="font-display text-[clamp(2rem,4vw,3.4rem)] font-medium leading-[1] tracking-[-0.045em] text-white">
                   {uiI18n.t('app.up_and_running_in_minutes_929787b0')}
                 </h2>
@@ -910,25 +653,11 @@ export function FeatureShowcase() {
                   {uiI18n.t('app.install_the_app_sign_in_and_pick_up_right_where__95ef3bd0')}
                 </p>
 
-                <div className="mx-auto mt-8 grid max-w-lg grid-cols-3 divide-x divide-white/10 rounded-2xl border border-white/[0.08] bg-white/[0.035] px-3 py-3 text-center">
-                  <div className="px-2 text-xs font-medium text-white/60">
-                    {uiI18n.t('app.discover_4827ea22')}
-                  </div>
-
-                  <div className="px-2 text-xs font-medium text-white/60">
-                    {uiI18n.t('app.track_b1c5a7af')}
-                  </div>
-
-                  <div className="px-2 text-xs font-medium text-white/60">
-                    {uiI18n.t('app.enjoy_b8edd65d')}
-                  </div>
-                </div>
-
-                <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+                <div data-landing-cta-actions className="mt-8 flex flex-wrap items-center gap-3">
                   <Button
                     size="lg"
                     onClick={() => navigate("/download")}
-                    className="group h-12 rounded-full border border-white/20 bg-white px-7 text-sm font-semibold text-black shadow-[0_0_34px_-6px_rgba(255,255,255,0.45)] transition-all hover:scale-[1.02] hover:shadow-[0_0_45px_-6px_rgba(255,255,255,0.65)]"
+                    className="group h-12 rounded-full border border-white/20 bg-white px-7 text-sm font-medium text-black  transition-[color,background-color,border-color,opacity]  "
                   >
                     <Download className="mr-2 h-4 w-4" />
                     {uiI18n.t('app.download_app_dd7b83d1')}
@@ -939,13 +668,13 @@ export function FeatureShowcase() {
                     size="lg"
                     variant="outline"
                     onClick={() => navigate("/browse")}
-                    className="h-12 rounded-full border border-white/15 bg-white/[0.05] px-7 text-sm font-semibold text-white backdrop-blur-md transition-all hover:border-white/30 hover:bg-white hover:text-black"
+                    className="h-12 rounded-full border border-white/15 bg-white/[0.05] px-7 text-sm font-medium text-white transition-[color,background-color,border-color,opacity] hover:border-white/30 hover:bg-white hover:text-black"
                   >
                     {uiI18n.t('app.browse_the_library_c6cfcdb1')}
                   </Button>
                 </div>
 
-                <p className="mt-6 text-xs text-white/40">
+                <p className="mt-6 text-xs text-white/70">
                   {uiI18n.t('app.free_amp_open_source_no_account_required_to_look_1501838c')}
                 </p>
               </div>
@@ -968,7 +697,7 @@ export function FeatureShowcase() {
             justify-center
             bg-black/80
             p-4
-            backdrop-blur-2xl
+
             sm:p-6
           "
           role="dialog"
@@ -987,21 +716,7 @@ export function FeatureShowcase() {
           />
 
           {/* Ambient preview glow */}
-          <div
-            className="
-              pointer-events-none
-              absolute
-              left-1/2
-              top-1/2
-              h-[55vh]
-              w-[55vw]
-              -translate-x-1/2
-              -translate-y-1/2
-              rounded-full
-              bg-violet-500/[0.08]
-              blur-[120px]
-            "
-          />
+
 
           {/* Close button */}
           <button
@@ -1028,15 +743,15 @@ export function FeatureShowcase() {
               border-white/[0.14]
               bg-black/50
               text-white/75
-              shadow-[0_12px_40px_rgba(0,0,0,0.45)]
-              backdrop-blur-xl
-              transition-all
+
+
+              transition-[color,background-color,border-color,opacity]
               duration-200
-              hover:scale-105
+
               hover:border-white/25
               hover:bg-white/10
               hover:text-white
-              active:scale-95
+              active:scale-[0.98]
               focus:outline-none
               focus-visible:ring-2
               focus-visible:ring-violet-300/70
@@ -1055,12 +770,12 @@ export function FeatureShowcase() {
               w-full
               max-w-6xl
               overflow-hidden
-              rounded-[28px]
+              rounded-2xl
               border
               border-white/[0.12]
               bg-[#09090d]/95
               p-2
-              shadow-[0_40px_120px_-35px_rgba(0,0,0,0.95)]
+
               sm:p-3
             "
             onPointerDown={(event) => {
@@ -1103,7 +818,7 @@ export function FeatureShowcase() {
                 <div className="mb-1.5 flex items-center gap-2">
                   <span className="h-1 w-1 rounded-full bg-violet-300" />
 
-                  <span className="truncate text-[9px] font-semibold uppercase tracking-[0.16em] text-violet-200/70">
+                  <span className="truncate text-xs font-medium normal-case tracking-normal text-violet-200/70">
                     {previewTile.eyebrow}
                   </span>
                 </div>
@@ -1125,11 +840,11 @@ export function FeatureShowcase() {
                   bg-white/[0.035]
                   px-3
                   py-2
-                  text-[10px]
+                  text-xs
                   font-medium
-                  uppercase
-                  tracking-[0.12em]
-                  text-white/40
+                  normal-case
+                  tracking-normal
+                  text-white/70
                   sm:flex
                 "
               >

@@ -53,33 +53,31 @@ export function DiscoverHero({ className }: { className?: string }) {
             src={backdrop}
             alt=""
             aria-hidden
-            initial={{ opacity: 0, scale: 1.06 }}
-            animate={{ opacity: 0.38, scale: 1 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 0.38 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.8, ease: 'easeOut' }}
+            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
             className="absolute inset-0 h-full w-full object-cover"
           />
         )}
       </AnimatePresence>
       <div className="absolute inset-0 bg-gradient-to-r from-card via-card/85 to-transparent" />
       <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-card/60" />
-      {/* The accent cast of the design, independent of the backdrop's own colour. */}
-      <div className="absolute inset-0 bg-[radial-gradient(120%_90%_at_15%_110%,hsl(var(--primary)/0.28),transparent_60%)]" />
 
-      <div className="relative grid gap-10 p-6 sm:p-10 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:items-center lg:gap-6 lg:p-14">
+      <div className="relative grid gap-8 p-6 sm:p-8 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:items-center lg:gap-8 lg:p-10">
         <div className="max-w-xl">
           <AnimatePresence mode="wait">
             <motion.div
               key={board.id}
-              initial={{ opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.35, ease: 'easeOut' }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
             >
-              <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-primary">
+              <p className="text-xs font-medium normal-case tracking-normal text-primary">
                 {board.eyebrow}
               </p>
-              <h1 className="font-display mt-3 text-4xl font-black leading-[1.05] tracking-tight text-foreground sm:text-5xl xl:text-[3.75rem]">
+              <h1 className="font-display mt-3 text-4xl font-medium leading-[1.08] tracking-tight text-foreground sm:text-5xl xl:text-[3.25rem]">
                 {board.heading}
               </h1>
               <p className="mt-4 max-w-lg text-sm leading-relaxed text-white/55 sm:text-base">
@@ -88,7 +86,7 @@ export function DiscoverHero({ className }: { className?: string }) {
 
               <Link
                 to={board.cta.to}
-                className="group mt-7 inline-flex items-center gap-2 rounded-full bg-gradient-to-b from-primary to-secondary px-6 py-3 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:from-primary/90 hover:to-secondary/90 hover:shadow-primary/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                className="group mt-7 inline-flex items-center gap-2 rounded-full bg-foreground px-6 py-3 text-sm font-medium text-background transition-[color,background-color,border-color,opacity] hover:bg-foreground/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
               >
                 {board.cta.label}
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
@@ -109,7 +107,7 @@ export function DiscoverHero({ className }: { className?: string }) {
                 aria-label={entry.heading}
                 aria-current={i === index}
                 className={cn(
-                  'h-1.5 rounded-full transition-all duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+                  'h-1.5 rounded-full transition-[color,background-color,border-color,opacity] duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
                   i === index ? 'w-8 bg-primary' : 'w-1.5 bg-white/25 hover:bg-white/50',
                 )}
               />

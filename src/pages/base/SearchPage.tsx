@@ -1,4 +1,5 @@
 import { useHistoryPreference } from '@/hooks/ui/useHistoryPreference';
+import '@/components/layout/catalog-polish.css';
 import { useScrollRestoration } from '@/hooks/ui/useScrollRestoration';
 import { mergeCatalog } from '@/lib/catalogMerge';
 import { ThemedCheckbox } from '@/components/ui/themed-checkbox';
@@ -123,6 +124,13 @@ export default function SearchPage() {
   const queryParam = searchParams.get("q") || decodedProducerName || "";
   const [query, setQuery] = useState(queryParam);
   const [searchInput, setSearchInput] = useState(queryParam);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const updateSearchInput = useCallback((value: string) => {
+    setSearchInput(value);
+    if (searchInputRef.current && searchInputRef.current.value !== value) {
+      searchInputRef.current.value = value;
+    }
+  }, []);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const closeSuggestions = useCallback(() => setShowSuggestions(false), []);
 
@@ -181,6 +189,11 @@ export default function SearchPage() {
   const [maxEpisodes, setMaxEpisodes] = useHistoryPreference<number>('maxEpisodes', 0);
   const [sortMode, setSortMode] = useHistoryPreference<'relevance' | 'rating' | 'title' | 'popularity'>('sortMode', 'relevance');
   const [discoverSort, setDiscoverSort] = useHistoryPreference<DiscoverSort>('discoverSort', 'for-you');
+  const catalogSortActive = discoverSort !== 'for-you' || sortMode !== 'relevance';
+  const catalogSort = sortMode === 'rating' ? 'SCORE_DESC'
+    : sortMode === 'title' ? 'TITLE_ROMAJI'
+      : sortMode === 'popularity' ? 'POPULARITY_DESC'
+        : discoverSort === 'newest' ? 'START_DATE_DESC' : undefined;
 
   const handleDiscoverSortChange = (newSort: DiscoverSort) => {
     setDiscoverSort(newSort);
@@ -464,7 +477,7 @@ export default function SearchPage() {
 
   const shouldEnableMangaSearch =
     shouldSearchManga &&
-    (query.length > 0 || mangaFilterActive || genreFilterActive || tagFilterActive) &&
+    (query.length > 0 || mangaFilterActive || genreFilterActive || tagFilterActive || catalogSortActive) &&
     (!shouldDelaySecondaryStreams || enableSecondaryResultStreams || genreFilterActive || mangaFilterActive || tagFilterActive);
 
   const normalizedMangaTypeFilter = useMemo(() => {
@@ -480,12 +493,14 @@ export default function SearchPage() {
     if (mangaAdultFilter) {
       return 'explore';
     }
+    if (catalogSortActive) return 'explore';
     return 'search';
   }, [
     mangaGenreFilter,
     normalizedMangaTypeFilter,
     query,
     mangaAdultFilter,
+    catalogSortActive,
   ]);
 
   const animeBackendFilters = useMemo<AnimeSearchFilters>(() => {
@@ -493,7 +508,8 @@ export default function SearchPage() {
     if (animeTypeFilter !== 'all') filters.type = animeTypeFilter;
     if (animeStatusFilter !== 'all') filters.status = animeStatusFilter;
     if (resolvedAnimeGenre) filters.genres = [resolvedAnimeGenre];
-    if (animeSortFilter !== 'default') filters.sort = animeSortFilter;
+    if (catalogSort) filters.sort = catalogSort;
+    else if (animeSortFilter !== 'default') filters.sort = animeSortFilter;
     if (minRating > 0) filters.minRating = minRating;
     if (minReleaseYear > 0) filters.minReleaseYear = minReleaseYear;
     if (maxRating > 0) filters.maxRating = maxRating;
@@ -502,13 +518,14 @@ export default function SearchPage() {
     if (minEpisodes > 0) filters.minEpisodes = minEpisodes;
     if (maxEpisodes > 0) filters.maxEpisodes = maxEpisodes;
     if (selectedAnimeTags.length > 0) filters.tags = selectedAnimeTags;
-    filters.isAdult = allowAdultAnime ? true : false;
+    filters.isAdult = allowAdultAnime ? undefined : false;
     return filters;
   }, [
     animeTypeFilter,
     animeStatusFilter,
     animeGenreFilter,
     animeSortFilter,
+    catalogSort,
     minRating,
     minReleaseYear,
     maxRating,
@@ -538,7 +555,7 @@ export default function SearchPage() {
       tags: selectedMangaTags,
       tagSource: mangaTagSource,
       origin: mangaOrigin === 'all' ? undefined : mangaOrigin,
-      sort: hasGenre ? 'POPULARITY_DESC' : undefined,
+      sort: catalogSort || (hasGenre ? 'POPULARITY_DESC' : undefined),
       adult: mangaAdultFilter || explicitMangaQuery || contentSafetySettings.showAdultEverywhere,
       types: types.length > 0 ? Array.from(new Set(types)) : undefined,
       mangaType: normalizedMangaTypeFilter !== 'all' ? (normalizedMangaTypeFilter as any) : undefined,
@@ -555,6 +572,7 @@ export default function SearchPage() {
     selectedMangaTags,
     mangaTagSource,
     mangaOrigin,
+    catalogSort,
   ]);
 
   const atsuGenreOptions = useMemo(() => {
@@ -580,7 +598,7 @@ export default function SearchPage() {
   }, []);
 
   const shouldEnableAnimeSearch =
-    shouldSearchAnime && !isProducerRoute && (query.length > 0 || animeFilterActive || genreFilterActive || tagFilterActive);
+    shouldSearchAnime && !isProducerRoute && (query.length > 0 || animeFilterActive || genreFilterActive || tagFilterActive || catalogSortActive);
 
   const {
     data: infiniteData,
@@ -588,7 +606,7 @@ export default function SearchPage() {
     hasNextPage: hasNextSearchPage,
     isFetchingNextPage: isFetchingNextSearchPage,
     isLoading: isLoadingSearch,
-  } = useInfSearch(query, animeBackendFilters, shouldEnableAnimeSearch, animeFilterActive || selectedAnimeTags.length > 0);
+  } = useInfSearch(query, animeBackendFilters, shouldEnableAnimeSearch, animeFilterActive || selectedAnimeTags.length > 0 || catalogSortActive);
   useScrollRestoration('search', { useWindow: true, ready: !isLoadingSearch });
 
   const {
@@ -646,18 +664,18 @@ export default function SearchPage() {
 
   const shouldEnableNovelSearch =
     shouldSearchNovels &&
-    (query.length > 0 || novelFilterActive || minReleaseYear > 0 || maxReleaseYear > 0 || minRating > 0 || maxRating > 0 || sortMode !== 'relevance') &&
+    (query.length > 0 || novelFilterActive || minReleaseYear > 0 || maxReleaseYear > 0 || minRating > 0 || maxRating > 0 || catalogSortActive) &&
     (!shouldDelaySecondaryStreams || enableSecondaryResultStreams || novelFilterActive);
 
   const novelSearchOptions = useMemo<NovelSearchOptions>(() => ({
     ...novelFilters,
-    sort: novelFilters.sort || (sortMode === 'rating' ? 'SCORE_DESC' : sortMode === 'title' ? 'TITLE_ROMAJI' : undefined),
+    sort: catalogSort || novelFilters.sort,
     minYear: minReleaseYear || undefined,
     maxYear: maxReleaseYear || undefined,
     minScore: minRating || undefined,
     maxScore: maxRating || undefined,
     adult: novelFilters.adult || explicitMangaQuery || contentSafetySettings.showAdultEverywhere,
-  }), [novelFilters, sortMode, minReleaseYear, maxReleaseYear, minRating, maxRating, explicitMangaQuery, contentSafetySettings.showAdultEverywhere]);
+  }), [novelFilters, catalogSort, minReleaseYear, maxReleaseYear, minRating, maxRating, explicitMangaQuery, contentSafetySettings.showAdultEverywhere]);
 
   const {
     data: infiniteNovelData,
@@ -989,7 +1007,7 @@ export default function SearchPage() {
       );
     }
 
-    if (sortMode === 'relevance') return arr;
+    if (sortMode === 'relevance' && discoverSort !== 'newest') return arr;
 
     const sorted = [...arr].sort((a, b) => {
       if (sortMode === 'rating') {
@@ -1001,6 +1019,7 @@ export default function SearchPage() {
       if (sortMode === 'popularity') {
         return Number((b as any).popularity || 0) - Number((a as any).popularity || 0);
       }
+      if (discoverSort === 'newest') return Number(b.year || 0) - Number(a.year || 0);
       return 0;
     });
 
@@ -1011,6 +1030,7 @@ export default function SearchPage() {
     filteredNovelResults,
     resultType,
     sortMode,
+    discoverSort,
     contentSafetySettings.showAdultEverywhere,
     contentSafetySettings.blurAdultInSearch,
     explicitMangaQuery,
@@ -1197,11 +1217,14 @@ export default function SearchPage() {
   };
 
   useEffect(() => {
+    setQuery(queryParam);
+    updateSearchInput(queryParam);
+    setShowSuggestions(false);
+  }, [queryParam, updateSearchInput]);
+
+  useEffect(() => {
     const tagSource = searchParams.get('mangaTagSource');
     setMangaTagSource(tagSource === 'anilist' || tagSource === 'mangabaka' ? tagSource : undefined);
-    setQuery(queryParam);
-    setSearchInput(queryParam);
-    setShowSuggestions(false);
     const typeParam = searchParams.get('type');
     if (typeParam === 'anime' || typeParam === 'manga' || typeParam === 'novel' || typeParam === 'character' || typeParam === 'all') {
       setResultType(typeParam as any);
@@ -1231,7 +1254,7 @@ export default function SearchPage() {
       setAnimeGenreFilter(slug);
       setLocalAnimeGenre(slug);
     }
-  }, [queryParam, searchParams]);
+  }, [searchParams]);
 
   useEffect(() => {
     if (!shouldDelaySecondaryStreams) {
@@ -1257,10 +1280,15 @@ export default function SearchPage() {
     setPage(1);
   }, [query]);
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setShowSuggestions(false);
-    const term = searchInput.trim();
+    // Native keyboards and paste can update the field before React's change
+    // notification. Submit the text the user sees, including an IME draft.
+    const term = (searchInputRef.current?.value ?? searchInput).trim();
+    searchInputRef.current?.blur();
+    updateSearchInput(term);
+    setQuery(term);
     if (term) {
       try {
         const history = localStorage.getItem('tatakai_search_history');
@@ -1275,7 +1303,7 @@ export default function SearchPage() {
   };
 
   const handleClearSearch = () => {
-    setSearchInput('');
+    updateSearchInput('');
     setShowSuggestions(false);
     if (query) {
       navigate('/search');
@@ -1297,7 +1325,7 @@ export default function SearchPage() {
   }, []);
 
   const runRecentSearch = (term: string) => {
-    setSearchInput(term);
+    updateSearchInput(term);
     navigate(`/search?q=${encodeURIComponent(term)}`);
   };
 
@@ -1309,8 +1337,8 @@ export default function SearchPage() {
     } catch { }
   };
 
-  const showAnimeResults = (resultType === 'all' || resultType === 'anime') && (query.length > 0 || animeFilterActive || genreFilterActive || tagFilterActive);
-  const showMangaResults = shouldSearchManga && (query.length > 0 || mangaFilterActive || genreFilterActive || tagFilterActive);
+  const showAnimeResults = (resultType === 'all' || resultType === 'anime') && (query.length > 0 || animeFilterActive || genreFilterActive || tagFilterActive || catalogSortActive);
+  const showMangaResults = shouldSearchManga && (query.length > 0 || mangaFilterActive || genreFilterActive || tagFilterActive || catalogSortActive);
   const showNovelResults = shouldEnableNovelSearch;
   const showCharacterResults = shouldEnableCharacterSearch && query.length > 1;
   const isQuerylessMangaMode = showMangaResults && mangaSearchMode !== 'search';
@@ -1341,12 +1369,12 @@ export default function SearchPage() {
   });
 
   return (
-    <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
-      {!isNative && <Background />}
+    <div className="catalog-page discovery-page min-h-screen bg-background text-foreground overflow-x-hidden">
+      {!isNative && <Background quiet />}
       {!isMobile && <Sidebar />}
 
       <main className={cn(
-        "app-page relative z-10 max-w-[1800px] mx-auto",
+        "app-page relative z-10 max-w-[1600px] mx-auto",
         "pr-[max(1.5rem,env(safe-area-inset-right))] md:pr-6",
         "pb-24 md:pb-6",
         "pt-[calc(1.5rem+env(safe-area-inset-top,0px))] md:pt-6",
@@ -1359,8 +1387,8 @@ export default function SearchPage() {
           </div>
         )}
 
-        {/* Centered Search Bar in Middle of Page after Hero */}
-        <div className="flex justify-center mb-8">
+        {/* Search aligns with the controls and results below it. */}
+        <div className="mb-8">
           <form
             onSubmit={handleSearch}
             onBlur={(e) => {
@@ -1369,15 +1397,22 @@ export default function SearchPage() {
             onKeyDown={(e) => {
               if (e.key === 'Escape') closeSuggestions();
             }}
-            className="relative z-30 w-full max-w-2xl"
+            className="relative z-30 w-full max-w-3xl"
           >
-            <div className="premium-search-field relative flex items-center rounded-full">
+            <div className="premium-search-field relative flex items-center rounded-[10px]">
               <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-primary pointer-events-none" />
               <Input
+                ref={searchInputRef}
                 id="tatakai-search-page-input"
                 type="text"
-                placeholder={uiI18n.t('app.search_anime_manga_novels_manhwa_or_alternate_ti_bace1b9f')}
-                value={searchInput}
+                inputMode="search"
+                enterKeyHint="search"
+                autoCapitalize="none"
+                autoCorrect="off"
+                placeholder={uiI18n.t('discover.searchPlaceholder')}
+                // Let the native keyboard own its composing text. Rewriting a
+                // controlled value mid-composition can duplicate characters.
+                defaultValue={queryParam}
                 onChange={(e) => {
                   setSearchInput(e.target.value);
                   setShowSuggestions(true);
@@ -1385,14 +1420,14 @@ export default function SearchPage() {
                 onFocus={() => setShowSuggestions(true)}
                 aria-label={uiI18n.t('app.search_anime_manga_novels_manhwa_and_characters__0caf6d34')}
                 autoComplete="off"
-                className="pl-14 pr-32 h-14 bg-card/85 hover:bg-card focus:bg-card border border-border hover:border-primary/40 focus:border-primary rounded-full text-base backdrop-blur-md transition-[color,background-color,border-color,opacity,transform]"
+                className="pl-12 pr-36 h-14 md:h-12 bg-card hover:bg-card focus:bg-card border border-border hover:border-foreground/25 focus:border-primary rounded-[10px] text-base transition-[color,background-color,border-color,opacity,transform]"
               />
               <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
                 {searchInput && (
                   <button
                     type="button"
                     onClick={handleClearSearch}
-                    className="p-1.5 rounded-full hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors"
+                    className="flex h-11 w-11 items-center justify-center rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors md:h-8 md:w-8"
                     title={uiI18n.t('app.clear_719ea396')}
                   >
                     <X className="w-4 h-4" />
@@ -1400,7 +1435,7 @@ export default function SearchPage() {
                 )}
                 <button
                   type="submit"
-                  className="px-5 h-9 rounded-full bg-primary text-primary-foreground font-semibold text-sm hover:brightness-110 active:scale-95 transition-[color,background-color,border-color,opacity,transform] shadow-md"
+                  className="px-4 h-11 md:h-9 rounded-lg bg-primary text-primary-foreground font-medium text-sm hover:brightness-110 active:scale-[0.98] transition-[color,background-color,border-color,opacity,transform]"
                 >
                   {uiI18n.t('app.search_bce06414')}
                 </button>
@@ -1410,7 +1445,7 @@ export default function SearchPage() {
               query={searchInput}
               visible={showSuggestions && !isProducerRoute}
               onSelect={(name) => {
-                setSearchInput(name);
+                updateSearchInput(name);
                 closeSuggestions();
               }}
               onClose={closeSuggestions}
@@ -1422,8 +1457,7 @@ export default function SearchPage() {
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5 mb-6">
             <div>
-              <h1 className="font-display text-2xl md:text-3xl font-bold flex items-center gap-3">
-                <Search className="w-6 h-6 md:w-7 md:h-7 text-primary" />
+              <h1 className="font-display text-2xl md:text-3xl font-medium flex items-center gap-3">
                 {hasSearchContext ? uiI18n.t('app.search_results_5e054413') : uiI18n.t('app.discover_4827ea22')}
               </h1>
               {hasSearchContext && (
@@ -1433,7 +1467,7 @@ export default function SearchPage() {
                       {uiI18n.t('app.showing_results_for_c17b3a2b')}<span className="text-foreground font-medium">{query}</span>"
                     </>
                   ) : (
-                    <>{uiI18n.t('app.showing_manga_discovery_results_8bcf1a96')}</>
+                    <>{uiI18n.t(isQuerylessMangaMode && resultType === 'manga' ? 'app.showing_manga_discovery_results_8bcf1a96' : 'app.discover_4827ea22')}</>
                   )}
                   {uiI18n.t('app.i18n_value_0_anime_06076e08', { value0: filteredAnimeResults.length })}
                   {uiI18n.t('app.i18n_value_0_manga_1600b087', { value0: filteredMangaResults.length })}
@@ -1450,9 +1484,10 @@ export default function SearchPage() {
 
 
           {/* Sleek Discover Filter Bar (docs/image-8.png / GenrePage style) */}
-          <div className="flex flex-wrap items-center gap-2.5">
+          <div className="discover-controls flex flex-wrap items-center gap-3">
 
             <PillGroup
+              className="w-full md:w-auto"
               options={DISCOVER_SORTS}
               value={discoverSort}
               onChange={handleDiscoverSortChange}
@@ -1460,7 +1495,7 @@ export default function SearchPage() {
             />
 
             {/* Type Switcher Pills */}
-            <div className="flex bg-muted/40 p-1 rounded-full border border-white/5">
+            <div className="discover-types flex max-w-full flex-wrap bg-muted/40 p-1 rounded-xl ring-1 ring-inset ring-border">
               {[
                 { id: 'all', get label() { return uiI18n.t('app.all_6a720856'); } },
                 { id: 'anime', get label() { return uiI18n.t('app.anime_f1b32a19'); }, icon: <Film className="w-3 h-3" /> },
@@ -1473,7 +1508,7 @@ export default function SearchPage() {
                   aria-pressed={resultType === type.id}
                   onClick={() => setResultType(type.id as any)}
                   className={cn(
-                    "px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-[color,background-color,border-color,opacity,transform] whitespace-nowrap",
+                    "min-h-10 px-3 py-1 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-[color,background-color,border-color,opacity,transform] whitespace-nowrap md:min-h-8",
                     resultType === type.id
                       ? "bg-primary text-primary-foreground shadow-sm"
                       : "text-muted-foreground hover:text-foreground"
@@ -1533,7 +1568,7 @@ export default function SearchPage() {
                 <button
                   onClick={handleImageSearch}
                   disabled={isSearchingImage}
-                  className="px-3.5 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-bold hover:brightness-110 active:scale-95 transition-[color,background-color,border-color,opacity,transform] flex items-center gap-1.5"
+                  className="px-3.5 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-medium hover:brightness-110 active:scale-[0.98] transition-[color,background-color,border-color,opacity,transform] flex items-center gap-1.5"
                 >
                   {isSearchingImage ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : uiI18n.t('app.identify_38af51b7')}
                 </button>
@@ -1587,7 +1622,7 @@ export default function SearchPage() {
               aria-controls="search-advanced-filters"
               onClick={() => setShowAdvancedAssist((val) => !val)}
               className={cn(
-                "h-8 px-3 rounded-full text-xs font-semibold border transition-[color,background-color,border-color,opacity,transform] flex items-center gap-1.5",
+                "h-8 px-3 rounded-full text-xs font-medium border transition-[color,background-color,border-color,opacity,transform] flex items-center gap-1.5",
                 showAdvancedAssist
                   ? "border-primary text-primary bg-primary/10 shadow-sm"
                   : "border-white/10 text-muted-foreground hover:text-foreground hover:border-white/20 bg-muted/20"
@@ -1596,7 +1631,7 @@ export default function SearchPage() {
               <SlidersHorizontal className="w-3.5 h-3.5" />
               <span>{uiI18n.t('app.filters_96e57821')}</span>
               {activeFilterCount > 0 && (
-                <span className="flex items-center justify-center w-4 h-4 rounded-full bg-primary text-primary-foreground text-[9px] font-bold">
+                <span className="flex items-center justify-center w-4 h-4 rounded-full bg-primary text-primary-foreground text-xs font-medium">
                   {activeFilterCount}
                 </span>
               )}
@@ -1606,16 +1641,16 @@ export default function SearchPage() {
           <AppliedFilters filters={appliedFilters} onClear={resetFilters} />
 
           {showAdvancedAssist && (
-            <GlassPanel id="search-advanced-filters" className="premium-filter-panel mt-4 p-4 md:p-6 space-y-6 rounded-2xl border border-border overflow-hidden relative ui-state-fade bg-card/60">
+            <GlassPanel quiet id="search-advanced-filters" className="premium-filter-panel mt-4 p-4 md:p-6 space-y-6 rounded-2xl border border-border overflow-hidden relative ui-state-fade bg-card/60">
 
               <div className="flex flex-wrap items-center justify-between gap-4 relative z-10 pb-4 border-b border-white/[0.07]">
                 <div className="flex items-center gap-2.5">
                   <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/15 text-primary">
                     <SlidersHorizontal className="w-4 h-4" />
                   </span>
-                  <span className="text-xs font-bold uppercase tracking-wider">{uiI18n.t('app.power_filters_c5424719')}</span>
+                  <span className="text-xs font-medium normal-case tracking-normal">{uiI18n.t('app.power_filters_c5424719')}</span>
                   {activeFilterCount > 0 && (
-                    <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-black text-primary-foreground">
+                    <span className="rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground">
                       {activeFilterCount} {uiI18n.t('app.active_2bb6b986')}
                     </span>
                   )}
@@ -1625,7 +1660,7 @@ export default function SearchPage() {
                   <button
                     type="button"
                     onClick={resetFilters}
-                    className="h-9 px-3.5 rounded-xl text-xs font-bold uppercase tracking-wide bg-background/70 border border-white/10 text-muted-foreground hover:text-foreground hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-[color,background-color,border-color,opacity,transform]"
+                    className="h-9 px-3.5 rounded-xl text-xs font-medium normal-case tracking-normal bg-background/70 border border-white/10 text-muted-foreground hover:text-foreground hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-[color,background-color,border-color,opacity,transform]"
                   >
                     {uiI18n.t('app.reset_all_a21b0fec')}
                   </button>
@@ -1633,7 +1668,7 @@ export default function SearchPage() {
                   <button
                     onClick={applyFilters}
                     type="button"
-                    className="ui-button h-10 px-6 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 motion-safe:active:scale-[.97] transition-[color,background-color,border-color,opacity,transform] shadow-lg shadow-primary/20 flex items-center gap-2 text-xs"
+                    className="ui-button h-10 px-6 rounded-xl bg-primary text-primary-foreground font-medium hover:bg-primary/90 motion-safe:active:scale-[.97] transition-[color,background-color,border-color,opacity,transform] shadow-none flex items-center gap-2 text-xs"
                   >
                     <Search className="w-3.5 h-3.5" />
                     {uiI18n.t('app.apply_filters_6b2a78a8')}
@@ -1646,12 +1681,12 @@ export default function SearchPage() {
                 <div className="space-y-4 rounded-2xl border border-white/[0.06] bg-white/[0.015] p-4 md:p-5">
                   <div className="flex items-center gap-2 pb-2 border-b border-white/5">
                     <Film className="w-4 h-4 text-primary" />
-                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-foreground">{uiI18n.t('app.anime_filters_93a99363')}</h3>
+                    <h3 className="text-xs font-medium normal-case tracking-normal text-foreground">{uiI18n.t('app.anime_filters_93a99363')}</h3>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <label htmlFor="filter-localAnimeType" className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.type_3deb7456')}</label>
+                      <label htmlFor="filter-localAnimeType" className="text-xs text-muted-foreground font-medium">{uiI18n.t('app.type_3deb7456')}</label>
                       <ThemedSelect
                         id="filter-localAnimeType"
                         value={localAnimeType}
@@ -1668,7 +1703,7 @@ export default function SearchPage() {
                     </div>
 
                     <div className="space-y-1.5">
-                      <label htmlFor="filter-localAnimeStatus" className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.status_bae7d5be')}</label>
+                      <label htmlFor="filter-localAnimeStatus" className="text-xs text-muted-foreground font-medium">{uiI18n.t('app.status_bae7d5be')}</label>
                       <ThemedSelect
                         id="filter-localAnimeStatus"
                         value={localAnimeStatus}
@@ -1684,7 +1719,7 @@ export default function SearchPage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label htmlFor="filter-localAnimeGenre" className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.genre_2aa31fca')}</label>
+                    <label htmlFor="filter-localAnimeGenre" className="text-xs text-muted-foreground font-medium">{uiI18n.t('app.genre_2aa31fca')}</label>
                     <ThemedSelect
                       id="filter-localAnimeGenre"
                       value={localAnimeGenre}
@@ -1703,7 +1738,7 @@ export default function SearchPage() {
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <Tags className="w-3.5 h-3.5 text-primary" />
-                      <p className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.anilist_tags_dae15328')}</p>
+                      <p className="text-xs text-muted-foreground font-medium">{uiI18n.t('app.anilist_tags_dae15328')}</p>
                     </div>
                     <Input
                       aria-label={uiI18n.t('app.search_anilist_tags_8238a70a')}
@@ -1716,7 +1751,7 @@ export default function SearchPage() {
                       type="button"
                       onClick={() => setShowSpoilerTags((v) => !v)}
                       className={cn(
-                        "inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-wide transition-colors",
+                        "inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium normal-case tracking-normal transition-colors",
                         showSpoilerTags
                           ? "border-amber-400/50 bg-amber-400/15 text-amber-300"
                           : "border-white/10 bg-background/60 text-muted-foreground hover:border-amber-400/30 hover:text-amber-300"
@@ -1732,7 +1767,7 @@ export default function SearchPage() {
                             type="button"
                             title={uiI18n.t('app.remove_tag_bc7b89e4')}
                             onClick={() => setSelectedAnimeTags((current) => current.filter((value) => value !== tag))}
-                            className="rounded-md bg-primary/15 px-2 py-1 text-[10px] font-bold text-primary hover:bg-primary/25"
+                            className="rounded-md bg-primary/15 px-2 py-1 text-xs font-medium text-primary hover:bg-primary/25"
                           >
                             {tag} x
                           </button>
@@ -1749,7 +1784,7 @@ export default function SearchPage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label htmlFor="filter-localAnimeSort" className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.sort_method_7ae019e9')}</label>
+                    <label htmlFor="filter-localAnimeSort" className="text-xs text-muted-foreground font-medium">{uiI18n.t('app.sort_method_7ae019e9')}</label>
                     <ThemedSelect
                       id="filter-localAnimeSort"
                       value={localAnimeSort}
@@ -1770,11 +1805,11 @@ export default function SearchPage() {
                 <div className="space-y-4 rounded-2xl border border-white/[0.06] bg-white/[0.015] p-4 md:p-5">
                   <div className="flex items-center gap-2 pb-2 border-b border-white/5">
                     <BookOpen className="w-4 h-4 text-primary" />
-                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-foreground">{uiI18n.t('app.manga_filters_f16ae5e7')}</h3>
+                    <h3 className="text-xs font-medium normal-case tracking-normal text-foreground">{uiI18n.t('app.manga_filters_f16ae5e7')}</h3>
                   </div>
 
                   <div className="space-y-1.5">
-                    <label htmlFor="filter-localMangaOrigin" className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.origin_44ab85a2')}</label>
+                    <label htmlFor="filter-localMangaOrigin" className="text-xs text-muted-foreground font-medium">{uiI18n.t('app.origin_44ab85a2')}</label>
                     <ThemedSelect
                       id="filter-localMangaOrigin"
                       value={localMangaOrigin}
@@ -1789,7 +1824,7 @@ export default function SearchPage() {
                   </div>
 
                   <div className="space-y-2 rounded-xl border border-white/10 bg-background/50 p-3">
-                    <p className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.popular_manhwa_webtoon_tags_dcc334b1')}</p>
+                    <p className="text-xs text-muted-foreground font-medium">{uiI18n.t('app.popular_manhwa_webtoon_tags_dcc334b1')}</p>
                     <div className="flex flex-wrap gap-1.5">
                       {['Cultivation', 'Dungeon', 'Necromancy', 'Age Regression', 'Video Games', 'Revenge', 'Survival', 'Martial Arts', 'Post-Apocalyptic'].map((tag) => (
                         <button
@@ -1797,7 +1832,7 @@ export default function SearchPage() {
                           type="button"
                           onClick={() => setSelectedMangaTags((current) => current.includes(tag) ? current.filter((value) => value !== tag) : [...current, tag])}
                           className={cn(
-                            "rounded-lg border px-2.5 py-1.5 min-h-[30px] text-[10px] font-semibold transition-[color,background-color,border-color,opacity,transform] active:scale-95",
+                            "rounded-lg border px-2.5 py-1.5 min-h-[30px] text-xs font-medium transition-[color,background-color,border-color,opacity,transform] active:scale-[0.98]",
                             selectedMangaTags.includes(tag) ? "border-primary/50 bg-primary/15 text-primary" : "border-white/10 text-muted-foreground hover:border-primary/30 hover:text-foreground"
                           )}
                         >
@@ -1805,7 +1840,7 @@ export default function SearchPage() {
                         </button>
                       ))}
                     </div>
-                    <p className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.popular_manga_tags_e53151a9')}</p>
+                    <p className="text-xs text-muted-foreground font-medium">{uiI18n.t('app.popular_manga_tags_e53151a9')}</p>
                     <div className="flex flex-wrap gap-1.5">
                       {['School', 'Shounen', 'Seinen', 'Shoujo', 'Josei', 'Isekai', 'Cyberpunk', 'Samurai', 'Ninja', 'Family Life'].map((tag) => (
                         <button
@@ -1813,7 +1848,7 @@ export default function SearchPage() {
                           type="button"
                           onClick={() => setSelectedMangaTags((current) => current.includes(tag) ? current.filter((value) => value !== tag) : [...current, tag])}
                           className={cn(
-                            "rounded-lg border px-2.5 py-1.5 min-h-[30px] text-[10px] font-semibold transition-[color,background-color,border-color,opacity,transform] active:scale-95",
+                            "rounded-lg border px-2.5 py-1.5 min-h-[30px] text-xs font-medium transition-[color,background-color,border-color,opacity,transform] active:scale-[0.98]",
                             selectedMangaTags.includes(tag) ? "border-primary/50 bg-primary/15 text-primary" : "border-white/10 text-muted-foreground hover:border-primary/30 hover:text-foreground"
                           )}
                         >
@@ -1825,7 +1860,7 @@ export default function SearchPage() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <label htmlFor="filter-localMangaType" className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.format_041a5dec')}</label>
+                      <label htmlFor="filter-localMangaType" className="text-xs text-muted-foreground font-medium">{uiI18n.t('app.format_041a5dec')}</label>
                       <ThemedSelect
                         id="filter-localMangaType"
                         value={localMangaType}
@@ -1841,7 +1876,7 @@ export default function SearchPage() {
                     </div>
 
                     <div className="space-y-1.5">
-                      <label htmlFor="filter-localMangaStatus" className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.status_bae7d5be')}</label>
+                      <label htmlFor="filter-localMangaStatus" className="text-xs text-muted-foreground font-medium">{uiI18n.t('app.status_bae7d5be')}</label>
                       <ThemedSelect
                         id="filter-localMangaStatus"
                         value={localMangaStatus}
@@ -1859,7 +1894,7 @@ export default function SearchPage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label htmlFor="filter-localMangaGenre" className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.genre_2aa31fca')}</label>
+                    <label htmlFor="filter-localMangaGenre" className="text-xs text-muted-foreground font-medium">{uiI18n.t('app.genre_2aa31fca')}</label>
                     <ThemedSelect
                       id="filter-localMangaGenre"
                       value={localMangaGenre}
@@ -1901,7 +1936,7 @@ export default function SearchPage() {
                       type="button"
                       onClick={() => setShowSpoilerTags((v) => !v)}
                       className={cn(
-                        "inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-wide transition-colors",
+                        "inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium normal-case tracking-normal transition-colors",
                         showSpoilerTags
                           ? "border-amber-400/50 bg-amber-400/15 text-amber-300"
                           : "border-white/10 bg-background/60 text-muted-foreground hover:border-amber-400/30 hover:text-amber-300"
@@ -1915,12 +1950,12 @@ export default function SearchPage() {
                           key={`manga-${tag}`}
                           type="button"
                           onClick={() => setSelectedMangaTags((current) => current.filter((value) => value !== tag))}
-                          className="rounded-md bg-primary/15 px-2 py-1 text-[10px] font-bold text-primary hover:bg-primary/25"
+                          className="rounded-md bg-primary/15 px-2 py-1 text-xs font-medium text-primary hover:bg-primary/25"
                         >
                           {tag} x
                         </button>
                       )) : (
-                        <span className="text-[10px] text-muted-foreground">{uiI18n.t('app.no_manga_tags_selected_05d6ce1a')}</span>
+                        <span className="text-xs text-muted-foreground">{uiI18n.t('app.no_manga_tags_selected_05d6ce1a')}</span>
                       )}
                     </div>
                     <TagGroupCloud
@@ -1940,10 +1975,10 @@ export default function SearchPage() {
                       className="w-4 h-4 accent-primary rounded"
                       id="adult-filter"
                     />
-                    <label htmlFor="adult-filter" className="text-xs font-bold uppercase tracking-wide text-muted-foreground group-hover:text-foreground cursor-pointer flex-1">
+                    <label htmlFor="adult-filter" className="text-xs font-medium normal-case tracking-normal text-muted-foreground group-hover:text-foreground cursor-pointer flex-1">
                       {uiI18n.t('app.18_adult_content_9017958f')}
                     </label>
-                    {localMangaAdult && <span className="text-[10px] text-primary animate-pulse font-black">{uiI18n.t('app.enabled_e22fb092')}</span>}
+                    {localMangaAdult && <span className="text-xs text-primary  font-medium">{uiI18n.t('app.enabled_e22fb092')}</span>}
                   </div>
                 </div>
 
@@ -1953,11 +1988,11 @@ export default function SearchPage() {
                 <div className="space-y-4 rounded-2xl border border-white/[0.06] bg-white/[0.015] p-4 md:p-5">
                   <div className="flex items-center gap-2 pb-2 border-b border-white/5">
                     <SlidersHorizontal className="w-4 h-4 text-primary" />
-                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-foreground">{uiI18n.t('app.general_tuning_6eb6147d')}</h3>
+                    <h3 className="text-xs font-medium normal-case tracking-normal text-foreground">{uiI18n.t('app.general_tuning_6eb6147d')}</h3>
                   </div>
 
                   <div className="space-y-1.5">
-                    <label htmlFor="filter-localSortMode" className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.global_sort_method_e38cf87c')}</label>
+                    <label htmlFor="filter-localSortMode" className="text-xs text-muted-foreground font-medium">{uiI18n.t('app.global_sort_method_e38cf87c')}</label>
                     <ThemedSelect
                       id="filter-localSortMode"
                       value={localSortMode}
@@ -1973,8 +2008,8 @@ export default function SearchPage() {
 
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <p className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.min_rating_a8ae7609')}</p>
-                      <span className="text-xs font-bold text-primary">{localMinRating.toFixed(1)}</span>
+                      <p className="text-xs text-muted-foreground font-medium">{uiI18n.t('app.min_rating_a8ae7609')}</p>
+                      <span className="text-xs font-medium text-primary">{localMinRating.toFixed(1)}</span>
                     </div>
                     <input
                       type="range"
@@ -1988,7 +2023,7 @@ export default function SearchPage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <p className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.min_release_year_e7f7c51e')}</p>
+                    <p className="text-xs text-muted-foreground font-medium">{uiI18n.t('app.min_release_year_e7f7c51e')}</p>
                     <div className="relative">
                       <Input
                         type="number"
@@ -2012,8 +2047,8 @@ export default function SearchPage() {
 
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <p className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.max_rating_d60f5b91')}</p>
-                      <span className="text-xs font-bold text-primary">{localMaxRating > 0 ? localMaxRating.toFixed(1) : uiI18n.t('app.any_322444d3')}</span>
+                      <p className="text-xs text-muted-foreground font-medium">{uiI18n.t('app.max_rating_d60f5b91')}</p>
+                      <span className="text-xs font-medium text-primary">{localMaxRating > 0 ? localMaxRating.toFixed(1) : uiI18n.t('app.any_322444d3')}</span>
                     </div>
                     <input
                       type="range"
@@ -2027,7 +2062,7 @@ export default function SearchPage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <p className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.max_release_year_3431e8c7')}</p>
+                    <p className="text-xs text-muted-foreground font-medium">{uiI18n.t('app.max_release_year_3431e8c7')}</p>
                     <div className="relative">
                       <Input
                         type="number"
@@ -2050,7 +2085,7 @@ export default function SearchPage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <p className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.season_62255f56')} <span className="text-muted-foreground/60 normal-case">{uiI18n.t('app.anime_1483ec5d')}</span></p>
+                    <p className="text-xs text-muted-foreground font-medium">{uiI18n.t('app.season_62255f56')} <span className="text-muted-foreground/60 normal-case">{uiI18n.t('app.anime_1483ec5d')}</span></p>
                     <ThemedSelect aria-label={uiI18n.t('app.season_62255f56')}
                         value={localSeason}
                       onChange={(e) => setLocalSeason(e.target.value)}
@@ -2065,7 +2100,7 @@ export default function SearchPage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <p className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.episodes_49d641ba')} <span className="text-muted-foreground/60 normal-case">{uiI18n.t('app.anime_1483ec5d')}</span></p>
+                    <p className="text-xs text-muted-foreground font-medium">{uiI18n.t('app.episodes_49d641ba')} <span className="text-muted-foreground/60 normal-case">{uiI18n.t('app.anime_1483ec5d')}</span></p>
                     <div className="grid grid-cols-2 gap-2">
                       <Input
                         type="number"
@@ -2088,8 +2123,8 @@ export default function SearchPage() {
 
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <p className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.image_confidence_3ed346c3')}</p>
-                      <span className="text-xs font-bold text-primary">{Math.round(imageConfidenceThreshold * 100)}%</span>
+                      <p className="text-xs text-muted-foreground font-medium">{uiI18n.t('app.image_confidence_3ed346c3')}</p>
+                      <span className="text-xs font-medium text-primary">{Math.round(imageConfidenceThreshold * 100)}%</span>
                     </div>
                     <input
                       type="range"
@@ -2115,9 +2150,9 @@ export default function SearchPage() {
         {/* Image Search Results Overlay/Section */}
         </div>
         {imageResults && (
-          <div className="mb-12 animate-in fade-in slide-in-from-top-4 duration-500">
+          <div className="mb-12 animate-in fade-in  duration-200">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold flex items-center gap-2">
+              <h2 className="text-xl font-medium flex items-center gap-2">
                 <Film className="w-5 h-5 text-primary" />
                 {uiI18n.t('app.scene_33446003')} <span className="text-primary italic">{uiI18n.t('app.identification_9d2c7063')}</span>
                 <span className="text-sm font-normal text-muted-foreground ml-1">({filteredImageResults.length} {uiI18n.t('app.match_ef5c844e')}{filteredImageResults.length !== 1 ? uiI18n.t('app.es_09cd68a2') : ''})</span>
@@ -2130,7 +2165,7 @@ export default function SearchPage() {
               </button>
             </div>
             {filteredImageResults.length === 0 ? (
-              <GlassPanel className="p-6 text-sm text-muted-foreground">
+              <GlassPanel quiet className="p-6 text-sm text-muted-foreground">
                 {uiI18n.t('app.no_frame_matches_above_a2661490')} {Math.round(imageConfidenceThreshold * 100)}{uiI18n.t('app.confidence_lower_the_confidence_filter_to_see_mo_a747aab3')}
               </GlassPanel>
             ) : (
@@ -2158,7 +2193,7 @@ export default function SearchPage() {
                   };
 
                   return (
-                    <GlassPanel key={`img-result-${idx}`} className="overflow-hidden group hover:border-primary/40 transition-colors flex flex-col">
+                    <GlassPanel quiet key={`img-result-${idx}`} className="overflow-hidden group hover:border-primary/40 transition-colors flex flex-col">
                       {/* Preview image / video row */}
                       <div className="relative aspect-video bg-black flex-shrink-0 overflow-hidden">
                         <img
@@ -2168,18 +2203,18 @@ export default function SearchPage() {
                           onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                         />
                         {/* Similarity badge */}
-                        <div className={`absolute top-2 right-2 px-2 py-0.5 rounded-full bg-black/70 backdrop-blur-sm text-xs font-black ${similarityColor}`}>
+                        <div className={`absolute top-2 right-2 px-2 py-0.5 rounded-full bg-black/70 backdrop-blur-sm text-xs font-medium ${similarityColor}`}>
                           {similarityPct}%
                         </div>
                         {/* Episode badge */}
                         {result.episode != null && (
-                          <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-black/70 backdrop-blur-sm text-xs font-bold text-white">
+                          <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-black/70 backdrop-blur-sm text-xs font-medium text-white">
                             {uiI18n.t('app.ep_00c1bff9')} {result.episode}
                           </div>
                         )}
                         {/* Timestamp */}
                         {timestampSecs !== null && (
-                          <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/70 backdrop-blur-sm text-[10px] text-white font-mono">
+                          <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/70 backdrop-blur-sm text-xs text-white font-mono">
                             {formatTimestamp(timestampSecs)}
                           </div>
                         )}
@@ -2211,26 +2246,26 @@ export default function SearchPage() {
                           />
                         )}
                         <div className="flex-1 min-w-0">
-                          <p className="font-bold text-sm leading-tight line-clamp-2 mb-1">{animeTitle}</p>
-                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
+                          <p className="font-medium text-sm leading-tight line-clamp-2 mb-1">{animeTitle}</p>
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                             {result.episode != null && (
-                              <span className="font-semibold text-foreground/70">{uiI18n.t('app.episode_8669aa56')} {result.episode}</span>
+                              <span className="font-medium text-foreground/70">{uiI18n.t('app.episode_8669aa56')} {result.episode}</span>
                             )}
                             {timestampSecs !== null && (
                               <span>{uiI18n.t('app.at_27e90dfa')} {formatTimestamp(timestampSecs)}</span>
                             )}
-                            <span className={`font-black ${similarityColor}`}>{similarityPct}{uiI18n.t('app.match_a12e74de')}</span>
+                            <span className={`font-medium ${similarityColor}`}>{similarityPct}{uiI18n.t('app.match_a12e74de')}</span>
                           </div>
                           <div className="mt-3 flex gap-2">
                             <button
                               onClick={() => navigate(`/anime/${result.anilist}`)}
-                              className="flex-1 py-1.5 rounded-lg bg-primary/15 hover:bg-primary/30 text-[10px] font-bold text-primary transition-[color,background-color,border-color,opacity,transform] border border-primary/20 hover:border-primary/40"
+                              className="flex-1 py-1.5 rounded-lg bg-primary/15 hover:bg-primary/30 text-xs font-medium text-primary transition-[color,background-color,border-color,opacity,transform] border border-primary/20 hover:border-primary/40"
                             >
                               {uiI18n.t('app.view_anime_fcdc083e')}
                             </button>
                             <button
                               onClick={() => navigate(`/search?q=${encodeURIComponent(animeTitle)}`)}
-                              className="flex-1 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-[10px] font-bold text-muted-foreground hover:text-foreground transition-[color,background-color,border-color,opacity,transform] border border-white/5"
+                              className="flex-1 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-medium text-muted-foreground hover:text-foreground transition-[color,background-color,border-color,opacity,transform] border border-white/5"
                             >
                               {uiI18n.t('app.search_bce06414')}
                             </button>
@@ -2246,14 +2281,14 @@ export default function SearchPage() {
         )}
 
         {query && extensionResults && extensionResults.length > 0 && (
-          <div className="mb-12 animate-in fade-in slide-in-from-top-4 duration-500">
-            <div className="mb-6 flex flex-wrap items-center justify-between gap-3"><h2 className="text-xl font-bold flex items-center gap-3">
+          <div className="mb-12 animate-in fade-in  duration-200">
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-3"><h2 className="text-xl font-medium flex items-center gap-3">
               <Puzzle className="w-5 h-5 text-primary" />
               {uiI18n.t('extensions.searchResults', { defaultValue: 'Extension results' })} ({filteredExtensionResults.length})
             </h2><label className="flex items-center gap-2 text-sm">Source<ThemedSelect aria-label="Filter extension results by source" className={controlTriggerClass} value={extensionFilter} onChange={event => setExtensionFilter(event.target.value)}><option value="all">All enabled sources</option>{[...extensionOptions].map(([id, name]) => <option key={id} value={id}>{name}</option>)}</ThemedSelect></label></div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredExtensionResults.map((result, idx) => (
-                <GlassPanel key={result.route || idx} role="button" tabIndex={0} className="p-4 flex gap-4 items-center group hover:border-primary/50 transition-[color,background-color,border-color,opacity,transform] cursor-pointer" onClick={() => result.route ? navigate(result.route) : result.url && window.open(result.url, '_blank', 'noopener,noreferrer')} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); result.route ? navigate(result.route) : result.url && window.open(result.url, '_blank', 'noopener,noreferrer'); } }}>
+                <GlassPanel quiet key={result.route || idx} role="button" tabIndex={0} className="p-4 flex gap-4 items-center group hover:border-primary/50 transition-[color,background-color,border-color,opacity,transform] cursor-pointer" onClick={() => result.route ? navigate(result.route) : result.url && window.open(result.url, '_blank', 'noopener,noreferrer')} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); result.route ? navigate(result.route) : result.url && window.open(result.url, '_blank', 'noopener,noreferrer'); } }}>
                   <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary flex-shrink-0">
                     {result.image ? (
                       <img src={result.image} alt="" className="w-full h-full object-cover rounded-xl" />
@@ -2262,10 +2297,10 @@ export default function SearchPage() {
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-sm truncate">{result.title}</h3>
+                    <h3 className="font-medium text-sm truncate">{result.title}</h3>
                     <div className="flex items-center gap-2 mt-1">
-                      <span className="text-[10px] font-black uppercase tracking-widest text-primary/70">{result.providerName}</span>
-                      <span className="text-[10px] text-muted-foreground">• {result.type || uiI18n.t('app.result_5faa59d4')}</span>
+                      <span className="text-xs font-medium normal-case tracking-normal text-primary/70">{result.providerName}</span>
+                      <span className="text-xs text-muted-foreground">• {result.type || uiI18n.t('app.result_5faa59d4')}</span>
                     </div>
                   </div>
                   <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
@@ -2286,7 +2321,7 @@ export default function SearchPage() {
                   <div className="p-2 rounded-xl bg-primary/10 text-primary">
                     <User className="w-5 h-5" />
                   </div>
-                  <h2 className="text-2xl font-black tracking-tight">{uiI18n.t('app.character_ee9946c8')} <span className="text-primary italic">{uiI18n.t('app.matches_ee2dbd5d')}</span></h2>
+                  <h2 className="text-2xl font-medium tracking-tight">{uiI18n.t('app.character_ee9946c8')} <span className="text-primary italic">{uiI18n.t('app.matches_ee2dbd5d')}</span></h2>
                 </div>
                 <div className={POSTER_GRID_CLASS}>
                   {characterResults.map((character: any) => (
@@ -2312,14 +2347,14 @@ export default function SearchPage() {
                   <div className="p-2 rounded-xl bg-primary/10 text-primary">
                     <Film className="w-5 h-5" />
                   </div>
-                  <h2 className="text-2xl font-black tracking-tight">
+                  <h2 className="text-2xl font-medium tracking-tight">
                     {uiI18n.t('app.episode_8669aa56')} <span className="text-primary italic">{uiI18n.t('app.matches_ee2dbd5d')}</span>
                     <span className="ml-2 text-sm font-normal text-muted-foreground">{uiI18n.t('app.by_episode_title_03d8c78e')}</span>
                   </h2>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {episodeTitleResults.map((hit: any, idx: number) => (
-                    <GlassPanel
+                    <GlassPanel quiet
                       key={`ep-${hit.anilistId ?? idx}`}
                       className="p-3 flex items-center gap-4 hover:bg-white/10 transition-[color,background-color,border-color,opacity,transform] cursor-pointer group border-white/5 hover:border-primary/30"
                       onClick={() => navigate(`/anime/${hit.animeId || hit.anilistId}`)}
@@ -2329,18 +2364,18 @@ export default function SearchPage() {
                           <img
                             src={hit.animePoster}
                             alt={hit.animeName}
-                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                            className="w-full h-full object-cover transition-transform duration-200 "
                             loading="lazy"
                           />
                         </div>
                       )}
                       <div className="min-w-0 flex-1">
-                        <p className="font-bold text-sm truncate group-hover:text-primary transition-colors">{hit.animeName}</p>
+                        <p className="font-medium text-sm truncate group-hover:text-primary transition-colors">{hit.animeName}</p>
                         <p className="text-xs text-muted-foreground truncate mt-0.5">
-                          <span className="font-semibold text-primary/70">{uiI18n.t('app.episode_8bffcf5b')} </span>{hit.episodeTitle}
+                          <span className="font-medium text-primary/70">{uiI18n.t('app.episode_8bffcf5b')} </span>{hit.episodeTitle}
                         </p>
                         <div className="flex items-center gap-2 mt-1">
-                          <span className="text-[10px] font-black uppercase tracking-widest text-primary/50 bg-primary/10 px-1.5 py-0.5 rounded-md">{uiI18n.t('app.episode_match_4f089f26')}</span>
+                          <span className="text-xs font-medium normal-case tracking-normal text-primary/50 bg-primary/10 px-1.5 py-0.5 rounded-md">{uiI18n.t('app.episode_match_4f089f26')}</span>
                           <ChevronRight className="w-3 h-3 text-muted-foreground/40 group-hover:translate-x-1 transition-transform" />
                         </div>
                       </div>
@@ -2376,9 +2411,9 @@ export default function SearchPage() {
                 {/* Infinite Scroll Trigger */}
                 <div ref={scrollRef} className="h-20 mt-8 flex flex-col items-center justify-center gap-3">
                   {isFetchingMoreResults ? (
-                    <div className="flex items-center gap-3 text-primary animate-pulse bg-primary/5 px-6 py-3 rounded-2xl border border-primary/10">
+                    <div className="flex items-center gap-3 text-primary  bg-primary/5 px-6 py-3 rounded-2xl border border-primary/10">
                       <Loader2 className="w-5 h-5 animate-spin" />
-                      <span className="text-sm font-bold uppercase tracking-wider">{uiI18n.t('app.loading_more_35e3dc3d')}</span>
+                      <span className="text-sm font-medium normal-case tracking-normal">{uiI18n.t('app.loading_more_35e3dc3d')}</span>
                     </div>
                   ) : hasMoreResults ? (
                     <Button variant="outline" onClick={() => {
@@ -2389,7 +2424,7 @@ export default function SearchPage() {
                   ) : (
                     <div className="flex flex-col items-center gap-2 opacity-40">
                       <div className="h-px w-24 bg-border" />
-                      <span className="text-[10px] font-black uppercase tracking-[0.2em]">{uiI18n.t('app.end_of_results_a68743b8')}</span>
+                      <span className="text-xs font-medium normal-case tracking-normal">{uiI18n.t('app.end_of_results_a68743b8')}</span>
                     </div>
                   )}
                 </div>
@@ -2399,7 +2434,7 @@ export default function SearchPage() {
             {!hasAnyResult && !hasMoreResults && !mangaSearchError && !novelSearchError && (
               <div className="text-center py-20">
                 <Search className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-                <h2 className="text-xl font-semibold mb-2">{uiI18n.t('app.no_results_found_658e79f9')}</h2>
+                <h2 className="text-xl font-medium mb-2">{uiI18n.t('app.no_results_found_658e79f9')}</h2>
                 <p className="text-muted-foreground">{uiI18n.t('app.try_broadening_filters_or_using_a_different_quer_3e21e6f7')}</p>
               </div>
             )}
@@ -2409,7 +2444,7 @@ export default function SearchPage() {
           <div className="mt-8 flex w-full flex-col items-center text-center">
             {recentSearches.length > 0 && (
               <div className="mb-8 w-full max-w-3xl">
-                <p className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">{uiI18n.t('app.recent_searches_a73d2913')}</p>
+                <p className="mb-3 text-xs font-medium normal-case tracking-normal text-muted-foreground">{uiI18n.t('app.recent_searches_a73d2913')}</p>
                 <div className="flex flex-wrap justify-center gap-2.5">
                   {recentSearches.map((term, idx) => (
                     <div key={idx} className="group inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-xs transition-[color,background-color,border-color,opacity,transform]">

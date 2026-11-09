@@ -364,8 +364,10 @@ function SettingsPanelBody({
               <select id="player-engine" value={settings.playerEngine} onChange={event => updateSetting('playerEngine', event.target.value as VideoSettings['playerEngine'])}
                 className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">
                 <option value="builtin">Tatakai (default)</option>
+                <option value="vidstack">Vidstack (alternative)</option>
                 <option value="jwplayer">JW Player (optional)</option>
               </select>
+              {settings.playerEngine === 'vidstack' && <p className="text-sm text-muted-foreground">Vidstack provides its own playback controls, captions, speed and quality menus. Video enhancement, torrents, downloads and watch rooms use the Tatakai player.</p>}
               {settings.playerEngine === 'jwplayer' && <>
                 <label htmlFor="jw-library" className="block text-sm font-medium">JW Player library ID</label>
                 <input id="jw-library" value={settings.jwPlayerLibraryId} onChange={event => updateSetting('jwPlayerLibraryId', event.target.value.trim())}

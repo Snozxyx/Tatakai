@@ -25,6 +25,7 @@ function createMainWindow(deps) {
         isDev,
         logger,
         desktopDir,
+        windowBackdrop,
     } = deps;
 
     const getMainWindow = () => winState.mainWindow;
@@ -43,7 +44,7 @@ function createMainWindow(deps) {
             return false;
         }
         if (url.protocol === 'app:') return url.hostname === APP_HOST;
-        if (url.protocol === 'https:') return url.origin === 'https://api.tatakai.me';
+        if (url.protocol === 'https:') return url.origin === 'https://api.tatakai.app';
         if (url.protocol === 'http:') {
             return (
                 (url.hostname === 'localhost' || url.hostname === '127.0.0.1') &&
@@ -64,7 +65,7 @@ function createMainWindow(deps) {
 
     const isMac = process.platform === 'darwin';
 
-    const mainWindow = new BrowserWindow({
+    const options = {
         width: 1280,
         height: 720,
         minWidth: 1000,
@@ -88,7 +89,7 @@ function createMainWindow(deps) {
             enableBlinkFeatures: 'CSSContainerQueries',
             backgroundThrottling: false,
         },
-        backgroundColor: '#09090b',
+        backgroundColor: '#0f0b0c',
         icon: pathModule.join(desktopDir, '..', 'resources', 'icon.ico'),
         // NOTE: do NOT set `paintWhenInitiallyHidden: false`. With `show: false`
         // that suppresses background painting, so `ready-to-show` NEVER fires —
@@ -96,9 +97,18 @@ function createMainWindow(deps) {
         // shows an unpainted frameless window (black) that invalidate() can't
         // reliably repaint. Default (true) lets it paint while hidden so
         // ready-to-show fires (~500ms) and reveals an already-painted window.
-    });
+    };
+    let mainWindow;
+    const backdropOptions = windowBackdrop?.windowOptions() || {};
+    try { mainWindow = new BrowserWindow({ ...options, ...backdropOptions }); }
+    catch (error) {
+        if (!windowBackdrop || !(backdropOptions.backgroundMaterial || backdropOptions.vibrancy || backdropOptions.transparent)) throw error;
+        windowBackdrop.constructorFallback(error);
+        mainWindow = new BrowserWindow({ ...options, ...windowBackdrop.windowOptions(true) });
+    }
 
     winState.mainWindow = mainWindow;
+    windowBackdrop?.attach(mainWindow);
 
     // Keep the renderer's title-bar maximize/restore glyph in sync with the real
     // window state (double-click, OS shortcuts, snap all bypass our button).

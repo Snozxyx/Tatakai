@@ -1,0 +1,41 @@
+/* Keep IPTV page spacing on its outer section and form scrolling on its fields. */
+.tv-iptv-page > h1 { margin-top: 0; }
+.tatakai-tv .tv-iptv-playlist-dialog {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: min(82dvh, 900px);
+  overflow: hidden;
+  gap: 1em;
+}
+.tv-iptv-playlist-fields {
+  display: flex;
+  flex-direction: column;
+  gap: .8em;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding: .6em;
+  padding: .3em;
+}
+.tv-iptv-playlist-fields label { display: flex; flex-direction: column; gap: .3em; }
+.tv-iptv-playlist-fields input {
+  width: 100%;
+  min-width: 0;
+  padding: .5em .7em;
+  color: inherit;
+  background: hsl(var(--background));
+  border: 1px solid hsl(var(--border));
+  border-radius: 10px;
+}
+.tv-iptv-playlist-type { min-width: 0; padding: 0; border: 0; }
+.tv-iptv-playlist-type legend { margin-bottom: .3em; }
+.tv-iptv-playlist-type > div, .tv-iptv-playlist-actions { display: flex; gap: .6em; }
+.tv-iptv-playlist-type button { flex: 1; }
+.tatakai-tv .tv-iptv-playlist-type button[aria-pressed="true"] { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
+.tv-iptv-playlist-footer { min-width: 0; padding: .3em; border-top: 1px solid hsl(var(--border)); }
+.tv-iptv-playlist-footer p { margin: .5em 0 0; overflow-wrap: anywhere; font-size: .85em; max-height: 3em; overflow-y: auto; }
+.tv-iptv-playlist-actions button { flex: 1; }
+@media (max-height: 480px) {
+  .tatakai-tv .tv-iptv-playlist-dialog { height: 90dvh; max-height: 90dvh !important; padding: 2vh 2vw !important; gap: .5em; }
+  .tv-iptv-playlist-dialog > div:first-child p { display: none; }
+}

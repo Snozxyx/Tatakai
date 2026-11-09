@@ -1,0 +1,76 @@
+[
+  {
+    "name": "aniyomi",
+    "url": "https://raw.githubusercontent.com/aniyomiorg/aniyomi/97414446b8a95994c72dd33c41c971a89d4d25b8/.github/assets/logo.png",
+    "file": "aniyomi.webp",
+    "originalDimensions": [
+      48,
+      48
+    ],
+    "sha256": "2d45b22f722f667ccefcb7b95ac20c179f475d6fdb523c887ba81a29f5917a91"
+  },
+  {
+    "name": "cloudstream",
+    "url": "https://raw.githubusercontent.com/recloudstream/cloudstream/9ff05a8bdb4ccf677ef26d692c6ff49bddc62079/app/src/main/ic_launcher-playstore.png",
+    "file": "cloudstream.webp",
+    "originalDimensions": [
+      512,
+      512
+    ],
+    "sha256": "5aa4da3313892b2aaee1021cf7b87e5bc203b33f1895b44ac32b3a15c98083c6"
+  },
+  {
+    "name": "kodi",
+    "url": "https://cdn.simpleicons.org/kodi/17B2E7",
+    "file": "kodi.svg",
+    "originalDimensions": "vector",
+    "sha256": "f73db0b0fa71ef4e9ecf49e26093d4c0667af2e8eea5f628af397e67d8305106"
+  },
+  {
+    "name": "mangayomi",
+    "url": "https://raw.githubusercontent.com/kodjodevf/mangayomi/91bda20a9235b64ba2fa5559b1e8fa1205a83988/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-1024x1024%401x.png",
+    "file": "mangayomi.webp",
+    "originalDimensions": [
+      1024,
+      1024
+    ],
+    "sha256": "722f456e4a736d3f5672064e6834dfc1c367e31c649584c1f088d97deae8b450"
+  },
+  {
+    "name": "mihon",
+    "url": "https://raw.githubusercontent.com/mihonapp/website/b9efd1a041f06fdeff1cd3085a6270f7a1307113/website/src/public/img/logo.png",
+    "file": "mihon.webp",
+    "originalDimensions": [
+      512,
+      512
+    ],
+    "sha256": "533cd69d6af9e9969b86777f0f256c442e8e1387379a07d4bdb67eb3a4ca65fc"
+  },
+  {
+    "name": "seanime",
+    "url": "https://seanime.app/seanime-logo.png",
+    "file": "seanime.webp",
+    "originalDimensions": [
+      439,
+      439
+    ],
+    "sha256": "5bf5ba1de61d3bd1fb57827ee2ff68edb2fde6302cb7f331a1bbaa44a737e074"
+  },
+  {
+    "name": "sora",
+    "url": "https://raw.githubusercontent.com/cranci1/Sora/28f55f3d273b0dd32338e564324054287e500ff9/Sora/Assets.xcassets/AppIcon.appiconset/lightmode.png",
+    "file": "sora.webp",
+    "originalDimensions": [
+      1024,
+      1024
+    ],
+    "sha256": "5debda213e4ffd71c6c675eaf0d8bf425983e7a04ce7da53180e255375173fdb"
+  },
+  {
+    "name": "stremio",
+    "url": "https://cdn.simpleicons.org/stremio/8A5CF6",
+    "file": "stremio.svg",
+    "originalDimensions": "vector",
+    "sha256": "9c3f2bf0a9911bb92cd02ededa1c3b97db2f903cd8e9a939208b7484d74ebdee"
+  }
+]

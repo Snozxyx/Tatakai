@@ -10,7 +10,7 @@ import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { CachedProfileImage } from '@/components/ui/cached-profile-image';
 import { useProfileWatchTime } from '@/hooks/user/useProfileWatchTime';
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Suspense, cloneElement, isValidElement, useEffect, useMemo, useState, type MouseEvent } from 'react';
 import { readThemePreferences } from '@/lib/profileThemes';
 import { resolveProfileTheme } from '@/components/profile/themes/registry';
 import './themes/sekaipop/sekaipop-preview.css';
@@ -54,6 +54,11 @@ interface ProfileWidgetCardProps {
   /** Popover side. */
   side?: 'top' | 'right' | 'bottom' | 'left';
   className?: string;
+}
+
+function keepNestedBadgeWidgetOpen(event: { detail: { originalEvent: Event }; preventDefault(): void }) {
+  const target = event.detail.originalEvent.target;
+  if (target instanceof Element && target.closest('.badge-widget-dialog,.badge-widget-tooltip,.badge-widget-overlay,[data-badge-collection]')) event.preventDefault();
 }
 
 /** Lightweight, privacy-safe profile lookup by user_id (does NOT throw on private). */
@@ -196,6 +201,14 @@ export function ProfileWidgetCard({
   const navigate = useNavigate();
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
+  const trigger = isValidElement<{ onClick?: (event: MouseEvent<HTMLElement>) => void }>(children)
+    ? cloneElement(children, { onClick: event => {
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      setOpen(value => !value);
+    } })
+    : children;
 
   useEffect(() => {
     if (open) void triggerHaptic('open');
@@ -277,12 +290,12 @@ export function ProfileWidgetCard({
       onFollow={() => isFollowing ? unfollow() : follow()} onOpen={goToProfile} onClose={close}
       moderation={userId ? <ModerationMenu contentType="user" contentId={userId} authorUserId={userId} authorName={name} /> : undefined}
     /></Suspense> : loadingCard;
-    return isMobile || isTV() ? <Dialog open={open} onOpenChange={setOpen}><DialogTrigger asChild>{children}</DialogTrigger><DialogContent showCloseButton={false} aria-describedby={undefined} className={cn('profile-theme-preview-shell', className)}><DialogTitle className="sr-only">{name} profile preview</DialogTitle>{themedBody}</DialogContent></Dialog> : <Popover open={open} onOpenChange={setOpen}><PopoverTrigger asChild>{children}</PopoverTrigger><PopoverContent side={side} align="center" className={cn('profile-theme-preview-shell z-[60]', className)}>{themedBody}</PopoverContent></Popover>;
+    return isMobile || isTV() ? <Dialog open={open} onOpenChange={setOpen}><DialogTrigger asChild>{trigger}</DialogTrigger><DialogContent showCloseButton={false} aria-describedby={undefined} className={cn('profile-theme-preview-shell', className)}><DialogTitle className="sr-only">{name} profile preview</DialogTitle>{themedBody}</DialogContent></Dialog> : <Popover open={open} onOpenChange={setOpen}><PopoverTrigger asChild>{trigger}</PopoverTrigger><PopoverContent side={side} align="center" onInteractOutside={keepNestedBadgeWidgetOpen} className={cn('profile-theme-preview-shell z-[60]', className)}>{themedBody}</PopoverContent></Popover>;
   }
 
   if (isTV()) return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>{children}</DialogTrigger>
+      <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent className="tv-profile-widget" aria-describedby={undefined}>
         {banner && <div className="tv-profile-widget-cover"><CachedProfileImage className="tv-profile-widget-banner" src={banner} alt="" onError={event => { event.currentTarget.style.visibility = 'hidden'; }} /></div>}
         <div className="tv-profile-widget-body" style={profileSurfaceStyle(customization)}>
@@ -462,7 +475,7 @@ export function ProfileWidgetCard({
         // bubbled wrapper click. asChild merges the open handler onto the
         // child element itself, exactly like PopoverTrigger does.
         <Dialog open={open} onOpenChange={(o) => { if (!o) void triggerHaptic('tap'); setOpen(o); }}>
-          <DialogTrigger asChild>{children}</DialogTrigger>
+          <DialogTrigger asChild>{trigger}</DialogTrigger>
           <DialogContent
             showCloseButton={false}
             aria-describedby={undefined}
@@ -477,10 +490,11 @@ export function ProfileWidgetCard({
         </Dialog>
       ) : (
         <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger asChild>{children}</PopoverTrigger>
+          <PopoverTrigger asChild>{trigger}</PopoverTrigger>
           <PopoverContent
             side={side}
             align="center"
+            onInteractOutside={keepNestedBadgeWidgetOpen}
             className={cn(
               'z-[50] w-80 overflow-hidden rounded-3xl border-white/10 bg-background/90 p-0 shadow-2xl backdrop-blur-xl',
               className,

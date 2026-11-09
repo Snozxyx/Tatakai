@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useVideoSettings } from '@/hooks/media/useVideoSettings';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SettingRow } from '@/components/settings/SettingsPrimitives';
@@ -6,7 +6,7 @@ import { UpscalerPreview } from './UpscalerPreview';
 import { Button } from '@/components/ui/button';
 import { isMobileNative } from '@/lib/platform/platform';
 import type { VideoEnhancementEngine, VideoEnhancementQuality } from '@/lib/video/enhancement-settings';
-import type { RtxCapability } from '@/lib/video/rtx-video';
+import { checkRtxCapability, type RtxCapability } from '@/lib/video/rtx-video';
 
 export function VideoEnhancementSettings() {
   const { settings, updateSetting } = useVideoSettings();
@@ -14,11 +14,18 @@ export function VideoEnhancementSettings() {
   const [playbackStatus, setPlaybackStatus] = useState('');
   const [gpuError, setGpuError] = useState('');
   const bridge = window.electron?.rtxVideo;
-  useEffect(() => {
-    let disposed = false;
-    void bridge?.capability().then(result => { if (!disposed) setCaps(result); }).catch(() => { if (!disposed) setCaps({ available: false, reason: 'Could not check RTX Video. Restart the desktop app and try again.', maxOutputHeight: 1080 }); });
-    return () => { disposed = true; };
+  const capabilityRequest = useRef(0);
+  const checkCompatibility = useCallback(async () => {
+    const request = ++capabilityRequest.current;
+    setCaps(undefined);
+    const result = await checkRtxCapability(bridge);
+    if (request === capabilityRequest.current) setCaps(result);
   }, [bridge]);
+  useEffect(() => {
+    const requests = capabilityRequest;
+    void checkCompatibility();
+    return () => { requests.current++; };
+  }, [checkCompatibility]);
   useEffect(() => {
     const receive = (event: Event) => setPlaybackStatus((event as CustomEvent<string>).detail);
     window.addEventListener('tatakai-video-enhancement-status', receive);
@@ -31,11 +38,8 @@ export function VideoEnhancementSettings() {
       <SelectTrigger aria-labelledby={labelId} className="h-9 w-44"><SelectValue /></SelectTrigger><SelectContent>
         <SelectItem value="off">Off</SelectItem><SelectItem value="anime4k">Anime4K</SelectItem><SelectItem value="rtx" disabled={!caps?.available}>RTX Video · beta</SelectItem>
       </SelectContent></Select>} />
-    <p className="text-xs text-muted-foreground">{!bridge ? 'RTX Video requires the Windows desktop app and a supported NVIDIA RTX GPU.' : !caps ? 'Checking NVIDIA RTX Video support…' : !caps.available ? caps.reason : `RTX Video ready on ${caps.adapter}. Output capped at ${caps.maxOutputHeight}p.`}</p>
-    {bridge && !caps?.available && <Button type="button" size="sm" variant="ghost" disabled={!caps} onClick={() => {
-      setCaps(undefined);
-      void bridge.capability().then(setCaps).catch(() => setCaps({ available: false, reason: 'Could not check RTX Video. Restart the desktop app and try again.', maxOutputHeight: 1080 }));
-    }}>Check again</Button>}
+    <p role="status" aria-live="polite" className="text-xs text-muted-foreground">{!bridge ? 'RTX Video requires the Windows desktop app and a supported NVIDIA RTX GPU.' : !caps ? 'Checking NVIDIA RTX Video support…' : !caps.available ? caps.reason : `RTX Video ready on ${caps.adapter}. Output capped at ${caps.maxOutputHeight}p.`}</p>
+    {bridge && <Button type="button" size="sm" variant="ghost" disabled={!caps} onClick={() => void checkCompatibility()}>{caps ? 'Check compatibility' : 'Checking compatibility…'}</Button>}
     {caps?.restartRequired && bridge && <Button type="button" size="sm" variant="secondary" onClick={() => void bridge.restartWithGpuPreference(true).catch(error => setGpuError(String(error)))}>Use NVIDIA GPU & restart</Button>}
     {caps?.restartRequired && <p className="text-xs text-muted-foreground">Using the dedicated GPU can increase laptop power use. You can return to the system GPU from these settings.</p>}
     {caps?.dedicatedGpuRequested && bridge && <Button type="button" size="sm" variant="ghost" onClick={() => void bridge.restartWithGpuPreference(false).catch(error => setGpuError(String(error)))}>Use system GPU & restart</Button>}

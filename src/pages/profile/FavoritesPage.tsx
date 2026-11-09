@@ -54,6 +54,7 @@ import {
 } from "@/lib/favoritesLibrary";
 import { parseExternalAnimeId } from "@/lib/animeIdMapping";
 import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton-custom";
 import "./favorites.css";
 
 const Recommendations = lazy(() => import("./FavoritesRecommendations"));
@@ -81,6 +82,29 @@ const READING_STATUSES = [
   "dropped",
 ];
 const EMPTY: any[] = [];
+
+function FavoritesLoadingState() {
+  return (
+    <section
+      role="status"
+      aria-label="Loading favorites"
+      className="space-y-6"
+    >
+      <div className="flex flex-wrap items-end justify-between gap-4 rounded-xl border border-border bg-card p-4">
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-10 w-48" />
+        </div>
+        <div className="flex gap-2">
+          <Skeleton className="h-11 w-28 rounded-lg" />
+          <Skeleton className="h-11 w-28 rounded-lg" />
+          <Skeleton className="h-11 w-24 rounded-lg" />
+        </div>
+      </div>
+      <PosterGridSkeleton count={12} />
+    </section>
+  );
+}
 
 export default function FavoritesPage() {
   const { t } = useTranslation();
@@ -361,7 +385,7 @@ export default function FavoritesPage() {
           <Heart className="mt-2 size-5 text-primary" aria-hidden="true" />
         </header>
         {!user && authLoading ? (
-          <p role="status">{t("favoritesHub.loading")}</p>
+          <FavoritesLoadingState />
         ) : !user ? (
           <section className="rounded-xl border border-border p-8">
             <h2 className="text-lg font-medium">{t("favoritesHub.signIn")}</h2>
@@ -676,7 +700,7 @@ export default function FavoritesPage() {
                         </p>
                       )}
                       {loading ? (
-                        <PosterGridSkeleton count={12} />
+                        <FavoritesLoadingState />
                       ) : !filtered.length ? (
                         failed ? null : (
                           <p className="rounded-xl border border-border px-6 py-12 text-center text-sm text-muted-foreground">

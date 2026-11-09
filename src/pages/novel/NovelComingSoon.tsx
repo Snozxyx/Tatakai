@@ -17,10 +17,10 @@ export default function NovelComingSoon() {
   const isMobile = useIsMobile();
 
   return (
-    <div className="min-h-screen bg-black text-zinc-50 overflow-x-hidden selection:bg-primary/30 font-sans">
+    <div data-app-page-surface className="min-h-screen bg-black text-zinc-50 overflow-x-hidden selection:bg-primary/30 font-sans">
       {/* Ambient Background Effects */}
       {!isNative && <Background />}
-      <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+      <div data-app-route-background className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
         <div className="absolute top-[20%] left-[20%] w-[500px] h-[500px] bg-primary/20 rounded-full blur-[120px] opacity-60 mix-blend-screen" />
         <div className="absolute bottom-[20%] right-[20%] w-[400px] h-[400px] bg-purple-500/10 rounded-full blur-[100px] opacity-50 mix-blend-screen" />
       </div>

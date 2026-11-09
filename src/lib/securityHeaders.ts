@@ -12,9 +12,10 @@ export const CSP_POLICY = {
     "'self'",
     "'unsafe-inline'", // Required for React
     "'unsafe-eval'", // Required for some libraries
+    "'wasm-unsafe-eval'", // Cap's proof-of-work solver
     'https://www.googletagmanager.com',
     'https://www.google-analytics.com',
-    'https://challenges.cloudflare.com', // Cloudflare Turnstile widget
+    'https://cdn.jsdelivr.net', // Cap's pinned decompression fallback on older WebViews
     'https://cdn.jwplayer.com', // Optional licensed player and its modules
   ],
   'style-src': [
@@ -30,6 +31,7 @@ export const CSP_POLICY = {
   'font-src': [
     "'self'",
     'data:',
+    'https://tatakai.app', // Profile theme fonts are served by the asset server
   ],
   'connect-src': [
     "'self'",
@@ -45,15 +47,14 @@ export const CSP_POLICY = {
     "https://*.waifu.im",
     "https://cdn.nekosia.cat",
     'https://*.supabase.co',
-    'https://*.tatakai.me',
+    'https://*.tatakai.app',
     'https://*.datadoghq.com',
     'https://www.google-analytics.com',
-    'https://api.tatakai.me',
+    'https://api.tatakai.app',
     'https://api.jikan.moe',
     'https://api.trace.moe',
     'https://graphql.anilist.co',
     'https://api.myanimelist.net',
-    'https://challenges.cloudflare.com', // Cloudflare Turnstile siteverify handshake
   ],
   'media-src': [
     "'self'",
@@ -67,7 +68,6 @@ export const CSP_POLICY = {
     'https://player.vimeo.com',
     'https://open.spotify.com',
     'https://*.supabase.co',
-    'https://challenges.cloudflare.com', // Cloudflare Turnstile challenge iframe
   ],
   'worker-src': [
     "'self'",

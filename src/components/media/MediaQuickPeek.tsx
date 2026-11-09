@@ -2,8 +2,8 @@ import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
-import { BookMarked, Bookmark, BookOpen, ChevronRight, Play, Plus, Check, Star, Loader2, RefreshCw } from "lucide-react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { BookMarked, Bookmark, BookOpen, Film, Check, Star, Loader2, RefreshCw } from "lucide-react";
 import { PeekSheet } from "@/components/media/PeekSheet";
 import { getProxiedImageUrl } from "@/lib/api";
 import { splitRating } from "@/lib/mediaRating";
@@ -17,6 +17,9 @@ import { useLongPress } from "@/hooks/ui/useLongPress";
 import { useWatchlistItem, useAddToWatchlist, useRemoveFromWatchlist } from "@/hooks/user/useWatchlist";
 import { useMangaReadlistItem, useUpsertMangaReadlist, useRemoveFromMangaReadlist } from "@/hooks/user/useMangaReadlist";
 import { useNovelReadlistItem, useUpsertNovelReadlist, useRemoveFromNovelReadlist } from "@/hooks/user/useNovelReadlist";
+import { useNovelDetail } from '@/hooks/api/useNovelData';
+import { selectReadingTitle } from '@/lib/titleLanguage';
+import { usePreferredReadingTitleLanguage } from '@/hooks/ui/useTitleLanguage';
 import {
   closeMediaQuickPeek,
   getMediaQuickPeekSnapshot,
@@ -57,7 +60,13 @@ export function Peekable({
     disabled: !media,
   });
   return (
-    <div className="contents" {...longPress}>
+    <div data-quick-peek-trigger={media?.kind} className="contents" {...longPress} onContextMenuCapture={event => {
+      if (!media) return;
+      longPress.onContextMenu(event);
+      if (!event.defaultPrevented) {
+        event.preventDefault(); event.stopPropagation(); openMediaQuickPeek(media);
+      }
+    }}>
       {children}
     </div>
   );
@@ -71,6 +80,8 @@ export function MediaQuickPeekHost() {
   useUiTranslation();
   const peeked = useSyncExternalStore(subscribeMediaQuickPeek, getMediaQuickPeekSnapshot);
   const navigate = useNavigate();
+  const location = useLocation();
+  const readingTitleLanguage = usePreferredReadingTitleLanguage();
   const { user } = useAuth();
   const open = peeked != null;
   // Retain the last media so the sheet can animate out on close.
@@ -83,14 +94,14 @@ export function MediaQuickPeekHost() {
   const animeId = visible?.kind === "anime" ? visible.id : undefined;
   const mangaId = visible?.kind === "manga" ? visible.id : undefined;
   const novelId = visible?.kind === "novel" ? visible.id : undefined;
-  // Novels share the manga catalog (AniList MANGA/NOVEL), so detail enrichment
-  // reuses the manga query — only the library write targets the novel track.
+  // Keep novel identity and its detail adapter separate from manga library writes.
 
   // Lazy enrichment — same queries the detail pages use, so results are
   // usually already cached. Disabled until the sheet actually opens.
   const { data: animeInfo, isLoading: animeLoading, isFetching: animeFetching, isError: animeError, refetch: retryAnime } = useAnimeInfo(open ? animeId : undefined);
-  const { data: mangaResp, isLoading: mangaLoading, isFetching: mangaFetching, isError: mangaError, refetch: retryManga } = useMangaDetail(open ? (mangaId ?? novelId) : undefined);
-  const mangaDetail = mangaResp?.detail ?? null;
+  const { data: mangaResp, isLoading: mangaLoading, isFetching: mangaFetching, isError: mangaError, refetch: retryManga } = useMangaDetail(open ? mangaId : undefined);
+  const novel = useNovelDetail(open ? novelId : undefined);
+  const mangaDetail = (novelId ? novel.data?.detail : mangaResp?.detail) ?? null;
 
   // Wide banner art: card-supplied first, else AniList (numeric id required).
   // Pure enhancement — failure keeps the blurred-poster header.
@@ -117,10 +128,7 @@ export function MediaQuickPeekHost() {
   useEffect(() => { setSaveMessage(''); setSaveFailed(false); }, [visible?.id, visible?.kind]);
 
   // Dismiss on route change (a peek must never survive navigation).
-  useEffect(() => {
-    if (!open) return;
-    return () => closeMediaQuickPeek();
-  }, [open]);
+  useEffect(() => { closeMediaQuickPeek(); }, [location.key]);
 
   const go = useCallback(
     (to: string) => {
@@ -137,9 +145,15 @@ export function MediaQuickPeekHost() {
 
   if (!visible) return null;
 
-  const media = visible;
+  const media = {
+    ...visible,
+    name: visible.kind === 'anime'
+      ? (visible.enrichIdentity ? animeInfo?.info?.name : visible.name) || visible.name
+      : selectReadingTitle(mangaDetail, readingTitleLanguage) || visible.name,
+    poster: visible.poster || (visible.kind === 'anime' ? animeInfo?.info?.poster : mangaDetail?.coverImage) || '',
+  };
   const isAnime = media.kind === "anime";
-  const { score } = splitRating(media.rating);
+  const { score } = splitRating(media.rating ?? (mangaDetail?.score ? mangaDetail.score / 10 : undefined));
 
   const genres: string[] = isAnime
     ? (animeInfo?.moreInfo?.genres ?? []).slice(0, 5)
@@ -148,19 +162,16 @@ export function MediaQuickPeekHost() {
     ? (animeInfo?.info?.description ?? "")
     : (mangaDetail?.synopsis ?? "");
   const description = rawDescription ? stripHtml(rawDescription) : "";
-  const detailLoading = isAnime ? animeLoading : mangaLoading;
-  const detailFetching = isAnime ? animeFetching : mangaFetching;
-  const detailError = isAnime ? animeError : mangaError;
+  const detailLoading = isAnime ? animeLoading : novelId ? novel.isLoading : mangaLoading;
+  const detailFetching = isAnime ? animeFetching : novelId ? novel.isFetching : mangaFetching;
+  const detailError = isAnime ? animeError : novelId ? novel.isError : mangaError;
   const status = media.status || (isAnime ? animeInfo?.moreInfo?.status : mangaDetail?.status) || null;
   const metaLine = [media.type || (isAnime ? "Anime" : media.kind === "novel" ? "Novel" : "Manga"), status, media.year].filter(Boolean).join(" · ");
 
+  const chapterCount = media.chapters ?? mangaDetail?.totalChapters;
   const countLine = isAnime
-    ? [media.episodesSub != null && media.episodesSub > 0 ? `${media.episodesSub} episodes` : null]
-        .filter(Boolean)
-        .join(" · ")
-    : media.chapters != null && media.chapters > 0
-      ? `${media.chapters} chapters`
-      : "";
+    ? media.episodesSub != null && media.episodesSub > 0 ? uiI18n.t('quickView.episodes', { count: media.episodesSub }) : ''
+    : chapterCount != null && chapterCount > 0 ? uiI18n.t('quickView.chapters', { count: chapterCount }) : '';
 
   const canSave = media.canSave !== false;
   const isNovel = media.kind === "novel";
@@ -212,185 +223,82 @@ export function MediaQuickPeekHost() {
             status: "plan_to_read",
           });
       }
-      if (getMediaQuickPeekSnapshot()?.id === savingId && getMediaQuickPeekSnapshot()?.kind === savingKind) setSaveMessage(saved ? 'Removed from your list.' : 'Saved to your list.');
+      if (getMediaQuickPeekSnapshot()?.id === savingId && getMediaQuickPeekSnapshot()?.kind === savingKind) setSaveMessage(uiI18n.t(saved ? 'quickView.removed' : 'quickView.saved'));
     } catch {
-      if (getMediaQuickPeekSnapshot()?.id === savingId && getMediaQuickPeekSnapshot()?.kind === savingKind) { setSaveFailed(true); setSaveMessage('Couldn’t update your list. Try again.'); }
+      if (getMediaQuickPeekSnapshot()?.id === savingId && getMediaQuickPeekSnapshot()?.kind === savingKind) { setSaveFailed(true); setSaveMessage(uiI18n.t('quickView.saveFailed')); }
     } finally {
       saving.current = false;
     }
   };
 
+  const detailsRoute = /^\/(?:anime|manga|novel)\/[^/]+(?:[?#].*)?$/.test(media.routeTo);
+  const actionLabel = uiI18n.t(detailsRoute ? 'quickView.openDetails' : /^https?:/i.test(media.routeTo)
+    ? 'app.open_cf9b7706' : isAnime ? 'quickView.continueWatching' : 'quickView.continueReading');
+
+  const actions = (
+    <div className="peek-actions border-t border-border bg-background px-5 py-4 md:px-6">
+      <div className="flex gap-3">
+        {canSave && <button type="button" onClick={toggleSave} disabled={saveLoading} aria-busy={saveLoading} aria-pressed={saved}
+          className={cn('peek-action ui-button flex h-12 min-w-0 flex-1 items-center justify-center gap-2 border px-3 text-sm font-medium disabled:opacity-60',
+            saved ? 'border-primary/30 bg-primary/10 text-primary' : 'border-border bg-muted/30 text-foreground hover:bg-muted/60')}>
+          {saveLoading ? <Loader2 aria-hidden className="size-4 animate-spin" /> : saved
+            ? isAnime ? <Check aria-hidden className="ui-save-check size-4" /> : <BookMarked aria-hidden className="ui-save-check size-4" />
+            : <Bookmark aria-hidden className="size-4" />}
+          <span className="truncate">{saved ? uiI18n.t('app.saved_c0ae8f6e') : isAnime ? uiI18n.t('app.watchlist_48a616d9') : uiI18n.t('app.bookmark_441da1bf')}</span>
+        </button>}
+        <button type="button" onClick={() => go(media.routeTo)}
+          className="peek-action ui-button flex h-12 min-w-0 flex-[1.2] items-center justify-center gap-2 bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+          {isAnime ? <Film aria-hidden className="size-4" /> : <BookOpen aria-hidden className="size-4" />}
+          <span className="truncate">{actionLabel}</span>
+        </button>
+      </div>
+      {canSave && (saveLoading || saveMessage) && <p role="status" className={cn('mt-3 text-center text-xs', saveFailed ? 'text-destructive' : 'text-muted-foreground')}>
+        {saveLoading ? uiI18n.t('app.updating_your_list_f716f24d') : saveMessage}
+        {saveFailed && <button type="button" onClick={toggleSave} className="ml-2 min-h-8 rounded px-1 font-medium underline underline-offset-4">{uiI18n.t('app.retry_9f5cd8a2')}</button>}
+      </p>}
+    </div>
+  );
+
   return (
-    <PeekSheet open={open} onClose={closeMediaQuickPeek} label={media.name}>
-      <div className="pb-[max(0.5rem,env(safe-area-inset-bottom))]">
-        {/* Banner header — real banner art when the row carries (or resolves)
-            one, blurred poster otherwise. Same language as the heroes. */}
-        {banner ? (
-          <div className="relative mb-4 h-28 shrink-0 overflow-hidden" aria-hidden>
-            <img
-              src={getProxiedImageUrl(banner)}
-              alt=""
-              className="h-full w-full object-cover object-center"
-              loading="lazy"
-              decoding="async"
-              referrerPolicy="no-referrer"
-              onError={(e) => {
-                e.currentTarget.style.display = "none";
-              }}
-            />
-            <div className="absolute inset-0 bg-gradient-to-b from-background/20 via-background/50 to-background" />
-          </div>
-        ) : (
-          <div className="relative mb-4 h-28 shrink-0 overflow-hidden" aria-hidden>
-            <img
-              src={getProxiedImageUrl(media.poster || "")}
-              alt=""
-              className="h-full w-full scale-110 object-cover object-top blur-2xl brightness-[0.5] saturate-150"
-              loading="lazy"
-              decoding="async"
-              onError={(e) => {
-                e.currentTarget.style.display = "none";
-              }}
-            />
-            <div className="absolute inset-0 bg-gradient-to-b from-background/30 via-background/60 to-background" />
-          </div>
-        )}
-
-        <div className="px-5">
-          <div className="flex gap-4">
-            <div className="w-24 shrink-0 overflow-hidden rounded-2xl border border-border bg-muted">
-              <img
-                src={getProxiedImageUrl(media.poster || "")}
-                alt={media.name}
-                className="aspect-[3/4] w-full object-cover"
-                loading="lazy"
-                decoding="async"
-                onError={(e) => {
-                  if (e.currentTarget.src !== `${window.location.origin}/placeholder.svg`)
-                    e.currentTarget.src = "/placeholder.svg";
-                }}
-              />
-            </div>
-            <div className="min-w-0 flex-1 py-0.5">
-              <h2 className="font-display text-xl font-black leading-tight tracking-tight text-foreground line-clamp-3">
-                {media.name}
-              </h2>
-              {metaLine ? <p className="mt-1.5 text-[13px] font-medium text-muted-foreground">{metaLine}</p> : null}
-              <p className="mt-1.5 flex items-center gap-1.5 text-[13px] font-semibold text-foreground/80">
-                {score ? (
-                  <>
-                    <Star className="h-3.5 w-3.5 fill-amber text-amber" />
-                    {score}
-                  </>
-                ) : null}
-                {score && countLine ? <span className="text-muted-foreground">·</span> : null}
-                {countLine ? <span className="text-muted-foreground">{countLine}</span> : null}
-                {!score && !countLine ? <span className="text-muted-foreground">{uiI18n.t('app.details_inside_293f9a1b')}</span> : null}
-              </p>
-            </div>
-          </div>
-
-          <div className="peek-details mt-4 min-h-[160px]" aria-busy={detailLoading || detailFetching}>
-          {detailLoading && genres.length === 0 ? (
-            <div className="flex min-h-8 flex-wrap gap-2" aria-hidden>
-              {[0, 1, 2].map((i) => (
-                <span key={i} className="h-8 w-20 animate-pulse rounded-full bg-muted" />
-              ))}
-            </div>
-          ) : genres.length > 0 ? (
-            <div className="flex min-h-8 flex-wrap gap-2">
-              {genres.map((g) => (
-                <span
-                  key={g}
-                  className="rounded-full border border-border bg-muted/60 px-3 py-1 text-[13px] font-medium text-foreground"
-                >
-                  {g}
-                </span>
-              ))}
-            </div>
-          ) : null}
-
-          {detailLoading && !description ? <div className="mt-3 space-y-2" aria-label={uiI18n.t('app.loading_details_448da065')} role="status">
+    <PeekSheet open={open} onClose={closeMediaQuickPeek} label={media.name} footer={actions}>
+      {banner && <div className="relative h-28 overflow-hidden bg-muted md:h-36" aria-hidden>
+        <img src={getProxiedImageUrl(banner)} alt="" className="h-full w-full object-cover object-center" decoding="async" referrerPolicy="no-referrer"
+          onError={event => { event.currentTarget.style.visibility = 'hidden'; }} />
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
+      </div>}
+      <div className={cn('peek-summary relative grid grid-cols-[96px_minmax(0,1fr)] gap-x-4 gap-y-4 px-5 pb-6 md:grid-cols-[144px_minmax(0,1fr)] md:gap-x-6 md:px-6', banner ? '-mt-8' : 'pt-12')}>
+        <div className="row-start-1 self-start overflow-hidden rounded-xl border border-border bg-muted md:row-span-2">
+          <img src={getProxiedImageUrl(media.poster || '')} alt="" className="aspect-[2/3] w-full object-cover" decoding="async"
+            onError={event => { if (event.currentTarget.src !== `${window.location.origin}/placeholder.svg`) event.currentTarget.src = '/placeholder.svg'; }} />
+        </div>
+        <div className={cn('col-start-2 min-w-0', banner && 'pt-10')}>
+          <h2 className="break-words font-display text-2xl font-semibold leading-[1.15] text-foreground md:text-[28px]">{media.name}</h2>
+          {metaLine && <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">{metaLine}</p>}
+          {(score || countLine) && <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] tabular-nums">
+            {score && <span className="inline-flex items-center gap-1 font-medium text-foreground"><Star aria-hidden className="size-3.5 fill-amber text-amber" />{score}</span>}
+            {score && countLine && <span aria-hidden className="text-muted-foreground">·</span>}
+            {countLine && <span className="text-muted-foreground">{countLine}</span>}
+          </p>}
+        </div>
+        <div className="peek-details col-span-2 min-w-0 md:col-span-1 md:col-start-2" aria-busy={detailLoading || detailFetching}>
+          {detailLoading && !genres.length ? <div className="flex gap-2" aria-hidden>
+            {[0, 1, 2].map(index => <span key={index} className="h-5 w-16 animate-pulse rounded bg-muted" />)}
+          </div> : genres.length > 0 && <div className="flex flex-wrap gap-x-3 gap-y-2 text-xs font-medium text-foreground/80">
+            {genres.map(genre => <span key={genre} className="border-b border-border pb-1">{genre}</span>)}
+          </div>}
+          {detailLoading && !description ? <div className="mt-4 space-y-2" role="status">
             <span className="sr-only">{uiI18n.t('app.loading_details_d6b61171')}</span>
             {[100, 95, 70].map(width => <div key={width} aria-hidden className="h-3 animate-pulse rounded bg-muted" style={{ width: `${width}%` }} />)}
-          </div> : description ? (
-            <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground line-clamp-3">{description}</p>
-          ) : !detailError ? <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground">{uiI18n.t('app.no_synopsis_available_you_can_still_open_the_ful_551403cf')}</p> : null}
-          {detailError && <div role="status" className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-muted/40 px-3 py-2">
-            <p className="text-xs text-muted-foreground">{uiI18n.t('app.additional_details_couldn_t_load_ef5d3db2')}</p>
-            <button type="button" disabled={detailFetching} onClick={() => { void (isAnime ? retryAnime() : retryManga()); }}
-              className="ui-button inline-flex min-h-9 items-center gap-2 rounded-lg px-2 text-xs font-semibold text-primary disabled:opacity-60">
-              <RefreshCw aria-hidden className={cn('h-3.5 w-3.5', detailFetching && 'animate-spin')} />{detailFetching ? uiI18n.t('app.retrying_2310131b') : uiI18n.t('app.retry_details_2d9fbf10')}
+          </div> : description ? <p className="mt-4 line-clamp-4 text-sm leading-relaxed text-muted-foreground md:line-clamp-5">{description}</p>
+            : !detailError && <p className="mt-4 text-sm leading-relaxed text-muted-foreground">{uiI18n.t('app.no_synopsis_available_you_can_still_open_the_ful_551403cf')}</p>}
+          {detailError && <div role="status" className="mt-4 rounded-xl border border-border bg-muted/25 p-3">
+            <p className="text-xs leading-relaxed text-muted-foreground">{uiI18n.t('app.additional_details_couldn_t_load_ef5d3db2')}</p>
+            <button type="button" disabled={detailFetching} onClick={() => { void (isAnime ? retryAnime() : novelId ? novel.refetch() : retryManga()); }}
+              className="ui-button mt-1 inline-flex min-h-9 items-center gap-2 rounded-lg px-2 text-xs font-medium text-primary disabled:opacity-60">
+              <RefreshCw aria-hidden className={cn('size-3.5', detailFetching && 'animate-spin')} />
+              {detailFetching ? uiI18n.t('app.retrying_2310131b') : uiI18n.t('app.retry_details_2d9fbf10')}
             </button>
           </div>}
-          </div>
-        </div>
-
-        {/* Sticky actions — always visible and tappable, even on small phones */}
-        <div className="sticky bottom-0 -mb-1 mt-4 border-t border-border bg-background/95 px-5 pb-3 pt-3 backdrop-blur-xl">
-          <div className="flex gap-2.5">
-            {canSave ? (
-              <button
-                type="button"
-                onClick={toggleSave}
-                disabled={saveLoading}
-                aria-busy={saveLoading}
-                aria-pressed={saved}
-                className={cn(
-                  "ui-button flex h-[52px] min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl border px-3 text-[15px] font-semibold transition-[background-color,border-color,color,transform] motion-safe:active:scale-[0.98] disabled:opacity-60",
-                  saved
-                    ? "border-primary/40 bg-primary/15 text-primary"
-                    : "border-border bg-muted/50 text-foreground hover:bg-muted",
-                )}
-              >
-                {saveLoading ? (
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                ) : saved ? (
-                  isAnime ? (
-                    <Check className="ui-save-check h-5 w-5" />
-                  ) : (
-                    <BookMarked className="ui-save-check h-5 w-5" />
-                  )
-                ) : (
-                  <Bookmark className="h-5 w-5" />
-                )}
-                <span className="truncate">{saved ? uiI18n.t('app.saved_c0ae8f6e') : isAnime ? uiI18n.t('app.watchlist_48a616d9') : uiI18n.t('app.bookmark_441da1bf')}</span>
-              </button>
-            ) : null}
-            <button
-              type="button"
-              onClick={() => go(media.routeTo)}
-              className="ui-button flex h-[52px] min-w-0 flex-[1.2] items-center justify-center gap-2 rounded-2xl bg-primary px-3 text-[15px] font-semibold text-primary-foreground transition-[background-color,transform] hover:bg-primary/90 motion-safe:active:scale-[0.98]"
-            >
-              {isAnime ? <Play className="h-5 w-5 fill-primary-foreground" /> : <BookOpen className="h-5 w-5" />}
-              <span className="truncate">{isAnime ? uiI18n.t('app.start_watching_da441255') : uiI18n.t('app.start_reading_9cc0a0cb')}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => go(media.routeTo)}
-              aria-label={uiI18n.t('app.view_i18n_value_0_06355651', { value0: media.name })}
-              className="ui-button flex h-[52px] w-[52px] shrink-0 items-center justify-center gap-0.5 rounded-2xl border border-border bg-muted/50 text-[15px] font-semibold text-foreground transition-[background-color,transform] hover:bg-muted motion-safe:active:scale-[.97]"
-            >
-              <span className="hidden min-[380px]:inline">{uiI18n.t('app.view_69bd4ef9')}</span>
-              <ChevronRight className="h-5 w-5" />
-            </button>
-          </div>
-          {canSave && <p role="status" className={cn('mt-2 min-h-5 text-center text-xs', saveFailed ? 'text-destructive' : 'text-muted-foreground')}>
-            {saveLoading ? uiI18n.t('app.updating_your_list_f716f24d') : saveMessage}
-            {saveFailed && <button type="button" onClick={toggleSave} className="ml-2 rounded px-1 font-semibold underline underline-offset-4">{uiI18n.t('app.retry_9f5cd8a2')}</button>}
-          </p>}
-
-          {/* Extra save affordance for anime parity with card hover actions */}
-          {canSave && isAnime && !saved ? (
-            <button
-              type="button"
-              onClick={toggleSave}
-              disabled={saveLoading}
-              className="mt-2.5 flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-white/10 px-3 py-2.5 text-[13px] font-semibold text-muted-foreground transition-colors hover:bg-white/[0.04] hover:text-foreground"
-            >
-              <Plus className="h-4 w-4" /> {uiI18n.t('app.add_to_watchlist_c1adf59b')}
-            </button>
-          ) : null}
         </div>
       </div>
     </PeekSheet>

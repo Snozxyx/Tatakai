@@ -27,6 +27,7 @@ query ($start: Int, $end: Int, $page: Int) {
         format
         episodes
         siteUrl
+        bannerImage
         title { romaji english }
         coverImage { medium large color }
       }
@@ -42,6 +43,7 @@ export interface AiringEntry {
   malId: number | null;
   title: string;
   coverImage: string | null;
+  bannerImage?: string | null;
   color: string | null;
   format: string | null;
   totalEpisodes: number | null;
@@ -73,6 +75,7 @@ async function fetchAiringWindow(startSec: number, endSec: number, signal?: Abor
         malId: m.idMal ?? null,
         title: m?.title?.english || m?.title?.romaji || 'Unknown',
         coverImage: m?.coverImage?.large || m?.coverImage?.medium || null,
+        bannerImage: m?.bannerImage ?? null,
         color: m?.coverImage?.color ?? null,
         format: m?.format ?? null,
         totalEpisodes: m?.episodes ?? null,

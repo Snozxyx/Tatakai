@@ -3,6 +3,7 @@ import { HelmetProvider } from "react-helmet-async";
 import { MotionPreferences } from '@/components/ui/MotionPreferences';
 import App from "./App.tsx";
 import "./index.css";
+import "./components/ui/product-transitions.css";
 import { isDeveloperModeEnabled, DEVELOPER_MODE_EVENT } from "@/lib/developerMode";
 const loadExtensionDebugger = () => { if (isDeveloperModeEnabled()) void import("./utils/debug-extension"); };
 loadExtensionDebugger();

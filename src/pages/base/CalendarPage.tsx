@@ -1,352 +1,140 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
-  calendarDateKey,
-  calendarDay,
-  parseCalendarDate,
-  groupDailyAirings,
-} from "@/lib/calendarDates";
+  CalendarDays, CalendarPlus, CalendarSearch, CalendarX, Check,
+  ChevronDown, ChevronLeft, ChevronRight, Clock, Menu, Star, Tv,
+} from "lucide-react";
 import { ThemedSelect } from "@/components/ui/themed-select";
 import { MangaReleaseCalendar } from "@/components/manga/MangaUpdatesDiscovery";
-import { useTranslation } from "react-i18next";
-import uiI18n from "@/lib/uiI18n";
-import { useUiTranslation } from "@/hooks/ui/useUiTranslation";
-/**
- * Tatakai Calendar (docs/Plans.md §6) — a Google-Calendar-style week view of the
- * anime airing schedule, powered by AniList (`useAiringSchedule`) and rendered in
- * the Tatakai design language (dark, GlassPanel, primary accents).
- *
- * Seven day-columns with a sticky date header; each column is an agenda of the
- * episodes airing that day, ordered by air time. Shows the user has pinned from
- * an anime page (`tracked_shows`, matched on AniList id) are highlighted and can
- * be isolated with the "My shows" toggle. Prev / Today / Next move the window,
- * so past and upcoming weeks are all reachable.
- */
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import {
-  CalendarDays,
-  ChevronLeft,
-  ChevronRight,
-  Star,
-  Filter,
-  CalendarSearch,
-  CalendarPlus,
-  CalendarX,
-  Clock,
-  Tv,
-  Sparkles,
-  Play,
-} from "lucide-react";
-import { Background } from "@/components/layout/Background";
 import { MobileNav } from "@/components/layout/MobileNav";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuTrigger,
+  ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIsDesktopApp } from "@/hooks/ui/useIsNativeApp";
-import {
-  useAiringSchedule,
-  type AiringEntry,
-} from "@/hooks/api/useAiringSchedule";
-import {
-  useTrackedShows,
-  useToggleTrackedShowByAnilist,
-} from "@/hooks/user/useTrackedShows";
+import { useAiringSchedule, type AiringEntry } from "@/hooks/api/useAiringSchedule";
+import { useTrackedShows, useToggleTrackedShowByAnilist } from "@/hooks/user/useTrackedShows";
+import { calendarDateKey, calendarDay, parseCalendarDate, groupDailyAirings } from "@/lib/calendarDates";
+import { useUiTranslation } from "@/hooks/ui/useUiTranslation";
+import uiI18n from "@/lib/uiI18n";
 import { cn } from "@/lib/utils";
 import { contentGraph } from "@/core";
+import { CalendarDateHeaders } from "@/components/calendar/CalendarDateHeaders";
+import { CalendarArtwork, CalendarReleasePreview } from "@/components/calendar/CalendarReleasePreview";
+import "./calendar-page.css";
 
-const DAY_MS = 86400000;
-const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const WEEKDAYS_LONG = [
-  "Sunday",
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-];
+const HOUR_HEIGHT = 72;
+const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
 
 function startOfWeek(base: Date): Date {
-  const d = new Date(base);
-  d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() - d.getDay()); // back to Sunday
-  return d;
+  const date = new Date(base);
+  date.setHours(0, 0, 0, 0);
+  date.setDate(date.getDate() - date.getDay());
+  return date;
 }
 
 function formatTime(unix: number) {
   return new Date(unix * 1000).toLocaleTimeString(uiI18n.language, {
-    hour: "2-digit",
-    minute: "2-digit",
+    hour: "numeric", minute: "2-digit",
   });
 }
 
-/* ------------------------------------------------------------------ */
-/* Entry card                                                          */
-/* ------------------------------------------------------------------ */
+/** Simultaneous airings share a block. Nearby blocks get separate lanes. */
+function layoutAirings(entries: AiringEntry[]) {
+  const slots = groupDailyAirings(entries).flatMap(period => period.slots).map(slot => {
+    const date = new Date(slot.airingAt * 1000);
+    return { ...slot, minute: date.getHours() * 60 + date.getMinutes(), lane: 0, lanes: 1 };
+  });
+  let cluster: typeof slots = [];
+  let laneEnds: number[] = [];
+  let clusterEnd = -1;
+  const finishCluster = () => cluster.forEach(slot => { slot.lanes = laneEnds.length; });
+  for (const slot of slots) {
+    if (slot.minute >= clusterEnd) {
+      finishCluster();
+      cluster = [];
+      laneEnds = [];
+    }
+    const available = laneEnds.findIndex(end => end <= slot.minute);
+    slot.lane = available < 0 ? laneEnds.length : available;
+    laneEnds[slot.lane] = slot.minute + 60;
+    clusterEnd = Math.max(...laneEnds);
+    cluster.push(slot);
+  }
+  finishCluster();
+  return slots;
+}
 
-function EntryCard({
-  entry,
-  tracked,
-  isPast,
-  isNext,
-  canTrack,
-  onToggle,
-  onOpen,
-  large = false,
-}: {
-  large?: boolean;
+function EntryCard({ entry, tracked, canTrack, onToggle, onOpen }: {
   entry: AiringEntry;
   tracked: boolean;
-  isPast: boolean;
-  isNext: boolean;
   canTrack: boolean;
   onToggle: (entry: AiringEntry, tracked: boolean) => void;
   onOpen: (entry: AiringEntry) => void;
 }) {
-  useUiTranslation();
-  const time = formatTime(entry.airingAt);
-
+  const { t } = useTranslation();
   const card = (
-    <div
-      className={cn(
-        "group relative overflow-hidden rounded-xl border transition-all duration-200",
-        "hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/30",
-        tracked
-          ? "border-primary/50 bg-primary/5 hover:border-primary/70"
-          : "border-white/[0.06] bg-white/[0.03] hover:border-white/[0.14] hover:bg-white/[0.06]",
-        isPast && !tracked && !large && "opacity-55 hover:opacity-90",
-        isNext &&
-          (large
-            ? "ring-1 ring-primary/50"
-            : "ring-1 ring-primary/60 shadow-[0_0_24px_-6px] shadow-primary/50")
-      )}
-    >
-      {/* Tracked accent bar */}
-      {tracked && (
-        <span
-          className="absolute inset-y-0 left-0 w-0.5 bg-primary"
-          aria-hidden
-        />
-      )}
-
-      <button
-        type="button"
-        onClick={() => onOpen(entry)}
-        className={cn(
-          "flex w-full text-left",
-          large ? "gap-4 p-4" : "gap-2.5 p-2"
-        )}
-      >
-        {/* Cover */}
-        <div
-          className={cn(
-            "relative shrink-0 overflow-hidden rounded-lg bg-muted/40",
-            large ? "h-40 w-28" : "h-16 w-11"
-          )}
-        >
-          {entry.coverImage ? (
-            <img
-              src={entry.coverImage}
-              alt=""
-              loading="lazy"
-              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center">
-              <Tv className="h-4 w-4 text-muted-foreground/50" />
-            </div>
-          )}
-          {/* Play overlay */}
-          <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
-            <Play className="h-4 w-4 fill-white text-white" />
-          </div>
-        </div>
-
-        {/* Text */}
-        <div className={cn("min-w-0 flex-1 py-0.5", large && "pb-12")}>
-          <div className="mb-1 flex items-center gap-1.5">
-            <span
-              className={cn(
-                "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 font-medium tabular-nums",
-                large ? "text-xs" : "text-[10px]",
-                isPast
-                  ? "bg-muted/50 text-muted-foreground"
-                  : "bg-primary/15 text-primary"
-              )}
-            >
-              <Clock className="h-2.5 w-2.5" />
-              {time}
-            </span>
-            {isNext && (
-              <span className="rounded-md bg-primary px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-primary-foreground">
-                {uiI18n.t("app.next_bc981983")}
-              </span>
-            )}
-            {tracked && (
-              <Star className="ml-auto h-3 w-3 shrink-0 fill-primary text-primary" />
-            )}
-          </div>
-          <p
-            className={cn(
-              "line-clamp-3 font-medium leading-snug text-foreground/95",
-              large ? "text-base" : "text-xs"
-            )}
-          >
-            {entry.title}
-          </p>
-          <p
-            className={cn(
-              "mt-2 font-medium text-muted-foreground",
-              large ? "text-sm" : "text-[10px]"
-            )}
-          >
-            {uiI18n.t("app.episode_8669aa56")}{" "}
-            <span className="text-foreground/80">{entry.episode}</span>
-            {entry.totalEpisodes ? (
-              <span className="text-muted-foreground/60">
-                {" "}
-                / {entry.totalEpisodes}
-              </span>
-            ) : null}
-          </p>
-          {large && (
-            <p className="mt-3 text-xs text-muted-foreground">
-              {uiI18n.t(
-                isPast
-                  ? "calendarView.aired"
-                  : isNext
-                  ? "calendarView.nextUp"
-                  : "calendarView.upcoming"
-              )}
-            </p>
-          )}
-        </div>
+    <div className="calendar-entry">
+      <button type="button" className="calendar-entry-open" onClick={() => onOpen(entry)}>
+        {entry.coverImage ? <img src={entry.coverImage} alt="" loading="lazy" /> : <Tv aria-hidden="true" />}
+        <span className="min-w-0">
+          <span className="calendar-entry-title">{entry.title}</span>
+          <span className="calendar-entry-meta">
+            {t("app.episode_8669aa56")} {entry.episode}{entry.totalEpisodes ? ` / ${entry.totalEpisodes}` : ""} · {formatTime(entry.airingAt)}
+          </span>
+          <span className="calendar-entry-meta">{t(entry.airingAt * 1000 < Date.now() ? "calendarView.aired" : "calendarView.upcoming")}{entry.format ? ` · ${entry.format.replace(/_/g, " ")}` : ""}</span>
+        </span>
       </button>
-
-      {/* Quick pin (hover) */}
       {canTrack && (
-        <button
-          type="button"
-          title={
-            tracked
-              ? uiI18n.t("app.remove_from_calendar_b9650b4e")
-              : uiI18n.t("app.add_to_calendar_4f05cd64")
-          }
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggle(entry, tracked);
-          }}
-          className={cn(
-            "absolute bottom-1.5 right-1.5 flex h-6 w-6 items-center justify-center rounded-md border transition-all",
-            large
-              ? "size-11 opacity-100"
-              : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100",
-            tracked
-              ? "border-primary/40 bg-primary/20 text-primary hover:bg-destructive/20 hover:text-destructive hover:border-destructive/40"
-              : "border-white/10 bg-black/40 text-muted-foreground hover:bg-primary/20 hover:text-primary hover:border-primary/40"
-          )}
-        >
-          {tracked ? (
-            <CalendarX className="h-3 w-3" />
-          ) : (
-            <CalendarPlus className="h-3 w-3" />
-          )}
+        <button type="button" className={cn("calendar-entry-pin", tracked && "is-tracked")}
+          aria-label={t(tracked ? "app.remove_from_calendar_b9650b4e" : "app.add_to_calendar_4f05cd64")}
+          aria-pressed={tracked} onClick={() => onToggle(entry, tracked)}>
+          {tracked ? <CalendarX aria-hidden="true" /> : <CalendarPlus aria-hidden="true" />}
         </button>
       )}
     </div>
   );
-
   if (!canTrack) return card;
-
-  return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>{card}</ContextMenuTrigger>
-      <ContextMenuContent className="w-52">
-        <ContextMenuItem onSelect={() => onOpen(entry)}>
-          <Play className="mr-2 h-4 w-4" />
-          {uiI18n.t("app.watch_now_db351956")}
-        </ContextMenuItem>
-        <ContextMenuItem onSelect={() => onToggle(entry, tracked)}>
-          {tracked ? (
-            <>
-              <CalendarX className="mr-2 h-4 w-4" />
-              {uiI18n.t("app.remove_from_calendar_b9650b4e")}
-            </>
-          ) : (
-            <>
-              <CalendarPlus className="mr-2 h-4 w-4" />
-              {uiI18n.t("app.add_to_calendar_4f05cd64")}
-            </>
-          )}
-        </ContextMenuItem>
-      </ContextMenuContent>
-    </ContextMenu>
-  );
+  return <ContextMenu>
+    <ContextMenuTrigger asChild>{card}</ContextMenuTrigger>
+    <ContextMenuContent>
+      <ContextMenuItem onClick={() => onToggle(entry, tracked)}>
+        {tracked ? <CalendarX className="mr-2 size-4" /> : <CalendarPlus className="mr-2 size-4" />}
+        {t(tracked ? "app.remove_from_calendar_b9650b4e" : "app.add_to_calendar_4f05cd64")}
+      </ContextMenuItem>
+    </ContextMenuContent>
+  </ContextMenu>;
 }
-
-/* ------------------------------------------------------------------ */
-/* Skeleton                                                            */
-/* ------------------------------------------------------------------ */
-
-function DaySkeleton({ rows }: { rows: number }) {
-  useUiTranslation();
-  return (
-    <div className="flex flex-col gap-2">
-      <div className="h-14 animate-pulse rounded-xl bg-white/[0.04]" />
-      {Array.from({ length: rows }).map((_, i) => (
-        <div
-          key={i}
-          className="h-20 animate-pulse rounded-xl bg-white/[0.03]"
-          style={{ animationDelay: `${i * 80}ms` }}
-        />
-      ))}
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Page                                                                */
-/* ------------------------------------------------------------------ */
 
 export default function CalendarPage() {
   const { t } = useTranslation();
+  useUiTranslation();
   const [params, setParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const isDesktopApp = useIsDesktopApp();
   const view = params.get("view") === "week" ? "week" : "day";
   const mediaTab = params.get("media") === "manga" ? "manga" : "anime";
-  const setMediaTab = (value: "anime" | "manga") =>
-    setParams((previous) => {
-      const next = new URLSearchParams(previous);
-      next.set("media", value);
-      return next;
-    });
-  useUiTranslation();
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const isDesktopApp = useIsDesktopApp();
-
-  const [weekStart, setWeekStart] = useState(() =>
-    startOfWeek(parseCalendarDate(params.get("date")) || new Date())
-  );
+  const initialDate = parseCalendarDate(params.get("date")) || new Date();
+  const [weekStart, setWeekStart] = useState(() => startOfWeek(initialDate));
+  const [selectedDay, setSelectedDay] = useState(() => initialDate.getDay());
+  const [month, setMonth] = useState(initialDate);
   const [mineOnly, setMineOnly] = useState(false);
-  const [mobileDay, setMobileDay] = useState(() =>
-    (parseCalendarDate(params.get("date")) || new Date()).getDay()
-  );
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [now, setNow] = useState(() => Date.now());
-  const selectedDate = calendarDay(weekStart, mobileDay);
+  const timelineRef = useRef<HTMLDivElement>(null);
+  const selectedDate = calendarDay(weekStart, selectedDay);
+  const selectedKey = calendarDateKey(selectedDate);
+
   const selectDate = (date: Date) => {
     setWeekStart(startOfWeek(date));
-    setMobileDay(date.getDay());
-    setParams((previous) => {
+    setSelectedDay(date.getDay());
+    setMonth(date);
+    setParams(previous => {
       const next = new URLSearchParams(previous);
       next.set("date", calendarDateKey(date));
       return next;
@@ -356,39 +144,52 @@ export default function CalendarPage() {
     const date = parseCalendarDate(params.get("date"));
     if (date) {
       setWeekStart(startOfWeek(date));
-      setMobileDay(date.getDay());
+      setSelectedDay(date.getDay());
+      setMonth(date);
     }
   }, [params]);
-
-  // Keep "past / next" markers fresh.
   useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 60_000);
-    return () => clearInterval(id);
+    const interval = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(interval);
   }, []);
 
-  const {
-    data: entries = [],
-    isLoading,
-    isError,
-    refetch,
-  } = useAiringSchedule(weekStart);
+  const { data: entries = [], isLoading, isError, refetch } = useAiringSchedule(weekStart);
   const { data: tracked = [] } = useTrackedShows();
   const toggleTrack = useToggleTrackedShowByAnilist();
+  const trackedIds = useMemo(() => new Set(tracked.map(show => show.anilist_id)
+    .filter((id): id is number => typeof id === "number")), [tracked]);
+  const days = useMemo(() => {
+    const buckets: AiringEntry[][] = Array.from({ length: 7 }, () => []);
+    const keys = buckets.map((_, index) => calendarDateKey(calendarDay(weekStart, index)));
+    for (const entry of entries) {
+      if (mineOnly && !trackedIds.has(entry.mediaId)) continue;
+      const index = keys.indexOf(calendarDateKey(new Date(entry.airingAt * 1000)));
+      if (index >= 0) buckets[index].push(entry);
+    }
+    buckets.forEach(bucket => bucket.sort((a, b) => a.airingAt - b.airingAt));
+    return buckets;
+  }, [entries, weekStart, mineOnly, trackedIds]);
+  const visibleDays = view === "day" ? [selectedDay] : [0, 1, 2, 3, 4, 5, 6];
+  const today = new Date(now);
+  const todayKey = calendarDateKey(today);
+  const total = visibleDays.reduce((count, day) => count + days[day].length, 0);
+  const nextEntry = visibleDays.flatMap(day => days[day])
+    .filter(entry => entry.airingAt * 1000 >= now).sort((a, b) => a.airingAt - b.airingAt)[0];
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const offset = -today.getTimezoneOffset();
+  const zoneLabel = `GMT${offset >= 0 ? "+" : "−"}${Math.floor(Math.abs(offset) / 60)}${Math.abs(offset) % 60 ? `:${String(Math.abs(offset) % 60).padStart(2, "0")}` : ""}`;
+  const rangeLabel = view === "day"
+    ? selectedDate.toLocaleDateString(uiI18n.language, { month: "long", day: "numeric", year: "numeric" })
+    : selectedDate.toLocaleDateString(uiI18n.language, { month: "long", year: "numeric" });
 
-  const handleToggle = (entry: AiringEntry, isTracked: boolean) => {
-    toggleTrack.mutate({
-      anilistId: entry.mediaId,
-      title: entry.title,
-      imageUrl: entry.coverImage,
-      tracked: isTracked,
-    });
-  };
+  // Open at daytime, while keeping overnight episodes reachable above it.
+  useEffect(() => {
+    if (timelineRef.current) timelineRef.current.scrollTop = 7 * HOUR_HEIGHT;
+  }, [selectedKey, view, mediaTab]);
 
-  // Clicking an entry should take you straight to watching. The calendar only
-  // knows the AniList id, so resolve it to our internal media (for its
-  // `tatakaiId`), then jump to that show's episode 1 — WatchPage matches the
-  // `?ep=` number against the real episode list. If the show can't be resolved
-  // (not in our catalogue), fall back to the anime page for its AniList id.
+  const handleToggle = (entry: AiringEntry, isTracked: boolean) => toggleTrack.mutate({
+    anilistId: entry.mediaId, title: entry.title, imageUrl: entry.coverImage, tracked: isTracked,
+  });
   const handleOpen = async (entry: AiringEntry) => {
     try {
       const media = await contentGraph.getMedia(`anilist-${entry.mediaId}`);
@@ -398,656 +199,208 @@ export default function CalendarPage() {
       navigate(`/anime/anilist-${entry.mediaId}`);
     }
   };
-
-  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-
-  const trackedAnilistIds = useMemo(
-    () =>
-      new Set(
-        tracked
-          .map((t) => t.anilist_id)
-          .filter((x): x is number => typeof x === "number")
-      ),
-    [tracked]
-  );
-
-  const days = useMemo(() => {
-    const buckets: AiringEntry[][] = [[], [], [], [], [], [], []];
-    const startMs = weekStart.getTime();
-    for (const e of entries) {
-      if (mineOnly && !trackedAnilistIds.has(e.mediaId)) continue;
-      const key = calendarDateKey(new Date(e.airingAt * 1000));
-      const idx = Array.from({ length: 7 }, (_, i) =>
-        calendarDateKey(calendarDay(weekStart, i))
-      ).indexOf(key);
-      if (idx >= 0 && idx < 7) buckets[idx].push(e);
-    }
-    buckets.forEach((b) => b.sort((a, z) => a.airingAt - z.airingAt));
-    return buckets;
-  }, [entries, weekStart, mineOnly, trackedAnilistIds]);
-
-  const todayIdx = useMemo(() => {
-    const t = new Date();
-    t.setHours(0, 0, 0, 0);
-    const idx = Array.from({ length: 7 }, (_, i) =>
-      calendarDateKey(calendarDay(weekStart, i))
-    ).indexOf(calendarDateKey(t));
-    return idx >= 0 && idx < 7 ? idx : -1;
-  }, [weekStart]);
-
-  // The single next-airing episode in the visible week (if it's the current week).
-  const nextEntryId = useMemo(() => {
-    let best: AiringEntry | null = null;
-    for (const b of view === "day" ? [days[mobileDay] || []] : days) {
-      for (const e of b) {
-        if (e.airingAt * 1000 >= now && (!best || e.airingAt < best.airingAt))
-          best = e;
-      }
-    }
-    return best?.id ?? null;
-  }, [days, now, view, mobileDay]);
-
-  const totalThisWeek = days.reduce((n, b) => n + b.length, 0);
-  const trackedThisWeek = days.reduce(
-    (n, b) => n + b.filter((e) => trackedAnilistIds.has(e.mediaId)).length,
-    0
-  );
-
-  const shellClass = cn(
-    "relative z-10 mx-auto max-w-[1800px] py-4 pb-24 pr-4 md:py-6 md:pb-6 md:pr-6",
-    isDesktopApp ? "pl-4" : "pl-4 md:pl-32"
-  );
-
-  const weekEnd = calendarDay(weekStart, 6);
-  const sameMonth = weekStart.getMonth() === weekEnd.getMonth();
-  const rangeLabel =
-    view === "day"
-      ? selectedDate.toLocaleDateString(uiI18n.language, {
-          weekday: "long",
-          month: "long",
-          day: "numeric",
-          year: "numeric",
-        })
-      : sameMonth
-      ? uiI18n.t("app.i18n_value_0_i18n_value_1_i18n_value_2_8646c380", {
-          value0: weekStart.toLocaleDateString(uiI18n.language, {
-            month: "long",
-            day: "numeric",
-          }),
-          value1: weekEnd.getDate(),
-          value2: weekEnd.getFullYear(),
-        })
-      : uiI18n.t("app.i18n_value_0_i18n_value_1_adcb5fa4", {
-          value0: weekStart.toLocaleDateString(uiI18n.language, {
-            month: "short",
-            day: "numeric",
-          }),
-          value1: weekEnd.toLocaleDateString(uiI18n.language, {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-          }),
-        });
-
-  const isCurrentWeek = todayIdx !== -1;
-  const shiftWeek = (dir: number) =>
-    selectDate(calendarDay(selectedDate, dir * (view === "day" ? 1 : 7)));
-  const goToday = () => {
-    selectDate(new Date());
-  };
-
-  const renderDay = (i: number) => {
-    const dayEntries = days[i];
-    const date = calendarDay(weekStart, i);
-    const isToday = i === todayIdx;
-    const isPastDay = calendarDay(date, 1).getTime() < now;
-
-    return (
-      <div key={i} className="flex min-w-0 flex-col">
-        {/* Day header */}
-        <div
-          className={cn(
-            "sticky top-0 z-10 mb-2 overflow-hidden rounded-xl border px-3 py-2 backdrop-blur-md transition-colors",
-            isToday
-              ? "border-primary/50 bg-primary/15 shadow-[0_0_30px_-10px] shadow-primary/60"
-              : "border-white/[0.06] bg-card/70"
-          )}
-        >
-          {isToday && (
-            <span className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-primary to-transparent" />
-          )}
-          <div className="flex items-end justify-between gap-2">
-            <div>
-              <div
-                className={cn(
-                  "text-[10px] font-bold uppercase tracking-[0.18em]",
-                  isToday ? "text-primary" : "text-muted-foreground"
-                )}
-              >
-                {WEEKDAYS[i]}
-              </div>
-              <div className="flex items-baseline gap-1">
-                <span
-                  className={cn(
-                    "font-display text-2xl font-black leading-none",
-                    isToday
-                      ? "text-primary"
-                      : isPastDay
-                      ? "text-foreground/60"
-                      : "text-foreground"
-                  )}
-                >
-                  {date.getDate()}
-                </span>
-                <span className="text-[10px] font-medium text-muted-foreground">
-                  {date.toLocaleDateString(uiI18n.language, { month: "short" })}
-                </span>
-              </div>
-            </div>
-            <div className="flex flex-col items-end gap-1">
-              {isToday && (
-                <span className="rounded-full bg-primary px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-primary-foreground">
-                  {uiI18n.t("app.today_24345a14")}
-                </span>
-              )}
-              {dayEntries.length > 0 && (
-                <span
-                  className={cn(
-                    "rounded-full px-2 py-0.5 text-[10px] font-bold tabular-nums",
-                    isToday
-                      ? "bg-primary/20 text-primary"
-                      : "bg-white/[0.06] text-muted-foreground"
-                  )}
-                >
-                  {dayEntries.length} {uiI18n.t("app.ep_881baaed")}
-                  {dayEntries.length === 1 ? "" : "s"}
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Agenda */}
-        <div
-          className={cn(
-            view === "day"
-              ? "grid grid-cols-1 gap-4 rounded-xl sm:grid-cols-2 xl:grid-cols-3"
-              : "flex-1 space-y-2 rounded-xl p-1",
-            isToday && "bg-primary/[0.04] ring-1 ring-inset ring-primary/10"
-          )}
-        >
-          {dayEntries.length === 0 ? (
-            <div className="flex h-28 flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-white/[0.06] text-muted-foreground/40">
-              <Tv className="h-4 w-4" />
-              <span className="text-[10px] font-medium">
-                {uiI18n.t("app.nothing_airing_f2a424a3")}
-              </span>
-            </div>
-          ) : (
-            dayEntries.map((entry) => (
-              <EntryCard
-                key={entry.id}
-                entry={entry}
-                large={view === "day"}
-                tracked={trackedAnilistIds.has(entry.mediaId)}
-                isPast={entry.airingAt * 1000 < now}
-                isNext={entry.id === nextEntryId}
-                canTrack={!!user}
-                onToggle={handleToggle}
-                onOpen={handleOpen}
-              />
-            ))
-          )}
-        </div>
-      </div>
-    );
-  };
+  const setMediaTab = (media: "anime" | "manga") => setParams(previous => {
+    const next = new URLSearchParams(previous);
+    next.set("media", media);
+    return next;
+  });
+  const datePicker = <Calendar mode="single" selected={selectedDate} month={month}
+    onMonthChange={setMonth} onSelect={date => date && selectDate(date)}
+    className="calendar-mini" classNames={{
+      caption: "calendar-mini-caption", caption_label: "rdp-caption_label",
+      nav_button: "rdp-nav_button", nav_button_previous: "rdp-nav_button_previous",
+      nav_button_next: "rdp-nav_button_next", head_cell: "rdp-head_cell",
+      cell: "rdp-cell", day: "rdp-day", row: "rdp-row", day_selected: "rdp-day_selected",
+      day_today: "rdp-day_today", day_outside: "rdp-day_outside",
+    }} />;
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-background text-foreground">
-      <Background />
-
-      <main className={shellClass}>
-        {/* ---------------------------------------------------------- */}
-        {/* Header                                                     */}
-        {/* ---------------------------------------------------------- */}
-        <section className="relative mb-5 rounded-2xl border border-border bg-card p-4 md:p-5">
-          <div className="relative flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <span className="relative flex h-12 w-12 items-center justify-center rounded-xl border border-border bg-muted">
-                <CalendarDays className="h-5 w-5 text-primary" />
-              </span>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h1 className="font-display text-2xl font-medium md:text-3xl">
-                    {view === "day"
-                      ? t(
-                          calendarDateKey(selectedDate) ===
-                            calendarDateKey(new Date(now))
-                            ? "calendarView.today"
-                            : "calendarView.dailySchedule"
-                        )
-                      : uiI18n.t("app.tatakai_calendar_36e4bd5e")}
-                  </h1>
-                  {view === "week" && isCurrentWeek && (
-                    <span className="hidden items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary sm:inline-flex">
-                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
-                      {uiI18n.t("app.this_week_7b72883e")}
-                    </span>
-                  )}
-                </div>
-                <p className="mt-0.5 text-sm text-muted-foreground">
-                  <span className="font-medium text-foreground/85">
-                    {rangeLabel}
-                  </span>
-                  <span className="mx-1.5 text-muted-foreground/40">·</span>
-                  <span className="text-muted-foreground/70">{timeZone}</span>
-                </p>
-              </div>
-            </div>
-
-            {/* Stats */}
-            {mediaTab === "anime" && (
-              <div className="hidden items-center gap-2 lg:flex">
-                <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-2">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                    {uiI18n.t("app.episodes_49d641ba")}
-                  </div>
-                  <div className="font-display text-xl font-black leading-none tabular-nums">
-                    {isLoading
-                      ? "—"
-                      : view === "day"
-                      ? days[mobileDay]?.length || 0
-                      : totalThisWeek}
-                  </div>
-                </div>
-                {user && (
-                  <div className="rounded-xl border border-primary/20 bg-primary/10 px-3 py-2">
-                    <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-primary">
-                      <Star className="h-2.5 w-2.5 fill-primary" />
-                      {uiI18n.t("app.yours_755844bc")}
-                    </div>
-                    <div className="font-display text-xl font-black leading-none tabular-nums text-primary">
-                      {isLoading
-                        ? "—"
-                        : view === "day"
-                        ? days[mobileDay]?.filter((entry) =>
-                            trackedAnilistIds.has(entry.mediaId)
-                          ).length || 0
-                        : trackedThisWeek}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Controls */}
-            <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-              <ThemedSelect
-                aria-label={t("calendarView.layout")}
-                value={view}
-                onChange={(event) =>
-                  setParams((previous) => {
-                    const next = new URLSearchParams(previous);
-                    next.set("view", event.target.value);
-                    next.set("date", calendarDateKey(selectedDate));
-                    return next;
-                  })
-                }
-              >
-                <option value="week">{t("calendarView.week")}</option>
-                <option value="day">{t("calendarView.day")}</option>
-              </ThemedSelect>
-              {user && mediaTab === "anime" && (
-                <Button
-                  variant={mineOnly ? "default" : "outline"}
-                  size="sm"
-                  className={cn(
-                    "gap-1.5 rounded-lg",
-                    mineOnly && "shadow-[0_0_20px_-6px] shadow-primary"
-                  )}
-                  onClick={() => setMineOnly((v) => !v)}
-                >
-                  <Filter className="h-3.5 w-3.5" />
-                  {uiI18n.t("app.my_shows_739eef73")}
-                  {mineOnly && trackedThisWeek > 0 && (
-                    <span className="ml-0.5 rounded-full bg-primary-foreground/20 px-1.5 text-[10px] tabular-nums">
-                      {trackedThisWeek}
-                    </span>
-                  )}
-                </Button>
-              )}
-
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-1.5 rounded-lg"
-                  >
-                    <CalendarSearch className="h-3.5 w-3.5" />
-                    <span className="hidden sm:inline">
-                      {uiI18n.t("app.jump_to_date_288a6887")}
-                    </span>
-                    <span className="sm:hidden">
-                      {uiI18n.t("app.date_eb9a4bc1")}
-                    </span>
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="end">
-                  <Calendar
-                    mode="single"
-                    selected={selectedDate}
-                    onSelect={(d) => {
-                      if (!d) return;
-                      selectDate(d);
-                    }}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-
-              <div className="ml-auto flex items-center rounded-lg border border-white/[0.06] bg-black/30 p-0.5 sm:ml-0">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 rounded-md hover:bg-white/10"
-                  onClick={() => shiftWeek(-1)}
-                  aria-label={
-                    view === "day"
-                      ? t("calendarView.previousDay")
-                      : uiI18n.t("app.previous_week_c4970e09")
-                  }
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className={cn(
-                    "h-8 rounded-md px-3 text-xs font-bold hover:bg-white/10",
-                    isCurrentWeek && "text-primary"
-                  )}
-                  onClick={goToday}
-                >
-                  {uiI18n.t("app.today_24345a14")}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 rounded-md hover:bg-white/10"
-                  onClick={() => shiftWeek(1)}
-                  aria-label={
-                    view === "day"
-                      ? t("calendarView.nextDay")
-                      : uiI18n.t("app.next_week_5a20763a")
-                  }
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
+    <div className="calendar-page">
+      <main className={cn("calendar-shell", !isDesktopApp && "calendar-shell-web")}>
+        <header className="calendar-toolbar">
+          <div className="calendar-brand">
+            <Button variant="ghost" size="icon" className="calendar-icon-button calendar-menu-button"
+              aria-label={t("calendarView.toggleSidebar", { defaultValue: "Toggle calendar sidebar" })}
+              aria-expanded={sidebarOpen} aria-controls="calendar-sidebar"
+              onClick={() => setSidebarOpen(open => !open)}><Menu aria-hidden="true" /></Button>
+            <CalendarDays className="calendar-brand-icon" aria-hidden="true" />
+            <h1>{t("calendarView.title", { defaultValue: "Calendar" })}</h1>
           </div>
-        </section>
+          <div className="calendar-navigation">
+            <Button variant="outline" className="calendar-today" onClick={() => selectDate(new Date())}>
+              {t("app.today_24345a14")}
+            </Button>
+            <Button variant="ghost" size="icon" className="calendar-icon-button"
+              aria-label={t(view === "day" ? "calendarView.previousDay" : "app.previous_week_c4970e09")}
+              onClick={() => selectDate(calendarDay(selectedDate, view === "day" ? -1 : -7))}>
+              <ChevronLeft aria-hidden="true" />
+            </Button>
+            <Button variant="ghost" size="icon" className="calendar-icon-button"
+              aria-label={t(view === "day" ? "calendarView.nextDay" : "app.next_week_5a20763a")}
+              onClick={() => selectDate(calendarDay(selectedDate, view === "day" ? 1 : 7))}>
+              <ChevronRight aria-hidden="true" />
+            </Button>
+          </div>
+          <Popover>
+            <PopoverTrigger asChild><button type="button" className="calendar-range calendar-range-picker"
+              aria-label={t("app.jump_to_date_288a6887")}>
+              <span aria-live="polite">{rangeLabel}</span><ChevronDown aria-hidden="true" />
+            </button></PopoverTrigger>
+            <PopoverContent className="w-auto p-3" align="start">
+              {datePicker}
+              <label className="calendar-date-input">{t("app.jump_to_date_288a6887")}
+                <input type="date" value={selectedKey} onChange={event => {
+                  const date = parseCalendarDate(event.target.value);
+                  if (date) selectDate(date);
+                }} />
+              </label>
+            </PopoverContent>
+          </Popover>
+          <div className="calendar-toolbar-end">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="icon" className="calendar-icon-button"
+                  aria-label={t("app.jump_to_date_288a6887")}><CalendarSearch aria-hidden="true" /></Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-3" align="end">{datePicker}</PopoverContent>
+            </Popover>
+            <ThemedSelect aria-label={t("calendarView.layout")} value={view} className="calendar-view-select"
+              onChange={event => setParams(previous => {
+                const next = new URLSearchParams(previous);
+                next.set("view", event.target.value);
+                next.set("date", selectedKey);
+                return next;
+              })}>
+              <option value="day">{t("calendarView.day")}</option>
+              <option value="week">{t("calendarView.week")}</option>
+            </ThemedSelect>
+          </div>
+        </header>
 
-        <div
-          className="mb-5 flex gap-2"
-          aria-label={t("discovery.calendarType")}
-        >
-          <Button
-            variant={mediaTab === "anime" ? "default" : "outline"}
-            aria-pressed={mediaTab === "anime"}
-            onClick={() => setMediaTab("anime")}
-          >
-            {t("discovery.anime")}
-          </Button>
-          <Button
-            variant={mediaTab === "manga" ? "default" : "outline"}
-            aria-pressed={mediaTab === "manga"}
-            onClick={() => setMediaTab("manga")}
-          >
-            {t("discovery.mangaReleases")}
-          </Button>
-        </div>
-        {mediaTab === "manga" ? (
-          <MangaReleaseCalendar
-            weekStart={weekStart}
-            selectedDay={view === "day" ? mobileDay : undefined}
-          />
-        ) : (
-          <>
-            {/* ---------------------------------------------------------- */}
-            {/* Mobile day picker                                          */}
-            {/* ---------------------------------------------------------- */}
-            <div
-              className={cn(
-                "mb-3 grid grid-cols-7 gap-1",
-                view !== "day" && "lg:hidden"
-              )}
-            >
-              {WEEKDAYS.map((wd, i) => {
-                const date = calendarDay(weekStart, i);
-                const active = i === mobileDay;
-                const isToday = i === todayIdx;
-                const count = days[i]?.length ?? 0;
-                return (
-                  <button
-                    key={wd}
-                    type="button"
-                    onClick={() => selectDate(calendarDay(weekStart, i))}
-                    className={cn(
-                      "relative flex flex-col items-center rounded-xl border py-1.5 transition-all",
-                      active
-                        ? "border-primary/50 bg-primary/15 text-primary"
-                        : "border-white/[0.06] bg-white/[0.03] text-muted-foreground hover:bg-white/[0.06]"
-                    )}
-                  >
-                    <span className="text-[9px] font-bold uppercase tracking-wider">
-                      {uiI18n.t(
-                        {
-                          Sun: "app.sun_48c98cab",
-                          Mon: "app.mon_24b2a099",
-                          Tue: "app.tue_529541bb",
-                          Wed: "app.wed_23408b19",
-                          Thu: "app.thu_3593ccd9",
-                          Fri: "app.fri_bbd6e32e",
-                          Sat: "app.sat_6b782d41",
-                        }[wd]
-                      )}
+        <div className={cn("calendar-workspace", !sidebarOpen && "calendar-sidebar-hidden")}>
+          <aside id="calendar-sidebar" className="calendar-sidebar" aria-label={t("discovery.calendarType")}>
+            <Button variant="secondary" className="calendar-browse" onClick={() => navigate("/search")}>
+              <CalendarPlus aria-hidden="true" />{t("app.add_to_calendar_4f05cd64")}
+            </Button>
+            {datePicker}
+            <div className="calendar-sidebar-section">
+              <h2>{t("discovery.calendarType")}</h2>
+              <div className="calendar-types" role="group" aria-label={t("discovery.calendarType")}>
+                {(["anime", "manga"] as const).map(media => (
+                  <button type="button" key={media} aria-pressed={mediaTab === media}
+                    className={cn("calendar-filter-row", mediaTab === media && "is-selected")}
+                    onClick={() => setMediaTab(media)}>
+                    <span className={cn("calendar-check", media === "manga" && "calendar-check-manga")}>
+                      {mediaTab === media && <Check aria-hidden="true" />}
                     </span>
-                    <span
-                      className={cn(
-                        "text-base font-black leading-tight",
-                        isToday && !active && "text-primary",
-                        active && "text-primary",
-                        !active && !isToday && "text-foreground"
-                      )}
-                    >
-                      {date.getDate()}
-                    </span>
-                    <span
-                      className={cn(
-                        "mt-0.5 h-1 w-1 rounded-full",
-                        count > 0
-                          ? active
-                            ? "bg-primary"
-                            : "bg-muted-foreground/50"
-                          : "bg-transparent"
-                      )}
-                    />
-                    {isToday && (
-                      <span className="absolute inset-x-3 top-0 h-0.5 rounded-b bg-primary" />
-                    )}
+                    {t(media === "anime" ? "discovery.anime" : "discovery.mangaReleases")}
                   </button>
-                );
-              })}
-            </div>
-
-            {/* ---------------------------------------------------------- */}
-            {/* Body                                                       */}
-            {/* ---------------------------------------------------------- */}
-            {isError ? (
-              <div
-                role="alert"
-                className="rounded-xl border border-border p-6 text-sm"
-              >
-                {t("favoritesHub.unavailable")}{" "}
-                <Button variant="outline" onClick={() => void refetch()}>
-                  {t("favoritesHub.retry")}
-                </Button>
-              </div>
-            ) : isLoading ? (
-              <>
-                <div className="hidden grid-cols-7 gap-2 lg:grid">
-                  {[3, 5, 4, 6, 3, 5, 4].map((rows, i) => (
-                    <DaySkeleton key={i} rows={rows} />
-                  ))}
-                </div>
-                <div className="lg:hidden">
-                  <DaySkeleton rows={5} />
-                </div>
-              </>
-            ) : view === "day" ? (
-              <section aria-label={rangeLabel} className="space-y-8">
-                {!days[mobileDay]?.length && (
-                  <p className="rounded-xl border border-dashed border-border px-6 py-12 text-center text-sm text-muted-foreground">
-                    {t("app.nothing_airing_f2a424a3")}
-                  </p>
-                )}
-                {groupDailyAirings(days[mobileDay] || []).map((period) => (
-                  <section
-                    key={period.id}
-                    aria-labelledby={`calendar-period-${period.id}`}
-                    className="space-y-4"
-                  >
-                    <h2
-                      id={`calendar-period-${period.id}`}
-                      className="flex flex-wrap items-baseline gap-3 text-lg font-medium"
-                    >
-                      {t(`calendarView.${period.id}`)}
-                      <span className="text-xs font-normal tabular-nums text-muted-foreground">
-                        {String(period.start).padStart(2, "0")}:00–
-                        {String(period.end - 1).padStart(2, "0")}:59
-                      </span>
-                    </h2>
-                    {period.slots.map((slot) => (
-                      <div
-                        key={slot.airingAt}
-                        className="grid gap-3 sm:grid-cols-[96px_minmax(0,1fr)]"
-                      >
-                        <time
-                          dateTime={new Date(
-                            slot.airingAt * 1000
-                          ).toISOString()}
-                          className="flex items-center gap-2 pt-2 text-sm font-medium tabular-nums text-muted-foreground"
-                        >
-                          <Clock className="size-4" aria-hidden="true" />
-                          {formatTime(slot.airingAt)}
-                        </time>
-                        <div className="grid gap-4 xl:grid-cols-2">
-                          {slot.entries.map((entry) => (
-                            <EntryCard
-                              key={entry.id}
-                              entry={entry}
-                              large
-                              tracked={trackedAnilistIds.has(entry.mediaId)}
-                              isPast={entry.airingAt * 1000 < now}
-                              isNext={entry.id === nextEntryId}
-                              canTrack={!!user}
-                              onToggle={handleToggle}
-                              onOpen={handleOpen}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </section>
                 ))}
-              </section>
-            ) : totalThisWeek === 0 ? (
-              <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/[0.08] bg-white/[0.02] px-6 py-20 text-center">
-                <span className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-white/[0.06] bg-white/[0.03]">
-                  {mineOnly ? (
-                    <Star className="h-6 w-6 text-muted-foreground" />
-                  ) : (
-                    <Sparkles className="h-6 w-6 text-muted-foreground" />
-                  )}
-                </span>
-                <h2 className="font-display text-lg font-bold">
-                  {mineOnly
-                    ? uiI18n.t("app.none_of_your_shows_air_this_week_5fe3bd92")
-                    : uiI18n.t("app.nothing_on_the_schedule_5b1d92a5")}
-                </h2>
-                <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-                  {mineOnly
-                    ? uiI18n.t(
-                        "app.pin_more_shows_from_their_anime_page_or_turn_off_50d99c50"
-                      )
-                    : uiI18n.t(
-                        "app.anilist_has_no_airing_data_for_this_week_yet_try_a6874e98"
-                      )}
-                </p>
-                {mineOnly && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-4"
-                    onClick={() => setMineOnly(false)}
-                  >
-                    {uiI18n.t("app.show_all_50a279de")}
-                  </Button>
-                )}
               </div>
-            ) : (
-              <>
-                {/* Desktop week grid */}
-                <div className="hidden grid-cols-7 gap-2 lg:grid">
-                  {days.map((_, i) => renderDay(i))}
-                </div>
+            </div>
+            {mediaTab === "anime" && <div className="calendar-sidebar-section">
+              <h2>{t("app.my_shows_739eef73")}</h2>
+              {user ? <label className="calendar-filter-row calendar-tracked-filter">
+                <input type="checkbox" checked={mineOnly} onChange={event => setMineOnly(event.target.checked)} />
+                <Star aria-hidden="true" />
+                <span>{t("app.my_shows_739eef73")}</span>
+                <span className="calendar-filter-count">{tracked.length}</span>
+              </label> : <p className="calendar-sidebar-hint">
+                <button type="button" onClick={() => navigate("/auth")}>{t("app.sign_in_ada2e9e9")}</button>{" "}
+                {t("app.and_pin_shows_from_their_anime_page_to_highlight_d6f7f7e8")}
+              </p>}
+              {user && <p className="calendar-sidebar-hint">{t("app.pin_more_shows_from_their_anime_page_or_turn_off_50d99c50")}</p>}
+            </div>}
+            <div className="calendar-sidebar-footer">
+              <span><Clock aria-hidden="true" />{timeZone.replace(/_/g, " ")}</span>
+              {mediaTab === "anime" && <span>{isLoading ? "…" : total} {t("app.episodes_49d641ba")}</span>}
+            </div>
+          </aside>
 
-                {/* Mobile single day */}
-                <div className="lg:hidden">
-                  <div className="mb-2 flex items-center justify-between px-1">
-                    <h2 className="font-display text-base font-bold">
-                      {WEEKDAYS_LONG[mobileDay]}
-                      {mobileDay === todayIdx && (
-                        <span className="ml-2 text-xs text-primary">
-                          {uiI18n.t("app.today_24345a14")}
-                        </span>
-                      )}
-                    </h2>
-                    <span className="text-xs text-muted-foreground tabular-nums">
-                      {days[mobileDay].length}{" "}
-                      {uiI18n.t("app.episode_39ae6b3c")}
-                      {days[mobileDay].length === 1 ? "" : "s"}
-                    </span>
+          <section className="calendar-board" aria-label={rangeLabel}>
+            <nav className="calendar-date-strip" aria-label={t("calendarView.chooseDate")}>
+              {Array.from({ length: 7 }, (_, day) => {
+                const date = calendarDay(weekStart, day);
+                return <button type="button" key={day} aria-pressed={selectedKey === calendarDateKey(date)}
+                  aria-label={date.toLocaleDateString(uiI18n.language, { dateStyle: "full" })}
+                  onClick={() => selectDate(date)}>
+                  <span>{date.toLocaleDateString(uiI18n.language, { weekday: "short" })}</span>
+                  <span>{date.toLocaleDateString(uiI18n.language, { month: "short", day: "numeric" })}</span>
+                </button>;
+              })}
+            </nav>
+            <div className="calendar-mobile-types" role="group" aria-label={t("discovery.calendarType")}>
+              <button type="button" aria-pressed={mediaTab === "anime"} onClick={() => setMediaTab("anime")}>{t("discovery.anime")}</button>
+              <button type="button" aria-pressed={mediaTab === "manga"} onClick={() => setMediaTab("manga")}>{t("discovery.mangaReleases")}</button>
+              {user && mediaTab === "anime" && <button type="button" aria-pressed={mineOnly} onClick={() => setMineOnly(value => !value)}>{t("app.my_shows_739eef73")}</button>}
+            </div>
+            {mediaTab === "manga" ?
+              <MangaReleaseCalendar weekStart={weekStart} selectedDay={view === "day" ? selectedDay : undefined} onSelectDate={selectDate} />
+             : <>
+              {(isError || (!isLoading && total === 0)) && <div className="calendar-status" role={isError ? "alert" : "status"}>
+                <Tv aria-hidden="true" />
+                <span>{isError ? t("favoritesHub.unavailable") : mineOnly
+                  ? t("app.none_of_your_shows_air_this_week_5fe3bd92") : t("app.nothing_airing_f2a424a3")}</span>
+                {isError && <Button variant="outline" size="sm" onClick={() => void refetch()}>{t("favoritesHub.retry")}</Button>}
+                {!isError && mineOnly && <Button variant="ghost" size="sm" onClick={() => setMineOnly(false)}>{t("app.show_all_50a279de")}</Button>}
+              </div>}
+              <div ref={timelineRef} className="calendar-timeline-scroll" tabIndex={0}
+                aria-label={t("calendarView.dailySchedule")} aria-busy={isLoading}>
+                <CalendarDateHeaders weekStart={weekStart} days={visibleDays} todayKey={todayKey} label={zoneLabel} onSelect={selectDate} />
+                <div className={cn("calendar-time-grid", view === "week" && "calendar-week")}
+                  style={{ gridTemplateColumns: `64px repeat(${visibleDays.length}, minmax(0, 1fr))`, height: 25 * HOUR_HEIGHT }}>
+                  <div className="calendar-time-labels">
+                    {HOURS.map(hour => <time key={hour} style={{ top: hour * HOUR_HEIGHT }}>
+                      {new Date(2026, 0, 1, hour).toLocaleTimeString(uiI18n.language, { hour: "numeric" })}
+                    </time>)}
                   </div>
-                  {renderDay(mobileDay)}
+                  {visibleDays.map(day => <div className="calendar-day-column" key={day}>
+                    {HOURS.map(hour => <div className="calendar-hour-line" key={hour} style={{ top: hour * HOUR_HEIGHT }} />)}
+                    {isLoading ? <div className="calendar-loading" role="status">{t("calendarView.loading", { defaultValue: "Loading schedule…" })}</div>
+                      : layoutAirings(days[day]).map(slot => {
+                        const saved = slot.entries.some(entry => trackedIds.has(entry.mediaId));
+                        const upcoming = slot.entries.some(entry => entry.id === nextEntry?.id);
+                        const position = { top: slot.minute / 60 * HOUR_HEIGHT + 2, height: HOUR_HEIGHT - 4,
+                          left: `calc(${slot.lane / slot.lanes * 100}% + 4px)`, width: `calc(${100 / slot.lanes}% - 8px)` };
+                        const event = <button type="button" className={cn("calendar-event", saved && "is-tracked", upcoming && "is-next", slot.airingAt * 1000 < now && "is-past")}
+                          aria-label={slot.entries.map(entry => `${entry.title}, ${t("app.episode_8669aa56")} ${entry.episode}, ${formatTime(entry.airingAt)}`).join("; ")}>
+                          <CalendarArtwork src={slot.entries[0].bannerImage || slot.entries[0].coverImage} />
+                          <span className="calendar-event-title">{slot.entries[0].title}</span>
+                          <span className="calendar-event-meta">{formatTime(slot.airingAt)} · {t("app.ep_881baaed")} {slot.entries[0].episode}</span>
+                          <span className="calendar-event-detail">
+                            {saved && <Star aria-hidden="true" />}
+                            {slot.entries.length > 1 ? t("calendarView.moreAirings", { defaultValue: "+{{count}} more", count: slot.entries.length - 1 })
+                              : upcoming ? t("calendarView.nextUp") : slot.entries[0].format?.replace(/_/g, " ")}
+                          </span>
+                        </button>;
+                        return <div key={slot.airingAt} className="calendar-event-container" style={position}>
+                          <CalendarReleasePreview trigger={event}>
+                            <div className="calendar-preview-banner">
+                              <CalendarArtwork src={slot.entries[0].bannerImage || slot.entries[0].coverImage} />
+                              <span>{new Date(slot.airingAt * 1000).toLocaleDateString(uiI18n.language, { month: "short", day: "numeric" })} · {formatTime(slot.airingAt)}</span>
+                            </div>
+                            <div className="calendar-preview-body">
+                              <h3>{t("calendarView.releaseDetails")}</h3>
+                              {slot.entries.map(entry => <EntryCard key={entry.id} entry={entry} tracked={trackedIds.has(entry.mediaId)}
+                                canTrack={!!user} onToggle={handleToggle} onOpen={handleOpen} />)}
+                            </div>
+                          </CalendarReleasePreview>
+                          {user && slot.entries.length === 1 && <button type="button" className="calendar-event-pin"
+                            aria-label={t(saved ? "app.remove_from_calendar_b9650b4e" : "app.add_to_calendar_4f05cd64")}
+                            aria-pressed={saved} onClick={() => handleToggle(slot.entries[0], saved)}>
+                            {saved ? <CalendarX aria-hidden="true" /> : <CalendarPlus aria-hidden="true" />}
+                          </button>}
+                        </div>;
+                      })}
+                    {calendarDateKey(calendarDay(weekStart, day)) === todayKey && <div className="calendar-now-line"
+                      style={{ top: (today.getHours() + today.getMinutes() / 60) * HOUR_HEIGHT }} aria-hidden="true" />}
+                  </div>)}
                 </div>
-              </>
-            )}
-          </>
-        )}
-
-        {/* Sign-in nudge */}
-        {!user && mediaTab === "anime" && (
-          <div className="mt-6 flex items-center justify-center gap-2 rounded-xl border border-primary/15 bg-primary/5 px-4 py-3 text-sm text-muted-foreground">
-            <Star className="h-4 w-4 shrink-0 text-primary" />
-            <p>
-              <button
-                className="font-semibold text-primary hover:underline"
-                onClick={() => navigate("/auth")}
-              >
-                {uiI18n.t("app.sign_in_ada2e9e9")}
-              </button>{" "}
-              {uiI18n.t(
-                "app.and_pin_shows_from_their_anime_page_to_highlight_d6f7f7e8"
-              )}
-            </p>
-          </div>
-        )}
+              </div>
+            </>}
+          </section>
+        </div>
       </main>
-
       <MobileNav />
     </div>
   );

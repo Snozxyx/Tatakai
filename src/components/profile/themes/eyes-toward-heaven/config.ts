@@ -1,3 +1,5 @@
+import { profileThemeAssetUrl } from '@/lib/profileThemeAssets';
+
 export interface HeavenConfig {
   version: 1; motion: boolean; palette: 'sky' | 'lavender' | 'sage';
   surface: 'glass' | 'solid'; dim: number; scenePosition: number;
@@ -13,5 +15,5 @@ export function readHeavenConfig(value: unknown): HeavenConfig | null {
   if (typeof v.scenePosition === 'number' && Number.isFinite(v.scenePosition)) c.scenePosition = Math.max(0,Math.min(100,v.scenePosition));
   return c;
 }
-export const HEAVEN_POSTER = '/assets/profile-themes/eyes-toward-heaven/poster.webp';
-export const HEAVEN_VIDEO = '/assets/profile-themes/eyes-toward-heaven/scene.mp4';
+export const HEAVEN_POSTER = profileThemeAssetUrl('/assets/profile-themes/eyes-toward-heaven/poster.webp');
+export const HEAVEN_VIDEO = profileThemeAssetUrl('/assets/profile-themes/eyes-toward-heaven/scene.mp4');

@@ -36,7 +36,7 @@ export type NovelSearchOptions = {
 };
 
 function resolveApiOrigin(): string {
-  return resolveBackendOrigin() || 'https://api.tatakai.me';
+  return resolveBackendOrigin() || 'https://api.tatakai.app';
 }
 
 async function apiGet<T>(path: string, params?: Record<string, string | number | boolean | undefined>): Promise<T> {

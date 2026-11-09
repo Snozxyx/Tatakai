@@ -65,7 +65,7 @@ const __tatakai_fetch__ = async (url: string, init?: RequestInit): Promise<Respo
 };
 
 (globalThis as any).__tatakai_fetch__ = __tatakai_fetch__;
-(globalThis as any).TATAKAI_API_BASE_URL = 'https://api.tatakai.me/api/v3';
+(globalThis as any).TATAKAI_API_BASE_URL = 'https://api.tatakai.app/api/v3';
 (globalThis as any).TATAKAI_PROXY_URL = PROXY_URL;
 
 // Test configuration

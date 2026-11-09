@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useMotionPreference } from '@/hooks/ui/useMotionPreference';
+import { profileThemeAssetUrl } from '@/lib/profileThemeAssets';
 
-export const UCHIHA_POSTER = '/assets/profile-themes/uchiha/itachi-rain-poster.webp';
-const MEDIA_ROOT = '/assets/profile-themes/uchiha/';
+export const UCHIHA_POSTER = profileThemeAssetUrl('/assets/profile-themes/uchiha/itachi-rain-poster.webp');
+const MEDIA_ROOT = profileThemeAssetUrl('/assets/profile-themes/uchiha/');
 
 /** Poster first. Decode only while visible; never download video in reduced/data-saving mode. */
 export function UchihaScene({ compact = false, paused = false }: { compact?: boolean; paused?: boolean }) {

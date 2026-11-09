@@ -2,6 +2,7 @@ import {useNavigate} from 'react-router-dom';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { installRemoteExtension, listRemoteExtensions, removeRemoteExtension } from "@/core/extensions/remote/installed";
+import { addonConfiguration } from '@/core/extensions/remote/configuration';
 import { migrateExtensionStorage } from "@/core/extensions/ecosystems";
 migrateExtensionStorage();
 /**
@@ -595,13 +596,15 @@ export function useExtensionInstaller() {
         }
         const endpoint = version?.manifestUrl || extension.manifestUrl || extension.latestVersion?.manifestUrl;
         if (!endpoint) throw new Error(uiI18n.t('app.extension_manifest_url_unavailable_8c0cf80d'));
-        const remoteManifest = await (await import('@/core/extensions/remote/transport')).fetchExtensionJson(endpoint);
+        let remoteManifest = await (await import('@/core/extensions/remote/transport')).fetchExtensionJson(endpoint);
+        let configuredEndpoint = endpoint;
         if (extension.ecosystem === 'stremio' && remoteManifest.behaviorHints?.configurationRequired) {
-          const config = new URL(endpoint); config.pathname = config.pathname.replace(/manifest\.json$/, 'configure');
-          window.open(config.href, '_blank', 'noopener,noreferrer');
-          throw new Error(uiI18n.t('app.configure_the_addon_then_use_add_extension_with__190f4e59'));
+          const configured = await addonConfiguration.start({ manifestUrl: endpoint, expectedAddonId: remoteManifest.id });
+          if (!configured) return { targetId, loaded: false, cancelled: true };
+          remoteManifest = configured.manifest;
+          configuredEndpoint = configured.manifestUrl;
         }
-        const remote = await installRemoteExtension(remoteManifest, endpoint);
+        const remote = await installRemoteExtension(remoteManifest, configuredEndpoint);
         rememberAliases([extension.id, extension.slug, remote.id]);
         const next = [...readJson<string[]>(INSTALLED_KEY, []).filter(id => !known.includes(id.toLowerCase())), remote.id];
         writeJson(INSTALLED_KEY, next); setInstalledIds(next); setAliasEpoch(value => value + 1);
@@ -673,6 +676,7 @@ export function useExtensionInstaller() {
     },
     onSuccess: (result) => {
       if ("openedInApp" in result && result.openedInApp) return;
+      if ('cancelled' in result && result.cancelled) return;
       const {targetId,loaded}=result;
       if (!loaded)
         setNotLoadedIds((prev) => Array.from(new Set([...prev, targetId])));

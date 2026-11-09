@@ -29,7 +29,7 @@ export default defineConfig(({ mode }) => {
   const hmrClientPort = env.VITE_HMR_CLIENT_PORT
     ? Number(env.VITE_HMR_CLIENT_PORT)
     : undefined;
-  const apiV3Origin = env.VITE_API_V3_ORIGIN || "https://api.tatakai.me";
+  const apiV3Origin = env.VITE_API_V3_ORIGIN || "https://api.tatakai.app";
 
   return {
     plugins: [react({ jsxImportSource: '@/lib/media-jsx' }), mediaCachePlugin(), seoPreviewPlugin(),
@@ -42,13 +42,13 @@ export default defineConfig(({ mode }) => {
         transform(code: string, id: string) {
           if (!/\.css(?:\?|$)/.test(id)) return;
           const result = code.replace(/url\(\s*(["']?)(\/assets\/[^"')]+)\1\s*\)/g, (match, _quote, source: string) => {
-            const original = new URL(source, env.VITE_SITE_URL || 'https://tatakai.me').href;
+            const original = new URL(source, env.VITE_SITE_URL || 'https://tatakai.app').href;
             const optimized = publicImageUrl(original);
             return optimized !== original ? `url("${optimized}")` : match;
           });
           return result !== code ? { code: result, map: null } : undefined;
         },
-      }] : []), ...(isPackagedBuild ? [packagedAssetsPlugin()] : [])],
+      }] : []), packagedAssetsPlugin({ packaged: isPackagedBuild, profileThemeAssetBase: env.VITE_PROFILE_THEME_ASSET_BASE })],
     // ONNX Runtime model files for the on-device KittenTTS narrator.
     assetsInclude: ['**/*.wasm'],
     worker: { format: 'es' },
@@ -98,6 +98,8 @@ export default defineConfig(({ mode }) => {
         'react-dom',
         'react-dom/client',
         'react/jsx-runtime',
+        '@vidstack/react',
+        '@vidstack/react/player/layouts/default',
         '@tanstack/react-query',
         'react-router-dom',
         'linkedom/worker',
@@ -105,7 +107,8 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       modulePreload: !isPackagedBuild,
-      copyPublicDir: !isPackagedBuild,
+      // All builds copy public assets through the filter; profile media is server-hosted.
+      copyPublicDir: false,
       commonjsOptions: { include: [/node_modules/, /desktop[\\/]runtime[\\/]torrent[\\/]naming/, /src[\\/]core[\\/]download/], extensions: ['.js', '.cjs'] },
       // Only generate sourcemaps if explicitly enabled (for debugging)
       sourcemap: mode === 'production' && ((process.env.ENABLE_SOURCEMAPS || env.ENABLE_SOURCEMAPS) === 'true'),

@@ -1,4 +1,5 @@
 import { ProfilePresence } from '@/components/profile/ProfilePresence';
+import { profileThemeAssetUrl } from '@/lib/profileThemeAssets';
 import { ProfileSocialActions } from '@/components/profile/ProfileSocialActions';
 import { X, ArrowUpRight } from "lucide-react";
 import type { ThemePreviewProps } from "../types";
@@ -7,7 +8,7 @@ import "./komorebi.css";
 export default function KomorebiPreview(p: ThemePreviewProps) {
   return (
     <section className="km-preview" aria-label={`${p.name}'s profile`}>
-      <img src="/assets/profile-themes/komorebi/garden.webp" alt="" />
+      <img src={profileThemeAssetUrl('/assets/profile-themes/komorebi/garden.webp')} alt="" />
       <button
         type="button"
         className="km-preview-close"

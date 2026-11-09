@@ -13,9 +13,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { SimpleCaptcha } from '@/components/ui/SimpleCaptcha';
-import { TurnstileWidget, type TurnstileWidgetHandle } from '@/components/security/TurnstileWidget';
-import { isTurnstileEnabled, verifyTurnstileToken } from '@/lib/security/turnstile';
+import { CaptchaWidget, type CaptchaWidgetHandle } from '@/components/security/CaptchaWidget';
+import { isCaptchaRequired } from '@/lib/security/captcha';
 import { supabase } from '@/integrations/supabase/client';
 import { ArrowLeft, Lightbulb, Send, Loader2, Upload, X } from 'lucide-react';
 import { formatDistanceToNow } from '@/lib/localeFormat';
@@ -41,10 +40,9 @@ export default function SuggestionsPage() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [captchaValid, setCaptchaValid] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
-  const turnstileRef = useRef<TurnstileWidgetHandle>(null);
-  const turnstileEnabled = isTurnstileEnabled();
+  const captchaRequired = isCaptchaRequired();
+  const captchaRef = useRef<CaptchaWidgetHandle>(null);
   
   const { data: suggestions = [], isLoading } = useUserSuggestions();
   const createSuggestion = useCreateSuggestion();
@@ -106,19 +104,7 @@ export default function SuggestionsPage() {
       return;
     }
 
-    if (turnstileEnabled) {
-      if (!captchaToken) {
-        toast.error(uiI18n.t('app.please_complete_the_verification_challenge_7dbc0a97'));
-        return;
-      }
-      const ok = await verifyTurnstileToken(captchaToken);
-      if (!ok) {
-        toast.error(uiI18n.t('app.verification_failed_please_try_again_79a2796b'));
-        turnstileRef.current?.reset();
-        setCaptchaToken(null);
-        return;
-      }
-    } else if (!captchaValid) {
+    if (captchaRequired && !captchaToken) {
       toast.error(uiI18n.t('app.please_complete_the_captcha_78103c35'));
       return;
     }
@@ -128,19 +114,24 @@ export default function SuggestionsPage() {
       imageUrl = await uploadImage();
     }
 
-    await createSuggestion.mutateAsync({
-      title,
-      description,
-      category,
-      ...(imageUrl && { image_url: imageUrl }),
-    });
-
-    setTitle('');
-    setDescription('');
-    setCategory('feature');
-    removeImage();
-    turnstileRef.current?.reset();
-    setCaptchaToken(null);
+    try {
+      await createSuggestion.mutateAsync({
+        title,
+        description,
+        category,
+        captchaToken: captchaToken ?? undefined,
+        ...(imageUrl && { image_url: imageUrl }),
+      });
+      setTitle('');
+      setDescription('');
+      setCategory('feature');
+      removeImage();
+    } catch {
+      // The mutation displays the error and keeps the draft for another attempt.
+    } finally {
+      captchaRef.current?.reset();
+      setCaptchaToken(null);
+    }
   };
 
   if (!user) {
@@ -263,24 +254,21 @@ export default function SuggestionsPage() {
                 </div>
 
                 {/* Captcha */}
-                {turnstileEnabled ? (
-                  <TurnstileWidget
-                    ref={turnstileRef}
-                    action="suggestion"
-                    onToken={setCaptchaToken}
-                    onExpire={() => setCaptchaToken(null)}
-                    onError={() => setCaptchaToken(null)}
-                  />
-                ) : (
-                  <SimpleCaptcha onValidate={setCaptchaValid} />
-                )}
+                <CaptchaWidget
+                  ref={captchaRef}
+                  action="suggestion"
+                  onToken={setCaptchaToken}
+                  onExpire={() => setCaptchaToken(null)}
+                  onError={() => setCaptchaToken(null)}
+                  disabled={createSuggestion.isPending || isUploading}
+                />
 
                 <Button
                   type="submit"
                   disabled={
                     createSuggestion.isPending ||
                     isUploading ||
-                    (turnstileEnabled ? !captchaToken : !captchaValid)
+                    (captchaRequired && !captchaToken)
                   }
                   className="w-full gap-2"
                 >

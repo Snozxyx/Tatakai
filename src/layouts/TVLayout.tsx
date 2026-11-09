@@ -1,3 +1,6 @@
+import { BrandLogo } from '@/components/branding/BrandLogo';
+import { useCustomization } from '@/hooks/ui/useCustomization';
+import { getThemeCustomization } from '@/lib/customization';
 import { TVLoadingScreen } from "@/components/tv/TVLoadingScreen";
 import { useTVAppearance } from "@/core/tv/appearance";
 import { tvThemeStyle } from "@/core/tv/themes";
@@ -41,6 +44,8 @@ const IPTV = lazy(() => import("@/pages/tv/TVIPTVPage"));
 const Library = lazy(() => import("@/pages/tv/TVLibraryPage"));
 export default function TVLayout({ children }: { children: React.ReactNode }) {
   const { appearance } = useTVAppearance();
+  const { settings: customizationSettings } = useCustomization();
+  const customPalette = getThemeCustomization(customizationSettings, appearance.theme).palette;
   const { fullPage: fullPageProfile } = useProfilePresentation();
   const location = useLocation(),
     navigate = useNavigate(),
@@ -233,11 +238,11 @@ export default function TVLayout({ children }: { children: React.ReactNode }) {
   return (
     <ConfirmProvider>
       <CommunityRulesGateProvider>
-        <div ref={root} className={`tv-shell ${path.startsWith("/watch") ? "tv-shell-watching" : ""} ${reading ? "tv-reading" : ""}`} data-tv-theme={appearance.theme} style={{ ...tvThemeStyle(appearance.theme), ...(fullPageProfile ? { padding: 0, overflow: 'hidden' } : {}) }}>
+        <div ref={root} className={`tv-shell ${path.startsWith("/watch") || /^\/x\/[^/]+\/[^/]+\/watch\//.test(path) ? "tv-shell-watching" : ""} ${reading ? "tv-reading" : ""}`} data-tv-theme={appearance.theme} style={{ ...tvThemeStyle(appearance.theme, customPalette), ...(fullPageProfile ? { padding: 0, overflow: 'hidden' } : {}) }}>
           <TVLauncherSync />
           {!fullPageProfile && !reading && <aside className="tv-icon-rail" aria-label="TV navigation">
             <Link to="/" className="tv-rail-brand" aria-label="Tatakai home">
-              <img src="/assets/logo/tatakai-logo-square.png" alt="" />
+              <BrandLogo  alt="" />
               <span className="tv-rail-label tv-rail-wordmark">tatakai</span>
             </Link>
             <nav aria-label="Main navigation">

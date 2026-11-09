@@ -48,7 +48,7 @@ export function looksXml(text) {
  * Last-resort body for a sitemap URL when neither upstream nor disk has usable
  * XML. Always valid XML (never HTML) — the caller must serve it as 503.
  * @param {string} canonicalPath canonical sitemap path (no trailing slash)
- * @param {string} siteOrigin e.g. "https://tatakai.me"
+ * @param {string} siteOrigin e.g. "https://tatakai.app"
  */
 export function degradedSitemapBody(canonicalPath, siteOrigin) {
   const isXsl = canonicalPath.endsWith(".xsl");

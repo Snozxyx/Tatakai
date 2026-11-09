@@ -8,8 +8,9 @@
  * and a wrapped row moves the content below it on every render. When the row
  * overflows, the edges fade to signal there is more to scroll to.
  */
-import { useRef, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
+import { useMotionPreference } from '@/hooks/ui/useMotionPreference';
 
 export interface PillOption<T extends string> {
   id: T;
@@ -34,6 +35,38 @@ export function PillGroup<T extends string>({
   className,
 }: PillGroupProps<T>) {
   const group = useRef<HTMLDivElement>(null);
+  const pill = useRef<HTMLSpanElement>(null);
+  const positioned = useRef(false);
+  const reducedMotion = useMotionPreference();
+
+  const movePill = useCallback((animate: boolean) => {
+    const tab = group.current?.querySelector<HTMLButtonElement>('[aria-selected="true"]');
+    const indicator = pill.current;
+    if (!tab || !indicator) return;
+    const previousTransition = indicator.style.transition;
+    if (!animate) indicator.style.transition = 'none';
+    indicator.style.transform = `translateX(${tab.offsetLeft}px)`;
+    indicator.style.width = `${tab.offsetWidth}px`;
+    indicator.style.top = `${tab.offsetTop}px`;
+    indicator.style.height = `${tab.offsetHeight}px`;
+    if (!animate) {
+      void indicator.offsetWidth;
+      indicator.style.transition = previousTransition;
+    }
+  }, []);
+
+  useLayoutEffect(() => {
+    movePill(positioned.current && !reducedMotion);
+    positioned.current = true;
+  }, [value, options, reducedMotion, movePill]);
+
+  useEffect(() => {
+    if (!group.current) return;
+    const observer = new ResizeObserver(() => movePill(false));
+    observer.observe(group.current);
+    group.current.querySelectorAll('[role="tab"]').forEach(tab => observer.observe(tab));
+    return () => observer.disconnect();
+  }, [options, movePill]);
   const handleKey = (event: React.KeyboardEvent<HTMLDivElement>) => {
     const keys = ["ArrowLeft", "ArrowRight", "Home", "End"];
     if (!keys.includes(event.key)) return;
@@ -53,11 +86,12 @@ export function PillGroup<T extends string>({
       role="tablist"
       aria-label={label}
       className={cn(
-        'flex w-full min-w-0 max-w-full items-center gap-1.5 overflow-x-auto rounded-full border border-border bg-muted/50 p-1.5 backdrop-blur-md scrollbar-hide no-scrollbar [-webkit-overflow-scrolling:touch] [touch-action:pan-x_pan-y] overscroll-x-contain',
+        't-tabs catalog-tabs flex w-full min-w-0 max-w-full items-center gap-1 overflow-x-auto rounded-xl bg-muted/50 p-1 ring-1 ring-inset ring-border scrollbar-hide no-scrollbar [-webkit-overflow-scrolling:touch] [touch-action:pan-x_pan-y] overscroll-x-contain',
         className,
       )}
 
     >
+      <span ref={pill} className="t-tabs-pill" aria-hidden="true" />
       {options.map((option) => {
         const active = value === option.id;
         return (
@@ -69,9 +103,9 @@ export function PillGroup<T extends string>({
             aria-selected={active}
             tabIndex={active ? 0 : -1}
             className={cn(
-              'group inline-flex flex-shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+              't-tab group inline-flex min-h-10 flex-shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary md:min-h-8',
               active
-                ? 'bg-primary text-primary-foreground shadow-md shadow-primary/30'
+                ? 'text-primary-foreground'
                 : 'text-muted-foreground hover:bg-muted hover:text-foreground',
             )}
           >

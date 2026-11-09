@@ -1,3 +1,4 @@
+import { ProfileBadges } from '@/components/profile/ProfileBadges';
 import ProfileThemeDetails from '../ProfileThemeDetails';
 import { ProfilePresence } from '@/components/profile/ProfilePresence';
 import { ProfileSocialActions } from '@/components/profile/ProfileSocialActions';
@@ -58,7 +59,7 @@ function WidgetContent({ widget, data, now, onOpenTab }: { widget: ScrapWidget; 
   if (widget.kind === 'library') return data.canViewLibrary ? <MediaList items={data.library} posters /> : <p className="sp-empty">This library is private.</p>;
   if (widget.kind === 'activity') return data.canViewHistory ? <MediaList items={data.activity} /> : <p className="sp-empty">Watch history is private.</p>;
   if (widget.kind === 'favorites') return <MediaList items={data.favorites} posters />;
-  if (widget.kind === 'badges') return data.badges.length ? <div className="sp-badges">{data.badges.map(b => <figure key={b.key}><img src={b.image} alt="" loading="lazy" /><figcaption>{b.label}</figcaption></figure>)}</div> : <p className="sp-empty">The collection starts here.</p>;
+  if (widget.kind === 'badges') return data.badges.length ? <div className="sp-badges"><ProfileBadges badges={data.badges} size={26} grid={true} interactive={true} className="contents" /></div> : <p className="sp-empty">The collection starts here.</p>;
   if (widget.kind === 'links') return <><p className="sp-bio">{owner.bio || 'A world of stories, one episode at a time.'}</p><div className="sp-links">{data.links.map(link => <a key={link.label} href={link.url} target="_blank" rel="noopener noreferrer"><LinkIcon size={14} />{link.label}</a>)}</div>{!data.isOwner && <button type="button" disabled={data.followPending} onClick={data.onFollow}><Heart size={14} />{data.following ? 'Following' : 'Follow'} · {data.followers}</button>}</>;
   if (widget.kind === 'note') return <p className="sp-note-text">{widget.text || 'Your story goes here.'}</p>;
   if (widget.kind === 'image') return <MediaImage src={widget.image || owner.avatar_url} alt={widget.text || 'Profile image sticker'} className="sp-sticker-image" />;

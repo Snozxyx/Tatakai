@@ -17,7 +17,7 @@ const config: CapacitorConfig = {
     // release builds exposes the app's WebView to any USB-connected debugger
     // and costs runtime overhead on low-end phones.
     webContentsDebuggingEnabled: false,
-    backgroundColor: '#09090b',
+    backgroundColor: '#0f0b0c',
     buildOptions: {
       releaseType: 'APK'
     }
@@ -27,7 +27,7 @@ const config: CapacitorConfig = {
     contentInset: 'never',
     allowsLinkPreview: false,
     scrollEnabled: true,
-    backgroundColor: '#09090b',
+    backgroundColor: '#0f0b0c',
     preferredContentMode: 'mobile'
   },
   plugins: {
@@ -38,9 +38,9 @@ const config: CapacitorConfig = {
     SplashScreen: {
       launchShowDuration: 2500,
       launchAutoHide: true,
-      backgroundColor: '#09090b',
+      backgroundColor: '#0f0b0c',
       showSpinner: true,
-      spinnerColor: '#a855f7',
+      spinnerColor: '#ef5d8d',
       spinnerStyle: 'large',
       splashFullScreen: true,
       splashImmersive: true,
@@ -51,7 +51,7 @@ const config: CapacitorConfig = {
       // Tatakai chrome needs. `dark` asks Android for a light status bar with
       // dark icons, causing the white strip seen above the WebView.
       style: 'light',
-      backgroundColor: '#09090b',
+      backgroundColor: '#0f0b0c',
       // SystemBars and --sat own the inset; native padding would count it twice.
       overlaysWebView: true
     },

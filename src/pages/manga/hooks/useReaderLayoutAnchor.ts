@@ -2,6 +2,9 @@ import { useLayoutEffect, useRef, type RefObject } from 'react';
 
 type Anchor = { element: HTMLElement; fraction: number; viewportFraction: number };
 export function captureReaderAnchor(root: HTMLElement): Anchor | null {
+  // The chapter start stays at scrollTop 0 as loading placeholders grow.
+  // A viewport-relative point could otherwise anchor to the second page.
+  if (root.scrollTop <= 0) return null;
   const bounds = root.getBoundingClientRect();
   const y = bounds.top + root.clientHeight * 0.4;
   const page = [...root.querySelectorAll<HTMLElement>('[data-page]')].find(el => {

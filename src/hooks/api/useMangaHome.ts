@@ -1,6 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { getMangaHome, type MangaHomeFeed } from "@/core/content/manga-client";
 import { useContentSafetySettings } from "@/hooks/user/useContentSafetySettings";
+import { useCallback } from 'react';
+import { usePreferredReadingTitleLanguage } from '@/hooks/ui/useTitleLanguage';
+import { projectReadingHomeTitles } from '@/lib/titleLanguage';
 
 /**
  * The manga hub's above-the-fold data — one request, shared by every consumer.
@@ -17,10 +20,13 @@ import { useContentSafetySettings } from "@/hooks/user/useContentSafetySettings"
 export function useMangaHome() {
   const { settings } = useContentSafetySettings();
   const adult = settings.showAdultEverywhere;
+  const titleLanguage = usePreferredReadingTitleLanguage();
+  const select = useCallback((feed: MangaHomeFeed) => projectReadingHomeTitles(feed, titleLanguage), [titleLanguage]);
 
   const query = useQuery<MangaHomeFeed>({
     queryKey: ["manga-home", adult],
     queryFn: () => getMangaHome(adult),
+    select,
     staleTime: 10 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,

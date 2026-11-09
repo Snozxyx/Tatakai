@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { assertNoPackagedProfileThemeAssets } from './profile-theme-asset-check.mjs';
 const directory = process.argv.slice(2).find(arg => !arg.startsWith('--')) || 'dist';
 function size(directory) {
   return fs.readdirSync(directory, { withFileTypes: true }).reduce((total, entry) => {
@@ -13,6 +14,7 @@ const report = { directory, totalBytes: size(directory), publicBytes: size('publ
   startupBytes: startup.reduce((total, file) => total + fs.statSync(path.join(directory, file)).size, 0), startup };
 console.log(JSON.stringify(report, null, 2));
 if (process.argv.includes('--check-native')) {
+  assertNoPackagedProfileThemeAssets(directory);
   const forbidden = ['assets/brand', 'assets/video', 'sw.js', 'altstore'];
   const presentForbidden = forbidden.filter(file => fs.existsSync(path.join(directory, file)));
   const totalLimit = 140 * 1024 * 1024;

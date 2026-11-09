@@ -80,7 +80,7 @@ try {
   await page.getByRole('alertdialog').waitFor();
   assert.ok(await page.evaluate(() => !window.hlsInstances.at(-1).url.includes('hoko.tatakai.me')), 'Cloud transport is never mounted before consent');
   await page.getByRole('button', { name: 'Use cloud proxy', exact: true }).click();
-  await page.waitForFunction(() => window.hlsInstances.at(-1).url.startsWith('https://hoko.tatakai.me/api/v1/streamingProxy?'));
+  await page.waitForFunction(() => window.hlsInstances.at(-1).url.startsWith('https://hoko.tatakai.app/api/v1/streamingProxy?'));
   assert.equal(await page.evaluate(() => new URL(window.hlsInstances.at(-1).url).searchParams.get('url')), 'https://cdn.fixture.test/stalled.m3u8');
   await page.evaluate(() => window.renderPlayer('https://cdn.fixture.test/decline.m3u8', true, false));
   await page.waitForFunction(() => window.hlsInstances.at(-1).url.startsWith('mobile-proxy:'));
@@ -90,7 +90,7 @@ try {
   assert.equal(await page.getByRole('alertdialog').count(), 0, 'Declining is remembered for the current source');
   assert.ok(await page.evaluate(() => !window.hlsInstances.at(-1).url.includes('hoko.tatakai.me')));
   await page.evaluate(() => window.mobileConfig.patchMobileConfig({ cloudProxyByDefault: true }));
-  await page.waitForFunction(() => window.hlsInstances.at(-1).url.startsWith('https://hoko.tatakai.me/'));
+  await page.waitForFunction(() => window.hlsInstances.at(-1).url.startsWith('https://hoko.tatakai.app/'));
   await page.evaluate(() => window.renderPlayer('https://cdn.fixture.test/next.m3u8', true, false));
   await page.waitForFunction(() => new URL(window.hlsInstances.at(-1).url).searchParams.get('url') === 'https://cdn.fixture.test/next.m3u8');
   assert.equal(await page.getByRole('alertdialog').count(), 0, 'The explicit default setting authorizes future videos');

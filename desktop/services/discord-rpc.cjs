@@ -92,7 +92,7 @@ function createDiscordRpc({ logger, clientId }) {
         if (Array.isArray(normalizedExtra.buttons) && normalizedExtra.buttons.length > 0) {
             activity.buttons = normalizedExtra.buttons.slice(0, 2).map((btn) => ({
                 label: String(btn.label || 'Visit').slice(0, 32),
-                url: String(btn.url || 'https://tatakai.me'),
+                url: String(btn.url || 'https://tatakai.app'),
             }));
         }
 

@@ -3,32 +3,33 @@ import { Gift, Check } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useThemeLaunchOffer } from "@/hooks/user/useProfileThemeClaims";
+import { profileThemeAssetUrl } from '@/lib/profileThemeAssets';
 
 const LAUNCH_PREVIEWS = [
   {
     id: "uchiha",
     label: "Uchiha",
-    image: "/assets/profile-themes/uchiha/itachi-rain-poster.webp",
+    image: profileThemeAssetUrl('/assets/profile-themes/uchiha/itachi-rain-poster.webp'),
   },
   {
     id: "sekaipop",
     label: "SekaiPop",
-    image: "/assets/profile-themes/sekaipop/default-wallpaper.png",
+    image: profileThemeAssetUrl('/assets/profile-themes/sekaipop/default-wallpaper.png'),
   },
   {
     id: "gothic-empress",
     label: "Gothic Empress",
-    image: "/assets/profile-themes/gothic-empress/empress-poster.jpg",
+    image: profileThemeAssetUrl('/assets/profile-themes/gothic-empress/empress-poster.jpg'),
   },
   {
     id: "midnight-lofi",
     label: "Midnight Lo-Fi",
-    image: "/assets/profile-themes/midnight-lofi/midnight-room.webp",
+    image: profileThemeAssetUrl('/assets/profile-themes/midnight-lofi/midnight-room.webp'),
   },
   {
     id: "komorebi",
     label: "Komorebi",
-    image: "/assets/profile-themes/komorebi/garden.webp",
+    image: profileThemeAssetUrl('/assets/profile-themes/komorebi/garden.webp'),
   },
 ] as const;
 

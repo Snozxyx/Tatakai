@@ -1,4 +1,5 @@
-export const EMPRESS_ASSETS = '/assets/profile-themes/gothic-empress/';
+import { profileThemeAssetUrl } from '@/lib/profileThemeAssets';
+export const EMPRESS_ASSETS = profileThemeAssetUrl('/assets/profile-themes/gothic-empress/');
 export const EMPRESS_POSTER = `${EMPRESS_ASSETS}empress-poster.jpg`;
 export interface EmpressConfig { version: 1; motion: boolean; embers: number }
 export const defaultEmpressConfig = (): EmpressConfig => ({ version: 1, motion: true, embers: 0.6 });

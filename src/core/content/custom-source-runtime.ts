@@ -3,7 +3,7 @@ import { serverCustomSources, serverCustomHome, serverCustomSearch, serverCustom
 import { isCompatibilityNamespace } from '@/core/extensions/compatibility/client';
 import { compatibilityCustomSources, compatibilityHome, compatibilitySearch, compatibilityInfo, compatibilityWatch, compatibilityRead } from '@/core/extensions/compatibility/content';
 import { isCapacitor } from '@/lib/platform/platform';
-import { listRemoteCustomSources, remoteCustomRow, remoteCustomHome, remoteCustomSearch, remoteCustomInfo, remoteCustomWatch, remoteCustomRead } from '@/core/extensions/remote/custom';
+import { listRemoteCustomSources, remoteCustomRow, remoteCustomHome, remoteCustomCatalogPage, remoteCustomSearch, remoteCustomInfo, remoteCustomWatch, remoteCustomRead } from '@/core/extensions/remote/custom';
 /**
  * Custom-source bridge (renderer side).
  *
@@ -42,6 +42,7 @@ import type {
 
 type InstalledExtensionRow = {
   id: string;
+  enabled?: boolean;
   name?: string;
   capabilities?: string[];
   apiServer?: { namespace?: string } | null;
@@ -153,8 +154,10 @@ function customNamespaces(namespaces: NamespaceInfo[]): NamespaceInfo[] {
  * "+" menu and the custom-source routes.
  */
 export async function listAllCustomSources(includeDisabled = false): Promise<CustomSourceEntry[]> {
-  const [remoteSources, compatibility, servers] = await Promise.all([listRemoteCustomSources(), compatibilityCustomSources(includeDisabled), serverCustomSources()]);
-  const out: CustomSourceEntry[] = [...remoteSources, ...compatibility, ...servers];
+  // Discovery stores and runtimes are independent. An unavailable remote store
+  // must not prevent native extensions from reaching the IPC fallback below.
+  const inventories = await Promise.allSettled([listRemoteCustomSources(), compatibilityCustomSources(includeDisabled), serverCustomSources()]);
+  const out: CustomSourceEntry[] = inventories.flatMap(result => result.status === "fulfilled" ? result.value : []);
   const seen = new Set<string>(out.map(source => `${source.namespace}::${source.id}`));
 
   // Deep links can reach a custom route before the app-shell bootstrap has
@@ -172,17 +175,19 @@ export async function listAllCustomSources(includeDisabled = false): Promise<Cus
     /* desktop / web or no cached mobile bundles */
   }
 
-  const push = (namespace: string, extensionId: string | undefined, src: CustomSourceDescriptor) => {
+  const push = (namespace: string, extensionId: string | undefined, src: CustomSourceDescriptor, enabled?: boolean) => {
     if (!src || !src.id || !src.name) return;
+    if (enabled === false && !includeDisabled) return;
     const key = `${namespace}::${src.id}`;
     if (seen.has(key)) return;
     seen.add(key);
-    out.push({ ...src, namespace, extensionId });
+    out.push({ ...src, namespace, extensionId, ...(enabled !== undefined ? { enabled } : {}) });
   };
 
   // Primary: the extension-API host namespaces.
   try {
-    const base = await resolveExtensionApiBase();
+    // The host URL is stable, but its namespaces change as extensions load.
+    const base = await resolveExtensionApiBase(true);
     for (const ns of customNamespaces(base.namespaces || [])) {
       for (const src of ns.customSources || []) push(ns.namespace, ns.extensionId, src);
     }
@@ -196,9 +201,11 @@ export async function listAllCustomSources(includeDisabled = false): Promise<Cus
     try {
       const rows = await w.electron.listInstalledExtensions();
       for (const row of rows || []) {
-        const namespace = row.apiServer?.namespace;
+        // IPC bundles do not need an HTTP API descriptor. Match the mobile
+        // host's extension-id namespace when that descriptor is absent.
+        const namespace = row.apiServer?.namespace || row.id;
         if (!namespace) continue;
-        for (const src of row.customSources || []) push(namespace, row.id, src);
+        for (const src of row.customSources || []) push(namespace, row.id, src, row.enabled);
       }
     } catch {
       /* ignore */
@@ -214,7 +221,7 @@ async function resolveExtensionId(namespace: string): Promise<string | null> {
   if (!w.electron?.listInstalledExtensions) return null;
   try {
     const rows = await w.electron.listInstalledExtensions();
-    const match = (rows || []).find((r) => r.apiServer?.namespace === namespace);
+    const match = (rows || []).find((r) => (r.apiServer?.namespace || r.id) === namespace && r.enabled !== false);
     return match?.id ?? null;
   } catch {
     return null;
@@ -263,6 +270,15 @@ export interface CustomSearchData {
   results: CustomMediaCard[];
   hasNextPage: boolean;
 }
+export interface CustomCatalogPage {
+  items: CustomMediaCard[];
+  nextSkip: number | null;
+}
+export async function fetchCustomCatalogPage(namespace: string, sourceId: string, catalogId: string, skip = 0, signal?: AbortSignal): Promise<CustomCatalogPage> {
+  const remote = await remoteCustomRow(namespace);
+  if (!remote) throw Error('This source is disabled, removed, or unavailable on this device');
+  return remoteCustomCatalogPage(remote, sourceId, catalogId, skip, signal);
+}
 export type CustomInfoData = CustomInfoResult;
 export interface CustomWatchData {
   sources: SourceResult[];
@@ -283,7 +299,7 @@ export interface CustomReadData {
 export async function fetchCustomHome(namespace: string, sourceId: string, page = 1, signal?: AbortSignal): Promise<CustomHomeData> {
   if (namespace.startsWith('server-')) return serverCustomHome(namespace, sourceId, page, signal);
   if (isCompatibilityNamespace(namespace)) return compatibilityHome(namespace, sourceId, page, signal);
-  const remote = await remoteCustomRow(namespace); if (remote) return remoteCustomHome(remote, sourceId);
+  const remote = await remoteCustomRow(namespace); if (remote) return remoteCustomHome(remote, sourceId, signal);
   const env = await resolveCustomHttpEnv();
   if (isMobileEnv(env)) {
     const r = await mobileCustom<{ sections?: unknown[]; filters?: CustomFilterSchema }>(

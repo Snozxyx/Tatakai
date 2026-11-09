@@ -87,7 +87,7 @@ export function VideoBackground({ animeId, poster, children, anilistId, titles }
   return (
     <div className="relative min-h-[70vh] md:min-h-[80vh] overflow-hidden">
       {/* Video or Poster Background */}
-      <div className="absolute inset-0">
+      <div data-app-route-background className="absolute inset-0">
         {/* Video — only shown when source resolved and ready (req 9.6, 9.7) */}
         <video
           ref={videoRef}

@@ -1,3 +1,4 @@
+import { HomeCustomization } from '@/components/customization/HomeCustomization';
 import { ThemedSelect } from "@/components/ui/themed-select";
 import uiI18n from "@/lib/uiI18n";
 import { useUiTranslation } from "@/hooks/ui/useUiTranslation";
@@ -39,6 +40,9 @@ import {
   customSourceBase,
 } from "@/core/content/custom-source-model";
 import { CustomProviderToolbar } from "@/components/extensions/CustomProviderToolbar";
+import { CustomCatalogMore } from "@/components/extensions/CustomCatalogMore";
+import { TVContentCard } from "@/components/tv/TVContentCard";
+import { isTV } from "@/core/tv/device";
 import { ExtensionContinue } from "@/components/extensions/ExtensionContinue";
 import { HomeSectionHeading } from "@/components/home/HomeSectionHeading";
 import { Button } from "@/components/ui/button";
@@ -84,18 +88,16 @@ function CardGrid({
   useUiTranslation();
   return (
     <div
-      className={
-        rail
-          ? "flex snap-x gap-4 overflow-x-auto pb-4"
-          : "grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6"
-      }
+      className={cn(isTV() && '[&_.tv-content-card]:!w-full [&_.tv-content-card]:!min-w-0',
+        rail ? isTV() ? 'tv-rail-items' : 'flex snap-x gap-4 overflow-x-auto pb-4'
+          : isTV() ? 'grid grid-cols-3 gap-4 xl:grid-cols-4' : 'grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6')}
     >
       {cards.map((item) => (
         <div
           key={item.id}
-          className={rail ? "w-36 shrink-0 snap-start md:w-44" : "min-w-0"}
+          className={rail ? isTV() ? 'w-[20vw] min-w-[200px] shrink-0' : 'w-36 shrink-0 snap-start md:w-44' : 'min-w-0'}
         >
-          <UnifiedMediaCard item={item} />
+          {isTV() ? <TVContentCard item={{ id: item.href || item.id, name: item.name, poster: item.poster, href: item.href, status: item.status }} /> : <UnifiedMediaCard item={item} />}
         </div>
       ))}
     </div>
@@ -169,7 +171,8 @@ export default function CustomHomePage() {
     [filters, activeTags]
   );
 
-  const resultsMode = Boolean(submitted) || hasActiveFilters;
+  const canSearch = source?.supportsSearch !== false;
+  const resultsMode = (canSearch && Boolean(submitted)) || hasActiveFilters;
 
   const searchQuery = useCustomSearch(
     namespace,
@@ -203,7 +206,10 @@ export default function CustomHomePage() {
   const sections = useMemo(
     () =>
       (home?.sections ?? []).map((s) => ({
+        id: s.id,
         title: s.title,
+        pagination: s.pagination,
+        items: s.items,
         cards: (s.items ?? []).map((c) => toUnifiedCustomCard(c, base, kind)),
       })),
     [home, base, kind]
@@ -217,7 +223,7 @@ export default function CustomHomePage() {
     [searchData, base, kind]
   );
 
-  const hasSections = sections.some((s) => s.cards.length > 0);
+  const hasSections = sections.some((s) => s.cards.length > 0 || s.pagination?.nextSkip != null);
   const refreshed = useMobileAppearance();
   const [activeSpotlight, setActiveSpotlight] = useState<SpotlightAnime>();
   const spotlights = useMemo<SpotlightAnime[]>(
@@ -254,6 +260,7 @@ export default function CustomHomePage() {
       {!isMobile && <Sidebar />}
 
       <main
+        data-spotlight-page
         data-mobile-home
         className={cn(
           "app-page relative z-10 mx-auto max-w-[1800px] py-6 pr-6 pb-28 md:pb-6",
@@ -261,8 +268,10 @@ export default function CustomHomePage() {
         )}
       >
         <Header
+          alignWithPage
           providerSearch={{
             name: source?.name || "provider",
+            supportsSearch: canSearch,
             query: submitted,
             onSearch: (term) => {
               setPage(1);
@@ -337,6 +346,7 @@ export default function CustomHomePage() {
             </AlertDescription>
           </Alert>
         )}
+        {source?.supportsSearch === false && <p className="mb-4 text-sm text-muted-foreground">{uiI18n.t('extensionSetup.browseOnly')}</p>}
         {activeQuery.isError && (
           <Alert variant="destructive" className="mb-6">
             <AlertDescription>
@@ -352,7 +362,36 @@ export default function CustomHomePage() {
             </AlertDescription>
           </Alert>
         )}
-        {!resultsMode && browsePage === 1 && spotlights.length > 0 && (
+        {resultsMode ? (<section className="mb-10">
+            <h3 className="mb-6 px-2 font-display text-xl font-semibold tracking-tight">
+              {submitted
+                ? uiI18n.t("app.results_for_i18n_value_0_f5bc8a09", {
+                    value0: submitted,
+                  })
+                : t("migration.filteredResults")}
+            </h3>
+            {searching ? (
+              <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-6">
+                {Array.from({ length: 12 }).map((_, i) => (
+                  <CardSkeleton key={`search-skel-${i}`} />
+                ))}
+              </div>
+            ) : searchQuery.isError ? null : searchCards.length > 0 ? (
+              <CardGrid cards={searchCards} />
+            ) : (
+              <GlassPanel className="border border-white/10 p-6">
+                <p className="text-sm text-muted-foreground">
+                  {submitted
+                    ? uiI18n.t("app.no_results_for_i18n_value_0_4f62353d", {
+                        value0: submitted,
+                      })
+                    : t("migration.noFilteredResults")}
+                </p>
+              </GlassPanel>
+            )}
+          </section>) : (
+          <HomeCustomization pageId={`provider:${namespace}/${sourceId}`} sections={[
+            { id: 'spotlight', label: 'Spotlight', available: browsePage === 1 && spotlights.length > 0, node: (!resultsMode && browsePage === 1 && spotlights.length > 0 && (
           <div data-custom-hero>
             <HeroSection
               spotlight={spotlights[0]}
@@ -366,8 +405,8 @@ export default function CustomHomePage() {
               mediaType={kind === "read" ? "manga" : "anime"}
             />
           </div>
-        )}
-        {source && !resultsMode && (
+        )) },
+            { id: 'provider-continue', label: 'Continue and saved titles', collection: true, available: Boolean(source), node: (source && !resultsMode && (
           <div className="mb-10 flex min-w-0 flex-col gap-10">
             <ExtensionContinue
               kind={kind}
@@ -381,9 +420,8 @@ export default function CustomHomePage() {
               saved
             />
           </div>
-        )}
-
-        {hasFilterUi && showFilters ? (
+        )) },
+            { id: 'provider-filters', label: 'Provider filters', available: hasFilterUi && showFilters, node: (hasFilterUi && showFilters ? (
           <GlassPanel className="mb-8 border border-white/10 p-4">
             {schemaGroups.length > 0 ? (
               <div className="mb-4 flex flex-wrap gap-3">
@@ -469,39 +507,8 @@ export default function CustomHomePage() {
               </div>
             ) : null}
           </GlassPanel>
-        ) : null}
-
-        {resultsMode ? (
-          <section className="mb-10">
-            <h3 className="mb-6 px-2 font-display text-xl font-semibold tracking-tight">
-              {submitted
-                ? uiI18n.t("app.results_for_i18n_value_0_f5bc8a09", {
-                    value0: submitted,
-                  })
-                : t("migration.filteredResults")}
-            </h3>
-            {searching ? (
-              <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-6">
-                {Array.from({ length: 12 }).map((_, i) => (
-                  <CardSkeleton key={`search-skel-${i}`} />
-                ))}
-              </div>
-            ) : searchQuery.isError ? null : searchCards.length > 0 ? (
-              <CardGrid cards={searchCards} />
-            ) : (
-              <GlassPanel className="border border-white/10 p-6">
-                <p className="text-sm text-muted-foreground">
-                  {submitted
-                    ? uiI18n.t("app.no_results_for_i18n_value_0_4f62353d", {
-                        value0: submitted,
-                      })
-                    : t("migration.noFilteredResults")}
-                </p>
-              </GlassPanel>
-            )}
-          </section>
-        ) : isLoading ? (
-          <div className="space-y-10">
+        ) : null) },
+            { id: 'home-state', label: 'Provider status', available: false, node: (isLoading ? (<div className="space-y-10">
             {Array.from({ length: 2 }).map((_, row) => (
               <div key={`skel-row-${row}`}>
                 <div className="mb-4 h-7 w-48 rounded-lg bg-muted/50" />
@@ -512,17 +519,21 @@ export default function CustomHomePage() {
                 </div>
               </div>
             ))}
-          </div>
-        ) : homeQuery.isError ? null : hasSections ? (
-          <div className="space-y-10">
-            {sections
-              .filter((s) => s.cards.length > 0)
-              .map((s) => (
-                <section key={s.title}>
+          </div>) : homeQuery.isError ? null : !hasSections ? (<GlassPanel className="border border-white/10 p-8 text-center">
+            <h2 className="text-lg font-bold">{t("discover.nothingHere")}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Search this provider, try another language, or check its settings.
+            </p>
+          </GlassPanel>) : null) },
+            ...(sections
+              .filter((s) => s.cards.length > 0 || s.pagination?.nextSkip != null)
+              .map((s, index) => ({ id: `catalog-${s.id || s.pagination?.catalogId || s.title}-${sections.slice(0, sections.indexOf(s)).filter(previous => previous.title === s.title).length}`, label: s.title, collection: true, node: (
+                <section key={`${namespace}:${sourceId}:${s.pagination?.catalogId || s.title}:${homeQuery.dataUpdatedAt}`}>
                   <HomeSectionHeading
                     title={s.title}
                     action={
                       <Button
+                        data-tv-key={`custom-row-${namespace}-${sourceId}-${s.pagination?.catalogId || s.title}`}
                         variant="ghost"
                         size="sm"
                         onClick={() =>
@@ -535,17 +546,167 @@ export default function CustomHomePage() {
                       </Button>
                     }
                   />
-                  <CardGrid cards={s.cards} rail={expanded !== s.title} />
+                  {s.pagination ? <CustomCatalogMore namespace={namespace!} sourceId={sourceId!} section={s}>
+                    {items => <CardGrid cards={items.map(card => toUnifiedCustomCard(card, base, kind))} rail={expanded !== s.title} />}
+                  </CustomCatalogMore> : <CardGrid cards={s.cards} rail={expanded !== s.title} />}
                 </section>
-              ))}
+              ) }))),
+          ]} defaultContent={<>{!resultsMode && browsePage === 1 && spotlights.length > 0 && (
+          <div data-custom-hero>
+            <HeroSection
+              spotlight={spotlights[0]}
+              spotlights={spotlights}
+              onActiveSpotlightChange={setActiveSpotlight}
+              getDetailsPath={(item) =>
+                `${base}/info/${encodeURIComponent(item.id)}`
+              }
+              hideCatalogActions
+              actionLabel="View title"
+              mediaType={kind === "read" ? "manga" : "anime"}
+            />
           </div>
-        ) : (
-          <GlassPanel className="border border-white/10 p-8 text-center">
+        )}{source && !resultsMode && (
+          <div className="mb-10 flex min-w-0 flex-col gap-10">
+            <ExtensionContinue
+              kind={kind}
+              namespace={namespace}
+              sourceIds={group?.variants.map((item) => item.id) || [sourceId!]}
+            />
+            <ExtensionContinue
+              kind={kind}
+              namespace={namespace}
+              sourceIds={group?.variants.map((item) => item.id) || [sourceId!]}
+              saved
+            />
+          </div>
+        )}{hasFilterUi && showFilters ? (
+          <GlassPanel className="mb-8 border border-white/10 p-4">
+            {schemaGroups.length > 0 ? (
+              <div className="mb-4 flex flex-wrap gap-3">
+                {schemaGroups.map((group) => (
+                  <label
+                    key={group.key}
+                    className="flex flex-col gap-1 text-xs font-semibold text-muted-foreground"
+                  >
+                    {group.label}
+                    <ThemedSelect
+                      value={
+                        typeof filters[group.key] === "string"
+                          ? (filters[group.key] as string)
+                          : ""
+                      }
+                      onChange={(e) => setGroup(group.key, e.target.value)}
+                      className="min-w-[9rem] rounded-lg border border-white/15 bg-background/80 px-2.5 py-1.5 text-sm font-medium text-foreground outline-none focus:border-primary/60"
+                    >
+                      <option value="">{t("migration.any")}</option>
+                      {group.options.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </ThemedSelect>
+                  </label>
+                ))}
+              </div>
+            ) : null}
+
+            {schemaTags.length > 0 ? (
+              <div>
+                <div className="mb-2 text-xs font-semibold text-muted-foreground">
+                  {t("migration.tags")}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {(showAllTags ? schemaTags : schemaTags.slice(0, 24)).map(
+                    (tag) => {
+                      const active = activeTags.includes(tag);
+                      return (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={() => toggleTag(tag)}
+                          className={cn(
+                            "rounded-full border px-3 py-1 text-xs font-medium transition active:scale-95",
+                            active
+                              ? "border-primary/60 bg-primary/25 text-foreground"
+                              : "border-white/15 bg-white/5 text-muted-foreground hover:bg-white/10"
+                          )}
+                        >
+                          {tag}
+                        </button>
+                      );
+                    }
+                  )}
+                  {schemaTags.length > 24 ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowAllTags((v) => !v)}
+                      className="rounded-full border border-dashed border-white/20 px-3 py-1 text-xs font-medium text-muted-foreground hover:bg-white/10"
+                    >
+                      {showAllTags
+                        ? t("comments.showLess")
+                        : uiI18n.t("app.i18n_value_0_more_f2150f35", {
+                            value0: schemaTags.length - 24,
+                          })}
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+
+            {hasActiveFilters ? (
+              <div className="mt-4 flex justify-end">
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-white/10"
+                >
+                  <X className="h-3.5 w-3.5" /> {t("migration.clearFilters")}
+                </button>
+              </div>
+            ) : null}
+          </GlassPanel>
+        ) : null}{isLoading ? (<div className="space-y-10">
+            {Array.from({ length: 2 }).map((_, row) => (
+              <div key={`skel-row-${row}`}>
+                <div className="mb-4 h-7 w-48 rounded-lg bg-muted/50" />
+                <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-6">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <CardSkeleton key={`skel-${row}-${i}`} />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>) : homeQuery.isError ? null : hasSections ? (<div className="space-y-10">{(sections
+              .filter((s) => s.cards.length > 0 || s.pagination?.nextSkip != null)
+              .map((s, index) => ({ id: `catalog-${s.id || s.pagination?.catalogId || s.title}-${sections.slice(0, sections.indexOf(s)).filter(previous => previous.title === s.title).length}`, label: s.title, collection: true, node: (
+                <section key={`${namespace}:${sourceId}:${s.pagination?.catalogId || s.title}:${homeQuery.dataUpdatedAt}`}>
+                  <HomeSectionHeading
+                    title={s.title}
+                    action={
+                      <Button
+                        data-tv-key={`custom-row-${namespace}-${sourceId}-${s.pagination?.catalogId || s.title}`}
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          setExpanded(
+                            expanded === s.title ? undefined : s.title
+                          )
+                        }
+                      >
+                        {expanded === s.title ? "Show row" : "View all"}
+                      </Button>
+                    }
+                  />
+                  {s.pagination ? <CustomCatalogMore namespace={namespace!} sourceId={sourceId!} section={s}>
+                    {items => <CardGrid cards={items.map(card => toUnifiedCustomCard(card, base, kind))} rail={expanded !== s.title} />}
+                  </CustomCatalogMore> : <CardGrid cards={s.cards} rail={expanded !== s.title} />}
+                </section>
+              ) }))).map(section => section.node)}</div>) : (<GlassPanel className="border border-white/10 p-8 text-center">
             <h2 className="text-lg font-bold">{t("discover.nothingHere")}</h2>
             <p className="mt-1 text-sm text-muted-foreground">
               Search this provider, try another language, or check its settings.
             </p>
-          </GlassPanel>
+          </GlassPanel>)}</>} />
         )}
         {((resultsMode && (page > 1 || searchData?.hasNextPage)) ||
           (!resultsMode && (browsePage > 1 || home?.hasNextPage))) && (

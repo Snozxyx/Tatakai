@@ -1,3 +1,4 @@
+import { selectReadingTitle } from '@/lib/titleLanguage';
 /**
  * `MangaCard` → `PosterItem`, so the manga surfaces render the same card as the
  * anime ones (docs/Plans.md §2 — "Cards (improve polish and consistency)").
@@ -82,7 +83,7 @@ export function mangaSearchItemToPosterItem(
   index = 0,
 ): PosterItem | null {
   const title =
-    item.canonicalTitle || item.title?.english || item.title?.romaji || item.title?.native || '';
+    selectReadingTitle(item) || '';
   const id = String(item.id || item.anilistId || item.malId || '').trim();
   if (!title || !id) return null;
 

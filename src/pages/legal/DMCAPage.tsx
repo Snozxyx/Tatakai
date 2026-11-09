@@ -43,26 +43,46 @@ export default function DMCAPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-yellow-500">
                 <AlertTriangle className="w-5 h-5" />
-                {uiI18n.t('app.important_educational_disclaimer_45153cb9')}
+                {uiI18n.t('app.dmca_role_title')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="font-semibold">
-                {uiI18n.t('app.this_entire_project_is_created_strictly_for_educ_c7df2967')}
+                {uiI18n.t('app.dmca_role_summary')}
               </p>
               <p>
-                {uiI18n.t('app.tatakai_is_a_frontend_demonstration_project_show_244be504')}
+                {uiI18n.t('app.dmca_role_description')}
               </p>
               <div className="p-4 rounded-lg bg-background/50 border border-border">
                 <p className="font-medium mb-2">{uiI18n.t('app.key_points_0c5cc172')}</p>
                 <ul className="list-disc list-inside space-y-2 ml-4 text-sm">
-                  <li>{uiI18n.t('app.we_do_not_host_any_anime_content_on_our_servers_703423d2')}</li>
-                  <li>{uiI18n.t('app.we_do_not_own_any_of_the_anime_content_displayed_8bbf1367')}</li>
-                  <li>{uiI18n.t('app.all_content_is_sourced_from_third_party_platform_797a80aa')}</li>
-                  <li>{uiI18n.t('app.we_are_merely_a_frontend_interface_demonstrating_e6c32074')}</li>
-                  <li>{uiI18n.t('app.this_is_a_non_commercial_educational_project_0787ef22')}</li>
+                  <li>{uiI18n.t('app.dmca_role_tracking')}</li>
+                  <li>{uiI18n.t('app.dmca_role_extensions')}</li>
+                  <li>{uiI18n.t('app.dmca_role_ownership')}</li>
+                  <li>{uiI18n.t('app.dmca_role_user_choices')}</li>
+                  <li>{uiI18n.t('app.dmca_role_no_license')}</li>
                 </ul>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>{uiI18n.t('app.dmca_user_responsibility_title')}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="font-semibold">
+                {uiI18n.t('app.dmca_user_responsibility_summary')}
+              </p>
+              <p>
+                {uiI18n.t('app.dmca_user_responsibility_lawful_use')}
+              </p>
+              <p>
+                {uiI18n.t('app.dmca_user_responsibility_liability')}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {uiI18n.t('app.dmca_user_responsibility_limits')}
+              </p>
             </CardContent>
           </Card>
 
@@ -75,40 +95,38 @@ export default function DMCAPage() {
                 {uiI18n.t('app.tatakai_respects_the_intellectual_property_right_4c89aea5')}
               </p>
               <p>
-                {uiI18n.t('app.all_anime_content_videos_images_and_related_mate_e28c87ca')}
+                {uiI18n.t('app.dmca_copyright_media')}
               </p>
               <ul className="list-disc list-inside space-y-2 ml-4">
-                <li>{uiI18n.t('app.sourced_from_third_party_platforms_and_apis_1bb644fb')}</li>
+                <li>{uiI18n.t('app.dmca_copyright_sources')}</li>
                 <li>{uiI18n.t('app.property_of_their_respective_copyright_holders_980ee9da')}</li>
-                <li>{uiI18n.t('app.not_hosted_or_stored_on_our_servers_cc278f8d')}</li>
-                <li>{uiI18n.t('app.displayed_for_educational_and_demonstration_purp_f03e7613')}</li>
+                <li>{uiI18n.t('app.dmca_copyright_source_terms')}</li>
+                <li>{uiI18n.t('app.dmca_copyright_no_license')}</li>
               </ul>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle>{uiI18n.t('app.how_we_aggregate_content_ef6f8def')}</CardTitle>
+              <CardTitle>{uiI18n.t('app.dmca_extensions_title')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <p>
-                {uiI18n.t('app.tatakai_functions_as_a_frontend_aggregator_that_bd7ec4ed')}
+                {uiI18n.t('app.dmca_extensions_description')}
               </p>
               <ul className="list-disc list-inside space-y-2 ml-4">
-                <li>{uiI18n.t('app.uses_public_apis_from_services_like_hianime_jika_b670678c')}</li>
-                <li>{uiI18n.t('app.scrapes_publicly_available_data_from_various_ani_3c3b1878')}</li>
-                <li>{uiI18n.t('app.embeds_video_players_from_external_sources_307cdc57')}</li>
-                <li>{uiI18n.t('app.acts_as_a_search_and_discovery_interface_5b36c5dd')}</li>
+                <li>{uiI18n.t('app.dmca_extensions_metadata')}</li>
+                <li>{uiI18n.t('app.dmca_extensions_playback')}</li>
+                <li>{uiI18n.t('app.dmca_extensions_reading')}</li>
+                <li>{uiI18n.t('app.dmca_extensions_progress')}</li>
               </ul>
               <p className="mt-4">
-                {uiI18n.t('app.we_do_not_50435689')}
+                {uiI18n.t('app.dmca_extensions_no_permission')}
               </p>
               <ul className="list-disc list-inside space-y-2 ml-4">
-                <li>{uiI18n.t('app.upload_anime_episodes_or_movies_to_our_servers_13e00ef5')}</li>
-                <li>{uiI18n.t('app.store_video_files_or_copyrighted_content_727de3d9')}</li>
-                <li>{uiI18n.t('app.claim_ownership_of_any_anime_content_0ba91373')}</li>
-                <li>{uiI18n.t('app.monetize_copyrighted_content_56a9a413')}</li>
-                <li>{uiI18n.t('app.bypass_any_drm_or_content_protection_systems_89ebf019')}</li>
+                <li>{uiI18n.t('app.dmca_extensions_no_infringement')}</li>
+                <li>{uiI18n.t('app.dmca_extensions_no_redistribution')}</li>
+                <li>{uiI18n.t('app.dmca_extensions_no_drm_bypass')}</li>
               </ul>
             </CardContent>
           </Card>
@@ -125,8 +143,8 @@ export default function DMCAPage() {
                 {uiI18n.t('app.please_note_b092b192')}
               </p>
               <ul className="list-disc list-inside space-y-2 ml-4">
-                <li>{uiI18n.t('app.we_can_only_remove_links_to_external_content_as__49c0b18b')}</li>
-                <li>{uiI18n.t('app.for_content_removal_you_should_contact_the_origi_5dee88cf')}</li>
+                <li>{uiI18n.t('app.dmca_takedown_control')}</li>
+                <li>{uiI18n.t('app.dmca_takedown_external_hosts')}</li>
                 <li>{uiI18n.t('app.we_will_cooperate_fully_with_valid_dmca_requests_86d0e0a2')}</li>
               </ul>
               
@@ -136,7 +154,7 @@ export default function DMCAPage() {
                 <ol className="list-decimal list-inside space-y-2 ml-4 text-sm">
                   <li>{uiI18n.t('app.a_physical_or_electronic_signature_of_the_copyri_d8d5a70b')}</li>
                   <li>{uiI18n.t('app.identification_of_the_copyrighted_work_claimed_t_56df4786')}</li>
-                  <li>{uiI18n.t('app.identification_of_the_material_that_is_claimed_t_a30fe994')}</li>
+                  <li>{uiI18n.t('app.dmca_notice_identification')}</li>
                   <li>{uiI18n.t('app.contact_information_address_telephone_number_ema_e5df76f4')}</li>
                   <li>{uiI18n.t('app.a_statement_of_good_faith_belief_that_use_is_not_1fb98b68')}</li>
                   <li>{uiI18n.t('app.a_statement_that_the_information_is_accurate_and_ae255569')}</li>
@@ -148,7 +166,7 @@ export default function DMCAPage() {
                 <div>
                   <p className="font-medium">{uiI18n.t('app.contact_for_dmca_notices_6273b42f')}</p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    {uiI18n.t('app.please_submit_dmca_notices_through_our_suggestio_481bfae3')}
+                    {uiI18n.t('app.dmca_notice_contact')}
                   </p>
                 </div>
               </div>
@@ -190,35 +208,32 @@ export default function DMCAPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <p>
-                {uiI18n.t('app.we_operate_in_good_faith_as_an_educational_proje_57055219')}
+                {uiI18n.t('app.dmca_good_faith_description')}
               </p>
               <ul className="list-disc list-inside space-y-2 ml-4">
                 <li>{uiI18n.t('app.we_will_promptly_investigate_the_claim_4f99629c')}</li>
                 <li>{uiI18n.t('app.we_will_remove_links_to_infringing_content_upon__bfa435e2')}</li>
                 <li>{uiI18n.t('app.we_encourage_rights_holders_to_contact_the_origi_5349be53')}</li>
-                <li>{uiI18n.t('app.we_maintain_no_copies_of_copyrighted_video_conte_dfc40a2b')}</li>
+                <li>{uiI18n.t('app.dmca_good_faith_user_responsibility')}</li>
               </ul>
             </CardContent>
           </Card>
 
           <Card className="border-primary/20 bg-primary/5">
             <CardHeader>
-              <CardTitle>{uiI18n.t('app.support_legal_anime_streaming_8499b936')}</CardTitle>
+              <CardTitle>{uiI18n.t('app.dmca_support_title')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <p>
-                {uiI18n.t('app.we_encourage_all_users_to_support_the_anime_indu_86294c8c')}
+                {uiI18n.t('app.dmca_support_description')}
               </p>
               <ul className="list-disc list-inside space-y-2 ml-4">
-                <li>{uiI18n.t('app.crunchyroll_e4d70dc3')}</li>
-                <li>{uiI18n.t('app.funimation_f7842b20')}</li>
-                <li>{uiI18n.t('app.netflix_ca024fd6')}</li>
-                <li>{uiI18n.t('app.hulu_3bf0b369')}</li>
-                <li>{uiI18n.t('app.amazon_prime_video_6d89b22f')}</li>
-                <li>{uiI18n.t('app.hidive_59d73dee')}</li>
+                <li>{uiI18n.t('app.dmca_support_anime')}</li>
+                <li>{uiI18n.t('app.dmca_support_manga')}</li>
+                <li>{uiI18n.t('app.dmca_support_novels')}</li>
               </ul>
               <p className="mt-4">
-                {uiI18n.t('app.these_services_directly_support_anime_creators_s_c1bf3fb7')}
+                {uiI18n.t('app.dmca_support_creators')}
               </p>
             </CardContent>
           </Card>

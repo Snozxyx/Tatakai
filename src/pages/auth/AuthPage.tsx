@@ -1,3 +1,4 @@
+import { BrandLogo } from '@/components/branding/BrandLogo';
 import { backgroundVideo } from '@/lib/assets';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
@@ -9,12 +10,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Eye, EyeOff, Mail, Lock, User, Play, ArrowLeft, ShieldCheck, RefreshCw } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, Play, ArrowLeft, ShieldCheck } from 'lucide-react';
 import { z } from 'zod';
 import { useIsNativeApp, useIsDesktopApp, useIsMobileApp } from '@/hooks/ui/useIsNativeApp';
 import { cn } from '@/lib/utils';
-import { TurnstileWidget, type TurnstileWidgetHandle } from '@/components/security/TurnstileWidget';
-import { isTurnstileEnabled } from '@/lib/security/turnstile';
+import { solveCaptcha } from '@/lib/security/capClient';
 import { OtpCodeInput } from '@/components/auth/OtpCodeInput';
 
 const emailSchema = z.string().email('Please enter a valid email');
@@ -50,6 +50,7 @@ const TEXT_VARIATIONS = [
 export default function AuthPage() {
   const [tvLinkParams] = useSearchParams();
   const requestedReturn = tvLinkParams.get('returnTo') || sessionStorage.getItem('tatakai-auth-return') || '/';
+  // eslint-disable-next-line no-control-regex -- Return destinations must reject control characters.
   const safeReturn = requestedReturn.startsWith('/') && !requestedReturn.startsWith('//') && !/[\\\u0000-\u001f]/.test(requestedReturn) && !requestedReturn.startsWith('/auth') ? requestedReturn : '/';
   useUiTranslation();
   const { t } = useTranslation();
@@ -72,14 +73,7 @@ export default function AuthPage() {
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
-  // Set when Cloudflare reports the challenge itself failed (red
-  // "Verification failed" state — common on iPhones with iCloud Private Relay,
-  // a VPN, or a Safari content blocker). Lets us show a retry affordance
-  // instead of leaving Sign In permanently disabled.
-  const [challengeError, setChallengeError] = useState(false);
-  const turnstileRef = useRef<TurnstileWidgetHandle>(null);
-  const turnstileEnabled = isTurnstileEnabled();
+  const submitting = useRef(false);
 
   // Pick a random video on mount
   const randomVideoSrc = useMemo(() => {
@@ -102,28 +96,6 @@ export default function AuthPage() {
     return null;
   }
 
-  const resetCaptcha = () => {
-    turnstileRef.current?.reset();
-    setCaptchaToken(null);
-    setChallengeError(false);
-  };
-
-  const handleChallengeToken = (token: string) => {
-    setCaptchaToken(token);
-    setChallengeError(false);
-  };
-
-  const handleChallengeError = () => {
-    setCaptchaToken(null);
-    setChallengeError(true);
-  };
-
-  const retryChallenge = () => {
-    setChallengeError(false);
-    setCaptchaToken(null);
-    turnstileRef.current?.reset();
-  };
-
   const validateForm = () => {
     const newErrors: { email?: string; password?: string } = {};
 
@@ -144,48 +116,45 @@ export default function AuthPage() {
   const goToVerify = () => {
     setOtp('');
     setStep('verify');
-    resetCaptcha();
   };
 
   const backToForm = () => {
     setStep('form');
     setOtp('');
-    resetCaptcha();
   };
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting.current) return;
     if (!validateForm()) return;
-    if (turnstileEnabled && !captchaToken) {
-      toast.error(t('auth.completeChallenge'));
-      return;
-    }
+    submitting.current = true;
     setIsLoading(true);
     try {
+      const proof = await solveCaptcha(isLogin ? 'signin' : 'signup');
       if (isLogin) {
-        const { error } = await signIn(email, password, captchaToken ?? undefined);
+        const { error } = await signIn(email, password, proof);
         if (error) {
           toast.error(error.message.includes('Invalid login credentials') ? t('auth.invalidCredentials') : error.message);
-          resetCaptcha();
         } else {
           toast.success(t('auth.welcomeBackToast'));
           navigate(safeReturn);
         }
       } else {
-        const { error, mode } = await signUp(email, password, displayName, captchaToken ?? undefined);
+        const { error, mode } = await signUp(email, password, displayName, proof);
         if (error) {
           toast.error(error.message.includes('already registered') ? t('auth.emailRegistered') : error.message);
-          resetCaptcha();
         } else if (mode === 'restricted') {
           toast.info(uiI18n.t('app.account_created_sign_in_to_browse_verify_your_em_2a041254'));
           setIsLogin(true);
-          resetCaptcha();
         } else {
           toast.success(t('auth.codeSent', { email }));
           goToVerify();
         }
       }
+    } catch {
+      toast.error(uiI18n.t('captcha.unavailable'));
     } finally {
+      submitting.current = false;
       setIsLoading(false);
     }
   };
@@ -213,17 +182,20 @@ export default function AuthPage() {
   };
 
   const handleResend = async () => {
-    if (turnstileEnabled) {
-      toast.info(t('auth.resendChallengeHint'));
-      backToForm();
-      return;
-    }
+    if (submitting.current) return;
+    submitting.current = true;
     setIsLoading(true);
     try {
-      const { error } = await resendSignupCode(email);
+      const proof = await solveCaptcha('resend');
+      const { error } = await resendSignupCode(email, proof);
       if (error) toast.error(error.message);
-      else toast.success(t('auth.newCodeSent', { email }));
+      else {
+        toast.success(t('auth.newCodeSent', { email }));
+      }
+    } catch {
+      toast.error(uiI18n.t('captcha.unavailable'));
     } finally {
+      submitting.current = false;
       setIsLoading(false);
     }
   };
@@ -234,14 +206,13 @@ export default function AuthPage() {
     setOtp('');
     setPassword('');
     setErrors({});
-    resetCaptcha();
   };
 
   return (
     <div className="min-h-screen flex flex-col lg:flex-row">
       {/* Left Side - Form */}
       <div className={cn(
-        "w-full lg:w-1/2 min-h-screen bg-background flex flex-col justify-center items-center p-6 lg:p-12 relative",
+        "w-full lg:w-1/2 min-h-screen bg-background flex flex-col justify-center items-center px-6 pb-6 pt-20 lg:p-12 relative",
         isMobileApp && "lg:w-full"
       )}>
         {/* Back button */}
@@ -261,7 +232,7 @@ export default function AuthPage() {
           <div className="mb-10">
             <div className="flex items-center gap-3 mb-6">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-lg overflow-hidden">
-                <img src={`${import.meta.env.BASE_URL}assets/logo/tatakai-logo-square.png`} alt={uiI18n.t('app.tatakai_logo_290743b0')} className="w-full h-full object-cover" />
+                <BrandLogo  alt={uiI18n.t('app.tatakai_logo_290743b0')} className="w-full h-full object-cover" />
               </div>
               <h1 className="font-display text-3xl font-bold gradient-text">{uiI18n.t('app.tatakai_28bda6bd')}</h1>
             </div>
@@ -378,38 +349,9 @@ export default function AuthPage() {
                 )}
               </div>
 
-              {turnstileEnabled && (
-                <div className="space-y-2">
-                  <TurnstileWidget
-                    ref={turnstileRef}
-                    action={isLogin ? 'login' : 'signup'}
-                    onToken={handleChallengeToken}
-                    onExpire={() => setCaptchaToken(null)}
-                    onError={handleChallengeError}
-                    onTimeout={handleChallengeError}
-                    className="flex justify-center"
-                  />
-                  {challengeError && !captchaToken && (
-                    <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-center">
-                      <p className="text-sm text-foreground font-medium">{uiI18n.t('app.verification_didn_t_load_correctly_4902f292')}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {uiI18n.t('app.on_iphone_this_is_usually_icloud_private_relay_a_b6f8de3d')}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={retryChallenge}
-                        className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline"
-                      >
-                        <RefreshCw className="w-4 h-4" /> {uiI18n.t('app.retry_verification_a113d86c')}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-
               <Button
                 type="submit"
-                disabled={isLoading || (turnstileEnabled && !captchaToken)}
+                disabled={isLoading}
                 className="w-full h-12 bg-gradient-to-r from-primary to-secondary hover:opacity-90 font-semibold text-lg shadow-lg shadow-primary/25 transition-all hover:shadow-xl hover:shadow-primary/30"
               >
                 {isLoading ? (

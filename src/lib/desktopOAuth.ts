@@ -2,7 +2,7 @@
  * Desktop OAuth helpers.
  *
  * AniList only allows a SINGLE redirect URI per app, and it must match exactly.
- * Since the registered URI is the website (`https://tatakai.me/...`), the
+ * Since the registered URI is the website (`https://tatakai.app/...`), the
  * desktop app can no longer use `tatakai://` as its OAuth `redirect_uri` —
  * AniList would reject the authorize request with a redirect mismatch.
  *
@@ -11,7 +11,7 @@
  *   1. Desktop builds the authorize URL with the normal WEB redirect URI plus
  *      a `state` marker (`tatakai-desktop-…`) and opens it in the system browser.
  *   2. AniList/MAL redirects the system browser to
- *      `https://tatakai.me/integration/<provider>/redirect?code=…&state=…`.
+ *      `https://tatakai.app/integration/<provider>/redirect?code=…&state=…`.
  *   3. That web page sees the desktop `state` marker and — instead of consuming
  *      the code with the browser's session — forwards it to
  *      `tatakai://integration/<provider>/redirect?code=…&state=…`.
@@ -26,6 +26,7 @@
 
 import { Capacitor } from '@capacitor/core';
 import { Browser } from '@capacitor/browser';
+import { currentPublicAniListApp } from '@/lib/anilistApp';
 
 type ElectronBridge = { openExternal?: (url: string) => Promise<unknown> };
 
@@ -67,12 +68,12 @@ function usableWebRedirect(explicit: string): boolean {
 /** Canonical MAL callback path. Keep in sync with `src/lib/mal.ts` and AppRoutes. */
 export const MAL_REDIRECT_PATH = '/api/mal/redirect';
 /** Canonical production origin for MAL. */
-export const MAL_PROD_ORIGIN = 'https://tatakai.me';
+export const MAL_PROD_ORIGIN = 'https://tatakai.app';
 
 /** Canonical MangaBaka callback path. Keep in sync with `src/lib/mangabaka.ts` and AppRoutes. */
 export const MANGABAKA_REDIRECT_PATH = '/integration/mangabaka/redirect';
 /** Canonical production origin for MangaBaka. */
-export const MANGABAKA_PROD_ORIGIN = 'https://tatakai.me';
+export const MANGABAKA_PROD_ORIGIN = 'https://tatakai.app';
 
 /**
  * Splits a possibly multi-URL env value (MAL dashboard uses line breaks;
@@ -104,12 +105,10 @@ function firstRedirectUri(explicit: string): string {
 
 /** Web redirect URI shared by web + desktop (the ONLY URI to register in provider dashboards). */
 export function getWebAnilistRedirectUri(): string {
-  const explicit = firstRedirectUri(String(import.meta.env.VITE_ANILIST_REDIRECT_URI || '').trim());
-  if (usableWebRedirect(explicit)) return explicit;
-  if (!isNativeOAuthApp() && typeof window !== 'undefined' && window.location.protocol.startsWith('http')) {
-    return `${window.location.origin}/integration/anilist/redirect`;
-  }
-  return 'https://tatakai.me/integration/anilist/redirect';
+  return currentPublicAniListApp(
+    isNativeOAuthApp(),
+    typeof window === 'undefined' ? undefined : window.location.origin,
+  ).redirectUri;
 }
 
 /** Web redirect URI for MAL — origin-aware (see body). Register each origin's URI one-per-line in the MAL app settings. */

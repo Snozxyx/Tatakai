@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { AccountContentSafetyState } from '@/lib/contentSafetyAccount';
 import {
   readGuestSettingsFromCookie,
   readProfileAppSettings,
@@ -15,6 +16,7 @@ export interface ContentSafetySettings {
 
 const STORAGE_KEY = "tatakai_content_safety";
 const UPDATE_EVENT = "tatakai-content-safety-updated";
+const accountState = new AccountContentSafetyState();
 
 const DEFAULT_SETTINGS: ContentSafetySettings = {
   showAdultEverywhere: false,
@@ -99,14 +101,14 @@ export function resetContentSafetySettings(): ContentSafetySettings {
 }
 
 export function useContentSafetySettings() {
-  const { user, profile } = useAuth();
+  const { user, profile, refreshProfile } = useAuth();
   const [settings, setSettings] = useState<ContentSafetySettings>(() =>
     getContentSafetySettings()
   );
   const seededAccountRef = useRef<string | null>(null);
 
   const accountContentSafety = useMemo(
-    () => readProfileAppSettings(profile).contentSafety,
+    () => readProfileAppSettings({ app_settings: profile?.app_settings }).contentSafety,
     [profile?.app_settings],
   );
 
@@ -132,9 +134,7 @@ export function useContentSafetySettings() {
     if (!user?.id) return;
     if (!hasContentSafetyPayload(accountContentSafety)) return;
 
-    const normalized = sanitizeSettings(
-      accountContentSafety as Partial<ContentSafetySettings>,
-    );
+    const normalized = accountState.read(user.id, sanitizeSettings(accountContentSafety as Partial<ContentSafetySettings>));
 
     setSettings((current) => {
       if (areSettingsEqual(current, normalized)) return current;
@@ -167,22 +167,30 @@ export function useContentSafetySettings() {
     setSettings(next);
 
     if (user?.id) {
-      void saveAccountSettingsPatch(user.id, { contentSafety: next }).catch(() => undefined);
+      const revision = accountState.choose(user.id, sanitizeSettings(accountContentSafety), next);
+      void saveAccountSettingsPatch(user.id, { contentSafety: next }).then(() => {
+        accountState.settled(user.id, revision);
+        return refreshProfile();
+      }).catch(() => accountState.settled(user.id, revision));
     }
 
     return next;
-  }, [user?.id]);
+  }, [user?.id, accountContentSafety, refreshProfile]);
 
   const resetSettings = useCallback(() => {
     const next = resetContentSafetySettings();
     setSettings(next);
 
     if (user?.id) {
-      void saveAccountSettingsPatch(user.id, { contentSafety: next }).catch(() => undefined);
+      const revision = accountState.choose(user.id, sanitizeSettings(accountContentSafety), next);
+      void saveAccountSettingsPatch(user.id, { contentSafety: next }).then(() => {
+        accountState.settled(user.id, revision);
+        return refreshProfile();
+      }).catch(() => accountState.settled(user.id, revision));
     }
 
     return next;
-  }, [user?.id]);
+  }, [user?.id, accountContentSafety, refreshProfile]);
 
   return {
     settings,

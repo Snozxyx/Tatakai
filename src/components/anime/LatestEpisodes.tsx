@@ -69,7 +69,7 @@ function LatestEpisodeCard({ anime }: { anime: AnimeCard }) {
       <article
         onClick={() => navigate(watchHref)}
         data-mobile-poster-card
-        className="group relative w-[240px] shrink-0 cursor-pointer snap-start overflow-hidden rounded-2xl border border-white/[0.07] bg-white/[0.02] transition-all duration-300 hover:border-primary/40 hover:bg-white/[0.04] active:scale-[0.98] md:w-[280px]"
+        className="group relative w-[240px] shrink-0 cursor-pointer snap-start overflow-hidden rounded-2xl border border-white/[0.07] bg-white/[0.02] transition-[color,background-color,border-color,opacity] duration-300 hover:border-primary/40 hover:bg-white/[0.04] active:scale-[0.98] md:w-[280px]"
         style={{ contentVisibility: "auto", containIntrinsicSize: "auto 220px" }}
       >
         {/* Episode thumbnail — 16:9 screencap when ani.zip has one, else poster */}
@@ -79,7 +79,7 @@ function LatestEpisodeCard({ anime }: { anime: AnimeCard }) {
             alt={epTitle ? uiI18n.t('app.episode_i18n_value_0_i18n_value_1_ea088a33', { value0: epNumber, value1: epTitle }) : anime.name}
             loading="lazy"
             decoding="async"
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+            className="h-full w-full object-cover transition-transform duration-200 "
             onError={(e) => {
               const img = e.currentTarget;
               if (img.dataset.fallback === "1") return;
@@ -90,7 +90,7 @@ function LatestEpisodeCard({ anime }: { anime: AnimeCard }) {
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
 
           {epNumber != null && (
-            <span className="absolute left-2 top-2 rounded-md bg-black/70 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-white backdrop-blur-sm">
+            <span className="absolute left-2 top-2 rounded-md bg-black/70 px-2 py-1 text-xs font-medium normal-case tracking-normal text-white backdrop-blur-sm">
               {t('migration.episodeShort')} {epNumber}
             </span>
           )}
@@ -102,7 +102,7 @@ function LatestEpisodeCard({ anime }: { anime: AnimeCard }) {
           </span>
 
           {epTitle && (
-            <p className="absolute inset-x-2 bottom-2 line-clamp-1 text-[11px] font-semibold text-white/90 drop-shadow-md">
+            <p className="absolute inset-x-2 bottom-2 line-clamp-1 text-xs font-medium text-white/90 drop-shadow-md">
               {epTitle}
             </p>
           )}
@@ -118,22 +118,22 @@ function LatestEpisodeCard({ anime }: { anime: AnimeCard }) {
           <div className="min-w-0 flex-1">
             <h4
               data-mobile-poster-title
-              className="line-clamp-1 text-[13px] font-bold leading-tight text-white/90 transition-colors group-hover:text-primary"
+              className="line-clamp-1 text-[13px] font-medium leading-tight text-white/90 transition-colors group-hover:text-primary"
             >
               {anime.name}
             </h4>
-            <div className="mt-1 flex items-center gap-1.5 text-[11px] text-white/50">
+            <div className="mt-1 flex items-center gap-1.5 text-xs text-white/50">
               {epNumber != null && (
-                <span className="font-semibold text-white/70">{t('anime.episode')} {epNumber}</span>
+                <span className="font-medium text-white/70">{t('anime.episode')} {epNumber}</span>
               )}
               {anime.type && <span className="truncate">• {anime.type}</span>}
             </div>
             <div className="mt-1.5 flex flex-wrap gap-1.5">
-              <span className="inline-flex items-center gap-1 rounded bg-white/[0.08] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white/70">
+              <span className="inline-flex items-center gap-1 rounded bg-white/[0.08] px-1.5 py-0.5 text-xs font-medium normal-case tracking-normal text-white/70">
                 {t('anime.sub')} <span className="tabular-nums text-white/40">{anime.episodes.sub}</span>
               </span>
               {anime.episodes.dub > 0 && (
-                <span className="inline-flex items-center gap-1 rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">
+                <span className="inline-flex items-center gap-1 rounded bg-primary/15 px-1.5 py-0.5 text-xs font-medium normal-case tracking-normal text-primary">
                   {t('anime.dub')} <span className="tabular-nums text-primary/60">{anime.episodes.dub}</span>
                 </span>
               )}
@@ -170,14 +170,14 @@ export const LatestEpisodes = memo(function LatestEpisodes({ animes }: LatestEpi
         action={
           <div className="hidden md:flex items-center gap-2">
             <button
-              onClick={() => scroll("left")}
+              data-section-scroll-control onClick={() => scroll("left")}
               aria-label={t('discover.scrollLeft')}
               className="flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.02] text-white/60 transition-colors hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
             <button
-              onClick={() => scroll("right")}
+              data-section-scroll-control onClick={() => scroll("right")}
               aria-label={t('discover.scrollRight')}
               className="flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.02] text-white/60 transition-colors hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
             >

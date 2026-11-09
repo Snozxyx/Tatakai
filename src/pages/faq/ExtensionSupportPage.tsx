@@ -221,7 +221,7 @@ export default function ExtensionSupportPage() {
           name="keywords"
           content="Tatakai extension support, Stremio, Seanime, CloudStream, Mihon, Aniyomi, Sora, Mangayomi, Tatakai Server"
         />
-        <link rel="canonical" href="https://tatakai.me/faq/extension-support" />
+        <link rel="canonical" href="https://tatakai.app/faq/extension-support" />
         <meta property="og:title" content="Tatakai Extension Support FAQ" />
         <meta
           property="og:description"
@@ -233,7 +233,7 @@ export default function ExtensionSupportPage() {
             "@context": "https://schema.org",
             "@type": "FAQPage",
             name: "Tatakai Extension Support FAQ",
-            url: "https://tatakai.me/faq/extension-support",
+            url: "https://tatakai.app/faq/extension-support",
             get description() {
               return uiI18n.t(
                 "app.current_compatibility_guide_for_stremio_seanime__d25d4cc0"

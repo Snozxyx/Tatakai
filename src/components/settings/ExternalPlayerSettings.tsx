@@ -1,8 +1,7 @@
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { MonitorPlay, CheckCircle2, PlaySquare, Settings2, ShieldAlert, Plus, X, Zap } from 'lucide-react';
+import { CheckCircle2, PlaySquare, Settings2, ShieldAlert, Plus, X, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
@@ -51,6 +50,7 @@ export function ExternalPlayerSettings() {
 
         if (prefRes?.executablePath) {
           setSelectedPath(prefRes.executablePath);
+          setManualPath(prefRes.executablePath);
         }
       } catch (err: any) {
         setError(err.message || uiI18n.t('app.error_loading_player_settings_3c941a0e'));
@@ -65,8 +65,11 @@ export function ExternalPlayerSettings() {
     try {
       const rt = (window as any).tatakaiRuntime;
       if (!rt) return;
-      await rt.saveExternalPlayerPref(path);
-      setSelectedPath(path);
+      const executablePath = path.trim().replace(/^"(.*)"$/, '$1');
+      if (!executablePath) return;
+      await rt.saveExternalPlayerPref(executablePath);
+      setSelectedPath(executablePath);
+      setManualPath(executablePath);
     } catch (err: any) {
       console.error('Failed to save preference', err);
     }
@@ -98,7 +101,7 @@ export function ExternalPlayerSettings() {
 
       if (path) {
         setManualPath(path);
-        handleSelect(path);
+        await handleSelect(path);
       }
     } catch (err) {
       console.error('Failed to select file', err);
@@ -128,13 +131,13 @@ export function ExternalPlayerSettings() {
       title={uiI18n.t('app.external_player_d6d6f3a4')}
       description={uiI18n.t('app.open_streams_directly_in_mpv_vlc_or_mpc_hc_c0d6c318')}
     >
-      {players.length === 0 ? (
+      {players.length === 0 && (
         <div className="p-4 rounded-xl bg-muted/20 border border-border text-sm text-muted-foreground text-center">
           {uiI18n.t('app.no_supported_external_players_detected_on_your_s_00eecad0')}
           <br />
           <span className="text-xs">{uiI18n.t('app.supported_mpv_vlc_mpc_hc_mpc_be_26354fd6')}</span>
         </div>
-      ) : (
+      )}
         <div className="grid gap-2">
           {/* Default/Internal Option */}
           <button
@@ -244,7 +247,6 @@ export function ExternalPlayerSettings() {
              )}
           </div>
         </div>
-      )}
     </SettingsSection>
   );
 }

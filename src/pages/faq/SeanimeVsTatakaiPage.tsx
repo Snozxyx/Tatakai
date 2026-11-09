@@ -303,7 +303,7 @@ export default function SeanimeVsTatakaiPage() {
           name="description"
           content="An honest, verified comparison between Tatakai (community tracking platform, MPL-2.0) and Seanime (self-hosted media server, GPL-3.0). Complete dimension breakdown and scoreboard."
         />
-        <link rel="canonical" href="https://tatakai.me/faq/seanime-vs-tatakai" />
+        <link rel="canonical" href="https://tatakai.app/faq/seanime-vs-tatakai" />
         <meta property="og:title" content="Tatakai vs Seanime — Honest Feature Comparison" />
         <meta
           property="og:description"

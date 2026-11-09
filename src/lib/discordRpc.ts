@@ -209,7 +209,7 @@ export function setWatchingRpc(options: {
       buttons.push({ label: 'Show in Tatakai', url: options.animeUrl });
     }
     // Always offer a download button so Discord friends can get the app.
-    buttons.push({ label: 'Download Tatakai', url: 'https://tatakai.me/download' });
+    buttons.push({ label: 'Download Tatakai', url: 'https://tatakai.app/download' });
     extra.buttons = buttons.slice(0, 2);
   }
 
@@ -259,7 +259,7 @@ export function setPausedRpc(options: {
     if (options.animeUrl) {
       buttons.push({ label: 'Show in Tatakai', url: options.animeUrl });
     }
-    buttons.push({ label: 'Download Tatakai', url: 'https://tatakai.me/download' });
+    buttons.push({ label: 'Download Tatakai', url: 'https://tatakai.app/download' });
     extra.buttons = buttons.slice(0, 2);
   }
 
@@ -297,7 +297,7 @@ export function setViewingRpc(options: {
     if (options.animeUrl) {
       buttons.push({ label: 'Show in Tatakai', url: options.animeUrl });
     }
-    buttons.push({ label: 'Download Tatakai', url: 'https://tatakai.me/download' });
+    buttons.push({ label: 'Download Tatakai', url: 'https://tatakai.app/download' });
     extra.buttons = buttons.slice(0, 2);
   }
 
@@ -323,7 +323,7 @@ export function setBrowsingRpc(section: string = 'Anime'): void {
 
   if (s.showButtons) {
     extra.buttons = [
-      { label: 'Download Tatakai', url: 'https://tatakai.me/download' },
+      { label: 'Download Tatakai', url: 'https://tatakai.app/download' },
     ];
   }
 
@@ -362,7 +362,7 @@ export function setSelectingRpc(options: {
     if (options.animeUrl) {
       buttons.push({ label: 'Show in Tatakai', url: options.animeUrl });
     }
-    buttons.push({ label: 'Download Tatakai', url: 'https://tatakai.me/download' });
+    buttons.push({ label: 'Download Tatakai', url: 'https://tatakai.app/download' });
     extra.buttons = buttons.slice(0, 2);
   }
 
@@ -404,7 +404,7 @@ export function setReadingMangaRpc(options: {
     if (options.mangaUrl) {
       buttons.push({ label: 'Show in Tatakai', url: options.mangaUrl });
     }
-    buttons.push({ label: 'Download Tatakai', url: 'https://tatakai.me/download' });
+    buttons.push({ label: 'Download Tatakai', url: 'https://tatakai.app/download' });
     extra.buttons = buttons.slice(0, 2);
   }
 
@@ -440,7 +440,7 @@ export function setViewingMangaRpc(options: {
     if (options.mangaUrl) {
       buttons.push({ label: 'Show in Tatakai', url: options.mangaUrl });
     }
-    buttons.push({ label: 'Download Tatakai', url: 'https://tatakai.me/download' });
+    buttons.push({ label: 'Download Tatakai', url: 'https://tatakai.app/download' });
     extra.buttons = buttons.slice(0, 2);
   }
 
@@ -482,7 +482,7 @@ export function setReadingNovelRpc(options: {
     if (options.novelUrl) {
       buttons.push({ label: 'Show in Tatakai', url: options.novelUrl });
     }
-    buttons.push({ label: 'Download Tatakai', url: 'https://tatakai.me/download' });
+    buttons.push({ label: 'Download Tatakai', url: 'https://tatakai.app/download' });
     extra.buttons = buttons.slice(0, 2);
   }
 
@@ -518,7 +518,7 @@ export function setViewingNovelRpc(options: {
     if (options.novelUrl) {
       buttons.push({ label: 'Show in Tatakai', url: options.novelUrl });
     }
-    buttons.push({ label: 'Download Tatakai', url: 'https://tatakai.me/download' });
+    buttons.push({ label: 'Download Tatakai', url: 'https://tatakai.app/download' });
     extra.buttons = buttons.slice(0, 2);
   }
 

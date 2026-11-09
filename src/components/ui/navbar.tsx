@@ -148,14 +148,12 @@ export function Navigation() {
       {renderMobileMenu()}
 
       <header
-        className={`fixed z-50 transition-[background-color,border-color,opacity,transform] duration-200 ${isScrolled
-            ? "top-4 left-4 right-4"
-            : "top-0 left-0 right-0"}`}
+        className="fixed top-0 left-0 right-0 z-50 transition-colors duration-200"
       >
         <nav
-          className={`mx-auto transition-[background-color,border-color,opacity,transform] duration-200 ${isScrolled || isMobileMenuOpen
-              ? "bg-background/80 backdrop-blur-xl border border-foreground/10 rounded-2xl shadow-lg max-w-[1200px]"
-              : "bg-transparent max-w-[1400px]"}`}
+          className={`mx-auto max-w-[1400px] transition-colors duration-200 ${isScrolled || isMobileMenuOpen
+              ? "bg-background/95 border-b border-foreground/10"
+              : "bg-transparent"}`}
         >
           <div
             className={`flex items-center justify-between transition-[background-color,border-color,opacity,transform] duration-200 px-6 lg:px-8 ${isScrolled ? "h-14" : "h-20"}`}

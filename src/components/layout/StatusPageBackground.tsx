@@ -3,6 +3,8 @@ import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
+import { createPortal } from 'react-dom';
+import { useAppThemeBackground, useAppSystemBlur, useAppBackdropPortal } from './AppThemeBackground';
 
 const VIDEO_SOURCES = ['1.mp4', '2.webm', '3.mp4', '5.mp4', '6.mp4'].map(backgroundVideo);
 
@@ -16,6 +18,9 @@ export const StatusPageBackground = ({
   overlayOpacity = 1 
 }: StatusPageBackgroundProps) => {
   useUiTranslation();
+  const custom = useAppThemeBackground();
+  const systemBlur = useAppSystemBlur();
+  const portal = useAppBackdropPortal();
   const videoRef = useRef<HTMLVideoElement>(null);
   const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -39,10 +44,11 @@ export const StatusPageBackground = ({
       video.removeEventListener('ended', handleEnded);
       video.removeEventListener('canplay', handleCanPlay);
     };
-  }, [currentVideoIndex]);
+  }, [currentVideoIndex, systemBlur, portal]);
 
-  return (
-    <div className="fixed inset-0 overflow-hidden">
+  if (custom || (systemBlur && !portal)) return null;
+  const background = (
+    <div data-app-route-background className="fixed inset-0 overflow-hidden">
       {/* Video Background */}
       <motion.video
         ref={videoRef}
@@ -106,4 +112,5 @@ export const StatusPageBackground = ({
       />
     </div>
   );
+  return systemBlur ? createPortal(background, portal!) : background;
 };

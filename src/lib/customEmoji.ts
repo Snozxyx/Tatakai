@@ -1,3 +1,5 @@
+import { profileThemeAssetUrl } from './profileThemeAssets';
+
 export interface CustomEmoji { key: string; name: string; src: string; group: "custom" | "mascots"; width: number; height: number; }
 export const CUSTOM_EMOJI: CustomEmoji[] = [
   {
@@ -1400,7 +1402,7 @@ export const CUSTOM_EMOJI: CustomEmoji[] = [
     "width": 1312,
     "height": 1199
   }
-];
+].map(item => item.group === 'mascots' ? { ...item, src: profileThemeAssetUrl(item.src) } : item) as CustomEmoji[];
 const emojiByKey = new Map(CUSTOM_EMOJI.map(item => [item.key, item]));
 export const customEmojiToken = (item: CustomEmoji) => `:tatakai-${item.key}:`;
 export const findCustomEmoji = (token: string) => token.startsWith(':tatakai-') && token.endsWith(':') ? emojiByKey.get(token.slice(9, -1)) : undefined;

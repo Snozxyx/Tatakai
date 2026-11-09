@@ -47,7 +47,7 @@ async function request(
         method: operation === "series" ? "GET" : "POST",
         headers: {
           "Content-Type": "application/json",
-          "User-Agent": "Tatakai/6 (https://tatakai.me)",
+          "User-Agent": "Tatakai/6 (https://tatakai.app)",
         },
         ...(operation === "series" ? {} : { body: JSON.stringify(body) }),
         signal: AbortSignal.timeout(15000),

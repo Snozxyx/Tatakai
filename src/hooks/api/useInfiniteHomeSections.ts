@@ -177,7 +177,7 @@ async function fetchGenreSection(config: typeof SECTION_CONFIGS[0], pageSeed: nu
   const animes = mergeUniqueAnimeCards(internalAnimes, anilistAnimes).slice(0, 12);
 
   return {
-    id: `section-${config.genre}-${Date.now()}-${pageSeed}`,
+    id: `genre-${config.genre}`,
     title: genreTitle,
     genre: config.genre,
     layout: config.layout,

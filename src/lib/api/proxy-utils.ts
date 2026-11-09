@@ -16,7 +16,7 @@ const STREAM_PROXY_BASE = String(
   import.meta.env.VITE_STREAM_PROXY_URL ||
     import.meta.env.VITE_PROXY_NODE_URL ||
     import.meta.env.VITE_PROXY_CF_URL ||
-    'https://hoko.tatakai.me/api/v1/streamingProxy'
+    'https://hoko.tatakai.app/api/v1/streamingProxy'
 ).trim();
 
 // Backend origin for subtitle proxying — avoids CORS issues with the external

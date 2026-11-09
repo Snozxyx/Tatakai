@@ -71,8 +71,8 @@ export function parseBetterStackStatus(
 }
 async function fetchReportJson(signal?: AbortSignal): Promise<unknown> {
   for (const endpoint of [
-    "https://api.tatakai.me/service-status.json",
-    "https://tatakai.me/service-status.json",
+    "https://api.tatakai.app/service-status.json",
+    "https://tatakai.app/service-status.json",
   ]) {
     if (signal?.aborted) throw new Error("Monitoring request cancelled");
     const controller = new AbortController();

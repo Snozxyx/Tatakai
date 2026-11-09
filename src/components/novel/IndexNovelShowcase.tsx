@@ -1,3 +1,4 @@
+import { selectReadingTitle } from '@/lib/titleLanguage';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMemo, useRef } from "react";
@@ -15,7 +16,7 @@ type NovelCardItem = UnifiedMediaCardProps["item"];
 
 function toNovelCard(item: NovelSearchItem): NovelCardItem | null {
   const title =
-    item.canonicalTitle || item.title?.english || item.title?.romaji || item.title?.native;
+    selectReadingTitle(item);
   const id = item.anilistId || item.malId || item.id;
 
   if (!id || !title) return null;
@@ -128,14 +129,14 @@ export function IndexNovelShowcase() {
           <div className="flex items-center gap-2 shrink-0">
             <div className="hidden sm:flex gap-1 p-1 rounded-full bg-white/5 border border-white/10">
               <button
-                onClick={() => scroll("left")}
+                data-section-scroll-control onClick={() => scroll("left")}
                 aria-label={uiI18n.t('app.scroll_left_2c9e5a60')}
                 className="p-2 rounded-full text-muted-foreground hover:text-white hover:bg-white/10 transition-colors duration-300"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
               <button
-                onClick={() => scroll("right")}
+                data-section-scroll-control onClick={() => scroll("right")}
                 aria-label={uiI18n.t('app.scroll_right_2994b49c')}
                 className="p-2 rounded-full text-muted-foreground hover:text-white hover:bg-white/10 transition-colors duration-300"
               >

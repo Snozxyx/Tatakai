@@ -1,3 +1,5 @@
+import { selectReadingTitle, type TitleLanguage } from '@/lib/titleLanguage';
+import { usePreferredReadingTitleLanguage } from '@/hooks/ui/useTitleLanguage';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useRef, useCallback, useEffect } from 'react';
@@ -55,7 +57,7 @@ function dedupeItems(items: UnifiedMediaCardProps['item'][]): UnifiedMediaCardPr
   });
 }
 
-function mapRowsToItems(rawItems: any[], canShowAdult: boolean): UnifiedMediaCardProps['item'][] {
+function mapRowsToItems(rawItems: any[], canShowAdult: boolean, language: TitleLanguage): UnifiedMediaCardProps['item'][] {
   return rawItems
     .filter((item) => {
       const isAdult = inferMangaAdultFlag(item);
@@ -63,7 +65,7 @@ function mapRowsToItems(rawItems: any[], canShowAdult: boolean): UnifiedMediaCar
     })
     .map((item) => ({
       id: String(item.anilistId || item.malId || item.id),
-      name: item.canonicalTitle || item.title?.english || item.title?.romaji || item.title?.native || 'Unknown',
+      name: selectReadingTitle(item, language) || 'Unknown',
       poster: item.poster || '',
       type: 'novel' as const,
       status: item.status || undefined,
@@ -84,9 +86,10 @@ export function useInfiniteNovelSections() {
   useUiTranslation();
   const { settings } = useContentSafetySettings();
   const showAdult = settings.showAdultEverywhere;
+  const titleLanguage = usePreferredReadingTitleLanguage();
 
   return useInfiniteQuery({
-    queryKey: ['infiniteNovelSections', showAdult],
+    queryKey: ['infiniteNovelSections', showAdult, titleLanguage],
     queryFn: async ({ pageParam = 1 }): Promise<{ sections: NovelSection[]; hasNextPage: boolean }> => {
       const start = (pageParam - 1) * SHELVES_PER_PAGE;
       const shelves = SHELVES.slice(start, start + SHELVES_PER_PAGE);
@@ -103,7 +106,7 @@ export function useInfiniteNovelSections() {
             genre: shelf.genre,
             layout: 'carousel' as NovelSectionLayout,
             icon: SECTION_ICONS[shelf.icon],
-            items: dedupeItems(mapRowsToItems(res?.results ?? [], showAdult)),
+            items: dedupeItems(mapRowsToItems(res?.results ?? [], showAdult, titleLanguage)),
           };
         }),
       );
@@ -126,13 +129,14 @@ export function useNovelSectionItems(sectionId: string) {
   const shelf = SHELVES.find(shelf => shelf.id === sectionId);
   const { settings } = useContentSafetySettings();
   const showAdult = settings.showAdultEverywhere;
+  const titleLanguage = usePreferredReadingTitleLanguage();
   const query = useInfiniteQuery({
-    queryKey: ['novel-section-pages', sectionId, showAdult],
+    queryKey: ['novel-section-pages', sectionId, showAdult, titleLanguage],
     initialPageParam: 2,
     queryFn: async ({ pageParam }) => {
       if (!shelf) return { items: [], hasNextPage: false };
       const result = await searchNovels('', pageParam, SHELF_ITEMS, { genre: shelf.genre, sort: 'POPULARITY_DESC', adult: showAdult });
-      return { items: mapRowsToItems(result.results, showAdult), hasNextPage: result.hasNextPage ?? result.results.length >= SHELF_ITEMS };
+      return { items: mapRowsToItems(result.results, showAdult, titleLanguage), hasNextPage: result.hasNextPage ?? result.results.length >= SHELF_ITEMS };
     },
     getNextPageParam: (page, _pages, previousPage) => page.hasNextPage ? previousPage + 1 : undefined,
     enabled: false,

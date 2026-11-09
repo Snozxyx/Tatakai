@@ -1,9 +1,10 @@
 import { deriveIsAdmin, type StaffRoleSource } from './roles';
 import { safeProfileAudio } from './profileThemeMusic';
+import { isProfileThemeAssetPath, isProfileThemeAssetUrl, profileThemeAssetUrl } from './profileThemeAssets';
 
 export const WIDGET_KINDS = ['identity', 'stats', 'streaks', 'activity', 'favorites', 'library', 'badges', 'links', 'clock', 'calendar', 'note', 'image', 'overview', 'watchlist', 'manga-readlist', 'novel-readlist', 'history', 'vault'] as const;
 export type WidgetKind = typeof WIDGET_KINDS[number];
-export const SEKAI_DEFAULT_WALLPAPER = '/assets/profile-themes/sekaipop/default-wallpaper.png';
+export const SEKAI_DEFAULT_WALLPAPER = profileThemeAssetUrl('/assets/profile-themes/sekaipop/default-wallpaper.png');
 export const SEKAI_WALLPAPERS = [{ id: 'original', title: 'SekaiPop original', url: SEKAI_DEFAULT_WALLPAPER }] as const;
 export const SEKAI_MASCOTS = [
   { key: 'yay', name: 'Yay!', file: 'Chibi Catgirl Yay Sticker.png' },
@@ -13,7 +14,7 @@ export const SEKAI_MASCOTS = [
   { key: 'crying', name: 'Little fox', file: 'Crying Fox-Eared Chibi with Plush.png' },
   { key: 'angry', name: 'Not amused', file: 'Angry Chibi Catgirl Sticker.png' },
 ] as const;
-export function sekaiMascotUrl(key: string) { return `/assets/mascots/${encodeURIComponent((SEKAI_MASCOTS.find(m => m.key === key) ?? SEKAI_MASCOTS[0]).file)}`; }
+export function sekaiMascotUrl(key: string) { return profileThemeAssetUrl(`/assets/mascots/${encodeURIComponent((SEKAI_MASCOTS.find(m => m.key === key) ?? SEKAI_MASCOTS[0]).file)}`); }
 export interface ScrapWidget {
   id: string; kind: WidgetKind; x: number; y: number; w: number; h: number;
   z: number; rotation: number; visible: boolean; title: string; text: string; image: string;
@@ -54,8 +55,8 @@ const record = (v: unknown): Record<string, unknown> => v && typeof v === 'objec
 const num = (v: unknown, fallback: number, min: number, max: number) => typeof v === 'number' && Number.isFinite(v) ? clamp(v, min, max) : fallback;
 const str = (v: unknown, max = 200) => typeof v === 'string' ? v.slice(0, max) : '';
 export function safeThemeImage(value: unknown): string {
-  if (value === SEKAI_DEFAULT_WALLPAPER) return value;
   if (typeof value !== 'string' || value.length > 2048) return '';
+  if (isProfileThemeAssetPath(value) || isProfileThemeAssetUrl(value)) return profileThemeAssetUrl(value);
   try { const u = new URL(value); return u.protocol === 'https:' && !u.username && !u.password ? u.href : ''; } catch { return ''; }
 }
 export function makeWidget(kind: WidgetKind, index = 0): ScrapWidget {

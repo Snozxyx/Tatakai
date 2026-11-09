@@ -1,14 +1,14 @@
-import { THEME_COLORS, THEME_INFO, type Theme } from "@/hooks/ui/useTheme";
+import { THEME_INFO, resolveColors, resolveThemeId, resolveThemePalette, type Theme, type ThemeId } from "@/hooks/ui/useTheme";
 import type { CSSProperties } from "react";
 
 export const DEFAULT_TV_THEME = "cherry-blossom";
 export const TV_THEMES = ["cherry-blossom", "midnight", "neon-tokyo", "deep-ocean", "blood-moon", "amoled"] as const satisfies readonly Theme[];
-export type TVTheme = typeof TV_THEMES[number];
+export type TVTheme = ThemeId;
 export function resolveTVTheme(value: unknown): TVTheme {
-  return TV_THEMES.includes(value as TVTheme) ? value as TVTheme : DEFAULT_TV_THEME;
+  return typeof value === 'string' ? resolveThemeId(value) : DEFAULT_TV_THEME;
 }
 export function tvThemeInfo(theme: TVTheme) {
-  return { ...THEME_INFO[theme], colors: THEME_COLORS[theme] };
+  return { ...(THEME_INFO as Record<string, typeof THEME_INFO['midnight']>)[theme], colors: resolveColors(theme) };
 }
 function rgbChannels(hsl: string): string {
   const [h, s, l] = hsl.split(/\s+/).map(Number.parseFloat);
@@ -20,8 +20,8 @@ function rgbChannels(hsl: string): string {
   }).join(',');
 }
 /** Scope TV colors to its shell, leaving the account's desktop theme untouched. */
-export function tvThemeStyle(theme: TVTheme): CSSProperties {
-  const colors = THEME_COLORS[theme];
+export function tvThemeStyle(theme: TVTheme, palette?: Record<string, string> | null): CSSProperties {
+  const colors = resolveThemePalette(theme, palette);
   const tokens: Record<string, string> = {};
   for (const [key, value] of Object.entries(colors)) {
     if (typeof value === "string") tokens[`--${key.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`)}`] = value;
@@ -32,6 +32,8 @@ export function tvThemeStyle(theme: TVTheme): CSSProperties {
     '--tv-accent': rgbChannels(colors.primary),
     '--tv-glass': rgbChannels(colors.card),
     '--tv-ink': rgbChannels(colors.background),
+    colorScheme: colors.isLight ? 'light' : 'dark',
     backgroundColor: `hsl(${colors.background})`,
+    color: `hsl(${colors.foreground})`,
   } as CSSProperties;
 }

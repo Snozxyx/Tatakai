@@ -22,8 +22,8 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Loader2, AlertTriangle } from "lucide-react";
-import { TurnstileWidget, type TurnstileWidgetHandle } from "@/components/security/TurnstileWidget";
-import { isTurnstileEnabled, verifyTurnstileToken } from "@/lib/security/turnstile";
+import { CaptchaWidget, type CaptchaWidgetHandle } from "@/components/security/CaptchaWidget";
+import { isCaptchaRequired, requestSecurity } from "@/lib/security/captcha";
 import { ugcErrorMessage } from "@/lib/ugcErrors";
 
 interface ReportModalProps {
@@ -41,8 +41,9 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName 
     const [details, setDetails] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [captchaToken, setCaptchaToken] = useState<string | null>(null);
-    const turnstileRef = useRef<TurnstileWidgetHandle>(null);
-    const turnstileEnabled = isTurnstileEnabled();
+    const captchaRequired = isCaptchaRequired();
+    const captchaRef = useRef<CaptchaWidgetHandle>(null);
+
 
     const handleSubmit = async () => {
         if (!user) {
@@ -55,46 +56,27 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName 
             return;
         }
 
-        if (turnstileEnabled && !captchaToken) {
+        if (captchaRequired && !captchaToken) {
             toast.error(uiI18n.t('app.please_complete_the_verification_challenge_7dbc0a97'));
             return;
         }
 
         setIsSubmitting(true);
         try {
-            if (turnstileEnabled) {
-                const ok = await verifyTurnstileToken(captchaToken);
-                if (!ok) {
-                    toast.error(uiI18n.t('app.verification_failed_please_try_again_79a2796b'));
-                    turnstileRef.current?.reset();
-                    setCaptchaToken(null);
-                    return;
-                }
-            }
-
-            const { error } = targetType === 'direct_message'
-              ? await (supabase as any).rpc('report_direct_message', { p_message: targetId, p_reason: `${reason}: ${details}` })
-              : await supabase.from('reports').insert({
-                reporter_id: user.id,
-                target_type: targetType,
-                target_id: targetId,
-                reason,
-                details,
-                status: 'pending'
-            });
-
-            if (error) throw error;
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) throw new Error(uiI18n.t('app.you_must_be_logged_in_to_report_cc4ae7d0'));
+            await requestSecurity('submissions/report', { captchaToken: captchaToken ?? undefined, targetType, targetId, reason, details }, { accessToken: session.access_token });
 
             toast.success(uiI18n.t('app.report_submitted_successfully_our_moderators_wil_f78c23c3'));
             onClose();
             // Reset form
             setReason("");
             setDetails("");
-            turnstileRef.current?.reset();
+            captchaRef.current?.reset();
             setCaptchaToken(null);
         } catch (error: any) {
             toast.error(ugcErrorMessage(error, "Failed to submit report: "));
-            turnstileRef.current?.reset();
+            captchaRef.current?.reset();
             setCaptchaToken(null);
         } finally {
             setIsSubmitting(false);
@@ -158,14 +140,15 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName 
                         />
                     </div>
 
-                    {turnstileEnabled && (
-                        <TurnstileWidget
-                            ref={turnstileRef}
+                    {isOpen && user && (
+                        <CaptchaWidget
+                            key={`${targetType}:${targetId}`}
+                            ref={captchaRef}
                             action="report"
                             onToken={setCaptchaToken}
                             onExpire={() => setCaptchaToken(null)}
                             onError={() => setCaptchaToken(null)}
-                            className="flex justify-center"
+                            disabled={isSubmitting}
                         />
                     )}
                 </div>
@@ -177,7 +160,7 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName 
                     <Button
                         variant="destructive"
                         onClick={handleSubmit}
-                        disabled={isSubmitting || !user || (turnstileEnabled && !captchaToken)}
+                        disabled={isSubmitting || !user || (captchaRequired && !captchaToken)}
                         className="shadow-lg shadow-destructive/20"
                     >
                         {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}

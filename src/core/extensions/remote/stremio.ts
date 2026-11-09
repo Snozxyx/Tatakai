@@ -25,8 +25,13 @@ export function normalizeStremioStream(stream: any, providerId: string, provider
   const trackers = Array.isArray(stream.sources) ? stream.sources.filter((v: unknown) => typeof v === 'string' && v.startsWith('tracker:')).map((v: string) => '&tr=' + encodeURIComponent(v.slice(8))).join('') : '';
   const url = hash ? `magnet:?xt=urn:btih:${hash}${trackers}` : stream.url;
   if (typeof url !== 'string' || !/^(https?:\/\/|magnet:\?)/i.test(url)) return null;
+  const headerEntries = new Map<string, [string, string]>();
+  for (const source of [stream.proxyHeaders?.request, stream.behaviorHints?.proxyHeaders?.request]) {
+    for (const [name, value] of Object.entries(source || {})) if (typeof value === 'string') headerEntries.set(name.toLowerCase(), [name, value]);
+  }
+  const headers = Object.fromEntries(headerEntries.values());
   return { url, originalUrl: url, providerKey: providerId, providerName, source: providerName,
-    ...streamMetadata(stream), title: stream.description || stream.title, headers: stream.behaviorHints?.proxyHeaders?.request || {},
+    ...streamMetadata(stream), title: stream.description || stream.title, headers,
       sourceType: hash ? 'torrent' : isDebridDirectUrl(url) ? 'debrid' : /\.m3u8(?:\?|$)/i.test(url) ? 'hls' : 'mp4', isTorrent: !!hash,
     magnetLink: hash ? url : undefined, infoHash: hash || undefined,
     fileIndex: Number.isInteger(stream.fileIdx) && stream.fileIdx >= 0 ? stream.fileIdx : undefined,

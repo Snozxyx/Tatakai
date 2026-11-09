@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Disc3, Pause, Play, Volume2 } from "lucide-react";
 import type { MidnightLofiConfig } from "./config";
+import { profileThemeAssetUrl } from '@/lib/profileThemeAssets';
 
 export function LofiMusic({ music }: { music: MidnightLofiConfig["music"] }) {
   const audio = useRef<HTMLAudioElement>(null);
@@ -38,8 +39,7 @@ export function LofiMusic({ music }: { music: MidnightLofiConfig["music"] }) {
       <audio
         ref={audio}
         src={
-          music.url ||
-          "/assets/profile-themes/midnight-lofi/after-the-last-train.mp3"
+          profileThemeAssetUrl(music.url || '/assets/profile-themes/midnight-lofi/after-the-last-train.mp3')
         }
         loop
         preload="none"

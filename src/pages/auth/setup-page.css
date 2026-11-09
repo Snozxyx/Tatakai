@@ -1,0 +1,52 @@
+.setup-form {
+  flex: 0 0 auto;
+  margin-block: auto;
+  padding: 32px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 20px;
+  background: hsl(var(--card));
+}
+
+@media (max-width: 1023px) {
+  .setup-form {
+    margin-block: 0;
+  }
+}
+
+.setup-step-content > div > div {
+  display: flex;
+  flex-direction: column;
+  min-height: 320px;
+}
+
+.setup-page .setup-nav {
+  margin-top: auto;
+  padding-top: 24px;
+}
+
+.setup-page .setup-toggle::after {
+  content: '';
+  position: absolute;
+  inset: -10px -4px;
+}
+
+.setup-page .setup-form h1 {
+  font-weight: 600;
+}
+
+.setup-page .setup-form h2 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 500;
+  line-height: 1.12;
+}
+
+@media (max-width: 639px) {
+  .setup-form {
+    padding: 24px 20px;
+    border-radius: 16px;
+  }
+
+  .setup-step-content > div > div {
+    min-height: 280px;
+  }
+}

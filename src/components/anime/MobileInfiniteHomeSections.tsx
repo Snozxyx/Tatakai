@@ -1,3 +1,6 @@
+import { HomeSectionGroup } from '@/components/customization/HomeCustomization';
+import { useCardDesign } from '@/components/customization/CardDesignContext';
+import { UnifiedMediaCard } from '@/components/UnifiedMediaCard';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { memo, useEffect, useMemo, useRef } from 'react';
@@ -19,6 +22,7 @@ const CARDS_PER_SECTION = 8;
 
 const MobileCard = memo(function MobileCard({ anime }: { anime: any }) {
   useUiTranslation();
+  const { design, readOnly } = useCardDesign();
   const navigate = useNavigate();
 
   const routeId = buildPreferredAnimeRouteId({
@@ -37,6 +41,7 @@ const MobileCard = memo(function MobileCard({ anime }: { anime: any }) {
 
   // Long-press quick peek — same widget as the desktop cards.
   const longPress = useLongPress({
+    disabled: readOnly,
     onLongPress: () => {
       openMediaQuickPeek({
         kind: 'anime',
@@ -54,6 +59,7 @@ const MobileCard = memo(function MobileCard({ anime }: { anime: any }) {
     },
   });
 
+  if (design) return <UnifiedMediaCard item={{ ...anime, id: String(anime.id), href: routeTo, mediaType: 'anime' }} />;
   return (
     <button
       type="button"
@@ -105,6 +111,13 @@ const MobileCard = memo(function MobileCard({ anime }: { anime: any }) {
     </button>
   );
 });
+
+export function MobileFeedGrid({ animes }: { animes: any[] }) {
+  const { design } = useCardDesign();
+  return <div data-mobile-home-rail data-card-collection="shelf" data-fixed-card-row className="flex flex-nowrap gap-3 overflow-x-auto pb-4 px-1 scrollbar-hide snap-x snap-mandatory">
+    {animes.slice(0, CARDS_PER_SECTION).map(anime => <div key={anime.id || anime.name} className="media-card-rail-item snap-start" style={{ width: design?.style?.width ?? 144 }}><MobileCard anime={anime} /></div>)}
+  </div>;
+}
 
 export function MobileInfiniteHomeSections() {
   useUiTranslation();
@@ -194,9 +207,9 @@ export function MobileInfiniteHomeSections() {
       </div>
 
       {isLoading && (
-        <div data-mobile-home-rail className="grid grid-cols-2 gap-3 px-1">
+        <div data-mobile-home-rail className="flex flex-nowrap gap-3 overflow-hidden px-1">
           {Array.from({ length: 4 }).map((_, index) => (
-            <div key={index} className="aspect-[2/3] animate-pulse rounded-2xl border border-white/[0.08] bg-white/[0.04]" />
+            <div key={index} className="media-card-rail-item aspect-[2/3] animate-pulse rounded-2xl border border-white/[0.08] bg-white/[0.04]" />
           ))}
         </div>
       )}
@@ -219,19 +232,15 @@ export function MobileInfiniteHomeSections() {
         </div>
       )}
 
-      {visibleSections.map((section: any) => (
+      <HomeSectionGroup groupId="genre-feed" sections={visibleSections.map((section: any) => ({ id: `feed-${section.genre || section.id}`, label: section.title, collection: true, layoutLocked: 'shelf' as const, node: (
         <div key={section.id} className="mb-8" style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 500px' }}>
           <HomeSectionHeading
             icon={<Compass className="w-5 h-5 text-primary" />}
             title={<span className="line-clamp-1 pr-2">{section.title}</span>}
           />
-          <div data-mobile-home-rail className="grid grid-cols-2 gap-3 px-1">
-            {(section.animes || []).slice(0, CARDS_PER_SECTION).map((anime: any) => (
-              <MobileCard key={anime.id || anime.name} anime={anime} />
-            ))}
-          </div>
+          <MobileFeedGrid animes={section.animes || []} />
         </div>
-      ))}
+      ) }))} />
 
       {!isLoading && visibleSections.length === 0 && !error && (
         <div className="px-1">

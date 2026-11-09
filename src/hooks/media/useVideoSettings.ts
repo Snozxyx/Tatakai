@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ANIME4K_QUALITY, normalizeVideoEnhancement, type VideoEnhancementEngine, type VideoEnhancementQuality } from '@/lib/video/enhancement-settings';
 import {
   readGuestSettingsFromCookie,
+  readAccountSettingsFromLocal,
   readProfileAppSettings,
   saveAccountSettingsPatch,
   writeGuestSettingsCookie,
@@ -21,7 +22,7 @@ export type SleepTimerOption = 'off' | '15' | '30' | '45' | '60' | 'end-of-episo
 export interface VideoSettings {
   videoEnhancementEngine: VideoEnhancementEngine;
   videoEnhancementQuality: VideoEnhancementQuality;
-  playerEngine: 'builtin' | 'jwplayer';
+  playerEngine: 'builtin' | 'jwplayer' | 'vidstack';
   jwPlayerLibraryId: string;
   audioLanguage: string;
   defaultQuality: 'auto' | '1080p' | '720p' | '480p' | '360p';
@@ -106,6 +107,18 @@ const DEFAULT_SETTINGS: VideoSettings = {
 
 const STORAGE_KEY = 'video-player-settings';
 const UPDATE_EVENT = 'tatakai-video-settings-updated';
+const REVISION_KEY = 'tatakai-video-settings-revision';
+type VideoSettingsRevision = { accountId: string | null; updatedAt: number };
+const settingsRevision = (settings: Record<string, unknown>) => {
+  const value = Number(settings.__updatedAt);
+  return Number.isFinite(value) && value > 0 ? value : 0;
+};
+function readLocalRevision(): VideoSettingsRevision | undefined {
+  try {
+    const value = JSON.parse(window.localStorage.getItem(REVISION_KEY) || 'null');
+    if (value && (value.accountId === null || typeof value.accountId === 'string') && Number.isFinite(value.updatedAt)) return value;
+  } catch { /* Storage may be unavailable. */ }
+}
 const VALID_DEFAULT_QUALITIES = new Set(['auto', '1080p', '720p', '480p', '360p']);
 const VALID_ANIME4K_PRESETS = new Set<Anime4KPreset>(['off', 'light', 'standard', 'high', 'upscale', 'restore']);
 const VALID_SLEEP_TIMERS = new Set<SleepTimerOption>(['off', '15', '30', '45', '60', 'end-of-episode']);
@@ -138,6 +151,14 @@ const isHexColor = (value: unknown): value is string =>
   typeof value === 'string' && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(value);
 
 const normalizeSettings = (raw: Partial<VideoSettings> & { autoPlayNext?: boolean } | null | undefined): VideoSettings => {
+  const enhancement = normalizeVideoEnhancement(raw);
+  // Older processing-selector saves changed the active preset without updating
+  // the quality field. Display the quality the renderer actually uses.
+  if (enhancement.videoEnhancementEngine === 'anime4k') {
+    if (raw?.anime4kPreset === 'high') enhancement.videoEnhancementQuality = 'high';
+    if (raw?.anime4kPreset === 'light') enhancement.videoEnhancementQuality = 'light';
+    if (raw?.anime4kPreset === 'standard') enhancement.videoEnhancementQuality = 'balanced';
+  }
   const autoNextEpisode =
     typeof raw?.autoNextEpisode === 'boolean'
       ? raw.autoNextEpisode
@@ -148,8 +169,8 @@ const normalizeSettings = (raw: Partial<VideoSettings> & { autoPlayNext?: boolea
   return {
     ...DEFAULT_SETTINGS,
     ...raw,
-    ...normalizeVideoEnhancement(raw),
-    playerEngine: raw?.playerEngine === 'jwplayer' ? 'jwplayer' : 'builtin',
+    ...enhancement,
+    playerEngine: raw?.playerEngine === 'jwplayer' || raw?.playerEngine === 'vidstack' ? raw.playerEngine : 'builtin',
     jwPlayerLibraryId: typeof raw?.jwPlayerLibraryId === 'string' ? raw.jwPlayerLibraryId.trim() : '',
     audioLanguage: typeof raw?.audioLanguage === 'string' && /^(auto|[a-z]{2,3})$/.test(raw.audioLanguage) ? raw.audioLanguage : 'auto',
     defaultQuality: VALID_DEFAULT_QUALITIES.has(String(raw?.defaultQuality))
@@ -206,9 +227,11 @@ const normalizeSettings = (raw: Partial<VideoSettings> & { autoPlayNext?: boolea
     sleepTimer: VALID_SLEEP_TIMERS.has(raw?.sleepTimer as SleepTimerOption)
       ? (raw!.sleepTimer as SleepTimerOption)
       : DEFAULT_SETTINGS.sleepTimer,
-    anime4kPreset: VALID_ANIME4K_PRESETS.has(raw?.anime4kPreset as Anime4KPreset)
+    anime4kPreset: VALID_ANIME4K_PRESETS.has(raw?.anime4kPreset as Anime4KPreset) && raw?.anime4kPreset !== 'off'
       ? (raw!.anime4kPreset as Anime4KPreset)
-      : DEFAULT_SETTINGS.anime4kPreset,
+      : enhancement.videoEnhancementEngine === 'anime4k'
+        ? ANIME4K_QUALITY[enhancement.videoEnhancementQuality]
+        : DEFAULT_SETTINGS.anime4kPreset,
   };
 };
 
@@ -236,43 +259,58 @@ function loadSettingsFromStorage(): VideoSettings {
   }
 }
 
-const persistLocalVideoSettings = (settings: VideoSettings) => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-  writeGuestSettingsCookie({ video: settings as unknown as Record<string, unknown> });
-  window.dispatchEvent(new CustomEvent(UPDATE_EVENT));
+const persistLocalVideoSettings = (settings: VideoSettings, revision: VideoSettingsRevision) => {
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+    window.localStorage.setItem(REVISION_KEY, JSON.stringify(revision));
+    writeGuestSettingsCookie({ video: { ...settings, __updatedAt: revision.updatedAt } });
+  } catch (error) {
+    console.error('Failed to save video settings:', error);
+  }
+  // Consumers only read this notification; they never write stale snapshots back.
+  window.dispatchEvent(new CustomEvent(UPDATE_EVENT, { detail: settings }));
 };
 
 export function useVideoSettings() {
   const { user, profile } = useAuth();
   const [settings, setSettings] = useState<VideoSettings>(() => loadSettingsFromStorage());
+  const currentSettingsRef = useRef(settings);
+  currentSettingsRef.current = settings;
   const seededAccountRef = useRef<string | null>(null);
 
   const accountVideoSettings = useMemo(
     () => readProfileAppSettings(profile).video,
-    [profile?.app_settings],
+    [profile],
   );
 
   useEffect(() => {
-    try {
-      persistLocalVideoSettings(settings);
-    } catch (e) {
-      console.error('Failed to save video settings:', e);
-    }
-  }, [settings]);
+    if (!user?.id || profile?.user_id !== user.id) return;
 
-  useEffect(() => {
-    if (!user?.id) return;
-    if (!accountVideoSettings || typeof accountVideoSettings !== 'object') return;
+    const localRevision = readLocalRevision();
+    const cachedAccountSettings = readAccountSettingsFromLocal(user.id).video;
+    const remoteSettings = accountVideoSettings && typeof accountVideoSettings === 'object' ? accountVideoSettings : undefined;
+    if (!remoteSettings && !cachedAccountSettings) return;
+    const remoteRevision = remoteSettings ? settingsRevision(remoteSettings) : 0;
+    const cachedRevision = cachedAccountSettings ? settingsRevision(cachedAccountSettings) : 0;
+    // The per-account cache also protects edits when switching away and back.
+    const latest = !remoteSettings || cachedRevision > remoteRevision ? cachedAccountSettings : remoteSettings;
+    const latestRevision = Math.max(cachedRevision, remoteRevision);
+    // The profile stays unchanged after an account save. A newly mounted drawer
+    // must keep this account's newer local choices instead of reloading that profile.
+    if (localRevision?.accountId === user.id && latestRevision <= localRevision.updatedAt) return;
 
-    const next = normalizeSettings(accountVideoSettings as Partial<VideoSettings> & { autoPlayNext?: boolean });
+    const next = normalizeSettings(latest as Partial<VideoSettings> & { autoPlayNext?: boolean });
+    currentSettingsRef.current = next;
+    persistLocalVideoSettings(next, { accountId: user.id, updatedAt: latestRevision });
     setSettings((previous) => (areSettingsEqual(previous, next) ? previous : next));
-  }, [user?.id, accountVideoSettings]);
+  }, [user?.id, profile?.user_id, accountVideoSettings]);
 
   useEffect(() => {
     if (!user?.id) {
       seededAccountRef.current = null;
       return;
     }
+    if (profile?.user_id !== user.id) return;
 
     if (accountVideoSettings && typeof accountVideoSettings === 'object') {
       seededAccountRef.current = user.id;
@@ -283,15 +321,18 @@ export function useVideoSettings() {
     seededAccountRef.current = user.id;
 
     void saveAccountSettingsPatch(user.id, {
-      video: settings as unknown as Record<string, unknown>,
+      video: { ...currentSettingsRef.current, __updatedAt: readLocalRevision()?.updatedAt || 0 },
     }).catch(() => {
       seededAccountRef.current = null;
     });
-  }, [user?.id, accountVideoSettings, settings]);
+  }, [user?.id, profile?.user_id, accountVideoSettings, settings]);
 
   useEffect(() => {
-    const syncSettings = () => {
-      const next = loadSettingsFromStorage();
+    const syncSettings = (event?: Event) => {
+      const next = event?.type === UPDATE_EVENT && (event as CustomEvent<VideoSettings>).detail
+        ? (event as CustomEvent<VideoSettings>).detail
+        : loadSettingsFromStorage();
+      currentSettingsRef.current = next;
       setSettings((previous) => (areSettingsEqual(previous, next) ? previous : next));
     };
 
@@ -300,8 +341,10 @@ export function useVideoSettings() {
       syncSettings();
     };
 
-    window.addEventListener('storage', handleStorage);
     window.addEventListener(UPDATE_EVENT, syncSettings);
+    window.addEventListener('storage', handleStorage);
+    // Account hydration in a sibling can run before this subscription mounts.
+    syncSettings();
     return () => {
       window.removeEventListener('storage', handleStorage);
       window.removeEventListener(UPDATE_EVENT, syncSettings);
@@ -312,25 +355,33 @@ export function useVideoSettings() {
     key: K,
     value: VideoSettings[K]
   ) => {
-    setSettings((prev) => {
-      const next = { ...prev, [key]: value };
-      if (key === 'anime4kPreset') next.videoEnhancementEngine = value === 'off' ? 'off' : 'anime4k';
-      if (key === 'videoEnhancementQuality') next.anime4kPreset = ANIME4K_QUALITY[value as VideoEnhancementQuality];
-      if (key === 'videoEnhancementEngine' && value === 'anime4k' && next.anime4kPreset === 'off') next.anime4kPreset = ANIME4K_QUALITY[next.videoEnhancementQuality];
-      if (user?.id) {
-        void saveAccountSettingsPatch(user.id, {
-          video: next as unknown as Record<string, unknown>,
-        }).catch(() => undefined);
-      }
-      return next;
-    });
+    let next = { ...currentSettingsRef.current, [key]: value };
+    if (key === 'anime4kPreset') {
+      next.videoEnhancementEngine = value === 'off' ? 'off' : 'anime4k';
+      if (value !== 'off') next.videoEnhancementQuality = value === 'high' ? 'high' : value === 'light' ? 'light' : 'balanced';
+    }
+    if (key === 'videoEnhancementQuality') next.anime4kPreset = ANIME4K_QUALITY[value as VideoEnhancementQuality];
+    if (key === 'videoEnhancementEngine' && value === 'anime4k' && next.anime4kPreset === 'off') next.anime4kPreset = ANIME4K_QUALITY[next.videoEnhancementQuality];
+    next = normalizeSettings(next);
+    const revision = { accountId: user?.id || null, updatedAt: Math.max(Date.now(), (readLocalRevision()?.updatedAt || 0) + 1) };
+    currentSettingsRef.current = next;
+    persistLocalVideoSettings(next, revision);
+    setSettings(next);
+    if (user?.id) {
+      void saveAccountSettingsPatch(user.id, {
+        video: { ...next, __updatedAt: revision.updatedAt },
+      }).catch(() => undefined);
+    }
   };
 
   const resetSettings = () => {
+    const revision = { accountId: user?.id || null, updatedAt: Math.max(Date.now(), (readLocalRevision()?.updatedAt || 0) + 1) };
+    currentSettingsRef.current = DEFAULT_SETTINGS;
+    persistLocalVideoSettings(DEFAULT_SETTINGS, revision);
     setSettings(DEFAULT_SETTINGS);
     if (user?.id) {
       void saveAccountSettingsPatch(user.id, {
-        video: DEFAULT_SETTINGS as unknown as Record<string, unknown>,
+        video: { ...DEFAULT_SETTINGS, __updatedAt: revision.updatedAt },
       }).catch(() => undefined);
     }
   };

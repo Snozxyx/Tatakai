@@ -6,12 +6,20 @@
     <application android:banner="@drawable/tv_banner" android:label="Tatakai TV" tools:replace="android:label">
         <provider android:name=".tv.TvSearchProvider" android:authorities="${applicationId}.search" android:exported="true" />
         <activity android:name=".MainActivity" android:screenOrientation="landscape">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
-            </intent-filter>
             <intent-filter><action android:name="android.intent.action.SEARCH" /><category android:name="android.intent.category.DEFAULT" /></intent-filter>
             <meta-data android:name="android.app.searchable" android:resource="@xml/tv_searchable" />
+        </activity>
+        <activity android:name=".branding.LauncherActivity$Dark" android:banner="@drawable/tv_banner_dark">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LEANBACK_LAUNCHER" /></intent-filter>
+        </activity>
+        <activity android:name=".branding.LauncherActivity$Light" android:banner="@drawable/tv_banner_light">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LEANBACK_LAUNCHER" /></intent-filter>
+        </activity>
+        <activity android:name=".branding.LauncherActivity$Monochrome" android:banner="@drawable/tv_banner_monochrome">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LEANBACK_LAUNCHER" /></intent-filter>
+        </activity>
+        <activity android:name=".branding.LauncherActivity$Legacy" android:banner="@drawable/tv_banner_legacy">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LEANBACK_LAUNCHER" /></intent-filter>
         </activity>
         <activity android:name=".player.TvPlayerActivity" android:exported="false" android:screenOrientation="landscape" android:theme="@style/AppTheme.NoActionBar" android:hardwareAccelerated="true" android:configChanges="screenSize|screenLayout|uiMode|keyboardHidden" />
     </application>

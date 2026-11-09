@@ -13,12 +13,14 @@ import AppRoutes from "@/routes/AppRoutes";
 import { GlobalSearch } from '@/components/layout/GlobalSearch';
 import { DesktopDeepLinkBridge } from "@/components/desktop/DesktopDeepLinkBridge";
 import { MobileDeepLinkBridge } from "@/components/mobile/MobileDeepLinkBridge";
+import { ExtensionConfigurationBridge } from '@/components/extensions/ExtensionConfigurationBridge';
 import { LightboxProvider } from "@/components/media/ImageLightbox";
 import { ExtensionUpdateSheet } from "@/components/extensions/ExtensionUpdateSheet";
 import { toast } from "sonner";
 import { useEffect, lazy, Suspense } from "react";
 import { isTV } from '@/core/tv/device';
 import { ProfilePresentationProvider } from '@/contexts/ProfilePresentationContext';
+import { BrandRuntimeProvider } from '@/components/layout/AppBranding';
 const TVLayout = lazy(() => import('@/layouts/TVLayout'));
 
 
@@ -118,11 +120,13 @@ const App = () => {
         <AuthProvider>
             <TooltipProvider>
               <Router future={routerFutureFlags}>
+                <BrandRuntimeProvider>
                 <BetaSubscriptionSync />
                 <AutomationScheduler />
                 <GlobalSearch />
                 <DesktopDeepLinkBridge />
                 <MobileDeepLinkBridge />
+                <ExtensionConfigurationBridge />
                 <SettingsModalProvider>
                   <LightboxProvider>
                     <ProfilePresentationProvider><Suspense fallback={<div role="status">Loading Tatakai…</div>}><Layout>
@@ -131,6 +135,7 @@ const App = () => {
             <ExtensionUpdateSheet />
                   </LightboxProvider>
                 </SettingsModalProvider>
+                </BrandRuntimeProvider>
               </Router>
             </TooltipProvider>
         </AuthProvider>

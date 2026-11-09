@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ExtensionLogo } from "@/components/extensions/ExtensionLogo";
 import { listAllCustomSources } from "@/core/content/custom-source-runtime";
+import { EXTENSION_INSTALLED_EVENT } from "@/core/extensions/ecosystems";
 import {
   customProviderKey,
   customSourceBase,
@@ -30,6 +31,7 @@ import {
 } from "@/core/extensions/compatibility/client";
 import { useIsDesktopApp } from "@/hooks/ui/useIsNativeApp";
 import { useContentSafetySettings } from "@/hooks/user/useContentSafetySettings";
+import { useSettingsModal } from "@/contexts/SettingsModalContext";
 import { isExplicitExtensionContent } from "@/lib/contentSafety";
 import { catalogKind } from "@/core/content/custom-catalog";
 import { cn } from "@/lib/utils";
@@ -48,6 +50,7 @@ export default function CustomProvidersPage() {
     navigate = useNavigate(),
     client = useQueryClient();
   const { settings: safety } = useContentSafetySettings();
+  const { openSettings } = useSettingsModal();
   const [params, setParams] = useSearchParams();
   const search = params.get("q") || "",
     type = params.get("type") || "all";
@@ -62,13 +65,17 @@ export default function CustomProvidersPage() {
   });
   useEffect(() => {
     const refresh = () => {
-      void client.invalidateQueries({
-        queryKey: ["custom-provider-inventory"],
-      });
+      // An initial lookup has no cached data, so invalidation alone reuses its
+      // pre-install snapshot. Cancel it explicitly before discovering again.
+      const filters = { queryKey: ["custom-provider-inventory"] };
+      void client.cancelQueries(filters).then(() => client.invalidateQueries(filters));
     };
     window.addEventListener("tatakai-extensions-changed", refresh);
-    return () =>
+    window.addEventListener(EXTENSION_INSTALLED_EVENT, refresh);
+    return () => {
       window.removeEventListener("tatakai-extensions-changed", refresh);
+      window.removeEventListener(EXTENSION_INSTALLED_EVENT, refresh);
+    };
   }, [client]);
   useEffect(() => setPage(1), [search, type, safety.showAdultEverywhere]);
   const groups = useMemo(
@@ -81,19 +88,22 @@ export default function CustomProvidersPage() {
       ),
     [inventory.data, safety.showAdultEverywhere]
   );
-  const filtered = groups.filter(
-    (group) =>
-      (type === "all" || catalogKind(group) === type) &&
-      [
-        group.name,
-        group.description,
-        group.namespace,
-        ...group.variants.map((v) => sourceLanguage(v.language)),
-      ]
-        .join(" ")
-        .toLocaleLowerCase()
-        .includes(search.toLocaleLowerCase())
-  );
+  const matchesFilters = (group: (typeof groups)[number]) =>
+    (type === "all" || catalogKind(group) === type) &&
+    [
+      group.name,
+      group.description,
+      group.namespace,
+      ...group.variants.map((v) => sourceLanguage(v.language)),
+    ]
+      .join(" ")
+      .toLocaleLowerCase()
+      .includes(search.toLocaleLowerCase());
+  const filtered = groups.filter(matchesFilters);
+  const visibleKeys = new Set(groups.map(customProviderKey));
+  const hiddenCount = groupCustomSources(inventory.data || []).filter(
+    (group) => matchesFilters(group) && !visibleKeys.has(customProviderKey(group))
+  ).length;
   const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE)),
     current = Math.min(page, pages);
   const update = (key: string, value: string) => {
@@ -225,6 +235,22 @@ export default function CustomProvidersPage() {
             </AlertDescription>
           </Alert>
         )}
+        {hiddenCount > 0 && filtered.length > 0 && (
+          <Alert className="mb-6">
+            <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
+              <span>
+                {hiddenCount} installed {hiddenCount === 1 ? "provider is" : "providers are"} hidden by your mature-content settings.
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => openSettings("privacy", "mature-content-controls")}
+              >
+                Content visibility settings
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
         {inventory.isPending ? (
           <p role="status" className="py-16 text-center text-muted-foreground">
             Loading installed providers…
@@ -233,18 +259,32 @@ export default function CustomProvidersPage() {
           <div className="rounded-2xl border border-dashed border-border py-16 px-6 text-center">
             <BookOpen className="mx-auto mb-4 size-8 text-muted-foreground" />
             <h2 className="font-display text-xl font-semibold">
-              {search
+              {hiddenCount
+                ? "Providers hidden by content settings"
+                : search
                 ? "No matching providers"
                 : `No ${type === "all" ? "" : type + " "}providers available`}
             </h2>
             <p className="mx-auto mt-2 max-w-lg text-sm text-muted-foreground">
-              {search
+              {hiddenCount
+                ? "Your installed mature providers are hidden. Review your content visibility settings to show them here."
+                : search
                 ? "Try a different name, extension or language."
                 : "Install an extension in the extension hub. Disabled installed sources appear here too; unavailable runtimes must be started in the hub."}
             </p>
-            <Button variant="outline" className="mt-5" asChild>
-              <Link to="/extensions">Open extension hub</Link>
-            </Button>
+            {hiddenCount ? (
+              <Button
+                variant="outline"
+                className="mt-5"
+                onClick={() => openSettings("privacy", "mature-content-controls")}
+              >
+                Content visibility settings
+              </Button>
+            ) : (
+              <Button variant="outline" className="mt-5" asChild>
+                <Link to="/extensions">Open extension hub</Link>
+              </Button>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">

@@ -493,7 +493,7 @@ export default function ProfilePage({ username: providedUsername }: { username?:
 
       {/* ── Ambient Background Color Bleed Throughout Whole Page ── */}
       {!isUchiha && profile?.banner_url && (
-        <div className="fixed inset-0 w-full h-full overflow-hidden pointer-events-none -z-10">
+        <div data-app-route-background className="fixed inset-0 w-full h-full overflow-hidden pointer-events-none -z-10">
           <CachedProfileImage
             src={profile.banner_url}
             alt=""

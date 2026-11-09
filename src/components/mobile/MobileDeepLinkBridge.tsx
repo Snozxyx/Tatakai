@@ -69,7 +69,7 @@ export function MobileDeepLinkBridge() {
  *  - `tatakai://integration/anilist/redirect?code=…`
  *  - `tatakai://anime/123/ep/5` → `/anime/123?ep=5` (native share shorthand)
  *  - `tatakai://watch/abc?ep=5`, `tatakai://manga/read/1?chapterKey=x`
- *  - `https://tatakai.me/anime/123`, `https://app.tatakai.me/watch/…`
+ *  - `https://tatakai.app/anime/123`, `https://app.tatakai.app/watch/…`
  *
  * NOTE: for the custom scheme, `new URL('tatakai://anime/123').pathname` is
  * `/123` with host `anime` — the host IS the first path segment, so it must

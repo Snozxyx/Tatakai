@@ -112,6 +112,16 @@ contextBridge.exposeInMainWorld('electron', {
     platform: process.platform,
     getPlatform: () => ipcRenderer.invoke('get-platform'),
     persistTheme: (payload) => ipcRenderer.invoke('theme:persist', payload),
+    backdrop: {
+        getCapabilities: () => ipcRenderer.invoke('backdrop:get-capabilities'),
+        getSelection: () => ipcRenderer.invoke('backdrop:get-selection'),
+        setSelection: (payload) => ipcRenderer.invoke('backdrop:set-selection', payload),
+    },
+    branding: {
+        getCapabilities: () => ipcRenderer.invoke('branding:get-capabilities'),
+        getSelection: () => ipcRenderer.invoke('branding:get-selection'),
+        setSelection: (payload) => ipcRenderer.invoke('branding:set-selection', payload),
+    },
     getSplashTheme: () => ipcRenderer.invoke('theme:get-splash'),
     updateRPC: (data) => ipcRenderer.send('update-rpc', data),
     clearRPC: () => ipcRenderer.send('clear-rpc'),

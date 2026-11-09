@@ -13,6 +13,7 @@ import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
  */
 import { Play, Loader2, Star } from "lucide-react";
 import { MediaCardFrame } from "@/components/MediaCardFrame";
+import { useCardDesign } from '@/components/customization/CardDesignContext';
 import { useTranslation } from "react-i18next";
 import { BlurhashImage } from "@/components/ui/blurhash-image";
 import { AnimeCard as AnimeCardType, getHighQualityPoster } from "@/lib/api";
@@ -44,6 +45,7 @@ const resolveAniListId = (value: unknown): number | null => {
 
 function AnimeCardWithPreviewInner({ anime, showPreview = true, disableClick = false }: AnimeCardWithPreviewProps) {
   useUiTranslation();
+  const { readOnly } = useCardDesign();
   const { t } = useTranslation();
   const blurhashEnabled = useFeatureFlag(FeatureFlag.BLURHASH_IMAGES);
 
@@ -79,7 +81,7 @@ function AnimeCardWithPreviewInner({ anime, showPreview = true, disableClick = f
     anilistId: previewAniListId,
     malId: anime.malId,
     title: anime.name,
-    enabled: showPreview,
+    enabled: showPreview && !readOnly,
   });
 
   const posterCandidates = useMemo(() => {
@@ -125,7 +127,7 @@ function AnimeCardWithPreviewInner({ anime, showPreview = true, disableClick = f
         routeTo,
       });
     },
-    disabled: disableClick,
+    disabled: disableClick || readOnly,
   });
 
   const posterClass = `media-card-image absolute inset-0 w-full h-full object-cover ${preview.isActive ? 'opacity-0' : 'opacity-100'}`;
@@ -144,6 +146,10 @@ function AnimeCardWithPreviewInner({ anime, showPreview = true, disableClick = f
         </span>
       </div>}
     </>}
+    safetyBadges={isAdult ? <AdultBadge className="absolute left-2 top-2 z-40" /> : undefined}
+    slotContent={{ title: anime.name, rating: score, type: anime.type, year: anime.year, status: anime.tvMetadata?.status,
+      episodes: anime.episodes?.sub ? `${anime.episodes.sub} ${t('anime.sub')}${anime.episodes.dub ? ` · ${anime.episodes.dub} ${t('anime.dub')}` : ''}` : undefined,
+      views: !readOnly && animeViewId ? <TatakaiAnimeViews animeId={animeViewId} /> : undefined }}
     badges={<>
       {isAdult && <AdultBadge className="absolute left-2 top-2 z-20" />}
       {score && <span className="media-card-score absolute right-16 top-2 z-20 rounded-lg bg-black/75 px-2 py-1 text-xs font-semibold text-white"><Star aria-hidden className="inline h-3 w-3 fill-amber text-amber mr-1" />{score}</span>}
@@ -153,7 +159,7 @@ function AnimeCardWithPreviewInner({ anime, showPreview = true, disableClick = f
       {!!anime.episodes?.sub && <span>· {anime.episodes.sub} {t('anime.sub')}</span>}
       {!!anime.episodes?.dub && <span>· {anime.episodes.dub} {t('anime.dub')}</span>}
       {label && <span>· {label}</span>}
-      {animeViewId && <TatakaiAnimeViews animeId={animeViewId} />}
+      {!readOnly && animeViewId && <TatakaiAnimeViews animeId={animeViewId} />}
     </div>} />;
 }
 

@@ -1,6 +1,6 @@
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { reviewPromptDelay, markReviewPromptDismissed } from '@/lib/mobile/review-prompt';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -9,8 +9,8 @@ import { Button } from './button';
 import { Star, X, Heart, ThumbsUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
-import { notifyReviewPopup } from '@/core/network/discord-webhook';
+import { CaptchaWidget, type CaptchaWidgetHandle } from '@/components/security/CaptchaWidget';
+import { isCaptchaRequired, requestSecurity } from '@/lib/security/captcha';
 
 interface ReviewPopupProps {
     isOpen?: boolean;
@@ -20,10 +20,8 @@ interface ReviewPopupProps {
     userId?: string;
 }
 
-export function ReviewPopup({ isOpen: propIsOpen, onClose, animeId, animeName, userId }: ReviewPopupProps) {
+export function ReviewPopup({ isOpen: propIsOpen, onClose, animeId, animeName }: ReviewPopupProps) {
   useUiTranslation();
-    const { user: authUser } = useAuth();
-    const user = userId ? { id: userId } : authUser;
     const [internalIsOpen, setInternalIsOpen] = useState(false);
     const isOpen = propIsOpen !== undefined ? propIsOpen : internalIsOpen;
 
@@ -37,6 +35,9 @@ export function ReviewPopup({ isOpen: propIsOpen, onClose, animeId, animeName, u
     const [rating, setRating] = useState(0);
     const [feedback, setFeedback] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+    const captchaRequired = isCaptchaRequired();
+    const captchaRef = useRef<CaptchaWidgetHandle>(null);
 
     useEffect(() => {
         if (propIsOpen !== undefined) return;
@@ -62,37 +63,31 @@ export function ReviewPopup({ isOpen: propIsOpen, onClose, animeId, animeName, u
     }, [isOpen, handleClose]);
 
     const handleSubmit = async () => {
+        if (captchaRequired && !captchaToken) {
+            toast.error(uiI18n.t('app.please_complete_the_verification_challenge_7dbc0a97'));
+            return;
+        }
         setIsSubmitting(true);
         try {
-            if (user?.id) {
-                await supabase.from('user_suggestions' as any).insert({
-                    user_id: user.id,
-                    get title() { return uiI18n.t('app.app_review_3a47975f'); },
-                    get description() { return uiI18n.t('app.rating_i18n_value_0_5_i18n_value_1_2750ae38', { value0: rating, value1: feedback }); },
-                    category: 'feedback',
-                    priority: 'normal',
-                    status: 'pending',
-                    created_at: new Date().toISOString()
-                });
-            }
-
-            notifyReviewPopup({
-                userId: user?.id,
-                userName: (authUser?.user_metadata as any)?.display_name || authUser?.email?.split('@')[0],
+            const { data: { session } } = await supabase.auth.getSession();
+            await requestSecurity('submissions/feedback', {
+                captchaToken: captchaToken ?? undefined,
                 animeId,
                 animeName,
                 rating,
                 feedback,
-            });
+            }, { accessToken: session?.access_token });
 
             setStep('thanks');
             markReviewPromptDismissed();
             toast.success(uiI18n.t('app.thank_you_for_your_feedback_71fa63b4'));
+            setTimeout(() => handleClose(), 3000);
         } catch (error) {
             toast.error(uiI18n.t('app.failed_to_submit_review_dec0f44b'));
         } finally {
+            captchaRef.current?.reset();
+            setCaptchaToken(null);
             setIsSubmitting(false);
-            setTimeout(() => handleClose(), 3000);
         }
     };
 
@@ -164,9 +159,10 @@ export function ReviewPopup({ isOpen: propIsOpen, onClose, animeId, animeName, u
                                     placeholder={uiI18n.t('app.suggestions_bugs_or_things_you_love_2d736d7c')}
                                     className="w-full h-24 bg-muted/30 border border-white/10 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
                                 />
+                                <CaptchaWidget ref={captchaRef} action="suggestion" onToken={setCaptchaToken} onExpire={() => setCaptchaToken(null)} onError={() => setCaptchaToken(null)} disabled={isSubmitting} />
                                 <Button
                                     onClick={handleSubmit}
-                                    disabled={isSubmitting}
+                                    disabled={isSubmitting || (captchaRequired && !captchaToken)}
                                     className="w-full"
                                 >
                                     {isSubmitting ? (uiI18n.language?.startsWith('es') ? 'Enviando...' : 'Submitting...') : uiI18n.t('app.submit_feedback_c5a35a73')}

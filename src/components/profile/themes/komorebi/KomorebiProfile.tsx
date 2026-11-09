@@ -1,4 +1,6 @@
+import { ProfileBadges } from '@/components/profile/ProfileBadges';
 import ProfileThemeDetails from '../ProfileThemeDetails';
+import { profileThemeAssetUrl } from '@/lib/profileThemeAssets';
 import { ProfilePresence } from '@/components/profile/ProfilePresence';
 import { ProfileSocialActions } from '@/components/profile/ProfileSocialActions';
 import { useState } from "react";
@@ -101,7 +103,7 @@ export default function KomorebiProfile({ data, onBack, configuration }: ThemeRe
         <section className="km-hero" aria-label={`${name}'s profile`}>
           <img
             className="km-art"
-            src="/assets/profile-themes/komorebi/garden.webp"
+            src={profileThemeAssetUrl('/assets/profile-themes/komorebi/garden.webp')}
             alt=""
           />
           <div className="km-hero-copy">
@@ -273,9 +275,7 @@ export default function KomorebiProfile({ data, onBack, configuration }: ThemeRe
           <span lang="ja">木漏れ日</span>
           <span>Stories, collected in the sunlight.</span>
           <div>
-            {data.badges.map((b) => (
-              <img key={b.key} src={b.image} alt={b.label} title={b.label} />
-            ))}
+            <ProfileBadges badges={data.badges} size={26} grid={false} interactive={true} className="contents" />
           </div>
         </footer>
         {!!data.links.length && (

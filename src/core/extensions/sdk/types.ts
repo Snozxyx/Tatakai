@@ -201,6 +201,8 @@ export interface CustomSourceDescriptor {
   /** Language variants share this key only within the same owning extension. */
   providerGroup?: string;
   language?: string;
+  /** False when this source only advertises browsable catalogs. */
+  supportsSearch?: boolean;
   /** Opt in to verified catalogue links; source IDs themselves are never catalogue IDs. */
   catalogMediaType?: 'anime' | 'manga' | 'novel';
 }
@@ -436,8 +438,12 @@ export interface CustomMediaCard {
 
 /** One titled row on a custom source's home page. */
 export interface CustomHomeSection {
+  /** Optional stable identity used to retain a user's home design across refreshes. */
+  id?: string;
   title: string;
   items: CustomMediaCard[];
+  /** Independent cursor for hosted catalogs; absent on other extension homes. */
+  pagination?: { catalogId: string; nextSkip: number | null };
 }
 
 /** Result of `customHome(sourceId)`. */

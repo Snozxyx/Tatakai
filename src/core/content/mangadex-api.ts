@@ -37,7 +37,7 @@ async function json(url: string, init: RequestInit = {}): Promise<any> {
     ? await extensionFetch(target, {
         ...init,
         headers: {
-          "User-Agent": "Tatakai/6 (https://tatakai.me)",
+          "User-Agent": "Tatakai/6 (https://tatakai.app)",
           ...Object.fromEntries(new Headers(init.headers).entries()),
         },
         signal,

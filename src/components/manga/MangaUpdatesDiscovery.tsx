@@ -12,9 +12,13 @@ import { HomeSectionHeading } from '@/components/home/HomeSectionHeading';
 import { UnifiedMediaCard } from '@/components/UnifiedMediaCard';
 import { Button } from '@/components/ui/button';
 import { CardSkeleton } from '@/components/ui/skeleton-custom';
+import { CalendarDateHeaders } from '@/components/calendar/CalendarDateHeaders';
+import { CalendarArtwork, CalendarReleasePreview } from '@/components/calendar/CalendarReleasePreview';
+import { calendarDateKey, calendarDay } from '@/lib/calendarDates';
 
 export interface UpdatesEntry {
   id: string; seriesId: string; title: string; poster: string | null;
+  bannerImage?: string | null;
   provider?: string; canonicalSeriesId?: string | null; releaseKind?: string; volume?: string | null; region?: string | null;
   type: string; adult?: boolean; href: string; chapter: string | null; date: string | null;
 }
@@ -79,38 +83,67 @@ export function MangaWhatsNew() {
     <FeedStatus feed={feed} />
   </section>;
 }
-export function MangaReleaseCalendar({ weekStart, selectedDay }: { weekStart: Date; selectedDay?: number }) {
+export function MangaReleaseCalendar({ weekStart, selectedDay, onSelectDate }: {
+  weekStart: Date; selectedDay?: number; onSelectDate?: (date: Date) => void;
+}) {
   const { t, i18n } = useTranslation();
   const feed = useUpdates('releases', weekStart, 'mangaupdates', selectedDay ?? 0);
   const otaku = useUpdates('releases', weekStart, 'otakucalendar');
+  const { hasNextPage, isFetching, isFetchNextPageError, fetchNextPage } = feed;
   useEffect(() => {
-    if (feed.hasNextPage && !feed.isFetching && !feed.isFetchNextPageError) void feed.fetchNextPage();
-  }, [feed.hasNextPage, feed.isFetching, feed.isFetchNextPageError, feed.fetchNextPage]);
+    if (hasNextPage && !isFetching && !isFetchNextPageError) void fetchNextPage();
+  }, [hasNextPage, isFetching, isFetchNextPageError, fetchNextPage]);
   const [type, setType] = useState('all');
   const items = deduplicateReleases([...(feed.data?.pages.flatMap(page => page.results) || []), ...(otaku.data?.pages.flatMap(page => page.results) || [])]);
-  return <section aria-label={t('discovery.mangaReleases')}>
-    <div className="mb-4 flex flex-wrap items-center gap-2">
+  const visibleDays = selectedDay == null ? Array.from({ length: 7 }, (_, index) => index) : [selectedDay];
+  const metadata = (item: UpdatesEntry) => [
+    t(`discovery.${item.type}`),
+    item.chapter ? t('discovery.chapter', { number: item.chapter }) : item.volume ? `Vol. ${item.volume}` : null,
+    item.provider === 'otakucalendar' ? 'OtakuCalendar' : 'MangaUpdates', item.region,
+  ].filter(Boolean).join(' · ');
+  return <section className="calendar-manga-calendar" aria-label={t('discovery.mangaReleases')}>
+    <div className="calendar-manga-controls">
       {['all', 'manga', 'manhwa', 'manhua'].map(value => <Button key={value} size="sm" variant={type === value ? 'default' : 'outline'} aria-pressed={type === value} onClick={() => setType(value)}>{t(`discovery.${value}`)}</Button>)}
       <a href="https://www.mangaupdates.com/releases" target="_blank" rel="noreferrer" className="ml-auto flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">MangaUpdates <ExternalLink className="h-3.5 w-3.5" /></a>
     </div>
-    <p className="mb-4 text-sm text-muted-foreground">{t(selectedDay == null ? 'discovery.releaseNote' : 'calendarView.releaseDateOnly')}</p>
-    {feed.isPending ? <div className="grid grid-cols-2 gap-4 md:grid-cols-4" aria-busy="true">{Array.from({ length: 4 }, (_, i) => <CardSkeleton key={i} />)}</div>
-      : <div className={selectedDay == null ? "grid gap-3 sm:grid-cols-2 xl:grid-cols-7" : "grid gap-4"}>
-        {(selectedDay == null ? Array.from({ length: 7 }, (_, index) => index) : [selectedDay]).map(index => {
-          const day = new Date(weekStart); day.setDate(day.getDate() + index);
+    <p className="calendar-release-note">{t('calendarView.releaseDateOnly')}</p>
+    <div className="calendar-timeline-scroll calendar-manga-scroll" tabIndex={0} aria-busy={feed.isPending && otaku.isPending}>
+      <CalendarDateHeaders weekStart={weekStart} days={visibleDays} todayKey={calendarDateKey(new Date())}
+        label={t('calendarView.releases')} onSelect={onSelectDate} />
+      <div className={`calendar-manga-columns ${visibleDays.length === 7 ? 'calendar-week' : ''}`}
+        style={{ gridTemplateColumns: `64px repeat(${visibleDays.length}, minmax(0, 1fr))` }}>
+        <div className="calendar-manga-gutter"><BookOpen aria-hidden="true" /></div>
+        {visibleDays.map(index => {
+          const day = calendarDay(weekStart, index);
           const dayItems = items.filter(item => item.date === localDate(day) && (type === 'all' || item.type === type));
-          return <div key={index} className="min-w-0 space-y-2">
-            <h2 className="rounded-xl border border-border bg-card px-3 py-2 text-sm font-semibold">{day.toLocaleDateString(i18n.language, { weekday: 'short', day: 'numeric', month: 'short' })}</h2>
-            {dayItems.map(item => {
-              const content = <><div className="flex h-14 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">{item.poster ? <img src={item.poster} alt="" loading="lazy" className="h-full w-full object-cover" /> : <BookOpen className="h-4 w-4 text-muted-foreground" />}</div><div className="min-w-0"><p className="line-clamp-2 text-xs font-semibold">{item.title}</p><p className="mt-1 text-xs text-muted-foreground">{t(`discovery.${item.type}`)} · {item.provider === 'otakucalendar' ? 'OtakuCalendar' : 'MangaUpdates'}{item.region ? ` · ${item.region}` : ''}{item.volume && !item.chapter ? ` · Vol. ${item.volume}` : ''}{item.chapter ? ` · ${t('discovery.chapter', { number: item.chapter })}` : ''}</p></div></>;
-              const className = 'flex gap-2 rounded-xl border border-border bg-card p-2 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
-              return <Link key={item.id} to={releaseMangaHref(item)} className={className}>{content}</Link>;
-            })}
-            {!dayItems.length && <p className="px-3 py-4 text-xs text-muted-foreground">{t(feed.hasNextPage || feed.isFetching ? 'discovery.loading' : feed.isError || otaku.isError ? 'discovery.partial' : 'discovery.noReleases')}</p>}
+          return <div key={index} className={`calendar-manga-day ${visibleDays.length === 1 ? 'calendar-manga-day-single' : ''}`}>
+            {dayItems.map(item => <CalendarReleasePreview key={item.id} trigger={
+              <button type="button" className="calendar-manga-event" aria-label={`${item.title}, ${metadata(item)}`}>
+                <CalendarArtwork src={item.bannerImage || item.poster} />
+                <span className="calendar-event-title">{item.title}</span>
+                <span className="calendar-event-meta">{item.chapter ? t('discovery.chapter', { number: item.chapter }) : item.volume ? `Vol. ${item.volume}` : t(`discovery.${item.type}`)}</span>
+                <span className="calendar-event-detail">{item.region || (item.provider === 'otakucalendar' ? 'OtakuCalendar' : 'MangaUpdates')}</span>
+              </button>
+            }>
+              <div className="calendar-preview-banner">
+                <CalendarArtwork src={item.bannerImage || item.poster} />
+                <span>{day.toLocaleDateString(i18n.language, { dateStyle: 'full' })}</span>
+              </div>
+              <div className="calendar-preview-body">
+                <h3>{item.title}</h3>
+                <p className="calendar-preview-meta">{metadata(item)}</p>
+                <p className="calendar-preview-meta">{t('calendarView.releaseDateOnly')}</p>
+                <Link className="calendar-preview-action" to={releaseMangaHref(item)}>{t('calendarView.openRelease')} <ExternalLink className="size-4" aria-hidden="true" /></Link>
+              </div>
+            </CalendarReleasePreview>)}
+            {!dayItems.length && <p className="calendar-manga-empty">{t(feed.hasNextPage || feed.isFetching || otaku.isPending ? 'discovery.loading' : feed.isError || otaku.isError ? 'discovery.partial' : 'discovery.noReleases')}</p>}
           </div>;
         })}
-      </div>}
-    <div aria-label="MangaUpdates"><FeedStatus feed={feed} /></div>
-    <div aria-label="OtakuCalendar"><span className="text-xs text-muted-foreground">OtakuCalendar</span><FeedStatus feed={otaku} /></div>
+      </div>
+      <div className="calendar-manga-feed-status">
+        <div aria-label="MangaUpdates"><FeedStatus feed={feed} /></div>
+        <div aria-label="OtakuCalendar"><span className="text-xs text-muted-foreground">OtakuCalendar</span><FeedStatus feed={otaku} /></div>
+      </div>
+    </div>
   </section>;
 }

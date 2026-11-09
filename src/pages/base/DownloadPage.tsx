@@ -22,7 +22,7 @@ import {
   GITHUB_RELEASES_URL,
 } from "@/lib/github";
 
-const ALTSTORE_SOURCE_URL = "https://tatakai.me/altstore/apps.json";
+const ALTSTORE_SOURCE_URL = "https://tatakai.app/altstore/apps.json";
 const OBTAINIUM_ADD_URL =
   "https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/snozxyx/tatakai";
 
@@ -227,7 +227,7 @@ export function DownloadSection() {
   };
 
   return (
-    <section id="downloads" ref={sectionRef} className="relative overflow-hidden pt-32 lg:pt-40 bg-black text-white">
+    <section data-app-page-surface id="downloads" ref={sectionRef} className="relative overflow-hidden pt-32 lg:pt-40 bg-black text-white">
       {/* Header */}
       <div className="relative z-10 text-center mb-16 px-6 lg:px-12">
         <span className={`inline-flex items-center gap-3 text-sm font-mono text-white/60 mb-8 transition-all duration-700 justify-center bg-white/5 border border-white/10 px-4 py-1.5 rounded-full ${isVisible ? "opacity-100" : "opacity-0"}`}>
@@ -516,7 +516,7 @@ export function DownloadSection() {
             {/* Mobile install instructions */}
             {selectedDownload?.name === "Android TV" && (
               <p className="text-sm text-muted-foreground">
-                Install the Android TV APK on your TV, then open tatakai.me/link on a signed-in phone or computer and approve the code displayed on the TV. The TV APK is separate from the phone app.
+                Install the Android TV APK on your TV, then open tatakai.app/link on a signed-in phone or computer and approve the code displayed on the TV. The TV APK is separate from the phone app.
               </p>
             )}
             {selectedDownload?.category === "Mobile App" && (
@@ -597,7 +597,7 @@ export function DownloadSection() {
 export default function DownloadPage() {
   useUiTranslation();
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col justify-between">
+    <div data-app-page-surface className="min-h-screen bg-black text-white flex flex-col justify-between">
       <Navigation />
       <DownloadSection />
       <FooterSection />

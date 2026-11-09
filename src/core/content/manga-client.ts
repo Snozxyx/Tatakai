@@ -241,7 +241,7 @@ function resolveApiOrigin(): string {
   } catch {
     /* fall through */
   }
-  return 'https://api.tatakai.me';
+  return 'https://api.tatakai.app';
 }
 
 async function apiGet<T>(path: string, params?: Record<string, string | number | boolean | undefined>, onMeta?: (meta: { total?: number; hasNextPage?: boolean; lastPage?: number; source?: string }) => void, timeoutMs = 30_000): Promise<T> {

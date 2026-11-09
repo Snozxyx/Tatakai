@@ -1,13 +1,14 @@
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useCallback, useMemo, useSyncExternalStore } from 'react';
+import { normalizeThemeSelection, resolveThemeSelection, type ResolvedThemeSelection } from '@/lib/themeSelection';
+import type { ThemeSelection, CustomThemeDefinitions } from '@/lib/customization';
+import { getCustomThemeDefinitions, getCustomThemeOverrides, getCustomThemeSnapshot, subscribeCustomThemes } from '@/lib/customThemeRegistry';
+export type { ThemeSelection } from '@/lib/customization';
 import { readableMutedColor } from '@/lib/themeContrast';
-import { useAuth } from '@/contexts/AuthContext';
 import { extensionRegistry, type RegisteredTheme } from '@/core/extensions/ExtensionRegistry';
 import {
   readGuestSettingsFromCookie,
-  readProfileAppSettings,
-  saveAccountSettingsPatch,
   writeGuestSettingsCookie,
 } from '@/lib/appSettingsPersistence';
 
@@ -840,17 +841,29 @@ function normalizeRegisteredColors(colors: Record<string, string>): ThemeColors 
 /** True if `id` names a built-in theme or a currently-registered extension theme. */
 function isKnownTheme(id: string | null | undefined): boolean {
   if (!id) return false;
-  if ((THEME_COLORS as Record<string, ThemeColors>)[id]) return true;
+  if (Object.prototype.hasOwnProperty.call(THEME_COLORS, id)) return true;
+  if (Object.prototype.hasOwnProperty.call(getCustomThemeDefinitions(), id) && getCustomThemeDefinitions()[id]) return true;
   return extensionRegistry.getThemes().some((t) => t.id === id);
 }
+export function resolveThemeId(id: ThemeId): ThemeId { return isKnownTheme(id) ? id : 'cherry-blossom'; }
 
 /**
  * Resolve any theme id to a color palette. Built-ins win; then a registered
  * extension theme; else fall back to the default so `applyTheme` never no-ops
  * on an id whose extension has not registered yet.
  */
-export function resolveColors(id: ThemeId): ThemeColors {
-  const builtin = (THEME_COLORS as Record<string, ThemeColors>)[id as string];
+export function resolveColors(id: ThemeId, customThemes?: CustomThemeDefinitions): ThemeColors {
+  return resolveBaseColors(id, customThemes ?? getCustomThemeDefinitions(), new Set(), customThemes === undefined);
+}
+function resolveBaseColors(id: ThemeId, definitions: CustomThemeDefinitions, visited: Set<string>, committed: boolean): ThemeColors {
+  if (visited.has(id)) return THEME_COLORS['cherry-blossom'];
+  const custom = Object.prototype.hasOwnProperty.call(definitions, id) ? definitions[id] : undefined;
+  if (custom && typeof custom.baseTheme === 'string') {
+    visited.add(id);
+    const colors = resolveBaseColors(custom.baseTheme, definitions, visited, committed);
+    return committed ? mergeThemePalette(colors, getCustomThemeOverrides()[id]) : colors;
+  }
+  const builtin = Object.prototype.hasOwnProperty.call(THEME_COLORS, id) ? (THEME_COLORS as Record<string, ThemeColors>)[id as string] : undefined;
   if (builtin) return builtin;
   const reg = extensionRegistry.getThemes().find((t) => t.id === id);
   if (reg) {
@@ -872,283 +885,109 @@ function registeredInfoEntry(t: RegisteredTheme): ThemeInfoEntry {
   };
 }
 
+const SELECTION_KEY = 'tatakai-theme-selection';
+type ThemeSnapshot = { selection: ResolvedThemeSelection; reduceMotion: boolean; highContrast: boolean };
+function readThemeSnapshot(): ThemeSnapshot {
+  const guest = readGuestSettingsFromCookie().theme || {};
+  let selected: Partial<ThemeSelection> = guest;
+  const read = (key: string) => { try { return typeof window !== 'undefined' ? localStorage.getItem(key) : null; } catch { return null; } };
+  try { selected = JSON.parse(read(SELECTION_KEY) || 'null') || { ...guest, theme: read(THEME_KEY) || guest.theme }; } catch { /* fall back to guest */ }
+  return {
+    selection: normalizeThemeSelection(selected),
+    reduceMotion: read('tatakai_reduce_motion') === null ? guest.reduceMotion === true : read('tatakai_reduce_motion') === 'true',
+    highContrast: read('tatakai_high_contrast') === null ? guest.highContrast === true : read('tatakai_high_contrast') === 'true',
+  };
+}
+let themeSnapshot = readThemeSnapshot();
+const themeListeners = new Set<() => void>();
+let extensionRevision = 0;
+const extensionListeners = new Set<() => void>();
+extensionRegistry.subscribe(() => { extensionRevision++; for (const listener of extensionListeners) listener(); });
+function subscribeExtensions(listener: () => void) { extensionListeners.add(listener); return () => { extensionListeners.delete(listener); }; }
+export function getCommittedThemeSelection() { return themeSnapshot.selection; }
+function publishThemeSnapshot(next: ThemeSnapshot) {
+  if (JSON.stringify(next) === JSON.stringify(themeSnapshot)) return;
+  themeSnapshot = next;
+  for (const listener of themeListeners) listener();
+}
+function subscribeTheme(listener: () => void) { themeListeners.add(listener); return () => { themeListeners.delete(listener); }; }
+if (typeof window !== 'undefined') window.addEventListener('storage', event => {
+  if ([THEME_KEY, SELECTION_KEY, 'tatakai_reduce_motion', 'tatakai_high_contrast'].includes(event.key || '')) publishThemeSnapshot(readThemeSnapshot());
+});
+function storeThemeSnapshot(next: ThemeSnapshot) {
+  const themeSettings = { ...next.selection, reduceMotion: next.reduceMotion, highContrast: next.highContrast };
+  try {
+    localStorage.setItem(THEME_KEY, next.selection.theme);
+    localStorage.setItem(SELECTION_KEY, JSON.stringify(next.selection));
+    localStorage.setItem('tatakai_reduce_motion', String(next.reduceMotion));
+    localStorage.setItem('tatakai_high_contrast', String(next.highContrast));
+  } catch { /* preferences remain available for this session */ }
+  writeGuestSettingsCookie({ theme: themeSettings });
+  publishThemeSnapshot(next);
+}
+function readSystemDark() { return typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(prefers-color-scheme: dark)').matches; }
+function subscribeSystemDark(listener: () => void) {
+  if (typeof window === 'undefined' || !window.matchMedia) return () => {};
+  const media = window.matchMedia('(prefers-color-scheme: dark)');
+  if (media.addEventListener) { media.addEventListener('change', listener); return () => media.removeEventListener('change', listener); }
+  media.addListener(listener); return () => media.removeListener(listener);
+}
+export function useSystemDark() { return useSyncExternalStore(subscribeSystemDark, readSystemDark, () => false); }
+
+/** Custom palettes use the same HSL channel format as built-in palettes. */
+export function resolveThemePalette(id: ThemeId, palette?: Record<string, string> | null, customThemes?: CustomThemeDefinitions): ThemeColors {
+  return mergeThemePalette(resolveColors(id, customThemes), palette);
+}
+function mergeThemePalette(base: ThemeColors, palette?: Record<string, string> | null): ThemeColors {
+  if (!palette) return base;
+  const colors = { ...base };
+  for (const [rawKey, value] of Object.entries(palette)) {
+    const key = rawKey.replace(/-([a-z])/g, (_, letter: string) => letter.toUpperCase());
+    if (typeof (base as unknown as Record<string, unknown>)[key] !== 'string' || typeof value !== 'string') continue;
+    if (/^\s*-?\d+(?:\.\d+)?\s+\d+(?:\.\d+)?%\s+\d+(?:\.\d+)?%\s*$/.test(value)) (colors as unknown as Record<string, string>)[key] = value.trim();
+  }
+  return colors;
+}
+
+/** The root runtime owns DOM writes; consumers only subscribe to committed state. */
+export function applyThemePalette(themeName: ThemeId, colors: ThemeColors, reduceMotion: boolean, highContrast: boolean) {
+  if (typeof document === 'undefined') return;
+  const root = document.documentElement;
+  Object.entries(colors).forEach(([key, value]) => {
+    if (typeof value === 'string') root.style.setProperty(`--${key.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`)}`, value);
+  });
+  root.style.setProperty('--primary-foreground', colors.primaryForeground || readableMutedColor(colors.background, [colors.primary]));
+  root.style.setProperty('--secondary-foreground', colors.secondaryForeground || readableMutedColor(colors.background, [colors.secondary]));
+  root.style.setProperty('--ring', colors.primary);
+  root.style.setProperty('--input', colors.border);
+  root.style.setProperty('--popover', colors.card);
+  root.style.setProperty('--popover-foreground', colors.cardForeground || colors.foreground);
+  root.style.setProperty('--accent-foreground', readableMutedColor(colors.accentForeground || colors.foreground, [colors.accent]));
+  root.style.colorScheme = colors.isLight ? 'light' : 'dark';
+  if (colors.mutedForeground) root.style.setProperty('--muted-foreground', readableMutedColor(colors.mutedForeground, [colors.background, colors.card, colors.muted, colors.surface]));
+  for (const [name, enabled] of Object.entries({ 'light-theme': colors.isLight, 'dark-theme': !colors.isLight, 'ultra-lite-theme': colors.isUltraLite, 'brutalism-theme': colors.isBrutalism, 'reduce-motion': reduceMotion, 'high-contrast': highContrast })) document.body.classList.toggle(name, !!enabled);
+  document.body.setAttribute('data-theme', themeName);
+}
 export function useTheme() {
   useUiTranslation();
-  const { user, profile } = useAuth();
-  const seededAccountRef = useRef<string | null>(null);
-
-  const isLowEndDevice = useCallback(() => {
-    if (typeof window === 'undefined') return false;
-
-    return (
-      ((navigator as any).deviceMemory !== undefined &&
-        (navigator as any).deviceMemory < 4) ||
-      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-        navigator.userAgent
-      )
-    );
-  }, []);
-
-  const [theme, setThemeState] = useState<ThemeId>(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem(THEME_KEY);
-      // Keep any persisted id (built-in or extension): resolveColors falls back
-      // safely until a still-loading extension theme registers.
-      if (stored) return stored as ThemeId;
-
-      const cookieTheme = readGuestSettingsFromCookie().theme?.theme;
-      if (cookieTheme) return cookieTheme as ThemeId;
-    }
-    return 'cherry-blossom';
-  });
-
-  // Re-render when extension themes (un)register, so the switcher stays live.
-  const [themesVersion, setThemesVersion] = useState(0);
-  useEffect(() => extensionRegistry.subscribe(() => setThemesVersion((v) => v + 1)), []);
-
-  const [reduceMotion, setReduceMotionState] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('tatakai_reduce_motion');
-      if (stored !== null) return stored === 'true';
-
-      const cookieValue = readGuestSettingsFromCookie().theme?.reduceMotion;
-      if (typeof cookieValue === 'boolean') return cookieValue;
-      return false;
-    }
-    return false;
-  });
-
-  const [highContrast, setHighContrastState] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('tatakai_high_contrast');
-      if (stored !== null) return stored === 'true';
-
-      const cookieValue = readGuestSettingsFromCookie().theme?.highContrast;
-      if (typeof cookieValue === 'boolean') return cookieValue;
-
-      return false;
-    }
-    return false;
-  });
-
-  const accountThemeSettings = useMemo(
-    () => readProfileAppSettings(profile).theme,
-    [profile?.app_settings],
-  );
-
-  useEffect(() => {
-    if (!user?.id) return;
-    if (!accountThemeSettings || typeof accountThemeSettings !== 'object') return;
-
-    const nextTheme = String(accountThemeSettings.theme || '').trim();
-    if (nextTheme && isKnownTheme(nextTheme) && nextTheme !== theme) {
-      setThemeState(nextTheme as ThemeId);
-      localStorage.setItem(THEME_KEY, nextTheme);
-    }
-
-    if (
-      typeof accountThemeSettings.reduceMotion === 'boolean' &&
-      accountThemeSettings.reduceMotion !== reduceMotion
-    ) {
-      setReduceMotionState(accountThemeSettings.reduceMotion);
-      localStorage.setItem('tatakai_reduce_motion', String(accountThemeSettings.reduceMotion));
-    }
-
-    if (
-      typeof accountThemeSettings.highContrast === 'boolean' &&
-      accountThemeSettings.highContrast !== highContrast
-    ) {
-      setHighContrastState(accountThemeSettings.highContrast);
-      localStorage.setItem('tatakai_high_contrast', String(accountThemeSettings.highContrast));
-    }
-
-    writeGuestSettingsCookie({
-      theme: {
-        theme: nextTheme && isKnownTheme(nextTheme) ? nextTheme : theme,
-        reduceMotion:
-          typeof accountThemeSettings.reduceMotion === 'boolean'
-            ? accountThemeSettings.reduceMotion
-            : reduceMotion,
-        highContrast:
-          typeof accountThemeSettings.highContrast === 'boolean'
-            ? accountThemeSettings.highContrast
-            : highContrast,
-      },
-    });
-  }, [user?.id, accountThemeSettings, theme, reduceMotion, highContrast]);
-
-  useEffect(() => {
-    if (!user?.id) {
-      seededAccountRef.current = null;
-      return;
-    }
-
-    if (accountThemeSettings && typeof accountThemeSettings === 'object') {
-      seededAccountRef.current = user.id;
-      return;
-    }
-
-    if (seededAccountRef.current === user.id) return;
-    seededAccountRef.current = user.id;
-
-    void saveAccountSettingsPatch(user.id, {
-      theme: {
-        theme,
-        reduceMotion,
-        highContrast,
-      },
-    }).catch(() => {
-      seededAccountRef.current = null;
-    });
-  }, [user?.id, accountThemeSettings, theme, reduceMotion, highContrast]);
-
-  const applyTheme = useCallback(
-    (themeName: ThemeId) => {
-      const colors = resolveColors(themeName);
-      if (!colors) return;
-
-      const root = document.documentElement;
-
-      Object.entries(colors).forEach(([key, value]) => {
-        if (typeof value === 'string') {
-          const token = key.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`);
-          root.style.setProperty(`--${token}`, value);
-        }
-      });
-      root.style.setProperty('--ring', colors.primary);
-      root.style.setProperty('--popover', colors.card);
-      root.style.setProperty('--popover-foreground', colors.cardForeground);
-      root.style.setProperty('--accent-foreground', readableMutedColor(colors.accentForeground || (colors as unknown as Record<string, string>)['accent-foreground'] || colors.foreground, [colors.accent]));
-      root.style.colorScheme = colors.isLight ? 'light' : 'dark';
-      const muted = colors.mutedForeground || (colors as unknown as Record<string, string>)['muted-foreground'];
-      if (muted) root.style.setProperty('--muted-foreground', readableMutedColor(muted, [colors.background, colors.card, colors.muted, colors.surface]));
-
-      document.body.classList.toggle('light-theme', colors.isLight);
-      document.body.classList.toggle('dark-theme', !colors.isLight);
-      document.body.classList.toggle('ultra-lite-theme', !!colors.isUltraLite);
-      document.body.classList.toggle('brutalism-theme', !!colors.isBrutalism);
-      document.body.classList.toggle('reduce-motion', reduceMotion);
-      document.body.classList.toggle('high-contrast', highContrast);
-
-      document.body.setAttribute('data-theme', themeName);
-    },
-    [reduceMotion, highContrast]
-  );
-
-  useEffect(() => {
-    applyTheme(theme);
-    // Include late-registering extension themes without a second mount effect.
-  }, [theme, applyTheme, themesVersion]);
-
-  /** Sync active palette to Electron `userData/theme.json` for the native splash + OS surfaces. */
-  useEffect(() => {
-    if (typeof window === 'undefined' || !window.electron?.persistTheme) return;
-    const colors = resolveColors(theme);
-    if (!colors) return;
-    void window.electron.persistTheme({
-      theme,
-      primary: colors.primary,
-      secondary: colors.secondary,
-      accent: colors.accent,
-      background: colors.background,
-      foreground: colors.foreground,
-      mutedForeground: colors.mutedForeground,
-      border: colors.border,
-      card: colors.card,
-    });
-  }, [theme, themesVersion]);
-
-  const setTheme = useCallback((newTheme: ThemeId) => {
-    setThemeState(newTheme);
-    localStorage.setItem(THEME_KEY, newTheme);
-    writeGuestSettingsCookie({
-      theme: {
-        theme: newTheme,
-        reduceMotion,
-        highContrast,
-      },
-    });
-
-    if (user?.id) {
-      void saveAccountSettingsPatch(user.id, {
-        theme: {
-          theme: newTheme,
-          reduceMotion,
-          highContrast,
-        },
-      }).catch(() => undefined);
-    }
-  }, [user?.id, reduceMotion, highContrast]);
-
-  const setReduceMotion = useCallback((value: boolean) => {
-    setReduceMotionState(value);
-    localStorage.setItem('tatakai_reduce_motion', String(value));
-    writeGuestSettingsCookie({
-      theme: {
-        theme,
-        reduceMotion: value,
-        highContrast,
-      },
-    });
-
-    if (user?.id) {
-      void saveAccountSettingsPatch(user.id, {
-        theme: {
-          theme,
-          reduceMotion: value,
-          highContrast,
-        },
-      }).catch(() => undefined);
-    }
-  }, [user?.id, theme, highContrast]);
-
-  const setHighContrast = useCallback((value: boolean) => {
-    setHighContrastState(value);
-    localStorage.setItem('tatakai_high_contrast', String(value));
-    writeGuestSettingsCookie({
-      theme: {
-        theme,
-        reduceMotion,
-        highContrast: value,
-      },
-    });
-
-    if (user?.id) {
-      void saveAccountSettingsPatch(user.id, {
-        theme: {
-          theme,
-          reduceMotion,
-          highContrast: value,
-        },
-      }).catch(() => undefined);
-    }
-  }, [user?.id, theme, reduceMotion]);
-
-  const isLightTheme = resolveColors(theme)?.isLight ?? false;
-
-  // Built-in ids first, then registered extension theme ids (recomputed on change).
-  const themes = useMemo<ThemeId[]>(() => {
-    const builtins = Object.keys(THEME_COLORS) as ThemeId[];
-    const registered = extensionRegistry.getThemes().map((t) => t.id);
-    return [...builtins, ...registered];
-  }, [themesVersion]);
-
+  const snapshot = useSyncExternalStore(subscribeTheme, () => themeSnapshot, () => themeSnapshot);
+  const systemDark = useSystemDark();
+  const themesVersion = useSyncExternalStore(subscribeExtensions, () => extensionRevision, () => 0);
+  const custom = useSyncExternalStore(subscribeCustomThemes, getCustomThemeSnapshot, getCustomThemeSnapshot);
+  const setSelection = useCallback((selection: ThemeSelection) => storeThemeSnapshot({ ...themeSnapshot, selection: normalizeThemeSelection(selection, themeSnapshot.selection) }), []);
+  const setTheme = useCallback((theme: ThemeId) => setSelection({ ...themeSnapshot.selection, theme, mode: 'manual' }), [setSelection]);
+  const setReduceMotion = useCallback((reduceMotion: boolean) => storeThemeSnapshot({ ...themeSnapshot, reduceMotion }), []);
+  const setHighContrast = useCallback((highContrast: boolean) => storeThemeSnapshot({ ...themeSnapshot, highContrast }), []);
+  const theme = resolveThemeId(resolveThemeSelection(snapshot.selection, systemDark));
+  const themes = useMemo<ThemeId[]>(() => [...Object.keys(THEME_COLORS), ...extensionRegistry.getThemes().map(t => t.id), ...Object.keys(custom.definitions).filter(id => !!custom.definitions[id])], [themesVersion, custom]);
   const themeInfo = useMemo<Record<string, ThemeInfoEntry>>(() => {
-    const merged: Record<string, ThemeInfoEntry> = { ...THEME_INFO };
+    const merged = { ...THEME_INFO };
     for (const t of extensionRegistry.getThemes()) merged[t.id] = registeredInfoEntry(t);
+    for (const [id, definition] of Object.entries(custom.definitions)) if (definition) {
+      const colors = resolveColors(id);
+      merged[id] = { name: definition.name, description: '', icon: '🎨', category: colors.isLight ? 'light' : 'dark', gradient: `linear-gradient(135deg,hsl(${colors.primary}),hsl(${colors.secondary}))` };
+    }
     return merged;
-  }, [themesVersion]);
-
-  return {
-    theme,
-    setTheme,
-    reduceMotion,
-    setReduceMotion,
-    highContrast,
-    setHighContrast,
-    themes,
-    themeInfo,
-    isLightTheme,
-    isUltraLite: resolveColors(theme)?.isUltraLite ?? false,
-  };
+  }, [themesVersion, custom]);
+  return { theme, selection: snapshot.selection, setSelection, setTheme, reduceMotion: snapshot.reduceMotion, setReduceMotion, highContrast: snapshot.highContrast, setHighContrast, themes, themeInfo, isLightTheme: resolveColors(theme).isLight ?? false, isUltraLite: resolveColors(theme).isUltraLite ?? false };
 }

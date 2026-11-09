@@ -1,5 +1,6 @@
 import { isTV } from "@/core/tv/device";
 import { OptionalJWPlayer } from './JWPlayer';
+import { OptionalVidstackPlayer } from './OptionalVidstackPlayer';
 import { TVPlaybackOverlay } from "@/components/tv/TVPlaybackOverlay";
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
@@ -117,7 +118,7 @@ const CURSOR_IDLE_MS = 6000;
 
 export function VideoPlayer(props: VideoPlayerProps & VideoPlayerExtendedProps) {
   if (isTV()) return <BuiltinVideoPlayer {...props} />;
-  return <OptionalJWPlayer {...props}><BuiltinVideoPlayer {...props} /></OptionalJWPlayer>;
+  return <OptionalVidstackPlayer {...props}><OptionalJWPlayer {...props}><BuiltinVideoPlayer {...props} /></OptionalJWPlayer></OptionalVidstackPlayer>;
 }
 
 function BuiltinVideoPlayer({
@@ -686,7 +687,7 @@ function BuiltinVideoPlayer({
     animeName,
     episodeNumber,
     animeImageUrl: animePoster,
-    animeUrl: animeId ? `https://tatakai.me/anime/${encodeURIComponent(animeId)}` : undefined,
+    animeUrl: animeId ? `https://tatakai.app/anime/${encodeURIComponent(animeId)}` : undefined,
   });
 
   // ---------------------------------------------------------------------------
@@ -958,6 +959,7 @@ function BuiltinVideoPlayer({
     if (!currentSource?.url || !videoRef.current) return;
 
     setVideoError(null);
+    setIsPlaying(false);
     setIsBuffering(true);
 
     let mode: "hls" | "dash" | "direct" | "torrent" | "offline" | "debrid" = "direct";
@@ -1065,8 +1067,22 @@ function BuiltinVideoPlayer({
     const video = videoRef.current;
     if (!video) return;
 
+    let lastPlaybackTime = video.currentTime;
+    let wasSeeking = video.seeking;
     const handleTimeUpdate = () => {
       const t = video.currentTime;
+      const now = Date.now();
+      // A resumed stream may not emit `playing` again after a source switch.
+      // Advancing playback is also proof that its buffering state is stale.
+      const advancing = !video.paused && !video.seeking && !wasSeeking && !video.ended
+        && video.readyState >= 2 && t > lastPlaybackTime && t - lastPlaybackTime < 5;
+      lastPlaybackTime = t;
+      wasSeeking = video.seeking;
+      if (advancing) {
+        setIsPlaying(true);
+        setIsBuffering(false);
+        lastProgressAtRef.current = now;
+      }
       setCurrentTime(t);
       updateGlobalVideoTime(t);
       // Persist progress periodically DURING playback — not just on pause/ended.
@@ -1074,7 +1090,6 @@ function BuiltinVideoPlayer({
       // close left only the 0s seed row and Continue Watching showed 0:00.
       // Throttled to 5s; WatchPage writes localStorage synchronously each call
       // (survives an abrupt close) and throttles the Supabase/Dexie write itself.
-      const now = Date.now();
       if (onProgressUpdate && t > 1 && now - lastEmitRef.current >= 5000) {
         lastEmitRef.current = now;
         reportProgress(Math.floor(t), Math.floor(video.duration || 0) || 0, false);
@@ -1089,6 +1104,18 @@ function BuiltinVideoPlayer({
       // playable video, including when autoplay is off and `playing` hasn't
       // fired yet.
       setVideoError((prev) => (prev ? null : prev));
+    };
+    const handleLoadStart = () => {
+      lastPlaybackTime = video.currentTime;
+      wasSeeking = video.seeking;
+      lastProgressAtRef.current = Date.now();
+      setIsPlaying(false);
+      setIsBuffering(Boolean(currentSource?.url));
+    };
+    const handleCanPlay = () => {
+      if (video.readyState < 3 || video.seeking) return;
+      setIsBuffering(false);
+      setIsPlaying(!video.paused && !video.ended);
     };
     const handlePlay = () => setIsPlaying(true);
     const handlePause = () => {
@@ -1106,6 +1133,7 @@ function BuiltinVideoPlayer({
       }
     };
     const handlePlaying = () => {
+      setIsPlaying(!video.paused && !video.ended);
       setIsBuffering(false);
       // Playback recovered (or started) — drop any stale error overlay. Without
       // this a transient failure (e.g. the empty-src event fired by a
@@ -1202,6 +1230,9 @@ function BuiltinVideoPlayer({
     video.addEventListener("timeupdate", handleTimeUpdate);
     video.addEventListener("durationchange", handleDurationChange);
     video.addEventListener("loadedmetadata", handleLoadedMetadata);
+    video.addEventListener("loadstart", handleLoadStart);
+    video.addEventListener("canplay", handleCanPlay);
+    video.addEventListener("canplaythrough", handleCanPlay);
     video.addEventListener("play", handlePlay);
     video.addEventListener("pause", handlePause);
     video.addEventListener("waiting", handleWaiting);
@@ -1210,10 +1241,16 @@ function BuiltinVideoPlayer({
     video.addEventListener("ended", handleEnded);
     video.addEventListener("error", handleError);
 
+    // Source initialization can finish before this effect subscribes.
+    handleCanPlay();
+
     return () => {
       video.removeEventListener("timeupdate", handleTimeUpdate);
       video.removeEventListener("durationchange", handleDurationChange);
       video.removeEventListener("loadedmetadata", handleLoadedMetadata);
+      video.removeEventListener("loadstart", handleLoadStart);
+      video.removeEventListener("canplay", handleCanPlay);
+      video.removeEventListener("canplaythrough", handleCanPlay);
       video.removeEventListener("play", handlePlay);
       video.removeEventListener("pause", handlePause);
       video.removeEventListener("waiting", handleWaiting);

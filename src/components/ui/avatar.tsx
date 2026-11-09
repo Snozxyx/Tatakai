@@ -23,7 +23,7 @@ const AvatarImage = React.forwardRef<
   const [direct,setDirect]=React.useState(false);
   React.useEffect(()=>setDirect(false),[src]);
   const cached=cachedProfileImageUrl(src);
-  return <AvatarPrimitive.Image ref={ref} className={cn("aspect-square h-full w-full", className)} {...props} src={direct?src:cached} onLoadingStatusChange={status=>{
+  return <AvatarPrimitive.Image ref={ref} className={cn("block aspect-square h-full w-full shrink-0 rounded-[inherit] object-cover object-center", className)} {...props} src={direct?src:cached} onLoadingStatusChange={status=>{
     if(status==='error'&&!direct&&cached!==src){setDirect(true);return;}onLoadingStatusChange?.(status);
   }}/>;
 });
@@ -35,7 +35,7 @@ const AvatarFallback = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <AvatarPrimitive.Fallback
     ref={ref}
-    className={cn("flex h-full w-full items-center justify-center rounded-full bg-muted", className)}
+    className={cn("flex h-full w-full items-center justify-center rounded-[inherit] bg-muted", className)}
     {...props}
   />
 ));

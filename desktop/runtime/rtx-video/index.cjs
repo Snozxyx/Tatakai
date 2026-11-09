@@ -7,6 +7,15 @@ const { randomUUID } = require('node:crypto');
 const readline = require('node:readline');
 const execFileAsync = promisify(execFile);
 const QUALITIES = ['light', 'balanced', 'high'];
+async function withTimeout(operation, timeoutMs, message) {
+    let timer;
+    try {
+        return await Promise.race([
+            Promise.resolve().then(operation),
+            new Promise((_resolve, reject) => { timer = setTimeout(() => reject(new Error(message)), timeoutMs); }),
+        ]);
+    } finally { clearTimeout(timer); }
+}
 function configuration(config) {
     if (!config || !QUALITIES.includes(config.quality) || !Number.isInteger(config.maxOutputHeight) || config.maxOutputHeight < 240 || config.maxOutputHeight > 1080) throw new Error('Invalid RTX configuration');
     if (config.purpose && !['playback', 'preview'].includes(config.purpose)) throw new Error('Invalid RTX session purpose');
@@ -31,24 +40,30 @@ function registerRtxVideo(ipcMain, app, electron) {
     const sessions = new Map();
     const preferenceFile = path.join(app.getPath('userData'), 'rtx-video-gpu.json');
     const requestedGpu = () => { try { return JSON.parse(fs.readFileSync(preferenceFile, 'utf8')).enabled === true; } catch { return false; } };
-    const capability = async () => {
+    const probeCapability = async () => {
         const unavailable = reason => ({ available: false, reason, maxOutputHeight: 1080, dedicatedGpuRequested: requestedGpu() });
         if (process.platform !== 'win32' || process.arch !== 'x64') return unavailable('RTX Video requires the Windows x64 desktop app.');
         if (!electron.sharedTexture?.importSharedTexture) return unavailable('This desktop build does not support shared GPU textures.');
-        if (!fs.existsSync(executable) || !fs.existsSync(path.join(binaryRoot, 'nvngx_vsr.dll'))) return unavailable('RTX Video is unavailable in this build. The official NVIDIA SDK runtime and compiled Windows helper are required.');
+        if (!fs.existsSync(executable) || !fs.existsSync(path.join(binaryRoot, 'nvngx_vsr.dll'))) return unavailable('This app build does not include the RTX Video runtime. Install a Tatakai build with RTX Video support.');
         try {
             const { stdout } = await execFileAsync(executable, ['--probe'], { windowsHide: true, timeout: 15000, maxBuffer: 16384, cwd: binaryRoot });
             const probe = JSON.parse(stdout.trim());
             if (probe.protocol !== 1 || probe.sdk !== 'nvidia-rtx-video' || probe.initialized !== true) return unavailable(probe.reason || 'The NVIDIA runtime could not initialize on this GPU/driver.');
-            const gpu = await app.getGPUInfo('complete');
+            const gpu = await withTimeout(() => app.getGPUInfo('complete'), 5000, 'The GPU compatibility check timed out. Try again or restart the desktop app.');
             if (gpu.auxAttributes?.displayType && !String(gpu.auxAttributes.displayType).startsWith('ANGLE_D3D11')) return unavailable('RTX Video requires the hardware-accelerated D3D11 renderer. This session uses a different graphics backend.');
             const active = gpu.gpuDevice?.find(device => device.active);
             if (!active || active.vendorId !== 0x10de) return { ...unavailable('RTX Video needs Tatakai to render on the NVIDIA GPU. Restart using the NVIDIA GPU to enable it.'), restartRequired: true, dedicatedGpuRequested: requestedGpu() };
             return { available: true, reason: '', adapter: String(probe.adapter || 'NVIDIA RTX'), maxOutputHeight: 1080, dedicatedGpuRequested: requestedGpu() };
         } catch (error) {
+            if (/application control|blocked.*policy|blocked this file/i.test(error.message || '') || error.code === 'EACCES') return unavailable('Windows Application Control blocked the RTX Video helper. A trusted, signed RTX-enabled Tatakai build is required on this device.');
             try { const result = JSON.parse(error.stdout?.trim()); if (result.reason) return unavailable(`RTX Video could not initialize. ${String(result.reason).slice(0, 200)}`); } catch { /* Process or loader failure without a JSON response. */ }
             return unavailable(`RTX Video could not initialize. ${error.message.slice(0, 180)}`);
         }
+    };
+    let capabilityInFlight;
+    const capability = () => {
+        if (!capabilityInFlight) capabilityInFlight = probeCapability().finally(() => { capabilityInFlight = undefined; });
+        return capabilityInFlight;
     };
     const send = (session, metadata, bytes = Buffer.alloc(0)) => {
         const header = Buffer.from(JSON.stringify(metadata));

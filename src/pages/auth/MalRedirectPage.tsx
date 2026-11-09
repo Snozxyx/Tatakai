@@ -168,7 +168,7 @@ export default function MalRedirectPage() {
                 // exactly what to check instead of leaving them retrying login.
                 const sentRedirect = safeReadMalRedirect();
                 const hinted = /invalid_client|redirect_uri|redirect/i.test(raw)
-                    ? `${raw} — in the MAL app settings, list the sent URI (${sentRedirect || 'unknown'}) on its own line in App Redirect URL (one URL per line; canonical prod: https://tatakai.me/api/mal/redirect), then reconnect from Settings → Integrations.`
+                    ? `${raw} — in the MAL app settings, list the sent URI (${sentRedirect || 'unknown'}) on its own line in App Redirect URL (one URL per line; canonical prod: https://tatakai.app/api/mal/redirect), then reconnect from Settings → Integrations.`
                     : raw;
                 setError(hinted);
                 toast.error(t('auth.malLinkFailed'));

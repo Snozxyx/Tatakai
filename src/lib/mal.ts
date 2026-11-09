@@ -150,7 +150,7 @@ export function clearMalPendingMarker(): void {
  *
  * Fix: in the MAL app settings (API panel → App Redirect URL) register BOTH
  * URLs, one per line:
- *   https://tatakai.me/api/mal/redirect
+ *   https://tatakai.app/api/mal/redirect
  *   <this-origin>/api/mal/redirect
  * (MAL supports multiple redirect URIs line-separated in the SAME app — no
  * second app / second client ID needed.)

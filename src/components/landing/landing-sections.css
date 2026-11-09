@@ -1,0 +1,40 @@
+/* Tatakai's cover art and product previews carry the color below the hero. */
+.landing-sections { --background: 300 6% 3%; --foreground: 320 10% 94%; --card: 300 3% 6%; --muted-foreground: 320 4% 68%; --border: 320 4% 18%; background: #090809; color: #f1eef0; }
+.landing-sections > .relative.mx-auto { max-width: 1400px; padding-bottom: 64px; }
+.landing-sections section { padding-top: clamp(64px, 8vw, 96px); padding-bottom: clamp(64px, 8vw, 96px); }
+.landing-sections section, .landing-sections h2 { scroll-margin-top: 96px; }
+.landing-sections h2 { color: #f1eef0; font-family: 'Space Grotesk', sans-serif; font-size: clamp(30px, 3.6vw, 48px); font-weight: 500; line-height: 1.12; letter-spacing: -.02em; }
+.landing-sections h3 { font-family: 'Space Grotesk', sans-serif; line-height: 1.2; letter-spacing: 0; }
+.landing-sections :is(p, li) { line-height: 1.65; }
+.landing-sections article { background-color: #111011; border-color: rgb(241 238 240 / .1); }
+.landing-sections [class*='text-violet-200'],
+.landing-sections [class*='text-cyan-200'],
+.landing-sections [class*='text-violet-300'] { color: rgb(241 238 240 / .7); }
+.landing-sections [class*='bg-violet-300'] { background-color: hsl(var(--primary)); }
+.landing-sections [class*='text-white/35'],
+.landing-sections [class*='text-white/45'],
+.landing-sections [class*='text-white/58'] { color: rgb(241 238 240 / .65); }
+.landing-sections [aria-hidden='true'][class*='text-7xl'] { display: none; }
+.landing-sections button:not([aria-label]), .landing-sections a[role='button'] { border-radius: 10px; }
+.landing-sections :is(button, a):focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 4px; }
+.landing-sections [data-extra] { border-width: 0 0 1px; border-radius: 0; background: transparent; padding: 24px 0; }
+.landing-sections [data-extra]:hover { background: transparent; }
+.landing-sections [data-extra] .lucide { width: 18px; height: 18px; stroke-width: 1.5; }
+.landing-sections [data-extra] > .inline-flex { width: auto; height: auto; border: 0; background: transparent; margin-bottom: 16px; justify-content: flex-start; }
+.landing-sections [data-landing-final-cta] { border-radius: 16px; background: #111011; padding: clamp(32px, 5vw, 64px); text-align: left; }
+.landing-sections [data-landing-final-cta] > .relative { margin-left: 0; max-width: 640px; }
+.landing-sections [data-landing-final-cta] p { margin-left: 0; }
+.landing-sections [data-landing-final-cta] [data-landing-cta-actions] { justify-content: flex-start; }
+.landing-sections [data-landing-capability] { background: transparent; border-width: 1px 0 0; border-radius: 0; }
+.landing-sections [data-landing-offline] .h-9.w-9 { width: 18px; height: 18px; border: 0; background: transparent; }
+.landing-sections [data-community-preview='compact'] { min-height: 120px; border-radius: 12px; }
+.landing-sections [data-community-preview='support'] { min-height: 192px; }
+.landing-sections .community-preview { border-radius: 16px; }
+.landing-sections [aria-labelledby='translate-heading'] ol .lucide { width: 18px; height: 18px; color: rgb(241 238 240 / .65); }
+.landing-footer { border-top: 1px solid rgb(241 238 240 / .1); }
+.landing-footer :is(a, button):focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 4px; }
+@media (max-width: 639px) {
+  .landing-sections section { padding-top: 48px; padding-bottom: 48px; }
+  .landing-sections [data-extra] { padding: 20px 0; }
+  .landing-sections [data-landing-final-cta] { padding: 24px; }
+}

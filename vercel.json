@@ -27,7 +27,7 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.google-analytics.com https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' blob: https: http: http://localhost:* http://127.0.0.1:* http://[::1]:* https://huggingface.co https://*.huggingface.co https://*.hf.co https://*.supabase.co https://*.tatakai.me https://api.tatakai.me https://api.jikan.moe https://api.trace.moe https://graphql.anilist.co https://api.myanimelist.net https://api.mangabaka.org https://www.google-analytics.com https://*.datadoghq.com https://challenges.cloudflare.com; media-src 'self' blob: https:; frame-src 'self' https: https://challenges.cloudflare.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https://www.googletagmanager.com https://www.google-analytics.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data: https://tatakai.me; connect-src 'self' blob: https: http: http://localhost:* http://127.0.0.1:* http://[::1]:* https://huggingface.co https://*.huggingface.co https://*.hf.co https://*.supabase.co https://*.tatakai.app https://api.tatakai.app https://api.jikan.moe https://api.trace.moe https://graphql.anilist.co https://api.myanimelist.net https://api.mangabaka.org https://www.google-analytics.com https://*.datadoghq.com; media-src 'self' blob: https:; worker-src 'self' blob:; frame-src 'self' https:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
         },
         {
           "key": "Strict-Transport-Security",
@@ -36,10 +36,6 @@
         {
           "key": "Cross-Origin-Opener-Policy",
           "value": "same-origin"
-        },
-        {
-          "key": "X-Frame-Options",
-          "value": "DENY"
         }
       ]
     },
@@ -83,15 +79,11 @@
       ]
     },
     {
-      "source": "/security/turnstile.html",
+      "source": "/(.*)",
       "headers": [
         {
-          "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.google-analytics.com https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' blob: https: http: http://localhost:* http://127.0.0.1:* http://[::1]:* https://huggingface.co https://*.huggingface.co https://*.hf.co https://*.supabase.co https://*.tatakai.me https://api.tatakai.me https://api.jikan.moe https://api.trace.moe https://graphql.anilist.co https://api.myanimelist.net https://api.mangabaka.org https://www.google-analytics.com https://*.datadoghq.com https://challenges.cloudflare.com; media-src 'self' blob: https:; frame-src 'self' https: https://challenges.cloudflare.com; frame-ancestors capacitor://tatakai.me capacitor://localhost https://tatakai.me; base-uri 'self'; form-action 'self'"
-        },
-        {
-          "key": "Cache-Control",
-          "value": "no-store"
+          "key": "X-Frame-Options",
+          "value": "DENY"
         }
       ]
     }

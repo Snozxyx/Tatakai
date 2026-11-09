@@ -1,3 +1,4 @@
+import { BrandLogo } from '@/components/branding/BrandLogo';
 import { backgroundVideo } from '@/lib/assets';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
@@ -55,6 +56,7 @@ export default function NoInternetPage({ isNative = false }: NoInternetPageProps
     // In Electron the TitleBar is 32px (pt-8). Use fixed positioning to cover
     // the entire viewport below the title bar, ignoring any sidebar offset.
     <div
+      data-app-page-surface
       className={`flex flex-col lg:flex-row bg-background ${isElectron
           ? 'fixed inset-0 top-8 z-[100]'
           : 'min-h-screen'}`}
@@ -80,7 +82,7 @@ export default function NoInternetPage({ isNative = false }: NoInternetPageProps
           <div className="mb-10">
             <div className="flex items-center gap-3 mb-8">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-lg overflow-hidden">
-                <img src={`${import.meta.env.BASE_URL}assets/logo/tatakai-logo-square.png`} alt={uiI18n.t('app.tatakai_logo_290743b0')} className="w-full h-full object-cover" />
+                <BrandLogo  alt={uiI18n.t('app.tatakai_logo_290743b0')} className="w-full h-full object-cover" />
               </div>
               <h1 className="font-display text-3xl font-bold gradient-text">{uiI18n.t('app.tatakai_28bda6bd')}</h1>
             </div>
@@ -207,6 +209,7 @@ export default function NoInternetPage({ isNative = false }: NoInternetPageProps
       <div className="hidden lg:block w-1/2 h-screen relative overflow-hidden">
         {/* Video Background */}
         <video
+          data-app-route-background
           autoPlay
           muted
           loop
