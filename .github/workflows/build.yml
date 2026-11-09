@@ -194,6 +194,24 @@ jobs:
       - name: Generate installer assets
         run: node scripts/generate-installer-assets.cjs
 
+      - name: Set up Windows x64 compiler
+        if: matrix.platform == 'win'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Download and verify NVIDIA RTX Video SDK
+        if: matrix.platform == 'win'
+        run: node scripts/prepare-rtx-sdk.mjs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and verify Windows RTX runtime
+        if: matrix.platform == 'win'
+        run: |
+          npm run rtx:build
+          node -e "require('./scripts/verify-rtx-runtime-package.cjs').verifyRtxRuntimePackage(require('node:path').resolve('resources'))"
+
       # Bundle the per-platform `cloudflared` binary for host-hosted watch-party
       # tunnels. Downloaded here (not committed) so ~50MB binaries stay out of
       # git; electron-builder ships it via extraResources (from resources/bin).

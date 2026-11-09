@@ -261,14 +261,6 @@
         ]
       },
       {
-        "from": "extension",
-        "to": "extension",
-        "filter": [
-          "*/manifest.json",
-          "*/dist/bundle.js"
-        ]
-      },
-      {
         "from": "resources/bin",
         "to": "bin",
         "filter": [
