@@ -43,6 +43,13 @@ export async function normalizeTile(input, mask) {
   return sharp(data, { raw: info }).png().toBuffer();
 }
 
+/** Desktop launchers display the asset's alpha channel instead of masking it. */
+async function desktopIcon(input) {
+  const size = 1024;
+  const mask = Buffer.from(`<svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg"><rect width="${size}" height="${size}" rx="${size * 0.18}" fill="white"/></svg>`);
+  return sharp(input).resize(size, size).ensureAlpha().composite([{ input: mask, blend: 'dest-in' }]).png().toBuffer();
+}
+
 export async function generateBrandingAssets() {
   const assets = path.join(root, 'public/assets/branding'), resources = path.join(root, 'resources/branding');
   await mkdir(assets, { recursive: true }); await mkdir(resources, { recursive: true });
@@ -65,8 +72,9 @@ export async function generateBrandingAssets() {
   for (const variant of variants) {
     await sharp(tiles[variant]).resize(512, 512).png().toFile(path.join(assets, `${variant}.png`));
     const flat = await sharp(tiles[variant]).resize(1024, 1024).flatten({ background: fills[variant] }).png().toBuffer();
-    await writeFile(path.join(resources, `${variant}.png`), flat);
-    await generateIconFiles(flat, resources, variant);
+    const desktop = await desktopIcon(tiles[variant]);
+    await writeFile(path.join(resources, `${variant}.png`), desktop);
+    await generateIconFiles(desktop, resources, variant);
     for (const [density, size] of Object.entries(densitySizes)) {
       const directory = path.join(root, 'android/app/src/main/res', `mipmap-${density}`);
       await mkdir(directory, { recursive: true });
@@ -101,11 +109,14 @@ export async function generateBrandingAssets() {
   }
   await sharp(glyph.data, { raw: glyph.info }).resize(96, 96).png().toFile(path.join(root, 'android/app/src/main/res/drawable/ic_notification.png'));
   // Keep the old originals intact; replace only generated installed defaults.
-  await sharp(tiles.dark).resize(512, 512).flatten({ background: fills.dark }).png().toFile(path.join(root, 'resources/icon.png'));
+  await sharp(tiles.dark).resize(512, 512).png().toFile(path.join(root, 'resources/icon.png'));
   for (const size of [16, 32, 48, 64, 128, 256, 512, 1024]) await sharp(tiles.dark).resize(size, size).png().toFile(path.join(root, 'resources', `icon-${size}.png`));
   await generateIconFiles(path.join(resources, 'dark.png'), path.join(root, 'resources'), 'icon', true);
   const pwa = path.join(root, 'public/assets/branding/pwa'); await mkdir(pwa, { recursive: true });
-  for (const size of [192, 512]) await sharp(tiles.dark).resize(size, size).flatten({ background: fills.dark }).png().toFile(path.join(pwa, `icon-${size}.png`));
+  for (const size of [192, 512]) {
+    await sharp(tiles.dark).resize(size, size).png().toFile(path.join(pwa, `icon-${size}.png`));
+    await sharp(tiles.dark).resize(size, size).flatten({ background: fills.dark }).png().toFile(path.join(pwa, `icon-maskable-${size}.png`));
+  }
   const primary = path.join(root, 'ios/App/App/Assets.xcassets/AppIcon.appiconset');
   await mkdir(primary, { recursive: true });
   const images = [];

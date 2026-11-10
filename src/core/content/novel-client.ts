@@ -18,6 +18,7 @@ import { ANILIST_GRAPHQL_ENDPOINT, resolveBackendOrigin } from '@/lib/api/backen
 import { mergeCatalog } from '@/lib/catalogMerge';
 import { fetchMangaBakaSeries } from '@/lib/mapping/mangabaka';
 import { getMangaTagOptions, searchMangaTags } from './manga-tag-search';
+import { normalizeNovelFilters, mangaBakaGenre } from './novel-filters';
 
 export type { NovelSearchItem, NovelSearchResult, MappedNovelChapter, NovelChapterResponse, NovelContentResponse };
 
@@ -33,6 +34,7 @@ export type NovelSearchOptions = {
   maxYear?: number;
   maxScore?: number;
   adult?: boolean;
+  adultOnly?: boolean;
 };
 
 function resolveApiOrigin(): string {
@@ -112,7 +114,7 @@ export async function getNovelHome(adult = false): Promise<NovelHomeData> {
 }
 
 export async function searchWebNovels(query = '', page = 1, limit = 20, options: NovelSearchOptions = {}): Promise<NovelSearchResult> {
-  const catalog = await searchMangaTags(query, page, limit, { ...options, mangaType: 'novel', tagSource: 'mangabaka' });
+  const catalog = await searchMangaTags(query, page, limit, { ...options, genre: mangaBakaGenre(options.genre), mangaType: 'novel', tagSource: 'mangabaka' });
   const results = catalog.results.map(item => ({ ...item, href: undefined, mediaType: 'novel' as const }))
     .filter(item => (!options.minYear || (item.year ?? 0) >= options.minYear)
       && (!options.maxYear || (item.year ?? Infinity) <= options.maxYear)
@@ -123,6 +125,11 @@ export async function searchWebNovels(query = '', page = 1, limit = 20, options:
 }
 
 export async function searchNovels(query: string, page = 1, limit = 20, options: NovelSearchOptions = {}): Promise<NovelSearchResult> {
+  options = normalizeNovelFilters(options);
+  if (options.adultOnly && options.adult !== true) return {
+    query, page, limit, results: [], partial: false, failedProviders: [],
+    currentPage: page, total: 0, totalPages: 1, hasNextPage: false, source: 'genre',
+  };
   if (options.tagSource === 'mangabaka') return searchWebNovels(query, page, limit, options);
   // AniList tag names must never be sent to the other taxonomy.
   if (options.tags?.length) return searchAniListNovels(query, page, limit, options);
@@ -183,7 +190,7 @@ async function searchAniListNovels(
         genre: options.genre, tags: tags?.length ? tags : undefined,
         statuses: options.statuses?.length ? options.statuses.map(status => statuses[status] || status) : undefined,
         sort: [options.sort || (query.trim() ? 'SEARCH_MATCH' : 'POPULARITY_DESC')],
-        origin: options.origin, adult: options.adult ? undefined : false,
+        origin: options.origin, adult: options.adultOnly ? true : options.adult ? undefined : false,
         minDate: options.minYear ? options.minYear * 10000 : undefined,
         maxDate: options.maxYear ? (options.maxYear + 1) * 10000 : undefined,
         minScore: options.minScore ? Math.round(options.minScore * 10) - 1 : undefined,

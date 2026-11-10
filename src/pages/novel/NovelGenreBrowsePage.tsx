@@ -228,6 +228,7 @@ async function fetchNovelCatalogPage(args: CatalogPageArgs): Promise<NovelSearch
     sort,
     feedMode,
     tags,
+    tagSource,
     minYear,
     minScore,
     canShowAdult,
@@ -250,9 +251,11 @@ async function fetchNovelCatalogPage(args: CatalogPageArgs): Promise<NovelSearch
     };
   }
 
-  const res = await searchNovels(genre && feedMode === 'auto' ? '' : '', page, PAGE_LIMIT, {
+  const res = await searchNovels('', page, PAGE_LIMIT, {
     genre: genre || undefined,
     tags: tags.length > 0 ? tags : undefined,
+    tagSource: tags.length > 0 ? tagSource : undefined,
+    statuses: novelStatus === 'all' ? undefined : [novelStatus],
     sort: sortToBackend(sort, feedMode),
     minYear: minYear > 0 ? minYear : undefined,
     minScore: minScore > 0 ? minScore : undefined,

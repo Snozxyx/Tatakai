@@ -12,13 +12,25 @@
       "src": "/assets/branding/pwa/icon-192.png",
       "type": "image/png",
       "sizes": "192x192",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "/assets/branding/pwa/icon-512.png",
       "type": "image/png",
       "sizes": "512x512",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/branding/pwa/icon-maskable-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/assets/branding/pwa/icon-maskable-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "maskable"
     }
   ],
   "categories": [
@@ -51,7 +63,7 @@
       "url": "/",
       "icons": [
         {
-          "src": "/assets/logo/tatakai-logo-square.png",
+          "src": "/assets/branding/pwa/icon-192.png",
           "sizes": "192x192"
         }
       ]
@@ -63,7 +75,7 @@
       "url": "/search",
       "icons": [
         {
-          "src": "/assets/logo/tatakai-logo-square.png",
+          "src": "/assets/branding/pwa/icon-192.png",
           "sizes": "192x192"
         }
       ]
@@ -75,7 +87,7 @@
       "url": "/offline-library",
       "icons": [
         {
-          "src": "/assets/logo/tatakai-logo-square.png",
+          "src": "/assets/branding/pwa/icon-192.png",
           "sizes": "192x192"
         }
       ]
