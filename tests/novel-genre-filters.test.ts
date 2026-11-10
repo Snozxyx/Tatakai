@@ -39,6 +39,7 @@ test('Isekai, Historical and Martial Arts browse links use tags instead of inval
     expect(searchRequest().variables.tags).toEqual([tag]);
   }
   expect(requests.every(request => Boolean(request.query))).toBe(true);
+  expect(requests.some(request => request.query?.includes('MediaTagCollection'))).toBe(false);
 }));
 
 test('the adult genre respects the opt-in and requests only adult novels from both catalogs', () => withCatalog(async () => {

@@ -18,7 +18,7 @@ import { ANILIST_GRAPHQL_ENDPOINT, resolveBackendOrigin } from '@/lib/api/backen
 import { mergeCatalog } from '@/lib/catalogMerge';
 import { fetchMangaBakaSeries } from '@/lib/mapping/mangabaka';
 import { getMangaTagOptions, searchMangaTags } from './manga-tag-search';
-import { normalizeNovelFilters, mangaBakaGenre } from './novel-filters';
+import { normalizeNovelFilters, mangaBakaGenre, novelGenreTag } from './novel-filters';
 
 export type { NovelSearchItem, NovelSearchResult, MappedNovelChapter, NovelChapterResponse, NovelContentResponse };
 
@@ -159,12 +159,12 @@ async function searchAniListNovels(
     });
     return { ...catalog, results: catalog.results.map(item => ({ ...item, mediaType: 'novel' as const })) };
   }
-  const taxonomy = options.tags?.length ? await getMangaTagOptions('anilist') : [];
+  const taxonomy = options.tags?.some(name => !novelGenreTag(name)) ? await getMangaTagOptions('anilist') : [];
   const tags = options.tags?.map(name => {
     const normalized = name.trim().toLowerCase() === 'regression' ? 'age regression' : name.trim().toLowerCase();
-    const tag = taxonomy.find(tag => tag.name.toLowerCase() === normalized);
+    const tag = novelGenreTag(normalized) || taxonomy.find(tag => tag.name.toLowerCase() === normalized)?.name;
     if (!tag) throw new Error(`“${name}” is not an AniList tag. Choose a tag from the novel filters.`);
-    return tag.name;
+    return tag;
   });
   const statuses: Record<string, string> = {
     ongoing: 'RELEASING', completed: 'FINISHED', hiatus: 'HIATUS',

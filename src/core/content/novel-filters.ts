@@ -10,6 +10,10 @@ const genreNames = new Map(genres.map(genre => [key(genre), genre]));
 // These browse links describe AniList tags, not genres.
 const tagNames = new Map([['isekai', 'Isekai'], ['historical', 'Historical'], ['martial arts', 'Martial Arts']]);
 
+export function novelGenreTag(value: string): string | undefined {
+  return tagNames.get(key(value));
+}
+
 export function normalizeNovelFilters(options: NovelSearchOptions): NovelSearchOptions {
   if (!options.genre?.trim()) return options;
   const slug = key(options.genre);
