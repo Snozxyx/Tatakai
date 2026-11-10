@@ -29,4 +29,20 @@ await test('generated light and monochrome logos have transparent corners and op
   expect(catalog.images.map(image => image.appearances?.[0]?.value ?? 'any')).toEqual(['any', 'dark', 'tinted']);
 });
 
+await test('desktop and ordinary PWA icons preserve rounded transparent corners', async () => {
+  for (const file of [
+    ...['dark', 'light', 'monochrome', 'legacy'].map(name => `resources/branding/${name}.png`),
+    'resources/icon.png', 'public/assets/branding/pwa/icon-192.png', 'public/assets/branding/pwa/icon-512.png',
+  ]) {
+    const { data, info } = await sharp(file).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    for (const index of [0, info.width - 1, (info.height - 1) * info.width, info.width * info.height - 1]) expect(data[index * 4 + 3]).toBe(0);
+    expect(data[(Math.floor(info.height / 2) * info.width + Math.floor(info.width / 2)) * 4 + 3]).toBe(255);
+  }
+  const manifest = JSON.parse(await readFile('public/manifest.json', 'utf8'));
+  for (const icon of manifest.icons) {
+    const { data } = await sharp(`public${icon.src}`).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    expect(data[3]).toBe(icon.purpose === 'maskable' ? 255 : 0);
+  }
+});
+
 console.log('BRANDING_ASSETS_OK');

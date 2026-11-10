@@ -272,7 +272,7 @@ export function NovelGenreSlider() {
       queryKey: ["novel-genre-cover", g.genre],
       queryFn: async (): Promise<string | null> => {
         if (g.isAdult) return null;
-        const res = await searchNovels("", 1, 3, { genre: g.label, adult: false }).catch(() => null);
+        const res = await searchNovels("", 1, 3, { genre: g.genre, adult: false }).catch(() => null);
         const first = (res?.results ?? []).find((r) => r.poster);
         return first?.poster ?? null;
       },

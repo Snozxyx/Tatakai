@@ -4,6 +4,15 @@ All notable changes to Tatakai are documented here.
 
 ---
 
+## [6.4.5] - 2026-11-10
+
+- Restore extension catalogue and stack loading after server container changes.
+- Preserve rounded launcher icons on Windows, macOS and Linux, with separate ordinary and maskable web app icons.
+- Cache spotlight, trending and manga discovery feeds in Redis with retained results, shared refreshes and retry backoff.
+- Keep failed home refreshes from replacing usable spotlight and trending data with empty feeds.
+- Repair novel genre browsing, including Isekai, Historical and Martial Arts, while preserving filters and the adult opt-in.
+- Load genre covers from stable catalogue names and avoid an extra tag-list request for known novel genres.
+
 ## [6.4.4] - 2026-11-09
 
 - Promote the 6.4.4 beta work to the stable channel with coordinated desktop, Android, iOS and Android TV version metadata.

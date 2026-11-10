@@ -67,7 +67,7 @@ interface MangaBakaSeries {
   total_chapters?: string; final_volume?: string; original_language?: string;
 }
 
-export async function searchMangaTags(query: string, page: number, limit: number, options: MangaSearchOptions): Promise<MangaSearchResult> {
+export async function searchMangaTags(query: string, page: number, limit: number, options: MangaSearchOptions & { adultOnly?: boolean }): Promise<MangaSearchResult> {
   const names = [...new Set(options.tags || [])];
   const normalize = (name: string) => name.trim().toLocaleLowerCase();
   let source = options.tagSource;
@@ -94,7 +94,7 @@ export async function searchMangaTags(query: string, page: number, limit: number
         }
       }`, {
       page, perPage: limit, search: query || undefined, tags: tags.map(tag => tag.name),
-      adult: options.adult ? undefined : false, genre: options.genre, country,
+      adult: options.adultOnly ? true : options.adult ? undefined : false, genre: options.genre, country,
       format: options.mangaType === 'novel' ? 'NOVEL' : undefined,
     });
     const results: MangaSearchItem[] = data.Page.media.map(media => ({
@@ -116,7 +116,7 @@ export async function searchMangaTags(query: string, page: number, limit: number
   const mangaType = options.mangaType || ({ KR: 'manhwa', CN: 'manhua', JP: 'manga' }[options.origin || '']);
   if (mangaType) params.append('type', mangaType === 'comics' ? 'oel' : mangaType);
   // Explicitly request allowed ratings; MangaBaka otherwise defaults to safe only.
-  (options.adult ? ['safe', 'suggestive', 'erotica', 'pornographic'] : ['safe', 'suggestive'])
+  (options.adultOnly ? ['erotica', 'pornographic'] : options.adult ? ['safe', 'suggestive', 'erotica', 'pornographic'] : ['safe', 'suggestive'])
     .forEach(rating => params.append('content_rating', rating));
   const data = await readJson<{ pagination: { count: number; next: string | null }; data: MangaBakaSeries[] }>(`${MANGABAKA_API}/search?${params}`);
   const results: MangaSearchItem[] = data.data.map(media => {
