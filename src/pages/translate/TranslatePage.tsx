@@ -1,3 +1,4 @@
+import { SlidingTabList } from '@/components/ui/sliding-tab-list';
 import { randomUUID } from '../../lib/uuid';
 import { ThemedCheckbox } from '@/components/ui/themed-checkbox';
 import { ThemedSelect } from '@/components/ui/themed-select';
@@ -58,6 +59,8 @@ import {
 import { ProviderSettings } from "@/components/translate/ProviderSettings";
 import { LayerInspector } from "@/components/translate/LayerInspector";
 import { EditorCanvas } from "@/components/translate/EditorCanvas";
+import { ManualWorkflow } from "@/components/translate/ManualWorkflow";
+import { clampFrame } from "@/core/translate/geometry";
 import { PageThumbnail } from "@/components/translate/PageThumbnail";
 import { LanguageInput } from "@/components/translate/LanguageInput";
 import "@/components/translate/translate.css";
@@ -89,6 +92,7 @@ export default function TranslatePage() {
     visionProvider: null,
   });
   const [scope, setScope] = useState("current");
+  const [manualMode, setManualMode] = useState(false);
   const [stages, setStages] = useState(["detect", "ocr", "translate", "cleanup"]);
   const [prompt, setPrompt] = useState("");
   const [visual, setVisual] = useState(false);
@@ -308,8 +312,17 @@ export default function TranslatePage() {
       const layer = p.pages
         .find((pg) => pg.id === activePage)
         ?.layers.find((l) => l.id === id);
-      if (layer) Object.assign(layer, patch);
+      if (layer) Object.assign(layer, patch, layer.kind === "text" ? {manual:true} : {});
     });
+  const selectedTextIds = page?.layers.filter(l => l.kind === "text" && selectedLayers.includes(l.id)).map(l => l.id) || [];
+  const processStages = (nextStages: string[], overwriteSelected = false) => void run(async () => {
+    if (!bridge || !projectRef.current) return;
+    setProcessing(true); setStatus("Starting processing…");
+    try { await bridge.request("process", {revision:projectRef.current.revision,pageIds:targets,stages:nextStages,
+      ...(scope === "layers" ? {layerIds:selectedTextIds} : {}), overwriteSelected}); }
+    catch (e) { setProcessing(false); throw e; }
+  });
+  const stopProcessing = () => void run(async () => { await bridge!.request("cancel", {}); setStatus("Stopping at the next safe boundary…"); });
   if (!bridge)
     return (
       <div className="mx-auto flex max-w-lg flex-col items-start gap-4 px-6 py-24">
@@ -754,6 +767,14 @@ export default function TranslatePage() {
           <ResizableHandle withHandle />
           <ResizablePanel defaultSize={58} minSize={35}>
             <section className="flex h-full min-h-0 flex-col">
+              <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-3 py-2">
+                <div role="group" aria-label="Translation mode" className="flex gap-1">
+                  <Button size="sm" variant={!manualMode ? "outline" : "ghost"} aria-pressed={!manualMode} disabled={disabled} onClick={()=>{setManualMode(false);setScope("current");}}>Automatic</Button>
+                  <Button size="sm" variant={manualMode ? "outline" : "ghost"} aria-pressed={manualMode} disabled={disabled} onClick={()=>{setManualMode(true);setScope("current");setPanel("properties");}}>Manual</Button>
+                </div>
+                <span className="text-xs text-muted-foreground">{manualMode ? "Correct regions, text and cleanup" : "Translate pages in one run"}</span>
+              </div>
+              {manualMode ? <ManualWorkflow scope={scope} onScope={setScope} selectedCount={selectedTextIds.length} hasPages={!!targets.length} disabled={disabled} processing={processing} onRun={(stage,replace)=>processStages([stage],replace)} onStop={stopProcessing}/> : (
               <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-b border-border p-2">
                 <ThemedSelect
                   aria-label="Processing scope"
@@ -864,23 +885,61 @@ export default function TranslatePage() {
                   </Button>
                 )}
               </div>
+              )}
               {page ? (
                 <EditorCanvas
+                  key={page.id}
                   page={page}
+                  manual={manualMode}
+                  onTransform={(id,rect,source)=>commit(p=>{
+                    const pg=p.pages.find(pg=>pg.id===activePage);
+                    const l=pg?.layers.find(l=>l.id===id);
+                    if(l) Object.assign(l,rect,{manual:true},source && l.kind==="text" ? {sourceRegion:clampFrame(rect,pg.width,pg.height)} : {});
+                  })}
+                  onCleanupMask={async cleanupMask => {
+                    let success = false;
+                    await run(async () => {
+                      let finish: (result: boolean) => void;
+                      const done = new Promise<boolean>(resolve => { finish = resolve; });
+                      const unsubscribe = bridge.onEvent(event => {
+                        if (event.event === "complete" || event.event === "error") {
+                          unsubscribe();
+                          finish(event.event === "complete");
+                        }
+                      });
+                      setProcessing(true);
+                      setStatus("Cleaning painted areas…");
+                      try {
+                        await bridge.request("process", {
+                          revision: projectRef.current!.revision,
+                          pageIds: [activePage],
+                          stages: ["cleanup"],
+                          cleanupMask,
+                        });
+                        success = await done;
+                      } catch (error) {
+                        unsubscribe();
+                        setProcessing(false);
+                        throw error;
+                      }
+                    });
+                    return success;
+                  }}
                   revision={project.revision}
                   bridge={bridge}
                   selected={selectedLayers}
                   onSelect={setSelectedLayers}
                   disabled={disabled}
                   onError={fail}
-                  onMove={(ids, dx, dy) =>
+                  onMove={(ids, dx, dy, source) =>
                     commit((p) => {
-                      p.pages
-                        .find((pg) => pg.id === activePage)
-                        ?.layers.forEach((l) => {
+                      const pg = p.pages.find((pg) => pg.id === activePage);
+                      pg?.layers.forEach((l) => {
                           if (ids.includes(l.id)) {
                             l.x += dx;
                             l.y += dy;
+                            l.manual = true;
+                            if(source && l.kind === "text") l.sourceRegion = clampFrame(l,pg.width,pg.height);
                           }
                         });
                     })
@@ -894,6 +953,8 @@ export default function TranslatePage() {
                           id,
                           name: "Text",
                           kind: "text",
+                          manual: true,
+                          sourceRegion: rect,
                           source: "",
                           translation: "",
                           sourceEdited: false,
@@ -970,7 +1031,7 @@ export default function TranslatePage() {
             collapsedSize={0}
           >
             <aside className="flex h-full min-h-0 flex-col border-l border-border">
-              <div className="flex shrink-0 gap-1 border-b border-border p-2">
+              <SlidingTabList className="flex shrink-0 gap-1 border-b border-border p-2">
                 <Button
                   size="sm"
                   className="flex-1"
@@ -991,7 +1052,7 @@ export default function TranslatePage() {
                   <Bot className="mr-2 size-4" />
                   Agent
                 </Button>
-              </div>
+              </SlidingTabList>
               {panel === "properties" ? (
                 page ? (
                   <LayerInspector

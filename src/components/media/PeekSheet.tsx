@@ -11,8 +11,9 @@ import './peek-sheet.css';
 const DISMISS_DY = 110;
 
 /** Radix owns focus and modal isolation; the existing top-edge swipe stays local. */
-export function PeekSheet({ open, onClose, label, children, footer }: {
+export function PeekSheet({ open, onClose, label, children, footer, showCloseButton = true, closeLabel }: {
   open: boolean; onClose: () => void; label: string; children: ReactNode; footer?: ReactNode;
+  showCloseButton?: boolean; closeLabel?: string;
 }) {
   useUiTranslation();
   const reduced = useMotionPreference();
@@ -92,9 +93,9 @@ export function PeekSheet({ open, onClose, label, children, footer }: {
             className="peek-panel pointer-events-auto relative mx-auto flex max-h-[88dvh] w-full flex-col overflow-hidden rounded-t-2xl border border-b-0 border-border bg-background shadow-xl outline-none md:max-w-[640px] md:rounded-2xl md:border-b">
             <DialogPrimitive.Title className="sr-only">{label}</DialogPrimitive.Title>
             {compact && <div data-peek-drag-handle className="relative z-10 flex h-6 shrink-0 touch-none items-center justify-center"><span className="h-1 w-10 rounded-full bg-muted-foreground/40" aria-hidden /></div>}
-            <DialogPrimitive.Close aria-label={uiI18n.t('app.close_quick_peek_2800ccbb')} className="absolute right-3 top-3 z-20 flex h-10 w-10 items-center justify-center rounded-lg border border-border/50 bg-background/85 text-foreground backdrop-blur-sm transition-colors hover:bg-background focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
+            {showCloseButton && <DialogPrimitive.Close aria-label={closeLabel || uiI18n.t('app.close_quick_peek_2800ccbb')} className="absolute right-3 top-3 z-20 flex h-10 w-10 items-center justify-center rounded-lg border border-border/50 bg-background/85 text-foreground backdrop-blur-sm transition-colors hover:bg-background focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
               <X className="size-4" aria-hidden />
-            </DialogPrimitive.Close>
+            </DialogPrimitive.Close>}
             <div ref={scrollRef} data-peek-scroll className="min-h-0 flex-1 overflow-y-auto overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>{children}</div>
             {footer && <div className="shrink-0">{footer}</div>}
           </div>

@@ -20,7 +20,9 @@ export type ReaderKeybindAction =
   | 'zoomIn'
   | 'zoomOut'
   | 'toggleComments'
-  | 'reload';
+  | 'reload'
+  | 'toggleSettings'
+  | 'toggleAutoScroll';
 
 export type ReaderKeybindMap = Record<ReaderKeybindAction, string>;
 
@@ -39,6 +41,8 @@ export const READER_KEYBIND_ACTIONS: { action: ReaderKeybindAction; label: strin
   { action: 'zoomIn', label: 'Wider', hint: 'Increase page width' },
   { action: 'zoomOut', label: 'Narrower', hint: 'Decrease page width' },
   { action: 'toggleComments', label: 'Comments', hint: 'Toggle the comments drawer' },
+  { action: 'toggleSettings', label: 'Reader settings', hint: 'Open reader settings' },
+  { action: 'toggleAutoScroll', label: 'Auto scroll', hint: 'Start or stop auto scroll' },
   { action: 'reload', label: 'Reload', hint: 'Re-fetch the current chapter pages' },
 ];
 
@@ -55,6 +59,8 @@ export const DEFAULT_READER_KEYBINDS: ReaderKeybindMap = {
   zoomOut: '-',
   toggleComments: 'c',
   reload: 'r',
+  toggleSettings: 's',
+  toggleAutoScroll: 'k',
 };
 
 /** Turn a KeyboardEvent into a stable, comparable token (matches the video layer). */
@@ -97,6 +103,9 @@ export function normalizeReaderKeybinds(raw: unknown): ReaderKeybindMap {
     if (isReaderKeybindAction(action) && typeof key === 'string') {
       next[action] = key.trim().toLowerCase();
     }
+  }
+  for (const action of ['toggleSettings', 'toggleAutoScroll'] as const) {
+    if (!(action in raw) && Object.values(raw).some(value => typeof value === 'string' && value.trim().toLowerCase() === next[action])) next[action] = '';
   }
   return next;
 }

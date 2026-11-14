@@ -47,6 +47,7 @@ export function OptionalJWPlayer({ children, ...props }: Props & { children: Rea
   const compatible = props.sources.length > 0 && props.sources.every(source =>
     /^(https?:|blob:)/i.test(source.url) && source.sourceType !== 'torrent' && !Object.keys(source.headers || {}).length)
     && !Object.keys(props.headers || {}).length && !props.externalRef && !props.isTimelineLocked && !props.hideTimelineUi
+    && !props.subtitles?.some(track => track.assContent || /\.(ass|ssa)(?:[?#]|$)/i.test(track.originalUrl || track.url))
     && !props.torrentSessionId && !props.torrentStats && !props.torrentUrl && props.sourceType !== 'torrent' && !props.isOffline && !props.isLoading;
   if (settings.playerEngine !== 'jwplayer' || fallback || !compatible) return <>{fallback && isValidElement<{ initialSeekSeconds?: number }>(children)
     ? cloneElement(children, { initialSeekSeconds: position.current }) : children}</>;

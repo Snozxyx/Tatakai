@@ -1,3 +1,4 @@
+import { SlidingTabList } from '@/components/ui/sliding-tab-list';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState } from "react";
@@ -111,9 +112,9 @@ export function ReportManager() {
                     <ShieldAlert className="w-6 h-6 text-primary" />
                     {uiI18n.t('app.user_reports_08936e1a')}
                 </h2>
-                <div className="flex bg-muted/30 rounded-xl p-1 border border-white/5">
+                <SlidingTabList className="flex bg-muted/30 rounded-xl p-1 border border-white/5">
                     {(['pending', 'action_taken', 'dismissed', 'all'] as const).map((f) => (
-                        <button
+                        <button aria-pressed={filter === f}
                             key={f}
                             onClick={() => setFilter(f)}
                             className={`px-4 py-1.5 rounded-lg text-xs font-bold capitalize transition-all ${filter === f ? "bg-primary text-primary-foreground shadow-lg" : "hover:bg-white/5"}`}
@@ -121,7 +122,7 @@ export function ReportManager() {
                             {f.replace('_', ' ')}
                         </button>
                     ))}
-                </div>
+                </SlidingTabList>
             </div>
 
             {isLoading ? (

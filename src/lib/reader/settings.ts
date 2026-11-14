@@ -9,6 +9,8 @@ export type ReaderLoadingMethod = 'native' | 'blob';
 export type ReaderLoadingStrategy = 'eager' | 'lazy';
 export type ReaderDirection = 'ltr' | 'rtl';
 export type ReaderPageFit = 'width' | 'height' | 'both' | 'original';
+export type ReaderTapBehavior = 'settings' | 'scroll' | 'none';
+export type ReaderAutoScrollMode = 'creep' | 'jump';
 
 export interface ReaderSettings {
   upscaler: UpscalerEngine;
@@ -31,6 +33,11 @@ export interface ReaderSettings {
   continuousScroll: boolean; // vertical mode: load the next chapter at the end / previous at the top so reading never stops
   autoScroll: boolean; // auto-advance scroll (vertical mode)
   autoScrollSpeed: number; // 1..10
+  autoScrollMode: ReaderAutoScrollMode;
+  autoScrollInterval: number; // seconds, 0.5..10 for jump mode
+  tapBehavior: ReaderTapBehavior;
+  hideCursorWhileReading: boolean;
+  cursorWakeDistance: number; // CSS pixels, 0..50
   progressIndicator: ReaderProgressIndicator;
   showProgressBar: boolean;
   showComments: boolean;
@@ -69,6 +76,11 @@ export const DEFAULT_SETTINGS: ReaderSettings = {
   continuousScroll: false,
   autoScroll: false,
   autoScrollSpeed: 4,
+  autoScrollMode: 'creep',
+  autoScrollInterval: 3,
+  tapBehavior: 'none',
+  hideCursorWhileReading: false,
+  cursorWakeDistance: 20,
   progressIndicator: 'page',
   showProgressBar: true,
   showComments: true,
@@ -78,7 +90,7 @@ export const DEFAULT_SETTINGS: ReaderSettings = {
   showCaptureButton: true,
   showReloadButton: true,
   backgroundColor: '#0a0a0f',
-  preloading: 'partial',
+  preloading: 'full',
   loadingMethod: 'native',
   loadingStrategy: 'lazy',
   panelCrop: false,
@@ -131,6 +143,11 @@ export const normalizeSettings = (raw: Partial<ReaderSettings> | null | undefine
   continuousScroll: asBool(raw?.continuousScroll, DEFAULT_SETTINGS.continuousScroll),
   autoScroll: asBool(raw?.autoScroll, DEFAULT_SETTINGS.autoScroll),
   autoScrollSpeed: clamp(asNum(raw?.autoScrollSpeed, DEFAULT_SETTINGS.autoScrollSpeed), 1, 10),
+  autoScrollMode: raw?.autoScrollMode === 'jump' ? 'jump' : 'creep',
+  autoScrollInterval: clamp(asNum(raw?.autoScrollInterval, 3), 0.5, 10),
+  tapBehavior: ['settings', 'scroll', 'none'].includes(raw?.tapBehavior) ? raw.tapBehavior : 'none',
+  hideCursorWhileReading: asBool(raw?.hideCursorWhileReading, false),
+  cursorWakeDistance: clamp(asNum(raw?.cursorWakeDistance, 20), 0, 50),
   progressIndicator: VALID_PROGRESS.has(raw?.progressIndicator as ReaderProgressIndicator)
     ? (raw!.progressIndicator as ReaderProgressIndicator)
     : DEFAULT_SETTINGS.progressIndicator,

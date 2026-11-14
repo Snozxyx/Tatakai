@@ -112,6 +112,20 @@ const tokenMap = new Map<string, MobileProxyEntry>();
  */
 const blobCache = new Map<string, string>();
 const blobInflight = new Map<string, Promise<string | null>>();
+const retainedImageUrls = new Map<string, number>();
+
+/** A reader lease prevents the proxy LRU from revoking an image still in use. */
+export function retainMobileReaderBlobUrl(url: string): () => void {
+  retainedImageUrls.set(url, (retainedImageUrls.get(url) || 0) + 1);
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    const count = (retainedImageUrls.get(url) || 1) - 1;
+    if (count) retainedImageUrls.set(url, count); else retainedImageUrls.delete(url);
+    sweepTokens();
+  };
+}
 const MAX_BLOB_ENTRIES = 250;
 const MAX_MEDIA_BLOB_ENTRIES = 16;
 
@@ -147,6 +161,7 @@ function sweepTokens(): void {
       if (toDrop <= 0) break;
       if (!matches(key)) continue;
       const url = blobCache.get(key);
+      if (url && retainedImageUrls.has(url)) continue;
       blobCache.delete(key);
       if (url) {
         try { URL.revokeObjectURL(url); } catch { /* ignore */ }

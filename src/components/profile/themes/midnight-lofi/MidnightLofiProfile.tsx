@@ -1,3 +1,4 @@
+import { SlidingTabList } from '@/components/ui/sliding-tab-list';
 import { ProfileBadges } from '@/components/profile/ProfileBadges';
 import { formatWatchHours } from '@/lib/formatWatchHours';
 import ProfileThemeDetails from '../ProfileThemeDetails';
@@ -326,7 +327,7 @@ export default function MidnightLofiProfile({ data, configuration, onBack }: The
         {/* Right Main Content */}
         <div className="flex flex-col min-w-0">
           {/* Navigation Tabs */}
-          <nav className="ml-tabs-nav"  aria-label="Profile Sections">
+          <SlidingTabList as="nav" className="ml-tabs-nav"  aria-label="Profile Sections">
             {tabs.map(tab => (
               <button
                 key={tab.id}
@@ -345,7 +346,7 @@ export default function MidnightLofiProfile({ data, configuration, onBack }: The
                 <span>{tab.label}</span>
               </button>
             ))}
-          </nav>
+          </SlidingTabList>
 
           {/* Tab Panel */}
           <div>

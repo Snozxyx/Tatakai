@@ -23,8 +23,15 @@ import { mergeCatalog } from '@/lib/catalogMerge';
 import { fetchMangaBakaSeries } from '@/lib/mapping/mangabaka';
 import { getMangaTagOptions, searchMangaTags } from './manga-tag-search';
 import { normalizeNovelFilters, mangaBakaGenre, novelGenreTag } from './novel-filters';
+import { MEDIA_METADATA_STALE_TIME } from '@/lib/cache/mediaMetadataCache';
 
 export type { NovelSearchItem, NovelSearchResult, MappedNovelChapter, NovelChapterResponse, NovelContentResponse };
+
+// Persisted details from older clients lack the tag metadata. Refresh those on
+// mount while retaining the normal lifetime for complete detail responses.
+export function novelDetailStaleTime(data?: { metadata?: unknown }): number {
+  return data?.metadata ? MEDIA_METADATA_STALE_TIME : 0;
+}
 
 export type NovelSearchOptions = {
   genre?: string;
@@ -249,7 +256,7 @@ export async function getNovelDetail(id: string) {
       description: series.description, status: series.status, genres: series.genres, format: 'NOVEL',
       startDate: { year: series.year }, averageScore: series.rating, authors: series.authors, artists: series.artists,
       chapters: series.totalChapters, volumes: series.totalVolumes,
-      isAdult: ['erotica', 'pornographic'].includes(series.contentRating || ''), externalLinks: series.links };
+      isAdult: ['erotica', 'pornographic'].includes(series.contentRating || ''), externalLinks: series.links, tags: series.tags || [] };
   } else if (normalizedId.startsWith('anilist:')) {
     row = await apiGet<any>(`/api/v3/manga/by-anilist/${normalizedId.replace('anilist:', '')}`);
   } else {
@@ -261,6 +268,7 @@ export async function getNovelDetail(id: string) {
   const media = row?.media ?? row;
   return {
     id,
+    metadata: media,
     detail: {
       mediaType: 'novel' as const,
       anilistId: media?.anilistId,
@@ -274,6 +282,8 @@ export async function getNovelDetail(id: string) {
       },
       status: media?.status || 'unknown',
       genres: media?.genres || [],
+      tags: media?.tags || [],
+      tagSource: /^mangabaka:/i.test(normalizedId) ? 'mangabaka' as const : 'anilist' as const,
       format: media?.format || 'NOVEL',
       origin: media?.countryOfOrigin || null,
       originLanguage: media?.countryOfOrigin || null,

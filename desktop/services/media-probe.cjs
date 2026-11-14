@@ -3,6 +3,9 @@
 const ffmpeg = require('fluent-ffmpeg');
 const path = require('path');
 const fs = require('fs');
+const { execFile } = require('child_process');
+const { promisify } = require('util');
+const execFileAsync = promisify(execFile);
 // Resolved to the unpacked binary in a packaged build (app.asar → app.asar.unpacked).
 const { ffmpegPath, ffprobePath } = require('./ffmpeg-paths.cjs');
 
@@ -216,7 +219,25 @@ class MediaProbeService {
      * @param {string} outputPath 
      * @returns {Promise<{ success: boolean, path?: string, error?: string }>}
      */
-    async extractSubtitle(url, trackIndex, outputPath) {
+    async extractFontAttachments(url, folder) {
+        const files = [];
+        try {
+            const { stdout } = await execFileAsync(ffprobePath || 'ffprobe', ['-v','quiet','-show_streams','-of','json','-rw_timeout','10000000',url], { timeout:15000, maxBuffer:8*1024*1024, windowsHide:true });
+            const streams = JSON.parse(stdout).streams || [];
+            const fonts = streams.filter(stream => stream.codec_type === 'attachment' && (/\.(ttf|otf|woff2?)$/i.test(stream.tags?.filename || '') || ['ttf','otf'].includes(stream.codec_name))).slice(0,32);
+            if (!fonts.length) return [];
+            const args=['-y'];
+            for (const [index,stream] of fonts.entries()) { const file=path.join(folder, 'font-'+index+'.bin');files.push(file);args.push('-dump_attachment:'+stream.index,file); }
+            args.push('-rw_timeout','10000000','-i',url,'-t','0','-map','0:v:0?','-c','copy','-f','null','-');
+            await execFileAsync(ffmpegPath || 'ffmpeg',args,{timeout:15000,maxBuffer:1024*1024,windowsHide:true}).catch(()=>{});
+            const result=[];let total=0;
+            for(const file of files) { const stat=await fs.promises.stat(file).catch(()=>null);if(!stat||stat.size>8*1024*1024||total+stat.size>64*1024*1024)continue;total+=stat.size;result.push('data:font/ttf;base64,'+(await fs.promises.readFile(file)).toString('base64')); }
+            return result;
+        } catch { return []; }
+        finally { for(const file of files) await fs.promises.unlink(file).catch(()=>{}); }
+    }
+
+    async extractSubtitle(url, trackIndex, outputPath, format = 'vtt') {
         return new Promise((resolve) => {
             if (isRendererOnlyUrl(url)) {
                 this._logger.warn('[MediaProbe] Refusing subtitle extraction from a renderer-only URL:', String(url).slice(0, 48));
@@ -264,7 +285,8 @@ class MediaProbeService {
                 .inputOptions(...inputOptions)
                 .outputOptions([
                     `-map 0:${trackIndex}?`,
-                    '-f webvtt',
+                    format === 'ass' ? '-c:s copy' : '-c:s webvtt',
+                    format === 'ass' ? '-f ass' : '-f webvtt',
                     '-v quiet',
                     '-map_metadata -1',
                     '-map_chapters -1'
@@ -277,7 +299,7 @@ class MediaProbeService {
                     if (stat.size < 30) return false; // Too small to contain any cues
                     // Check if the file contains actual subtitle cues (timestamps with -->)
                     const content = fs.readFileSync(outputPath, 'utf8');
-                    return content.includes('-->');
+                    return format === 'ass' ? /^(?:Dialogue:|\[Events\])/im.test(content) : content.includes('-->');
                 } catch {
                     return false;
                 }

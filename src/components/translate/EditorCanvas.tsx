@@ -9,12 +9,15 @@ import {
   ZoomIn,
   ZoomOut,
   Scan,
+  ScanLine,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type {
   TranslationBridge,
   TranslationPage,
+  CleanupStroke,
 } from "@/core/translate/types";
+import { resizeFrame, textFrame, type Frame, type ResizeCorner } from "@/core/translate/geometry";
 
 export type CanvasTool =
   | "select"
@@ -23,6 +26,7 @@ export type CanvasTool =
   | "brush"
   | "eraser"
   | "picker";
+type PageView = "original" | "cleaned" | "translated";
 interface Point {
   x: number;
   y: number;
@@ -38,13 +42,16 @@ export function EditorCanvas({
   onPaint,
   onError,
   disabled,
+  manual = false,
+  onTransform,
+  onCleanupMask,
 }: {
   page: TranslationPage;
   revision: number;
   bridge: TranslationBridge;
   selected: string[];
   onSelect: (ids: string[]) => void;
-  onMove: (ids: string[], dx: number, dy: number) => void;
+  onMove: (ids: string[], dx: number, dy: number, source: boolean) => void;
   onText: (rect: {
     x: number;
     y: number;
@@ -60,8 +67,17 @@ export function EditorCanvas({
   }) => Promise<void>;
   onError: (message: string) => void;
   disabled: boolean;
+  manual?: boolean;
+  onTransform: (id: string, rect: Frame, source: boolean) => void;
+  onCleanupMask: (strokes: CleanupStroke[]) => Promise<boolean>;
 }) {
-  const [tool, setTool] = useState<CanvasTool>("select");
+  const [tool, setTool] = useState<CanvasTool | "mask">("select");
+  const [view, setView] = useState<PageView>(manual ? "original" : "translated");
+  const [masks, setMasks] = useState<CleanupStroke[]>([]);
+  const [applyingMask, setApplyingMask] = useState(false);
+  const maskCanvas = useRef<HTMLCanvasElement>(null);
+  const resize = useRef<{id:string;corner:ResizeCorner;frame:Frame & {rotation:number};start:Point} | null>(null);
+  const [resized, setResized] = useState<Frame | null>(null);
   const [zoom, setZoom] = useState(0.65);
   const [image, setImage] = useState("");
   const [rendering, setRendering] = useState(false);
@@ -75,7 +91,7 @@ export function EditorCanvas({
     start: Point;
     last: Point;
     ids: string[];
-    tool: CanvasTool;
+    tool: CanvasTool | "mask";
     scrollX: number;
     scrollY: number;
   } | null>(null);
@@ -84,8 +100,8 @@ export function EditorCanvas({
     if (viewport.current)
       setZoom(
         Math.min(
-          (viewport.current.clientWidth - 100) / page.width,
-          (viewport.current.clientHeight - 50) / page.height,
+          Math.max(1, viewport.current.clientWidth - 100) / page.width,
+          Math.max(1, viewport.current.clientHeight - 50) / page.height,
           1
         )
       );
@@ -93,11 +109,25 @@ export function EditorCanvas({
   useEffect(() => {
     fit();
   }, [page.id, fit]); // Fit when changing pages, preserve zoom on edits.
+  useEffect(() => { setMasks([]); resize.current = null; setResized(null); setImage(""); }, [page.id]);
+  useEffect(() => { setTool("select"); setView(manual ? "original" : "translated"); }, [manual]);
+  useEffect(() => {
+    const ctx = maskCanvas.current?.getContext("2d");
+    if (!ctx) return;
+    ctx.clearRect(0, 0, page.width, page.height);
+    ctx.strokeStyle = "#e9587b"; ctx.lineCap = "round"; ctx.lineJoin = "round";
+    for (const stroke of masks) {
+      ctx.lineWidth = stroke.diameter; ctx.beginPath();
+      stroke.points.forEach(([x,y], index) => index ? ctx.lineTo(x,y) : ctx.moveTo(x,y));
+      const first = stroke.points[0]; if (stroke.points.length === 1) ctx.lineTo(first[0]+0.01,first[1]+0.01);
+      ctx.stroke();
+    }
+  }, [masks, page.width, page.height]);
   useEffect(() => {
     let disposed = false;
     setRendering(true);
     bridge
-      .request("render", { pageId: page.id })
+      .request("render", { pageId: page.id, view })
       .then((result) => {
         if (!disposed) {
           setImage(`data:image/png;base64,${result.png}`);
@@ -115,9 +145,10 @@ export function EditorCanvas({
     return () => {
       disposed = true;
     };
-  }, [bridge, page.id, page.width, page.height, revision, onError]);
+  }, [bridge, page.id, page.width, page.height, revision, onError, view]);
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
+      if (disabled || applyingMask) return;
       if (
         event.target instanceof HTMLElement &&
         event.target.closest('input,textarea,select,[contenteditable="true"]')
@@ -133,9 +164,11 @@ export function EditorCanvas({
       };
       if (map[event.key.toLowerCase()] && !event.ctrlKey && !event.metaKey)
         setTool(map[event.key.toLowerCase()]);
+      if (manual && event.key.toLowerCase() === "m" && !event.ctrlKey && !event.metaKey) setTool("mask");
       if (event.key === "0") fit();
       if (event.key === "Escape") {
         gesture.current = null;
+        resize.current = null; setResized(null);
         setDrag(null);
         onSelect([]);
         paint.current
@@ -145,18 +178,18 @@ export function EditorCanvas({
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [page.id, page.width, page.height, onSelect, fit]);
+  }, [page.id, page.width, page.height, onSelect, fit, disabled, applyingMask, manual]);
   const point = (event: React.PointerEvent): Point => {
     const rect = surface.current!.getBoundingClientRect();
     return {
-      x: (event.clientX - rect.left) / zoom,
-      y: (event.clientY - rect.top) / zoom,
+      x: Math.min(page.width, Math.max(0, (event.clientX - rect.left) / zoom)),
+      y: Math.min(page.height, Math.max(0, (event.clientY - rect.top) / zoom)),
     };
   };
   const stroke = (from: Point, to: Point) => {
     const ctx = paint.current?.getContext("2d");
     if (!ctx) return;
-    ctx.strokeStyle = tool === "eraser" ? "#80808080" : color;
+    ctx.strokeStyle = tool === "mask" ? "#e9587b" : tool === "eraser" ? "#80808080" : color;
     ctx.lineWidth = diameter;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
@@ -168,6 +201,7 @@ export function EditorCanvas({
   const down = (event: React.PointerEvent) => {
     if (
       disabled ||
+      applyingMask ||
       rendering ||
       event.button !== 0 ||
       !surface.current ||
@@ -210,8 +244,8 @@ export function EditorCanvas({
     }
     let ids = [...selected];
     if (tool === "select") {
-      const hit = [...page.layers]
-        .reverse()
+      const candidates = [...page.layers].reverse().filter(l=>l.visible);
+      const hit = [...candidates.filter(l=>l.kind==="text"),...candidates.filter(l=>l.kind!=="text")]
         .find(
           (l) =>
             l.visible &&
@@ -239,12 +273,16 @@ export function EditorCanvas({
       scrollX: event.clientX,
       scrollY: event.clientY,
     };
-    if (tool === "brush" || tool === "eraser") {
+    if (tool === "brush" || tool === "eraser" || tool === "mask") {
       strokePoints.current = [[p.x, p.y]];
       stroke(p, p);
     }
   };
   const move = (event: React.PointerEvent) => {
+    if (resize.current) {
+      const r = resize.current, p = point(event);
+      setResized(resizeFrame(r.frame, r.corner, p.x-r.start.x, p.y-r.start.y)); return;
+    }
     const g = gesture.current;
     if (!g) return;
     const p = point(event);
@@ -254,7 +292,7 @@ export function EditorCanvas({
       g.scrollX = event.clientX;
       g.scrollY = event.clientY;
     }
-    if (g.tool === "brush" || g.tool === "eraser") {
+    if (g.tool === "brush" || g.tool === "eraser" || g.tool === "mask") {
       strokePoints.current.push([p.x, p.y]);
       stroke(g.last, p);
     }
@@ -262,23 +300,27 @@ export function EditorCanvas({
       setDrag({ x: p.x - g.start.x, y: p.y - g.start.y });
     g.last = p;
   };
-  const up = () => {
+  const up = (event: React.PointerEvent) => {
+    if (resize.current) {
+      const r = resize.current, p = point(event);
+      onTransform(r.id, resizeFrame(r.frame, r.corner, p.x-r.start.x, p.y-r.start.y), view === "original");
+      resize.current = null; setResized(null); return;
+    }
     const g = gesture.current;
     gesture.current = null;
     setDrag(null);
     if (!g) return;
+    g.last = point(event);
     if (
       g.tool === "select" &&
       Math.abs(g.last.x - g.start.x) + Math.abs(g.last.y - g.start.y) > 1
     )
-      onMove(g.ids, g.last.x - g.start.x, g.last.y - g.start.y);
-    if (g.tool === "text")
-      onText({
-        x: Math.max(0, Math.min(g.start.x, g.last.x)),
-        y: Math.max(0, Math.min(g.start.y, g.last.y)),
-        width: Math.max(100, Math.abs(g.last.x - g.start.x)),
-        height: Math.max(60, Math.abs(g.last.y - g.start.y)),
-      });
+      onMove(g.ids, g.last.x - g.start.x, g.last.y - g.start.y, view === "original");
+    if (g.tool === "text") onText(textFrame(g.start, g.last, page.width, page.height));
+    if (g.tool === "mask") {
+      setMasks(current => [...current, {diameter, points: [...strokePoints.current]}]);
+      paint.current?.getContext("2d")?.clearRect(0,0,page.width,page.height);
+    }
     if (g.tool === "brush" || g.tool === "eraser")
       void onPaint({
         mode: g.tool,
@@ -303,8 +345,23 @@ export function EditorCanvas({
   ] as const;
   return (
     <div className="relative flex min-h-0 flex-1 flex-col bg-muted/30">
+      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-background px-3 py-2">
+        <div role="group" aria-label="Page preview" className="flex gap-1">
+          {(["original", "cleaned", "translated"] as const).map(value => <Button key={value} size="sm" variant={view === value ? "outline" : "ghost"} aria-pressed={view === value} disabled={applyingMask} onClick={() => setView(value)}>{value === "original" ? "Original" : value === "cleaned" ? "Cleaned" : "Translated"}</Button>)}
+        </div>
+        {manual && <span className="text-xs text-muted-foreground">Draw regions with T · Paint a cleanup mask with M</span>}
+        {masks.length > 0 && <div className="flex items-center gap-1">
+          <Button size="sm" disabled={disabled || applyingMask} onClick={async () => {
+            setApplyingMask(true);
+            try { if (await onCleanupMask(masks)) setMasks([]); } catch (e) { onError(e instanceof Error ? e.message : "Cleanup failed"); }
+            finally { setApplyingMask(false); }
+          }}>Apply cleanup mask ({masks.length})</Button>
+          <Button size="sm" variant="ghost" disabled={disabled || applyingMask} onClick={() => setMasks(current => current.slice(0,-1))}>Undo mask stroke</Button>
+          <Button size="sm" variant="ghost" disabled={disabled || applyingMask} onClick={() => setMasks([])}>Clear mask</Button>
+        </div>}
+      </div>
       <div
-        className="absolute left-3 top-4 z-10 flex flex-col gap-1 rounded-xl border border-border bg-background p-1 shadow-md"
+        className="absolute left-3 top-16 z-10 flex flex-col gap-1 rounded-xl border border-border bg-background p-1 shadow-md"
         role="toolbar"
         aria-label="Canvas tools"
       >
@@ -317,18 +374,20 @@ export function EditorCanvas({
             aria-label={label}
             title={label}
             aria-pressed={tool === id}
-            disabled={disabled}
+            disabled={disabled || applyingMask}
             onClick={() => setTool(id)}
           >
             <Icon className="size-4" />
           </Button>
         ))}
+        {manual && <Button size="icon" variant={tool === "mask" ? "outline" : "ghost"} disabled={disabled || applyingMask} aria-label="Cleanup mask (M)" title="Paint areas to clean (M)" aria-pressed={tool === "mask"} onClick={() => setTool("mask")}><ScanLine className="size-4" /></Button>}
         <input
           type="color"
           aria-label="Brush color"
           title="Brush color"
           className="mx-auto mt-2 size-7 cursor-pointer bg-transparent"
           value={color}
+          disabled={disabled || applyingMask}
           onChange={(e) => setColor(e.target.value)}
         />
         <input
@@ -339,6 +398,7 @@ export function EditorCanvas({
           min={1}
           max={300}
           value={diameter}
+          disabled={disabled || applyingMask}
           onChange={(e) =>
             setDiameter(Math.min(300, Math.max(1, Number(e.target.value))))
           }
@@ -382,6 +442,7 @@ export function EditorCanvas({
             onPointerUp={up}
             onPointerCancel={() => {
               gesture.current = null;
+              resize.current = null; setResized(null);
               setDrag(null);
               paint.current
                 ?.getContext("2d")
@@ -397,25 +458,36 @@ export function EditorCanvas({
               />
             )}
             <canvas
+              ref={maskCanvas}
+              width={page.width}
+              height={page.height}
+              className="pointer-events-none absolute inset-0 opacity-40"
+            />
+            <canvas
               ref={paint}
               width={page.width}
               height={page.height}
               className="pointer-events-none absolute inset-0"
             />
             {page.layers
-              .filter((l) => selected.includes(l.id))
+              .filter((l) => selected.includes(l.id) || (manual && l.kind === "text"))
               .map((l) => (
                 <div
                   key={l.id}
-                  className="pointer-events-none absolute border-2 border-primary"
+                  className={`pointer-events-none absolute ${selected.includes(l.id) ? "border-2 border-primary" : "border border-dashed border-primary/40"}`}
                   style={{
-                    left: l.x + (drag?.x || 0),
-                    top: l.y + (drag?.y || 0),
-                    width: l.width,
-                    height: l.height,
+                    left: resize.current?.id === l.id && resized ? resized.x : l.x + (selected.includes(l.id) ? drag?.x || 0 : 0),
+                    top: resize.current?.id === l.id && resized ? resized.y : l.y + (selected.includes(l.id) ? drag?.y || 0 : 0),
+                    width: resize.current?.id === l.id && resized ? resized.width : l.width,
+                    height: resize.current?.id === l.id && resized ? resized.height : l.height,
                     transform: `rotate(${l.rotation}deg)`,
                   }}
-                />
+                >
+                  {manual && selected.length === 1 && selected.includes(l.id) && tool === "select" && !disabled && !applyingMask && (["nw","ne","sw","se"] as const).map(corner => <button
+                    key={corner} aria-label={`Resize ${corner} corner`} className="pointer-events-auto absolute border border-primary bg-background"
+                    style={{width:10/zoom,height:10/zoom,left:corner.includes("w") ? -5/zoom : undefined,right:corner.includes("e") ? -5/zoom : undefined,top:corner.includes("n") ? -5/zoom : undefined,bottom:corner.includes("s") ? -5/zoom : undefined,cursor:`${corner}-resize`}}
+                    onPointerDown={e => { if(e.button !== 0 || rendering) return; e.stopPropagation(); surface.current?.setPointerCapture(e.pointerId); resize.current={id:l.id,corner,frame:l,start:point(e)}; }} />)}
+                </div>
               ))}
             {drag && gesture.current?.tool === "text" && (
               <div

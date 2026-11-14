@@ -24,8 +24,12 @@ export const CHANGELOG: ChangelogRelease[] = [
       "Redesign Gallery with searchable filters, grid and masonry views, automatic pagination and decoded next/previous image preloading.",
       "Keep home previews visible in Adult Mode, recover broken cover URLs, and isolate cached content by mode and enabled categories.",
       "Compact desktop navigation, align content with one sidebar gutter, remove duplicated Trending navigation, and hide the app sidebar in readers.",
-      "Limit the home genre cloud, provide 18+ search tags and replace ordinary infinite home feeds with adult-only catalog feeds."
-]
+      "Limit the home genre cloud, provide 18+ search tags and replace ordinary infinite home feeds with adult-only catalog feeds.",
+      "Improve manga reading with page preloading, bounded chapter rendering, configurable controls and smoother chapter changes.",
+      "Render ASS subtitles and embedded fonts in web, desktop and Android players.",
+      "Add manual translation editing with editable layers and improved image cleanup.",
+      "Refine title details, search, setup, profile and update interfaces, and improve native development builds."
+    ]
   },
   {
     version: "6.4.4",

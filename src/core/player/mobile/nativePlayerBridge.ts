@@ -37,6 +37,7 @@ export type NativePlayerOpenOptions = {
   preferredAudioLanguage?: string;
   preferredSubtitleLanguage?: string;
   subtitlesEnabled?: boolean;
+  assFonts?: string[];
 };
 
 export type NativePlayerEventName = 'playerProgress' | 'playerEnded' | 'playerClosed' | 'playerError' | 'playerSourceRequested' | 'playerQueueRequested' | 'playerNextRequested' | 'playerPreviousRequested' | 'playerItemChanged';

@@ -57,6 +57,8 @@ export async function ensureCustomSubtitleFontLoaded(): Promise<void> {
 }
 
 /** The display name of the stored custom font, or null if none. */
+export function getCustomSubtitleFontDataUrl(): string | undefined { return readStored()?.dataUrl; }
+
 export function getCustomSubtitleFontName(): string | null {
   return readStored()?.name ?? null;
 }

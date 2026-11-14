@@ -11,8 +11,8 @@
   --distance-base: 8px;
   --scale-large: 0.96;
   --scale-small: 0.98;
-  --tabs-dur: 250ms;
-  --tabs-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --tabs-dur: var(--duration-fast);
+  --tabs-ease: var(--ease-smooth-out);
   --tabs-text-muted: rgba(15, 15, 15, 0.8);
   --tabs-text-active: #0f0f0f;
   --tabs-bar-bg: #f1f1f1;
@@ -74,11 +74,66 @@
 }
 
 :root {
-  --dropdown-open-dur: 250ms;
-  --dropdown-close-dur: 150ms;
+  --dropdown-open-dur: var(--duration-fast);
+  --dropdown-close-dur: var(--duration-quick);
   --dropdown-pre-scale: 0.97;
   --dropdown-closing-scale: 0.99;
-  --dropdown-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --dropdown-ease: var(--ease-smooth-out);
+  --acc-expand: var(--duration-fast);
+  --acc-collapse: var(--duration-fast);
+  --acc-chevron: var(--duration-fast);
+  --acc-ease: var(--ease-smooth-out);
+}
+
+/* Accordion recipe from Transitions.dev. */
+/* grid-template-rows 0fr → 1fr gives a clean height animation
+   with no JS measurement; the inner element clips overflow. */
+.t-acc-panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--acc-collapse) var(--acc-ease);
+}
+.t-acc[data-open="true"] .t-acc-panel {
+  grid-template-rows: 1fr;
+  transition: grid-template-rows var(--acc-expand) var(--acc-ease);
+}
+.t-acc-panel-inner {
+  overflow: hidden;
+  opacity: 0;
+  filter: blur(2px);
+  transition:
+    opacity var(--acc-collapse) var(--acc-ease),
+    filter var(--acc-collapse) var(--acc-ease);
+}
+.t-acc[data-open="true"] .t-acc-panel-inner {
+  opacity: 1;
+  filter: blur(0);
+  transition:
+    opacity var(--acc-expand) var(--acc-ease),
+    filter var(--acc-expand) var(--acc-ease);
+}
+/* Flip the chevron vertically to turn the "v" into a "^".
+   scaleY(-1) about the centre passes through a flat line at
+   the midpoint (same look as a `d:` path morph) but animates
+   in every browser, unlike CSS `d:` morphing (Chromium only).
+   The chevron path is symmetric about the 16x16 viewBox
+   centre, so the flip lands exactly on the "^"; non-scaling
+   -stroke keeps the stroke width constant through the flip. */
+.t-acc-chevron {
+  display: inline-flex;
+  transform: scaleY(1);
+  transform-origin: center;
+  transition: transform var(--acc-chevron) var(--acc-ease);
+}
+.t-acc-chevron path { vector-effect: non-scaling-stroke; }
+.t-acc[data-open="true"] .t-acc-chevron {
+  transform: scaleY(-1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .t-acc-panel, .t-acc-panel-inner, .t-acc-chevron {
+    transition: none !important;
+  }
 }
 
 /* Keep Tatakai's selected palette and its desktop/touch target sizes. */
@@ -98,6 +153,56 @@
 }
 .catalog-tabs .t-tabs-pill { border-radius: 8px; }
 .catalog-tabs .t-tab:not([aria-selected="true"]):hover { color: hsl(var(--foreground)); }
+
+/* Shared/custom tabs keep their layout and selected colors; one measured surface
+   travels with the same timing as Search, including wrapped and vertical lists. */
+.sliding-tab-list { position: relative; isolation: isolate; }
+.sliding-tab-list > .t-tabs-pill {
+  visibility: hidden;
+  box-sizing: border-box;
+  transition-property: transform, width, height;
+}
+.sliding-tab-list :is(button, a, [role="tab"]) {
+  position: relative;
+  z-index: 1;
+  transition-property: color, opacity !important;
+  transition-duration: var(--tabs-dur);
+  transition-timing-function: var(--tabs-ease);
+}
+.sliding-tab-list[data-sliding-tab-measuring] :is(button, a, [role="tab"]) {
+  --tw-ring-shadow: 0 0 #0000;
+  --tw-ring-offset-shadow: 0 0 #0000;
+  transition: none !important;
+}
+.sliding-tab-list[data-sliding-tab-ready]:not([data-sliding-tab-measuring]) :is([aria-selected="true"], [aria-pressed="true"], [aria-current="page"], [data-active="true"]):not([data-sliding-tab-static]) {
+  background-color: transparent !important;
+  background-image: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+.sliding-tab-list :is(button, a, [role="tab"]):focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sliding-tab-list :is(button, a, [role="tab"]) { transition: none !important; }
+}
+html[data-reduced-motion="true"] .sliding-tab-list :is(button, a, [role="tab"]),
+.reduce-motion .sliding-tab-list :is(button, a, [role="tab"]) { transition: none !important; }
+
+/* Theme-owned selection ornaments travel on the same surface. */
+.ge-tabs.sliding-tab-list button[aria-selected="true"] { box-shadow: inset 0 -1px #e65c6b; }
+.ge-tabs.sliding-tab-list button[aria-selected="true"]::before,
+.ge-tabs.sliding-tab-list button[aria-selected="true"]::after { display: none; }
+.ge-tabs.sliding-tab-list > .t-tabs-pill::after {
+  content: '◆';
+  position: absolute;
+  left: calc(50% - 2px);
+  bottom: 5px;
+  color: var(--ge-red);
+  font-size: 5px;
+}
+.eh-rail.sliding-tab-list[data-sliding-tab-ready]:not([data-sliding-tab-measuring]) button[aria-current="page"] > span { background: transparent; }
 .ui-popup.t-menu-popup[data-state="open"] {
   animation-duration: var(--dropdown-open-dur);
   animation-timing-function: var(--dropdown-ease);
@@ -111,6 +216,141 @@ html[data-reduced-motion="true"] .t-tab,
 .reduce-motion .t-tabs-pill,
 .reduce-motion .t-tab { transition: none !important; }
 @media (prefers-reduced-motion: reduce) {
-  .ui-popup.t-menu-popup[data-state] { animation-duration: 150ms; }
+  .ui-popup.t-menu-popup[data-state] { animation: none !important; }
 }
-html[data-reduced-motion="true"] .ui-popup.t-menu-popup[data-state] { animation-duration: 150ms; }
+html[data-reduced-motion="true"] .ui-popup.t-menu-popup[data-state],
+.reduce-motion .ui-popup.t-menu-popup[data-state] { animation: none !important; }
+
+/* Focused control polish informed by unslop by @heydamir (CC BY 4.0). */
+.search-control-section .catalog-tabs { flex-wrap: nowrap; }
+.search-control-section .catalog-tabs .t-tab { min-height: 32px; }
+.search-type-tabs .lucide { width: 16px; height: 16px; stroke-width: 1.5; }
+.search-control-section .premium-filter-panel { box-shadow: none; }
+.search-control-section .premium-filter-panel h3 { font-size: 14px; font-weight: 500; letter-spacing: 0; }
+
+/* Preserve the community's light, rounded tab bar. */
+.feed-tabs {
+  --tabs-bar-bg: hsl(var(--foreground) / .96);
+  --tabs-pill-bg: hsl(var(--foreground));
+  --tabs-text-muted: hsl(var(--background) / .75);
+  --tabs-text-active: hsl(var(--background));
+  display: inline-flex;
+  max-width: 100%;
+  gap: 0;
+  padding: 6px;
+  border-radius: 24px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.feed-tabs .t-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  height: 32px;
+  padding: 0 12px;
+  font-size: 20px;
+  font-weight: 400;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+.feed-tabs [data-feed-tab-label] { padding: 0 4px; line-height: 28px; }
+.feed-tabs .t-tabs-pill { border-radius: 16px; }
+.feed-tabs .t-tab:focus-visible { outline: 2px solid hsl(var(--background)); outline-offset: -2px; }
+
+/* The dock keeps its existing surface and safe-area spacing. */
+.mobile-nav-dock.t-tabs {
+  --tabs-text-muted: hsl(var(--muted-foreground));
+  --tabs-text-active: hsl(var(--foreground));
+  --tabs-pill-bg: hsl(var(--foreground) / .1);
+  display: flex;
+  gap: 2px;
+  padding: 6px max(10px, var(--sar, 0px)) max(6px, var(--sab, 0px)) max(10px, var(--sal, 0px));
+  border-radius: 0;
+  background: hsl(var(--card));
+}
+.mobile-nav-dock .t-tabs-pill { border-radius: 12px; box-shadow: inset 0 1px 0 hsl(var(--foreground) / .1); }
+.mobile-nav-dock .ui-mobile-nav-button.t-tab { height: auto; padding-inline: 0; }
+.mobile-nav-dock .ui-mobile-nav-button[aria-current="page"] > [data-nav-icon] { background: transparent; box-shadow: none; }
+.mobile-nav-dock .ui-mobile-nav-button.t-tab[aria-current="page"] { color: hsl(var(--foreground)); }
+
+html[data-reduced-motion="true"] :is(.t-acc-panel, .t-acc-panel-inner, .t-acc-chevron),
+.reduce-motion :is(.t-acc-panel, .t-acc-panel-inner, .t-acc-chevron) { transition: none !important; }
+
+@media (max-width: 767px) {
+  .search-control-section .catalog-tabs .t-tab { min-height: 40px; }
+  .feed-tabs .t-tab { padding-inline: 12px; font-size: 14px; }
+}
+@media (max-width: 359px) {
+  .mobile-nav-dock.t-tabs { gap: 0; padding-inline: 6px; }
+}
+
+/* Modal and toast recipes from Transitions.dev. */
+:root {
+  --modal-open-dur: var(--duration-fast);
+  --modal-close-dur: var(--duration-quick);
+  --modal-scale: 0.96;
+  --modal-scale-close: 0.96;
+  --modal-ease: var(--ease-smooth-out);
+  --toast-open: 350ms;
+  --toast-close: 250ms;
+  --toast-distance: 16px;
+  --toast-blur: 2px;
+  --toast-scale: 0.97;
+  --toast-ease: var(--ease-smooth-out);
+}
+
+.t-modal {
+  transform-origin: center;
+  transform: scale(var(--modal-scale));
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    transform var(--modal-open-dur) var(--modal-ease),
+    opacity   var(--modal-open-dur) var(--modal-ease);
+  will-change: transform, opacity;
+}
+.t-modal.is-open {
+  transform: scale(1);
+  opacity: 1;
+  pointer-events: auto;
+}
+.t-modal.is-closing {
+  transform: scale(var(--modal-scale-close));
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    transform var(--modal-close-dur) var(--modal-ease),
+    opacity   var(--modal-close-dur) var(--modal-ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .t-modal { transition: none !important; }
+}
+
+.t-toast {
+  opacity: 0;
+  transform: translateY(var(--toast-distance)) scale(var(--toast-scale));
+  filter: blur(var(--toast-blur));
+  will-change: transform, opacity, filter;
+  transition:
+    opacity var(--toast-close) var(--toast-ease),
+    transform var(--toast-close) var(--toast-ease),
+    filter var(--toast-close) var(--toast-ease);
+}
+.t-toast.is-open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  filter: blur(0);
+  transition:
+    opacity var(--toast-open) var(--toast-ease),
+    transform var(--toast-open) var(--toast-ease),
+    filter var(--toast-open) var(--toast-ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .t-toast { transition: none !important; }
+}
+
+html[data-reduced-motion="true"] :is(.t-modal, .t-toast),
+.reduce-motion :is(.t-modal, .t-toast) { transition: none !important; }

@@ -1,3 +1,5 @@
+import { DetailTag, DetailTooltip } from '@/components/media/DetailTooltip';
+import { useRelationCovers } from '@/hooks/api/useRelationCovers';
 import { selectReadingTitle } from '@/lib/titleLanguage';
 import '@/components/anime/detail-polish.css';
 import '@/components/layout/catalog-polish.css';
@@ -74,6 +76,7 @@ import { useMangaBakaSeries } from "@/hooks/api/useMangaData";
 // --- Helper Component: Relation Tree ---
 function RelationTree({ relations }: { relations: MediaRelation[] }) {
   useUiTranslation();
+  const covers = useRelationCovers(relations);
   const navigate = useNavigate();
   void navigate;
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -106,10 +109,11 @@ function RelationTree({ relations }: { relations: MediaRelation[] }) {
               item={{
                 id: String(rel.id),
                 name: rel.titleEnglish || rel.titleRomaji || "Untitled",
-                poster: rel.coverImage || "",
+                poster: rel.coverImage || covers[rel.id] || "",
+                anilistId: rel.id,
                 type: rel.relationType,
                 status: rel.format || undefined,
-                mediaType: isManga ? 'manga' : 'novel',
+                mediaType: isManga ? 'manga' : (isNovel ? 'novel' : 'anime'),
                 href: isNovel ? `/novel/${rel.id}` : undefined
               }}
               className="flex-1"
@@ -221,54 +225,30 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
   const [fullScanForNovel, setFullScanForNovel] = useState<string | null>(null);
   const { data: chapterData, isLoading: loadingChapters, isFetching: checkingChapters, refetch: recheckChapters } = useNovelChapters(sourceContext ? undefined : novelId, novelSearchTitle, fullScanForNovel === novelId);
   const { data: mangaBakaData } = useMangaBakaSeries((novelData as any)?.detail?.anilistId);
-  const { data: anilistNovelMeta } = useQuery({
-    queryKey: ['novel-anilist-tags', (novelData as any)?.detail?.anilistId],
-    queryFn: async () => {
-      const id = (novelData as any)?.detail?.anilistId;
-      if (!id) return null;
-      const response = await fetch(`${resolveApiV3Base()}/manga/by-anilist/${id}`);
-      if (!response.ok) return null;
-      const payload = await response.json();
-      return payload?.data ?? null;
-    },
-    enabled: Boolean((novelData as any)?.detail?.anilistId),
-    staleTime: 10 * 60 * 1000,
-  });
-
-  const { data: directAniListNovelTags = [] } = useQuery({
-    queryKey: ['novel-tags-direct', (novelData as any)?.detail?.anilistId],
-    // Tags come from the server-proxied `by-anilist` query (anilistNovelMeta),
-    // which is cached and CORS-safe.
-    queryFn: async () => (anilistNovelMeta?.tags ?? []) as Array<{
-      id: number;
-      name: string;
-      category?: string;
-      rank?: number;
-      isMediaSpoiler?: boolean;
-      isGeneralSpoiler?: boolean;
-    }>,
-    enabled: Boolean((novelData as any)?.detail?.anilistId),
-    staleTime: 60 * 60 * 1000,
-  });
+  // The detail loader already unwraps data.media. Reuse it so tags update with
+  // the detail request instead of caching an empty array in a separate query.
+  const anilistNovelMeta = novelData?.detail.tagSource === 'anilist' ? novelData.metadata : undefined;
 
   const combinedNovelTags = useMemo(() => {
-    // 1. Direct AniList tags or anilistNovelMeta tags
-    const aniList = directAniListNovelTags.length > 0 ? directAniListNovelTags : ((anilistNovelMeta?.tags || []) as any[]);
+    const aniList = (anilistNovelMeta?.tags || []) as any[];
     const validAniList = aniList
-      .filter((t: any) => !t.isMediaSpoiler && !t.isGeneralSpoiler)
+      .filter((t: any) => t?.name && !t.isMediaSpoiler && !t.isGeneralSpoiler)
       .map((t: any) => ({
         id: t.id || t.name,
         name: t.name,
         source: 'anilist' as const,
         rank: t.rank,
+        description: t.description,
+        category: t.category,
         weight: t.rank && t.rank >= 80 ? 'defining' : t.rank && t.rank >= 60 ? 'core' : 'normal',
       }));
 
     if (validAniList.length > 0) return validAniList;
 
     // 2. MangaBaka tags fallback
-    return ((mangaBakaData as any)?.tags || [])
-      .filter((t: any) => !t.isSpoiler)
+    const mangaBakaTags = novelData?.detail.tagSource === 'mangabaka' ? novelData.detail.tags : (mangaBakaData as any)?.tags;
+    return (mangaBakaTags || [])
+      .filter((t: any) => t?.name && !t.isSpoiler)
       .map((t: any) => ({
         id: t.id ?? t.name,
         name: t.name,
@@ -276,7 +256,7 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
         rank: t.weight === 'defining' ? 90 : t.weight === 'core' ? 70 : undefined,
         weight: t.weight,
       }));
-  }, [directAniListNovelTags, anilistNovelMeta?.tags, mangaBakaData]);
+  }, [anilistNovelMeta?.tags, novelData?.detail.tags, novelData?.detail.tagSource, mangaBakaData]);
 
   const { data: readlistEntry } = useNovelReadlistItem(novelId);
   const addToReadlist = useUpsertNovelReadlist();
@@ -1156,33 +1136,43 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
 
                 <div className="flex flex-wrap gap-3 mb-6">
                   {displayRating && (
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber/20 text-amber">
-                      <Star className="w-4 h-4 fill-amber" />
-                      <span className="font-medium">{displayRating}</span>
-                    </div>
+                    <DetailTooltip content={uiI18n.t('detailUi.rating')}>
+                      <div tabIndex={0} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber/20 text-amber">
+                        <Star className="w-4 h-4 fill-amber" />
+                        <span className="font-medium">{displayRating}</span>
+                      </div>
+                    </DetailTooltip>
                   )}
-                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted">
-                    <BookOpen className="w-4 h-4" />
-                    <span className="capitalize">{uiI18n.t('app.novel_1a9fdb91')}</span>
-                  </div>
-                  {info.status && (
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary/20 text-primary">
-                      <span className="font-medium capitalize">
-                        {String(info.status).toLowerCase().replace(/_/g, " ")}
-                      </span>
+                  <DetailTooltip content={uiI18n.t('detailUi.format')}>
+                    <div tabIndex={0} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted">
+                      <BookOpen className="w-4 h-4" />
+                      <span className="capitalize">{uiI18n.t('app.novel_1a9fdb91')}</span>
                     </div>
+                  </DetailTooltip>
+                  {info.status && (
+                    <DetailTooltip content={uiI18n.t('detailUi.status')}>
+                      <div tabIndex={0} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary/20 text-primary">
+                        <span className="font-medium capitalize">
+                          {String(info.status).toLowerCase().replace(/_/g, " ")}
+                        </span>
+                      </div>
+                    </DetailTooltip>
                   )}
                   {typeof info.totalChapters === "number" && info.totalChapters > 0 && (
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted">
-                      <Layers className="w-4 h-4" />
-                      <span>{info.totalChapters} {uiI18n.t('app.chapters_034e2733')}</span>
-                    </div>
+                    <DetailTooltip content={uiI18n.t('detailUi.chapters')}>
+                      <div tabIndex={0} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted">
+                        <Layers className="w-4 h-4" />
+                        <span>{info.totalChapters} {uiI18n.t('app.chapters_034e2733')}</span>
+                      </div>
+                    </DetailTooltip>
                   )}
                   {typeof info.totalVolumes === "number" && info.totalVolumes > 0 && (
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted">
-                      <BookOpen className="w-4 h-4" />
-                      <span>{info.totalVolumes} {uiI18n.t('app.volumes_39c0ee03')}</span>
-                    </div>
+                    <DetailTooltip content={uiI18n.t('detailUi.volumes')}>
+                      <div tabIndex={0} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted">
+                        <BookOpen className="w-4 h-4" />
+                        <span>{info.totalVolumes} {uiI18n.t('app.volumes_39c0ee03')}</span>
+                      </div>
+                    </DetailTooltip>
                   )}
                 </div>
 
@@ -1191,29 +1181,31 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
                     <Users className="w-4 h-4 shrink-0" />
                     {uiI18n.t('app.by_cfadbd7a')}{" "}
                     {info.authors.map((author: string, idx: number) => (
-                      <button
-                        key={author}
-                        type="button"
-                        className="hover:text-primary transition-colors"
-                        onClick={() => navigate(`/search?q=${encodeURIComponent(author)}`)}
-                      >
-                        {author}
-                        {idx < info.authors.length - 1 ? "," : ""}
-                      </button>
+                      <DetailTooltip key={author} content={uiI18n.t('detailUi.browseAuthor', { author })}>
+                        <button
+                          type="button"
+                          className="hover:text-primary transition-colors"
+                          onClick={() => navigate(`/search?q=${encodeURIComponent(author)}`)}
+                        >
+                          {author}
+                          {idx < info.authors.length - 1 ? "," : ""}
+                        </button>
+                      </DetailTooltip>
                     ))}
                   </p>
                 )}
 
                 <div className="flex flex-wrap gap-2 mb-3">
                   {info.genres?.map((genre: string) => (
-                    <button
-                      key={genre}
-                      type="button"
-                      onClick={() => navigate(`/search?genre=${encodeURIComponent(genre)}&type=novel`)}
-                      className="px-3 py-1.5 rounded-lg bg-muted text-sm font-medium hover:bg-primary/20 hover:text-primary transition-colors"
-                    >
-                      {genre}
-                    </button>
+                    <DetailTooltip key={genre} content={uiI18n.t('detailUi.browseGenre', { genre })}>
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/search?genre=${encodeURIComponent(genre)}&type=novel`)}
+                        className="px-3 py-1.5 rounded-lg bg-muted text-sm font-medium hover:bg-primary/20 hover:text-primary transition-colors"
+                      >
+                        {genre}
+                      </button>
+                    </DetailTooltip>
                   ))}
                 </div>
 
@@ -1225,12 +1217,11 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
                       {uiI18n.t('app.tags_b5ddd4e8')}
                     </span>
                     {combinedNovelTags.slice(0, 14).map((tag: any) => (
-                      <button
+                      <DetailTag tag={tag} mediaType="novel"
                         key={`hero-tag-${tag.id || tag.name}`}
                         type="button"
                         onClick={() => navigate(`/search?novelTag=${encodeURIComponent(tag.name)}&novelTagSource=${tag.source}&type=novel`)}
                         className="px-2.5 py-0.5 rounded-full bg-white/5 hover:bg-primary/20 border border-white/10 hover:border-primary/40 text-xs text-muted-foreground hover:text-primary transition-[color,background-color,border-color,opacity] flex items-center gap-1 group"
-                        title={tag.rank ? uiI18n.t('app.i18n_value_0_i18n_value_1_click_to_search_b5c1c535', { value0: tag.name, value1: tag.rank }) : uiI18n.t('app.i18n_value_0_click_to_search_befc3ac0', { value0: tag.name })}
                       >
                         <span>{tag.name}</span>
                         {typeof tag.rank === 'number' && (
@@ -1238,7 +1229,7 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
                             {tag.rank}%
                           </span>
                         )}
-                      </button>
+                      </DetailTag>
                     ))}
                   </div>
                 )}
@@ -1262,15 +1253,16 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
                   mediaFormat="novel"
                   className="h-auto border border-white/15 bg-white/5 text-foreground px-6 py-3.5 rounded-xl font-medium hover:bg-white/10 active:scale-95 transition-[color,background-color,border-color,opacity]"
                 />
-                <button
-                  onClick={() => setShowNovelDownload(true)}
-                  disabled={sortedChapters.length === 0}
-                  className="flex items-center justify-center gap-2 border border-white/15 bg-white/5 text-foreground px-6 py-3.5 rounded-xl font-medium hover:bg-white/10 active:scale-95 transition-[color,background-color,border-color,opacity] disabled:opacity-50 disabled:cursor-not-allowed"
-                  title={uiI18n.t('app.download_chapters_for_offline_reading_a3dc5b8e')}
-                >
-                  <Download className="w-5 h-5" />
-                  {uiI18n.t('app.download_a479c9c3')}
-                </button>
+                <DetailTooltip content={uiI18n.t('app.download_chapters_for_offline_reading_a3dc5b8e')}>
+                  <button aria-label={uiI18n.t('app.download_chapters_for_offline_reading_a3dc5b8e')}
+                    onClick={() => setShowNovelDownload(true)}
+                    disabled={sortedChapters.length === 0}
+                    className="flex items-center justify-center gap-2 border border-white/15 bg-white/5 text-foreground px-6 py-3.5 rounded-xl font-medium hover:bg-white/10 active:scale-95 transition-[color,background-color,border-color,opacity] disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Download className="w-5 h-5" />
+                    {uiI18n.t('app.download_a479c9c3')}
+                  </button>
+                </DetailTooltip>
                 {!user ? (
                   <button
                     onClick={() => navigate("/auth")}
@@ -1345,7 +1337,7 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
                   <GlassPanel quiet className="p-5">
                     <div className="flex flex-wrap gap-1.5">
                       {combinedNovelTags.slice(0, 40).map((tag: any) => (
-                        <button
+                        <DetailTag tag={tag} mediaType="novel"
                           key={`tag-${tag.id ?? tag.name}`}
                           type="button"
                           onClick={() => navigate(`/search?novelTag=${encodeURIComponent(tag.name)}&novelTagSource=${tag.source}&type=novel`)}
@@ -1354,13 +1346,12 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
                               : tag.weight === 'core'
                               ? 'bg-white/5 border-white/10 text-foreground/70'
                               : 'bg-white/[0.03] border-white/5 text-muted-foreground'}`}
-                          title={tag.rank ? uiI18n.t('app.i18n_value_0_i18n_value_1_click_to_search_b5c1c535', { value0: tag.name, value1: tag.rank }) : uiI18n.t('app.i18n_value_0_click_to_search_befc3ac0', { value0: tag.name })}
                         >
                           <span>{tag.name}</span>
                           {typeof tag.rank === 'number' && (
                             <span className="text-xs opacity-60">{tag.rank}%</span>
                           )}
-                        </button>
+                        </DetailTag>
                       ))}
                     </div>
                   </GlassPanel>
@@ -1542,20 +1533,20 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
                         const isActiveGroup = index === activeChapterGroup;
 
                         return (
-                          <button
-                            key={`chapter-group-${range.start}-${range.end}-${index}`}
-                            onClick={() => setSelectedChapterGroup(index)}
-                            aria-pressed={isActiveGroup}
-                            className={cn(
-                              "px-3 py-1.5 rounded-full text-xs font-medium border transition-colors",
-                              isActiveGroup
-                                ? "bg-primary text-primary-foreground border-primary"
-                                : "bg-white/5 text-muted-foreground border-white/10 hover:bg-white/10 hover:text-foreground",
-                            )}
-                            title={uiI18n.t('app.i18n_value_0_chapters_6744ce28', { value0: group.length })}
-                          >
-                            {range.start}-{range.end}
-                          </button>
+                          <DetailTooltip key={`chapter-group-${range.start}-${range.end}-${index}`} content={uiI18n.t('app.i18n_value_0_chapters_6744ce28', { value0: group.length })}>
+                            <button aria-label={uiI18n.t('app.i18n_value_0_chapters_6744ce28', { value0: group.length })}
+                              onClick={() => setSelectedChapterGroup(index)}
+                              aria-pressed={isActiveGroup}
+                              className={cn(
+                                "px-3 py-1.5 rounded-full text-xs font-medium border transition-colors",
+                                isActiveGroup
+                                  ? "bg-primary text-primary-foreground border-primary"
+                                  : "bg-white/5 text-muted-foreground border-white/10 hover:bg-white/10 hover:text-foreground",
+                              )}
+                            >
+                              {range.start}-{range.end}
+                            </button>
+                          </DetailTooltip>
                         );
                       })}
                     </div>
@@ -1800,14 +1791,15 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
                   {info.genres && info.genres.length > 0 ? (
                     <div className="flex flex-wrap gap-1.5">
                       {info.genres.map((genre: string) => (
-                        <button
-                          key={`meta-genre-${genre}`}
-                          type="button"
-                          onClick={() => navigate(`/search?genre=${encodeURIComponent(genre)}&type=novel`)}
-                          className="rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-xs font-medium normal-case tracking-normal text-foreground transition-colors hover:border-primary/40 hover:text-primary"
-                        >
-                          {genre}
-                        </button>
+                        <DetailTooltip key={`meta-genre-${genre}`} content={uiI18n.t('detailUi.browseGenre', { genre })}>
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/search?genre=${encodeURIComponent(genre)}&type=novel`)}
+                            className="rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-xs font-medium normal-case tracking-normal text-foreground transition-colors hover:border-primary/40 hover:text-primary"
+                          >
+                            {genre}
+                          </button>
+                        </DetailTooltip>
                       ))}
                     </div>
                   ) : (
@@ -1822,15 +1814,14 @@ export default function NovelPage({ catalogId, sourceContext }: CatalogDetailPro
                     </p>
                     <div className="flex flex-wrap gap-1.5">
                       {anilistNovelMeta.tags.filter((tag: any) => tag?.name).map((tag: any) => (
-                        <button
+                        <DetailTag tag={tag} mediaType="novel"
                           key={tag.name}
                           type="button"
-                          title={tag.isAdult ? uiI18n.t('app.adult_anilist_tag_09278eca') : uiI18n.t('app.search_this_anilist_tag_c14512b4')}
                           onClick={() => navigate(`/search?novelTag=${encodeURIComponent(tag.name)}&novelTagSource=anilist&type=novel`)}
                           className="rounded-md border border-primary/20 bg-primary/5 px-2 py-0.5 text-xs font-medium normal-case tracking-normal text-primary/80 transition-colors hover:border-primary/40 hover:bg-primary/15"
                         >
                           #{tag.name}
-                        </button>
+                        </DetailTag>
                       ))}
                     </div>
                   </div>

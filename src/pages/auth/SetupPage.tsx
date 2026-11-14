@@ -8,16 +8,12 @@ import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { rankSetupExtensions } from '@/core/extensions/setup-ranking';
 import { usePersistentState } from '@/hooks/ui/usePersistentState';
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   motion,
   AnimatePresence,
   MotionConfig,
-  useMotionValue,
-  useTransform,
-  animate,
-  type Variants,
 } from 'framer-motion';
 
 import {
@@ -26,7 +22,7 @@ import {
   ChevronRight,
   Check,
   Disc,
-  Sparkles,
+  Play,
   ArrowLeft,
   Globe,
   Wifi,
@@ -107,36 +103,66 @@ const COLOR_MAP: Record<string, string> = {
   green: 'bg-muted border-border text-muted-foreground',
 };
 
-const containerVariants: Variants = {
-  hidden: {},
-  show: {
-    transition: { staggerChildren: 0.05, delayChildren: 0.02 },
-  },
-};
+function SetupStepTransition({ step, reduceMotion, children }: {
+  step: number;
+  reduceMotion: boolean;
+  children: (stepIndex: number) => React.ReactNode;
+}) {
+  const sliderRef = useRef<HTMLDivElement>(null);
+  const [transition, setTransition] = useState<{ step: number; page: 1 | 2; previous: number | null }>({ step, page: 1, previous: null });
+  const [shownPage, setShownPage] = useState<1 | 2>(1);
 
-const itemVariants: Variants = {
-  hidden: { opacity: 0, y: 8 },
-  show: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.18, ease: [0.22, 1, 0.36, 1] },
-  },
-};
+  if (transition.step !== step) {
+    setTransition({ step, page: transition.page === 1 ? 2 : 1, previous: transition.step });
+  }
 
-const slideVariants: Variants = {
-  enter: (dir: number) => ({
-    x: dir > 0 ? 8 : -8,
-    opacity: 0,
-  }),
-  center: {
-    x: 0,
-    opacity: 1,
-  },
-  exit: (dir: number) => ({
-    x: dir < 0 ? 8 : -8,
-    opacity: 0,
-  }),
-};
+  useLayoutEffect(() => {
+    const slider = sliderRef.current;
+    if (!slider) return;
+    // Paint the incoming page's resting state before flipping the CSS hook.
+    void slider.offsetWidth;
+    setShownPage(transition.page);
+    if (transition.previous === null) return;
+
+    if (slider.parentElement) slider.parentElement.scrollTop = 0;
+    slider.querySelector<HTMLElement>(`#setup-step-title-${step}`)?.focus({ preventScroll: true });
+    const styles = getComputedStyle(slider);
+    const milliseconds = (property: string) => {
+      const value = styles.getPropertyValue(property).trim();
+      return (parseFloat(value) || 0) * (value.endsWith('ms') ? 1 : 1000);
+    };
+    const duration = reduceMotion ? 0 : Math.max(milliseconds('--page-slide-dur'), milliseconds('--page-fade-dur')) + milliseconds('--page-stagger');
+    const timer = window.setTimeout(() => {
+      setTransition(current => current.step === step ? { ...current, previous: null } : current);
+    }, duration);
+    return () => window.clearTimeout(timer);
+  }, [step, transition.page, transition.previous, reduceMotion]);
+
+  const direction = transition.previous === null || step > transition.previous ? 1 : -1;
+  return (
+    <div ref={sliderRef} className="t-page-slide" data-page={shownPage}>
+      {[transition.previous, transition.step].filter((value): value is number => value !== null).map(stepIndex => {
+        const active = stepIndex === transition.step;
+        const page = active ? transition.page : transition.page === 1 ? 2 : 1;
+        const fromRight = active ? direction > 0 : direction < 0;
+        return (
+          <section
+            key={stepIndex}
+            ref={element => { if (element) element.inert = !active; }}
+            className="t-page"
+            data-page-id={page}
+            data-active={active}
+            aria-hidden={!active}
+            aria-labelledby={`setup-step-title-${stepIndex}`}
+            style={{ '--t-page-from-x': fromRight ? 'var(--page-slide-distance)' : 'calc(var(--page-slide-distance) * -1)' } as React.CSSProperties}
+          >
+            {children(stepIndex)}
+          </section>
+        );
+      })}
+    </div>
+  );
+}
 
 // --- Sub-components ---
 
@@ -209,37 +235,24 @@ const Toggle = ({ value, onChange, label }: { value: boolean; onChange: (v: bool
 function ProgressBar({ step, total }: { step: number; total: number }) {
   useUiTranslation();
   return (
-    <div className="flex items-center gap-1.5 mb-8" role="progressbar" aria-label={uiI18n.t('app.setup_label')} aria-valuemin={1} aria-valuemax={total} aria-valuenow={step}>
+    <div className="setup-progress" role="progressbar" aria-label={uiI18n.t('app.setup_label')} aria-valuemin={1} aria-valuemax={total} aria-valuenow={step} aria-valuetext={`${step} / ${total}: ${STEP_META[step - 1].title}`}>
       {Array.from({ length: total }).map((_, i) => {
         const n = i + 1;
         const done = step > n;
         const active = step === n;
 
         return (
-          <div key={n} className="flex items-center gap-1.5 flex-1 max-w-[40px]">
-            <motion.div
-              animate={{
-                backgroundColor: done || active ? 'hsl(var(--primary))' : 'hsl(var(--muted))',
-              }}
-              className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-medium z-10 relative"
-            >
+          <div key={n} className="setup-progress-item" data-active={active} data-complete={done} aria-hidden="true">
+            <div className="setup-progress-stop">
               {done ? (
-                <Check className="w-3 h-3 text-primary-foreground relative z-10" />
+                <Check className="w-3 h-3" />
               ) : (
-                <span className={cn('relative z-10', active ? 'text-primary-foreground' : 'text-muted-foreground')}>
-                  {n}
-                </span>
+                <span>{n}</span>
               )}
-            </motion.div>
+            </div>
 
             {n < total && (
-              <div className="relative flex-1 h-[2px] rounded-full bg-muted/50 overflow-hidden">
-                <motion.div
-                  className="absolute inset-y-0 left-0 bg-primary"
-                  animate={{ width: step > n ? '100%' : '0%' }}
-                  transition={{ ease: 'easeInOut', duration: 0.3 }}
-                />
-              </div>
+              <div className="setup-progress-track" />
             )}
           </div>
         );
@@ -260,31 +273,25 @@ function StepHeader({ stepIndex }: { stepIndex: number }) {
   const Icon = meta.icon;
 
   return (
-    <div className="flex items-center gap-4 mb-6">
-      <motion.div
-        initial={{ scale: 0.8, opacity: 0, rotate: -10 }}
-        animate={{ scale: 1, opacity: 1, rotate: 0 }}
-        transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-        className={cn('w-12 h-12 rounded-2xl flex items-center justify-center border shadow-sm', COLOR_MAP[meta.color])}
+    <div className="setup-step-header flex items-center gap-3 mb-6">
+      <div
+        className={cn('setup-step-icon w-11 h-11 rounded-xl flex items-center justify-center border', COLOR_MAP[meta.color])}
       >
         <Icon className="w-5 h-5" />
-      </motion.div>
+      </div>
       <div>
-        <motion.h3
-          initial={{ opacity: 0, x: -10 }}
-          animate={{ opacity: 1, x: 0 }}
+        <h3
+          id={`setup-step-title-${stepIndex}`}
+          tabIndex={-1}
           className="text-xl font-medium text-foreground tracking-tight"
         >
           {meta.title}
-        </motion.h3>
-        <motion.p
-          initial={{ opacity: 0, x: -10 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.05 }}
+        </h3>
+        <p
           className="text-sm text-muted-foreground"
         >
           {meta.subtitle}
-        </motion.p>
+        </p>
       </div>
     </div>
   );
@@ -306,11 +313,9 @@ function ToggleRow({
   useUiTranslation();
   return (
     <motion.div
-      variants={itemVariants}
-
-      className="flex items-center justify-between p-4 rounded-2xl bg-card border border-border/50 hover:border-primary/30 shadow-sm transition-[color,background-color,border-color,opacity]"
+      className="flex items-center justify-between gap-3 p-4 rounded-2xl bg-card border border-border/50 hover:border-primary/30 shadow-sm transition-[color,background-color,border-color,opacity]"
     >
-      <div className="flex items-center gap-4">
+      <div className="min-w-0 flex items-center gap-3">
         <div className="p-2.5 rounded-xl bg-muted text-muted-foreground">
           <Icon className="w-4 h-4" />
         </div>
@@ -375,7 +380,7 @@ function SetupExtensionsList() {
   if (!isServiceConfigured) return null;
 
   return (
-    <motion.div variants={itemVariants} className="space-y-3 pt-2">
+    <motion.div className="space-y-3 pt-2">
       <p className="text-xs font-medium normal-case tracking-normal text-muted-foreground px-1">
         {uiI18n.t('app.popular_add_ons_c08a98f9')}
       </p>
@@ -391,7 +396,7 @@ function SetupExtensionsList() {
           {uiI18n.t('app.no_extensions_available_right_now_add_them_later_23b7eebd')}
         </p>
       ) : (
-        <div className="space-y-2 max-h-[220px] overflow-y-auto pr-2 custom-scrollbar">
+        <div className="setup-scroll space-y-2 max-h-[220px] overflow-y-auto">
           {top.map((ext) => {
             const state = installer.stateFor(ext);
             const busy = state === 'installing';
@@ -463,7 +468,6 @@ export default function SetupPage() {
   useUiTranslation();
   const [savedStep, setStep] = usePersistentState('tatakai_setup_step', 1, 'local');
   const step = Number.isInteger(savedStep) ? Math.min(7, Math.max(1, savedStep)) : 1;
-  const [dir, setDir] = useState(1);
 
   // States
   const [downloadPath, setDownloadPath] = usePersistentState('tatakai_setup_draft:downloadPath', '', 'local');
@@ -481,6 +485,7 @@ export default function SetupPage() {
   const navigate = useNavigate();
   const shouldReduceMotion = useMotionPreference();
   const setupVideoRef = useRef<HTMLVideoElement>(null);
+  const [videoPlaying, setVideoPlaying] = useState(false);
   const countryPolicy = useCountryPolicy();
 
   const isMobile = Capacitor.isNativePlatform() && !!(window as any).Capacitor;
@@ -501,9 +506,10 @@ export default function SetupPage() {
   }, [shouldReduceMotion]);
 
   useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
-      document.body.style.overflow = '';
+      document.body.style.overflow = previousOverflow;
     };
   }, []);
 
@@ -522,7 +528,6 @@ export default function SetupPage() {
   }, [isDesktop, isMobile]);
 
   const goTo = (next: number) => {
-    setDir(next > step ? 1 : -1);
     setStep(next);
   };
 
@@ -575,16 +580,16 @@ export default function SetupPage() {
 
   return (
     <MotionConfig reducedMotion={shouldReduceMotion ? 'always' : 'never'}>
-    <div className="catalog-page setup-page min-h-[100dvh] overflow-x-hidden bg-background flex flex-col lg:h-screen lg:flex-row lg:overflow-hidden relative selection:bg-primary/30">
+    <div className="catalog-page setup-page bg-background relative selection:bg-primary/30" data-reduced-motion={shouldReduceMotion}>
       
 
       {/* LEFT COLUMN: Setup Interface */}
-      <div className="setup-panel w-full lg:w-[45%] xl:w-[40%] h-[100dvh] flex flex-col justify-start items-center overflow-y-auto p-5 pt-[max(1.25rem,env(safe-area-inset-top))] pb-[max(1.25rem,env(safe-area-inset-bottom))] lg:h-screen lg:p-10 relative z-20 bg-background lg:border-r border-border">
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.18 }} className="setup-form w-full max-w-[480px]">
+      <div className="setup-panel">
+        <div className="setup-form">
           
           {/* Logo & Header */}
-          <div className="mb-6 sm:mb-8">
-            <div className="flex items-center gap-4 mb-8">
+          <div className="setup-intro">
+            <div className="setup-brand flex items-center gap-3">
               <motion.div
 
                 className="w-12 h-12 rounded-xl flex items-center justify-center border border-border overflow-hidden"
@@ -608,17 +613,18 @@ export default function SetupPage() {
           <ProgressBar step={step} total={totalSteps} />
 
           {/* Dynamic Content Area */}
-          <div className="setup-step-content">
-            <AnimatePresence mode="wait" custom={dir}>
+          <div className="setup-step-content setup-scroll">
+            <SetupStepTransition step={step} reduceMotion={shouldReduceMotion}>
+              {(stepIndex) => (<>
               
               {/* STEP 1: Storage */}
-              {step === 1 && (
-                <motion.div key="s1" custom={dir} variants={slideVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}>
-                  <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-5">
+              {stepIndex === 1 && (
+                <motion.div key="s1">
+                  <motion.div className="setup-step-body space-y-5">
                     <StepHeader stepIndex={1} />
 
                     {isMobile ? (
-                      <motion.div variants={itemVariants} className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-start gap-4">
+                      <motion.div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-start gap-4">
                         <div className="p-2 bg-emerald-500/20 rounded-xl"><Check className="w-4 h-4 text-emerald-500" /></div>
                         <div>
                           <p className="font-medium text-sm text-emerald-50">{uiI18n.t('app.app_storage_c4e44a5b')}</p>
@@ -626,13 +632,13 @@ export default function SetupPage() {
                         </div>
                       </motion.div>
                     ) : (
-                      <motion.div variants={itemVariants} className="space-y-3">
+                      <motion.div className="space-y-3">
                         <label className="text-sm font-medium text-foreground ml-1">{uiI18n.t('app.download_directory_d625f3b5')}</label>
                         <motion.div  className="flex items-center gap-2 p-1.5 rounded-2xl bg-card border border-border/60 shadow-sm transition-[color,background-color,border-color,opacity] focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/20">
                           <div className="p-2 bg-muted rounded-xl ml-1">
                             <HardDrive className="w-4 h-4 text-muted-foreground" />
                           </div>
-                          <div className="flex-1 px-2 text-sm font-mono text-foreground truncate select-none">
+                          <div className="min-w-0 flex-1 px-2 text-sm font-mono text-foreground truncate select-none" title={downloadPath || undefined}>
                             {downloadPath || uiI18n.t('app.select_a_folder_d0ab0158')}
                           </div>
                           <Button
@@ -654,18 +660,17 @@ export default function SetupPage() {
                       </motion.div>
                     )}
 
-                    <NavButtons onNext={() => goTo(2)} nextLabel="Continue" />
                   </motion.div>
                 </motion.div>
               )}
 
               {/* STEP 2: Privacy */}
-              {step === 2 && (
-                <motion.div key="s2" custom={dir} variants={slideVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}>
-                  <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-4">
+              {stepIndex === 2 && (
+                <motion.div key="s2">
+                  <motion.div className="setup-step-body space-y-4">
                     <StepHeader stepIndex={2} />
                     {isMobile ? (
-                      <motion.div variants={itemVariants} className="p-4 rounded-2xl bg-card border border-border/50 flex items-start gap-4">
+                      <motion.div className="p-4 rounded-2xl bg-card border border-border/50 flex items-start gap-4">
                         <div className="p-2 bg-primary/10 rounded-xl"><ShieldCheck className="w-4 h-4 text-primary" /></div>
                         <div>
                           <p className="font-medium text-sm text-foreground">{uiI18n.t('app.mobile_privacy_4feafb46')}</p>
@@ -677,18 +682,17 @@ export default function SetupPage() {
                     ) : (
                       <ToggleRow icon={Disc} title={uiI18n.t('app.discord_rich_presence_1ce59a08')} desc={uiI18n.t('app.setup_discord_description')} value={discordEnabled} onChange={setDiscordEnabled} />
                     )}
-                    <NavButtons onBack={() => goTo(1)} onNext={() => goTo(3)} />
                   </motion.div>
                 </motion.div>
               )}
 
               {/* STEP 3: Country Policy */}
-              {step === 3 && (
-                <motion.div key="s3" custom={dir} variants={slideVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}>
-                  <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-5">
+              {stepIndex === 3 && (
+                <motion.div key="s3">
+                  <motion.div className="setup-step-body space-y-5">
                     <StepHeader stepIndex={3} />
                     {isIos ? (
-                      <motion.div variants={itemVariants} className="rounded-2xl bg-card border border-border/50 p-5 space-y-3 shadow-inner">
+                      <motion.div className="rounded-2xl bg-card border border-border/50 p-5 space-y-3 shadow-inner">
                         <div className="flex items-center gap-3">
                           <Globe className="w-5 h-5 text-primary" />
                           <p className="text-sm font-medium text-foreground">{uiI18n.t('app.regional_streaming_settings_8a2eafba')}</p>
@@ -698,7 +702,7 @@ export default function SetupPage() {
                         </p>
                       </motion.div>
                     ) : (
-                    <motion.div variants={itemVariants} className="rounded-2xl bg-amber-500/10 border border-amber-500/20 p-5 space-y-4 shadow-inner">
+                    <motion.div className="rounded-2xl bg-amber-500/10 border border-amber-500/20 p-5 space-y-4 shadow-inner">
                       <div className="flex items-center gap-3">
                         <Globe className="w-5 h-5 text-amber-500" />
                         <p className="text-sm font-medium text-amber-50">{uiI18n.t('app.local_copyright_notice_370c3938')}</p>
@@ -720,15 +724,14 @@ export default function SetupPage() {
                       </CustomCheckbox>
                     </motion.div>
                     )}
-                    <NavButtons onBack={() => goTo(2)} onNext={() => goTo(4)} nextDisabled={!isIos && !countryAck} />
                   </motion.div>
                 </motion.div>
               )}
 
               {/* STEP 4: Network */}
-              {step === 4 && (
-                <motion.div key="s4" custom={dir} variants={slideVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}>
-                  <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-4">
+              {stepIndex === 4 && (
+                <motion.div key="s4">
+                  <motion.div className="setup-step-body space-y-4">
                     <StepHeader stepIndex={4} />
                     <ToggleRow icon={Lock} title={uiI18n.t('app.warp_dns_over_https_34b5ea5c')} desc={uiI18n.t('app.setup_network_description')} value={enableWarp} onChange={setEnableWarp} />
                     <AnimatePresence>
@@ -741,15 +744,14 @@ export default function SetupPage() {
                         </motion.div>
                       )}
                     </AnimatePresence>
-                    <NavButtons onBack={() => goTo(3)} onNext={() => goTo(5)} />
                   </motion.div>
                 </motion.div>
               )}
 
               {/* STEP 5: Extensions */}
-              {step === 5 && (
-                <motion.div key="s5" custom={dir} variants={slideVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}>
-                  <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-4">
+              {stepIndex === 5 && (
+                <motion.div key="s5">
+                  <motion.div className="setup-step-body space-y-4">
                     <StepHeader stepIndex={5} />
                     <ToggleRow icon={Puzzle} title={uiI18n.t('app.enable_extensions_94bbffe3')} desc={uiI18n.t('app.setup_extensions_description')} value={enableExtensions} onChange={setEnableExtensions} />
                     <AnimatePresence>
@@ -759,31 +761,29 @@ export default function SetupPage() {
                         </motion.div>
                       )}
                     </AnimatePresence>
-                    <NavButtons onBack={() => goTo(4)} onNext={() => goTo(6)} />
                   </motion.div>
                 </motion.div>
               )}
 
               {/* STEP 6: Debrid Services */}
-              {step === 6 && (
-                <motion.div key="s6" custom={dir} variants={slideVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}>
-                  <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-4">
+              {stepIndex === 6 && (
+                <motion.div key="s6">
+                  <motion.div className="setup-step-body space-y-4">
                     <StepHeader stepIndex={6} />
-                    <motion.div variants={itemVariants} className="bg-card p-4 rounded-2xl border border-border/50 shadow-sm">
+                    <motion.div className="bg-card p-4 rounded-2xl border border-border/50 shadow-sm">
                       <DebridSettingsPanel />
                     </motion.div>
-                    <NavButtons onBack={() => goTo(5)} onNext={() => goTo(7)} />
                   </motion.div>
                 </motion.div>
               )}
 
               {/* STEP 7: Support & Terms */}
-              {step === 7 && (
-                <motion.div key="s7" custom={dir} variants={slideVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}>
-                  <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-3">
+              {stepIndex === 7 && (
+                <motion.div key="s7">
+                  <motion.div className="setup-step-body space-y-3">
                     <StepHeader stepIndex={7} />
 
-                    <motion.button variants={itemVariants}  whileTap={{ scale: 0.99 }} onClick={() => openExternalUrl('https://github.com/snozxyx/tatakai')} className="w-full flex items-center gap-4 p-4 rounded-2xl bg-card border border-border/50 hover:border-amber-500/40 shadow-sm transition-[color,background-color,border-color,opacity] text-left group">
+                    <motion.button whileTap={{ scale: 0.99 }} onClick={() => openExternalUrl('https://github.com/snozxyx/tatakai')} className="w-full flex items-center gap-4 p-4 rounded-2xl bg-card border border-border/50 hover:border-amber-500/40 shadow-sm transition-[color,background-color,border-color,opacity] text-left group">
                       <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-400 group-hover:bg-amber-500 group-hover:text-amber-950 transition-colors"><Star className="w-4 h-4" /></div>
                       <div className="flex-1">
                         <p className="text-sm font-medium text-foreground">{uiI18n.t('app.star_on_github_9becc508')}</p>
@@ -792,7 +792,7 @@ export default function SetupPage() {
                       <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-amber-500 transition-colors" />
                     </motion.button>
 
-                    <motion.button variants={itemVariants}  whileTap={{ scale: 0.99 }} onClick={() => openExternalUrl('https://discord.gg/Mt2jG5QuGP')} className="w-full flex items-center gap-4 p-4 rounded-2xl bg-card border border-border/50 hover:border-indigo-500/40 shadow-sm transition-[color,background-color,border-color,opacity] text-left group">
+                    <motion.button whileTap={{ scale: 0.99 }} onClick={() => openExternalUrl('https://discord.gg/Mt2jG5QuGP')} className="w-full flex items-center gap-4 p-4 rounded-2xl bg-card border border-border/50 hover:border-indigo-500/40 shadow-sm transition-[color,background-color,border-color,opacity] text-left group">
                       <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-400 group-hover:bg-indigo-500 group-hover:text-indigo-50 transition-colors"><MessageCircle className="w-4 h-4" /></div>
                       <div className="flex-1">
                         <p className="text-sm font-medium text-foreground">{uiI18n.t('app.join_discord_7ec699b1')}</p>
@@ -801,7 +801,7 @@ export default function SetupPage() {
                       <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-indigo-500 transition-colors" />
                     </motion.button>
 
-                    <motion.div variants={itemVariants} className="pt-2">
+                    <motion.div className="pt-2">
                       <div className="p-4 rounded-2xl bg-muted/40 border border-border/40">
                         <CustomCheckbox checked={tcAccepted} onChange={setTcAccepted}>
                           <span className="text-sm text-foreground/90">
@@ -814,36 +814,41 @@ export default function SetupPage() {
                       </div>
                     </motion.div>
 
-                    <NavButtons onBack={() => goTo(6)} onNext={handleComplete} nextLabel={uiI18n.t('app.setup_finish')} nextIcon={ChevronRight} nextDisabled={!tcAccepted} />
                   </motion.div>
                 </motion.div>
               )}
 
-            </AnimatePresence>
+              </>)}
+            </SetupStepTransition>
           </div>
-        </motion.div>
+          <NavButtons
+            onBack={step > 1 ? () => goTo(step - 1) : undefined}
+            onNext={handleContinue}
+            nextLabel={step === totalSteps ? uiI18n.t('app.setup_finish') : undefined}
+            nextIcon={step === totalSteps ? ChevronRight : undefined}
+            nextDisabled={(step === 3 && !isIos && !countryAck) || (step === totalSteps && !tcAccepted)}
+          />
+        </div>
       </div>
 
       {/* RIGHT COLUMN: Cinematic Video Background */}
-      <div className="hidden lg:block w-[55%] xl:w-[60%] h-screen relative overflow-hidden bg-black z-10">
-        
-        {/* Gradient fade to blend left and right panels */}
-        <div className="absolute inset-y-0 left-0 w-48 bg-gradient-to-r from-background to-transparent z-20 pointer-events-none" />
-        
-        {/* Vignette effect for text readability and cinematic feel */}
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.8)_100%)] z-10 pointer-events-none" />
-
-        <video ref={setupVideoRef} autoPlay={!shouldReduceMotion} muted loop playsInline poster={setupScene} className="absolute inset-0 w-full h-full object-cover opacity-70">
+      <aside className="setup-visual">
+        <img src={setupScene} alt="" className="setup-scene" aria-hidden="true" />
+        <video ref={setupVideoRef} autoPlay={!shouldReduceMotion} muted loop playsInline poster={setupScene} aria-hidden="true" className="setup-video" data-playing={videoPlaying && !shouldReduceMotion} onPlaying={() => setVideoPlaying(true)} onPause={() => setVideoPlaying(false)} onError={() => setVideoPlaying(false)}>
           <source src={randomVideoSrc} type={randomVideoSrc.endsWith('.webm') ? 'video/webm' : 'video/mp4'} />
         </video>
 
-        <div className="absolute bottom-12 left-12 right-12 z-20 flex flex-col gap-2">
-        
-          <motion.h2 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6, duration: 0.8 }} className="text-3xl lg:text-5xl font-medium text-white max-w-xl leading-[1.1] tracking-tight">
+        <div className="setup-visual-content">
+          <h2>
             {uiI18n.t('app.stream_download_and_organize_your_anime_e8d26a7c')}
-          </motion.h2>
+          </h2>
+          <div className="setup-features">
+            <span><Play aria-hidden="true" />{uiI18n.t('app.streaming_1e832552')}</span>
+            <span><Download aria-hidden="true" />{uiI18n.t('download.download')}</span>
+            <span><Folder aria-hidden="true" />{uiI18n.t('app.library_b8100f5b')}</span>
+          </div>
         </div>
-      </div>
+      </aside>
     </div>
     </MotionConfig>
   );

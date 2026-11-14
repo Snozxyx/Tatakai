@@ -45,6 +45,8 @@ export function matchEntityRoute(pathname) {
     switch (a) {
       case "anime":
         return { type: "anime", id: b };
+      case "novel":
+        return MANGA_RESERVED.has(b.toLowerCase()) || b === "comingsoon" ? null : { type: "novel", id: b };
       case "manga":
         return MANGA_RESERVED.has(b.toLowerCase()) ? null : { type: "manga", id: b };
       case "tierlist":

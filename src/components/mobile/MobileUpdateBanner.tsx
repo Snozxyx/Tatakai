@@ -1,8 +1,10 @@
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Download, Loader2, RefreshCw, X } from 'lucide-react';
 import { isCapacitor } from '@/lib/platform/platform';
+import { useMotionPreference } from '@/hooks/ui/useMotionPreference';
+import '@/components/layout/update-surfaces.css';
 import {
   cancelMobileUpdateDownload,
   checkMobileUpdate,
@@ -11,6 +13,7 @@ import {
   isAndroidAutoUpdateTarget,
   openMobileReleasePage,
   useMobileUpdateState,
+  type MobileUpdateState,
 } from '@/core/update/mobile-update';
 
 /**
@@ -32,32 +35,106 @@ export function MobileUpdateBanner() {
   if (!update.latestVersion) return null;
   if (dismissed === update.latestVersion) return null;
 
+  return (
+    <MobileUpdateCard
+      key={update.latestVersion}
+      update={update}
+      onDismiss={() => setDismissed(update.latestVersion ?? null)}
+    />
+  );
+}
+
+function MobileUpdateCard({
+  update,
+  onDismiss,
+}: {
+  update: MobileUpdateState;
+  onDismiss(): void;
+}) {
+  const reducedMotion = useMotionPreference();
+  const [open, setOpen] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const closeTimer = useRef<number | null>(null);
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      void cardRef.current?.offsetWidth;
+      setOpen(true);
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+      if (closeTimer.current !== null) window.clearTimeout(closeTimer.current);
+    };
+  }, []);
+  const dismiss = () => {
+    if (closeTimer.current !== null) return;
+    setOpen(false);
+    const closeMs = reducedMotion ? 0 : parseFloat(
+      getComputedStyle(document.documentElement).getPropertyValue('--toast-close')
+    ) || 250;
+    closeTimer.current = window.setTimeout(onDismiss, closeMs);
+  };
   const autoCapable = isAndroidAutoUpdateTarget() && !!update.downloadUrl;
   const progress = Math.max(0, Math.min(100, Math.round(Number(update.progress ?? 0))));
 
   return (
-    <div className="sticky top-0 z-[80] flex justify-center px-4 pt-2">
-      <div className="w-full max-w-2xl rounded-xl border border-primary/30 bg-primary/10 px-4 py-2.5 shadow-lg backdrop-blur-md">
-        <div className="flex items-center gap-3">
-          {update.phase === 'installing' ? (
-            <Loader2 className="h-4 w-4 shrink-0 animate-spin text-primary" />
-          ) : (
-            <Download className="h-4 w-4 shrink-0 text-primary" />
-          )}
-          <p className="flex-1 text-sm text-foreground/90">
-            {update.phase === 'downloading' && uiI18n.t('app.downloading_tatakai_i18n_value_0_i18n_value_1_e9cdf41e', { value0: update.latestVersion, value1: progress })}
-            {update.phase === 'downloaded' && uiI18n.t('app.tatakai_i18n_value_0_is_ready_to_install_7fa95f9c', { value0: update.latestVersion })}
-            {update.phase === 'installing' && uiI18n.t('app.opening_the_installer_e8883229')}
-            {update.phase === 'available' && (
-              <>{uiI18n.t('app.tatakai_28bda6bd')} {update.latestVersion} {uiI18n.t('app.is_available_6b7a7a3e')}{update.currentVersion ? uiI18n.t('app.you_have_i18n_value_0_2c7c5e44', { value0: update.currentVersion }) : ''}.</>
+    <div className="mobile-update-banner">
+      <div
+        ref={cardRef}
+        role="region"
+        aria-labelledby="mobile-update-title"
+        className={`mobile-update-card t-toast${open ? ' is-open' : ''}`}
+      >
+        <div className="mobile-update-header">
+          <div className="mobile-update-copy">
+            <div className="update-brand">
+              <span className="update-bookmark" aria-hidden="true" />
+              <span>{uiI18n.t('app.tatakai_28bda6bd')}</span>
+              <span className="mobile-update-version">v{update.latestVersion}</span>
+            </div>
+            <div aria-live="polite" aria-atomic="true">
+              <p id="mobile-update-title" className="mobile-update-title">
+                {update.phase === 'available' && uiI18n.t('app.update_available_21f1865b')}
+                {update.phase === 'downloading' && uiI18n.t('app.downloading_tatakai_i18n_value_0_i18n_value_1_e9cdf41e', { value0: update.latestVersion, value1: progress })}
+                {update.phase === 'downloaded' && uiI18n.t('app.tatakai_i18n_value_0_is_ready_to_install_7fa95f9c', { value0: update.latestVersion })}
+                {update.phase === 'installing' && uiI18n.t('app.opening_the_installer_e8883229')}
+              </p>
+            </div>
+            {update.phase === 'available' && update.currentVersion && (
+              <p className="mobile-update-current">
+                {uiI18n.t('app.current_version_vi18n_value_0_0829162c', { value0: update.currentVersion })}
+              </p>
             )}
-          </p>
+          </div>
+          <button
+            type="button"
+            title={uiI18n.t('app.dismiss_70afe9ef')}
+            aria-label={uiI18n.t('app.dismiss_70afe9ef')}
+            onClick={dismiss}
+            className="mobile-update-icon-button"
+          >
+            <X aria-hidden="true" />
+          </button>
+        </div>
+        {update.phase === 'downloading' && (
+          <div
+            className="mobile-update-progress"
+            role="progressbar"
+            aria-label={uiI18n.t('app.download_a479c9c3')}
+            aria-valuenow={progress}
+            aria-valuemin={0}
+            aria-valuemax={100}
+          >
+            <div className="mobile-update-progress-fill" style={{ transform: `scaleX(${progress / 100})` }} />
+          </div>
+        )}
+        <div className="mobile-update-actions">
           {update.phase === 'available' && autoCapable && (
             <button
               type="button"
               onClick={() => void downloadMobileUpdate()}
-              className="shrink-0 rounded-lg bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+              className="mobile-update-action"
             >
+              <Download aria-hidden="true" />
               {uiI18n.t('app.download_a479c9c3')}
             </button>
           )}
@@ -65,7 +142,7 @@ export function MobileUpdateBanner() {
             <button
               type="button"
               onClick={() => void openMobileReleasePage(update.releaseUrl)}
-              className="shrink-0 rounded-lg bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+              className="mobile-update-action"
             >
               {uiI18n.t('app.update_fb91e24f')}
             </button>
@@ -74,7 +151,7 @@ export function MobileUpdateBanner() {
             <button
               type="button"
               onClick={() => void cancelMobileUpdateDownload()}
-              className="shrink-0 rounded-lg border border-white/10 bg-white/[0.03] px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-primary/5"
+              className="mobile-update-action mobile-update-action-secondary"
             >
               {uiI18n.t('app.cancel_77dfd213')}
             </button>
@@ -83,9 +160,11 @@ export function MobileUpdateBanner() {
             <button
               type="button"
               disabled={update.phase === 'installing'}
+              aria-busy={update.phase === 'installing'}
               onClick={() => void installMobileUpdate()}
-              className="shrink-0 rounded-lg bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
+              className="mobile-update-action"
             >
+              {update.phase === 'installing' && <Loader2 className="animate-spin" aria-hidden="true" />}
               {uiI18n.t('app.install_fd6c3ebf')}
             </button>
           )}
@@ -94,31 +173,11 @@ export function MobileUpdateBanner() {
             title={uiI18n.t('app.check_again_e185048c')}
             aria-label={uiI18n.t('app.check_again_e185048c')}
             onClick={() => void checkMobileUpdate({ announce: true })}
-            className="shrink-0 rounded-lg p-1 text-muted-foreground transition-colors hover:bg-foreground/10 hover:text-foreground"
+            className="mobile-update-icon-button"
           >
-            <RefreshCw className="h-3.5 w-3.5" />
-          </button>
-          <button
-            type="button"
-            title={uiI18n.t('app.dismiss_70afe9ef')}
-            aria-label={uiI18n.t('app.dismiss_70afe9ef')}
-            onClick={() => setDismissed(update.latestVersion ?? 'x')}
-            className="shrink-0 rounded-lg p-1 text-muted-foreground transition-colors hover:bg-foreground/10 hover:text-foreground"
-          >
-            <X className="h-3.5 w-3.5" />
+            <RefreshCw aria-hidden="true" />
           </button>
         </div>
-        {update.phase === 'downloading' && (
-          <div
-            className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10"
-            role="progressbar"
-            aria-valuenow={progress}
-            aria-valuemin={0}
-            aria-valuemax={100}
-          >
-            <div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${progress}%` }} />
-          </div>
-        )}
       </div>
     </div>
   );

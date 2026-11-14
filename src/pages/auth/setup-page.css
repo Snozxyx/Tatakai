@@ -1,33 +1,75 @@
+:root {
+  --page-slide-dur: 250ms;
+  --page-fade-dur: 250ms;
+  --page-slide-distance: 8px;
+  --page-blur: 3px;
+  --page-stagger: 0ms;
+  --page-exit-enabled: 1;
+  --page-slide-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --page-fade-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.setup-page {
+  --page-slide-dur: var(--duration-fast);
+  --page-fade-dur: var(--duration-fast);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  height: var(--desktop-content-height, 100dvh);
+  overflow: hidden;
+}
+
+html.app-fullscreen .setup-page {
+  height: 100dvh;
+}
+
+.setup-panel {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  min-height: 0;
+  padding: max(20px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  background: hsl(var(--background));
+}
+
+.setup-panel,
+.setup-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.setup-page :is(.setup-panel, .setup-scroll)::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
 .setup-form {
-  flex: 0 0 auto;
-  margin-block: auto;
+  display: flex;
+  flex: 0 1 auto;
+  flex-direction: column;
+  width: 100%;
+  max-width: 480px;
+  height: min(700px, 100%);
+  min-height: 0;
+  margin: auto;
   padding: 32px;
   border: 1px solid hsl(var(--border));
-  border-radius: 20px;
+  border-radius: 24px;
   background: hsl(var(--card));
+  box-shadow: 0 20px 64px rgb(0 0 0 / 0.12);
 }
 
-@media (max-width: 1023px) {
-  .setup-form {
-    margin-block: 0;
-  }
+.setup-intro {
+  flex-shrink: 0;
+  margin-bottom: 24px;
 }
 
-.setup-step-content > div > div {
-  display: flex;
-  flex-direction: column;
-  min-height: 320px;
-}
-
-.setup-page .setup-nav {
-  margin-top: auto;
-  padding-top: 24px;
-}
-
-.setup-page .setup-toggle::after {
-  content: '';
-  position: absolute;
-  inset: -10px -4px;
+.setup-brand {
+  margin-bottom: 28px;
 }
 
 .setup-page .setup-form h1 {
@@ -37,16 +79,294 @@
 .setup-page .setup-form h2 {
   font-family: 'Space Grotesk', sans-serif;
   font-weight: 500;
-  line-height: 1.12;
+  line-height: 1.16;
+  text-wrap: balance;
+}
+
+.setup-progress {
+  --setup-stop-size: 28px;
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 28px;
+}
+
+.setup-progress-item {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.setup-progress-item:last-child {
+  flex: 0 0 var(--setup-stop-size);
+}
+
+.setup-progress-stop {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: var(--setup-stop-size);
+  height: var(--setup-stop-size);
+  border-radius: 50%;
+  background: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+  font-weight: 500;
+  transition: background-color var(--duration-quick), color var(--duration-quick), box-shadow var(--duration-quick);
+}
+
+.setup-progress-item[data-complete="true"] .setup-progress-stop {
+  background: hsl(var(--primary) / 0.16);
+  color: hsl(var(--primary));
+}
+
+.setup-progress-item[data-active="true"] .setup-progress-stop {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  box-shadow: 0 0 0 4px hsl(var(--primary) / 0.1);
+}
+
+.setup-progress-track {
+  position: relative;
+  flex: 1;
+  height: 1px;
+  overflow: hidden;
+  background: hsl(var(--border));
+}
+
+.setup-progress-track::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: hsl(var(--primary) / 0.65);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform var(--duration-fast) var(--ease-smooth-out);
+}
+
+.setup-progress-item[data-complete="true"] .setup-progress-track::after {
+  transform: scaleX(1);
+}
+
+.setup-step-content {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scroll-padding-block: 12px;
+}
+
+.setup-step-content .t-page-slide {
+  min-height: 100%;
+  overflow: clip;
+}
+
+.setup-step-content .t-page[data-active="true"] {
+  position: relative;
+}
+
+.setup-step-body {
+  padding-bottom: 8px;
+}
+
+.setup-step-header > div:last-child {
+  min-width: 0;
+}
+
+.setup-step-header h3:focus {
+  outline: none;
+}
+
+.setup-page .setup-nav {
+  flex-shrink: 0;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid hsl(var(--border));
+}
+
+.setup-page .setup-toggle::after {
+  content: '';
+  position: absolute;
+  inset: -10px -4px;
+}
+
+.setup-page .setup-toggle {
+  flex-shrink: 0;
+}
+
+.setup-visual {
+  position: relative;
+  display: none;
+  min-width: 0;
+  overflow: hidden;
+  background: #080607;
+}
+
+.setup-scene,
+.setup-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.setup-scene {
+  filter: brightness(1.5);
+}
+
+.setup-video {
+  opacity: 0;
+  filter: brightness(0.8);
+  transition: opacity var(--duration-slow) var(--ease-smooth-out);
+}
+
+.setup-video[data-playing="true"] {
+  opacity: 1;
+}
+
+.setup-visual::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, hsl(var(--background)) 0%, transparent 30%), linear-gradient(0deg, rgb(0 0 0 / 0.88), transparent 70%);
+  pointer-events: none;
+}
+
+.setup-visual-content {
+  position: absolute;
+  z-index: 1;
+  right: clamp(32px, 4vw, 64px);
+  bottom: clamp(32px, 5vh, 56px);
+  left: clamp(32px, 4vw, 64px);
+  color: white;
+}
+
+.setup-visual-content h2 {
+  max-width: 660px;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(36px, 4vw, 64px);
+  font-weight: 500;
+  line-height: 1.08;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+
+.setup-features {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid rgb(255 255 255 / 0.16);
+  color: rgb(255 255 255 / 0.7);
+  font-size: 13px;
+}
+
+.setup-features > span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.setup-features .lucide {
+  width: 16px;
+  height: 16px;
+}
+
+@media (min-width: 1024px) {
+  .setup-page {
+    grid-template-columns: minmax(400px, 0.9fr) minmax(0, 1.25fr);
+  }
+
+  .setup-panel {
+    padding: 32px;
+    border-right: 1px solid hsl(var(--border) / 0.6);
+  }
+
+  .setup-visual {
+    display: block;
+  }
 }
 
 @media (max-width: 639px) {
   .setup-form {
     padding: 24px 20px;
-    border-radius: 16px;
+    border-radius: 20px;
   }
 
-  .setup-step-content > div > div {
-    min-height: 280px;
+  .setup-progress,
+  .setup-progress-item {
+    gap: 6px;
   }
+}
+
+@media (max-height: 520px) {
+  .setup-form {
+    height: auto;
+  }
+
+  .setup-step-content {
+    flex: 0 0 auto;
+    overflow: visible;
+  }
+}
+
+@media (max-width: 359px) {
+  .setup-progress {
+    --setup-stop-size: 24px;
+  }
+
+  .setup-progress,
+  .setup-progress-item {
+    gap: 4px;
+  }
+}
+
+.setup-page[data-reduced-motion="true"] :is(.t-page, .setup-video, .setup-progress-stop),
+.setup-page[data-reduced-motion="true"] .setup-progress-track::after {
+  transition: none !important;
+}
+
+/* Page side-by-side recipe from Transitions.dev. */
+.t-page-slide {
+  position: relative;
+}
+.t-page-slide .t-page[data-page-id="1"] {
+  --t-page-from-x: calc(var(--page-slide-distance) * -1);
+}
+.t-page-slide .t-page[data-page-id="2"] {
+  --t-page-from-x: var(--page-slide-distance);
+}
+.t-page-slide .t-page {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(calc(var(--t-page-from-x, 0px) * var(--page-exit-enabled)));
+  filter: blur(calc(var(--page-blur) * var(--page-exit-enabled)));
+  transition:
+    opacity   var(--page-fade-dur)  var(--page-fade-ease),
+    transform var(--page-slide-dur) var(--page-slide-ease),
+    filter    var(--page-slide-dur) var(--page-slide-ease);
+  will-change: opacity, transform, filter;
+}
+.t-page-slide[data-page="1"] .t-page[data-page-id="1"],
+.t-page-slide[data-page="2"] .t-page[data-page-id="2"] {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
+  filter: blur(0);
+  transition-delay: var(--page-stagger);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .t-page-slide .t-page { transition: none !important; }
+  .setup-page :is(.setup-video, .setup-progress-stop),
+  .setup-page .setup-progress-track::after { transition: none !important; }
 }

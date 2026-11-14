@@ -1,4 +1,25 @@
 {
+  "detailUi": {
+    "tagRelevance": "この作品との関連度 {{rank}}%",
+    "browseTag": {
+      "anime": "このタグのアニメを探す",
+      "manga": "このタグの漫画を探す",
+      "novel": "このタグの小説を探す"
+    },
+    "browseGenre": "{{genre}}ジャンルを探す",
+    "browseAuthor": "{{author}}の作品を検索",
+    "browseProducer": "{{producer}}のアニメを探す",
+    "rating": "この作品のコミュニティ平均評価。",
+    "format": "作品の放送・出版形式。",
+    "status": "現在の放送・出版状況。",
+    "duration": "各エピソードの標準的な長さ。",
+    "subEpisodes": "字幕付きで視聴できるエピソード数。",
+    "dubEpisodes": "吹き替えで視聴できるエピソード数。",
+    "chapters": "カタログに記載された総話数。配信元によって利用可能な話数は異なります。",
+    "volumes": "カタログに記載された出版済み巻数。",
+    "searchUnavailable": "アニメ検索は一時的に利用できません。もう一度お試しください。",
+    "retrySearch": "アニメ検索を再試行"
+  },
   "extensionSetup": {
     "invalidManifestUrl": "アドオンからマニフェストURLが返されませんでした。",
     "wrongAddon": "設定から別のアドオン、または無効なアドオンが返されました。",
@@ -7299,6 +7320,13 @@
     "noBadges": "まだバッジを獲得していません",
     "loadFailed": "バッジを読み込めませんでした。もう一度お試しください。",
     "levels": "バッジのレベル",
+    "currentLevel": "現在のレベル",
+    "levelCount": "レベル {{level}} / {{total}}",
+    "nextLevel": "次のレベル：{{name}}",
+    "maxLevel": "最高レベルに到達",
+    "current": "現在",
+    "unlocked": "解放済み",
+    "locked": "未解放",
     "earned": "獲得済み",
     "openDetails": "クリックまたはタップで詳細を表示",
     "viewCollection": "すべてのバッジ（{{count}}個）を表示",

@@ -1,4 +1,5 @@
 import { DEFAULT_SETTINGS, normalizeSettings, type ReaderSettings } from '@/lib/reader/settings';
+import { migrateReaderSettings, READER_DEFAULTS_VERSION } from '@/lib/reader/settingsMigration';
 export * from '@/lib/reader/settings';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -32,9 +33,9 @@ function loadSettingsFromStorage(): ReaderSettings {
     if (!stored) {
       const cookieSettings = readGuestSettingsFromCookie().reader;
       if (!cookieSettings || typeof cookieSettings !== 'object') return DEFAULT_SETTINGS;
-      return normalizeSettings(cookieSettings as Partial<ReaderSettings>);
+      return migrateReaderSettings(cookieSettings as Partial<ReaderSettings>, localRevision());
     }
-    return normalizeSettings(JSON.parse(stored) as Partial<ReaderSettings>);
+    return migrateReaderSettings(JSON.parse(stored) as Partial<ReaderSettings>, localRevision());
   } catch (e) {
     console.error('Failed to load reader settings:', e);
     return DEFAULT_SETTINGS;
@@ -42,8 +43,8 @@ function loadSettingsFromStorage(): ReaderSettings {
 }
 
 const persistLocalReaderSettings = (settings: ReaderSettings) => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-  writeGuestSettingsCookie({ reader: { ...settings, __updatedAt: localRevision() } as unknown as Record<string, unknown> });
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...settings, __defaultsVersion: READER_DEFAULTS_VERSION }));
+  writeGuestSettingsCookie({ reader: { ...settings, __defaultsVersion: READER_DEFAULTS_VERSION, __updatedAt: localRevision() } as unknown as Record<string, unknown> });
   window.dispatchEvent(new CustomEvent(UPDATE_EVENT));
 };
 
@@ -73,7 +74,7 @@ export function useReaderSettings() {
     const remoteRevision = Number(accountReaderSettings.__updatedAt) || 0;
     if (hadLocalSettings.current && remoteRevision <= localRevision()) return;
     if (remoteRevision) localStorage.setItem(REVISION_KEY, String(remoteRevision));
-    const next = normalizeSettings(accountReaderSettings as Partial<ReaderSettings>);
+    const next = migrateReaderSettings(accountReaderSettings as Partial<ReaderSettings>, remoteRevision);
     setSettings((previous) => (areSettingsEqual(previous, next) ? previous : next));
   }, [user?.id, accountReaderSettings]);
 
@@ -89,7 +90,7 @@ export function useReaderSettings() {
     if (seededAccountRef.current === user.id) return;
     seededAccountRef.current = user.id;
     void saveAccountSettingsPatch(user.id, {
-      reader: { ...settings, __updatedAt: localRevision() } as unknown as Record<string, unknown>,
+      reader: { ...settings, __defaultsVersion: READER_DEFAULTS_VERSION, __updatedAt: localRevision() } as unknown as Record<string, unknown>,
     }).catch(() => {
       seededAccountRef.current = null;
     });
@@ -121,7 +122,7 @@ export function useReaderSettings() {
     currentSettingsRef.current = next;
     persistLocalReaderSettings(next);
     setSettings(next);
-    if (user?.id) void saveAccountSettingsPatch(user.id, { reader: { ...next, __updatedAt: localRevision() } as unknown as Record<string, unknown> }).catch(() => undefined);
+    if (user?.id) void saveAccountSettingsPatch(user.id, { reader: { ...next, __defaultsVersion: READER_DEFAULTS_VERSION, __updatedAt: localRevision() } as unknown as Record<string, unknown> }).catch(() => undefined);
   };
 
   const replaceSettings = (value: Partial<ReaderSettings>) => {
@@ -130,7 +131,7 @@ export function useReaderSettings() {
     const next = normalizeSettings(value);
     persistLocalReaderSettings(next);
     setSettings(next);
-    if (user?.id) void saveAccountSettingsPatch(user.id, { reader: { ...next, __updatedAt: localRevision() } as unknown as Record<string, unknown> }).catch(() => undefined);
+    if (user?.id) void saveAccountSettingsPatch(user.id, { reader: { ...next, __defaultsVersion: READER_DEFAULTS_VERSION, __updatedAt: localRevision() } as unknown as Record<string, unknown> }).catch(() => undefined);
   };
 
   const resetSettings = () => {
@@ -140,7 +141,7 @@ export function useReaderSettings() {
     setSettings(DEFAULT_SETTINGS);
     if (user?.id) {
       void saveAccountSettingsPatch(user.id, {
-        reader: { ...DEFAULT_SETTINGS, __updatedAt: localRevision() } as unknown as Record<string, unknown>,
+        reader: { ...DEFAULT_SETTINGS, __defaultsVersion: READER_DEFAULTS_VERSION, __updatedAt: localRevision() } as unknown as Record<string, unknown>,
       }).catch(() => undefined);
     }
   };

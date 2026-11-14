@@ -10,17 +10,18 @@ import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { CachedProfileImage } from '@/components/ui/cached-profile-image';
 import { useProfileWatchTime } from '@/hooks/user/useProfileWatchTime';
-import { Suspense, cloneElement, isValidElement, useEffect, useMemo, useState, type MouseEvent } from 'react';
+import { Suspense, cloneElement, isValidElement, useEffect, useMemo, useRef, useState, type AriaAttributes, type ComponentProps, type MouseEvent } from 'react';
 import { readThemePreferences } from '@/lib/profileThemes';
 import { resolveProfileTheme } from '@/components/profile/themes/registry';
 import './themes/sekaipop/sekaipop-preview.css';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { motion, useReducedMotion, useMotionValue, useTransform, animate } from 'framer-motion';
+import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
 import { Loader2, UserCheck, UserPlus, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { PeekSheet } from '@/components/media/PeekSheet';
 import { useIsMobile } from '@/hooks/ui/use-mobile';
 import { useMotionPreference } from '@/hooks/ui/useMotionPreference';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -117,47 +118,12 @@ function useWidgetStats(userId?: string | null, enabled = false, watchAllowed = 
 }
 
 /**
- * Ambient glow scoped to the card — a compact echo of the profile page's
- * background effects (drifting blurred orbs + a radial tint) that lives INSIDE
- * the popover rather than as a full-screen `fixed` layer. Collapses to a static
- * gradient under `prefers-reduced-motion`.
- */
-function WidgetAmbient() {
-  useUiTranslation();
-  const reduce = useMotionPreference();
-  return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden">
-      {/* Base radial tint */}
-      <div
-        className="absolute inset-0 opacity-70"
-        style={{
-          background:
-            'radial-gradient(120% 90% at 50% 0%, hsl(var(--profile-accent) / 0.18) 0%, transparent 55%)',
-        }}
-      />
-      {/* Drifting accent orbs */}
-      <motion.div
-        className="absolute -left-10 -top-10 h-40 w-40 rounded-full blur-3xl"
-        style={{ background: 'hsl(var(--profile-accent) / 0.25)' }}
-        animate={reduce ? undefined : { x: [0, 24, 0], y: [0, 16, 0], opacity: [0.5, 0.75, 0.5] }}
-        transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut' }}
-      />
-      <motion.div
-        className="absolute -right-12 top-16 h-44 w-44 rounded-full bg-secondary/25 blur-3xl"
-        animate={reduce ? undefined : { x: [0, -28, 0], y: [0, -18, 0], opacity: [0.4, 0.65, 0.4] }}
-        transition={{ duration: 15, repeat: Infinity, ease: 'easeInOut' }}
-      />
-    </div>
-  );
-}
-
-/**
  * Count-up number that animates 0 → `value` whenever the value changes (e.g.
  * once follow counts load). Respects `prefers-reduced-motion` by snapping.
  */
 function CountUp({ value }: { value: number }) {
   useUiTranslation();
-  const reduce = useReducedMotion();
+  const reduce = useMotionPreference();
   const mv = useMotionValue(0);
   const text = useTransform(mv, (v) => Math.round(v).toLocaleString(uiI18n.language));
 
@@ -166,7 +132,8 @@ function CountUp({ value }: { value: number }) {
       mv.set(value);
       return;
     }
-    const controls = animate(mv, value, { duration: 0.8, ease: 'easeOut' });
+    const duration = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--duration-fast')) || 250;
+    const controls = animate(mv, value, { duration: duration / 1000, ease: [0.22, 1, 0.36, 1] });
     return controls.stop;
   }, [value, reduce, mv]);
 
@@ -179,6 +146,19 @@ function formatWatchTime(seconds: number): string {
   const minutes = totalMinutes % 60;
   if (hours > 0) return `${hours.toLocaleString(uiI18n.language)}h ${minutes}m`;
   return `${minutes}m`;
+}
+
+/** Keep the loaded profile visible while the shared media sheet closes. */
+function MobileProfilePeek({ open, children, footer, ...props }: ComponentProps<typeof PeekSheet>) {
+  const lastContent = useRef(children);
+  const lastFooter = useRef(footer);
+  if (open) {
+    lastContent.current = children;
+    lastFooter.current = footer;
+  }
+  return <PeekSheet {...props} open={open} footer={open ? footer : lastFooter.current}>
+    {open ? children : lastContent.current}
+  </PeekSheet>;
 }
 
 /**
@@ -201,8 +181,8 @@ export function ProfileWidgetCard({
   const navigate = useNavigate();
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
-  const trigger = isValidElement<{ onClick?: (event: MouseEvent<HTMLElement>) => void }>(children)
-    ? cloneElement(children, { onClick: event => {
+  const trigger = isValidElement<{ onClick?: (event: MouseEvent<HTMLElement>) => void } & Pick<AriaAttributes, 'aria-haspopup' | 'aria-expanded'>>(children)
+    ? cloneElement(children, { 'aria-haspopup': 'dialog', 'aria-expanded': open, onClick: event => {
       if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
       event.preventDefault();
       event.stopPropagation();
@@ -265,6 +245,7 @@ export function ProfileWidgetCard({
     void triggerHaptic('tap');
     setOpen(false);
   };
+  const previewLabel = `${uiI18n.t('app.profile_preview_9a067c9b')} ${name}`;
 
   const ownedThemes = useOwnedProfileThemes(open ? userId : undefined);
   const widgetPreferences = readThemePreferences(fetched?.app_settings);
@@ -290,7 +271,16 @@ export function ProfileWidgetCard({
       onFollow={() => isFollowing ? unfollow() : follow()} onOpen={goToProfile} onClose={close}
       moderation={userId ? <ModerationMenu contentType="user" contentId={userId} authorUserId={userId} authorName={name} /> : undefined}
     /></Suspense> : loadingCard;
-    return isMobile || isTV() ? <Dialog open={open} onOpenChange={setOpen}><DialogTrigger asChild>{trigger}</DialogTrigger><DialogContent showCloseButton={false} aria-describedby={undefined} className={cn('profile-theme-preview-shell', className)}><DialogTitle className="sr-only">{name} profile preview</DialogTitle>{themedBody}</DialogContent></Dialog> : <Popover open={open} onOpenChange={setOpen}><PopoverTrigger asChild>{trigger}</PopoverTrigger><PopoverContent side={side} align="center" onInteractOutside={keepNestedBadgeWidgetOpen} className={cn('profile-theme-preview-shell z-[60]', className)}>{themedBody}</PopoverContent></Popover>;
+    if (isMobile && !isTV()) return <>
+      {trigger}
+      <MobileProfilePeek open={open} onClose={close} label={previewLabel} showCloseButton={resolvingWidget}
+        closeLabel={uiI18n.t('app.close_profile_preview_fb08f6b3')}>
+        <div className="p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <div className={cn('profile-theme-preview-shell mx-auto', className)}>{themedBody}</div>
+        </div>
+      </MobileProfilePeek>
+    </>;
+    return isTV() ? <Dialog open={open} onOpenChange={setOpen}><DialogTrigger asChild>{trigger}</DialogTrigger><DialogContent showCloseButton={false} aria-describedby={undefined} className={cn('profile-theme-preview-shell', className)}><DialogTitle className="sr-only">{name} profile preview</DialogTitle>{themedBody}</DialogContent></Dialog> : <Popover open={open} onOpenChange={setOpen}><PopoverTrigger asChild>{trigger}</PopoverTrigger><PopoverContent side={side} align="center" onInteractOutside={keepNestedBadgeWidgetOpen} className={cn('profile-theme-preview-shell z-[60]', className)}>{themedBody}</PopoverContent></Popover>;
   }
 
   if (isTV()) return (
@@ -314,20 +304,18 @@ export function ProfileWidgetCard({
     </Dialog>
   );
 
+  // Default card polish informed by unslop by @heydamir (CC BY 4.0).
   const cardBody = (
     <div className="relative isolate overflow-hidden" style={profileSurfaceStyle(customization)}>
-      {backgroundEffect === 'none' && <WidgetAmbient />}
       {open && <ProfileBackgroundEffects effect={backgroundEffect} variant="widget" />}
       {open && <ProfileCosmeticEffect effect={profileEffect} />}
-      {/* hairline top highlight — consistent glass edge */}
-      <span aria-hidden className="pointer-events-none absolute inset-x-8 top-0 z-20 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent" />
 
       {/* Single refined close — top-left so it never collides with moderation kebab */}
       <button
         type="button"
         aria-label={uiI18n.t('app.close_profile_preview_fb08f6b3')}
         onClick={close}
-        className="absolute left-2.5 top-2.5 z-20 flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-black/40 text-white/80 shadow-lg backdrop-blur-md transition-colors hover:bg-black/60 hover:text-white active:scale-95"
+        className="absolute left-2 top-2 z-20 flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-card/90 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <X className="h-4 w-4" />
       </button>
@@ -346,9 +334,9 @@ export function ProfileWidgetCard({
       )}
 
           <div className="relative z-10 flex flex-col">
-            {/* Banner — falls back to an accent gradient so the header always has depth */}
+            {/* Keep member artwork; the fallback stays inside the theme palette. */}
             <div
-              className="h-20 w-full shrink-0 cursor-pointer overflow-hidden bg-gradient-to-br from-primary/30 via-secondary/20 to-transparent"
+              className="h-20 w-full shrink-0 cursor-pointer overflow-hidden bg-muted/60"
               style={{ maskImage: 'linear-gradient(to bottom, black 35%, transparent 100%)' }}
               onClick={goToProfile}
             >
@@ -369,7 +357,7 @@ export function ProfileWidgetCard({
                   onClick={goToProfile}
                 >
                   <AvatarImage src={avatar} className="object-cover" />
-                  <AvatarFallback className="bg-gradient-to-br from-primary/60 to-secondary/60 text-lg font-bold text-primary-foreground">
+                  <AvatarFallback className="bg-muted text-lg font-medium text-foreground">
                     {name[0]?.toUpperCase() || 'U'}
                   </AvatarFallback>
                 </Avatar>
@@ -379,7 +367,7 @@ export function ProfileWidgetCard({
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <button
                     onClick={goToProfile}
-                    className={cn('truncate text-sm font-bold transition-opacity hover:opacity-80', rankStyle.className)}
+                    className={cn('truncate text-base font-medium transition-opacity hover:opacity-80', rankStyle.className)}
                     style={rankStyle.style}
                   >
                     <ProfileNameplate nameplate={nameplate}>{name}</ProfileNameplate>
@@ -397,7 +385,7 @@ export function ProfileWidgetCard({
                     }}
                   />
                 </div>
-                {handle && <p className="truncate text-xs text-muted-foreground/70">@{handle}</p>}
+                {handle && <p className="truncate text-xs text-muted-foreground">@{handle}</p>}
                 <ProfilePresence userId={userId} enabled={open} />
               </div>
             </div>
@@ -414,7 +402,7 @@ export function ProfileWidgetCard({
                   variant={isFollowing ? 'outline' : 'default'}
                   onClick={() => (isFollowing ? unfollow() : follow())}
                   disabled={checkingFollow || isFollowingLoading}
-                  className="h-8 flex-1 gap-1.5 text-xs font-semibold"
+                  className="h-9 flex-1 gap-2 rounded-lg text-sm font-medium"
                 >
                   {isFollowingLoading ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -431,10 +419,10 @@ export function ProfileWidgetCard({
 
             {/* Bio (only for public profiles) */}
             {isSelf && <div className="px-4 pb-3"><ProfileSocialActions userId={userId} onMessageOpened={() => setOpen(false)} /></div>}
-            {bio && <p className="px-4 pb-3 text-xs leading-relaxed text-muted-foreground line-clamp-3">{bio}</p>}
+            {bio && <p className="px-4 pb-4 text-sm leading-relaxed text-muted-foreground line-clamp-3">{bio}</p>}
 
             {/* Complete profile snapshot */}
-            <div className="grid grid-cols-2 gap-2 border-y border-white/10 px-4 py-4">
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-4 border-y border-border px-4 py-4">
               {[
                 { get label() { return uiI18n.t('app.followers_78eaabf4'); }, value: <CountUp value={followStats?.followers ?? 0} /> },
                 { get label() { return uiI18n.t('app.following_90eeb100'); }, value: <CountUp value={followStats?.following ?? 0} /> },
@@ -443,51 +431,43 @@ export function ProfileWidgetCard({
                 { get label() { return uiI18n.t('app.comics_read_4581963d'); }, value: <CountUp value={stats?.mangaCount ?? 0} /> },
                 { get label() { return uiI18n.t('app.reputation_5f21606b'); }, value: `${reputationRate}%` },
               ].map((stat) => (
-                <div key={stat.label} className="rounded-xl border border-white/[0.07] bg-white/[0.03] px-2 py-3 text-center">
-                  <div className="text-lg font-black tabular-nums text-foreground">{stat.value}</div>
-                  <div className="mt-1 text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">{stat.label}</div>
+                <div key={stat.label} className="flex min-w-0 flex-col">
+                  <dt className="order-2 mt-1 text-xs leading-4 text-muted-foreground">{stat.label}</dt>
+                  <dd className="order-1 text-xl font-medium tabular-nums leading-7 text-foreground">{stat.value}</dd>
                 </div>
               ))}
-            </div>
+            </dl>
 
             {/* Show more */}
-            <div className="border-t border-white/5 p-2">
+            {!isMobile && <div className="p-2">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={goToProfile}
                 disabled={!handle}
-                className="h-9 w-full text-xs font-semibold"
+                className="h-10 w-full rounded-lg text-sm font-medium"
               >
                 {uiI18n.t('app.view_profile_b98795a2')}
               </Button>
-            </div>
+            </div>}
           </div>
         </div>
       );
 
       return (
       isMobile ? (
-        // Mobile: true centered Dialog — Radix Popover's side-based transform
-        // kept pulling the card to the side, so mobile gets a real modal.
-        // NOTE: must use DialogTrigger asChild (not a wrapping onClick span):
-        // call-site buttons call e.stopPropagation(), which would swallow a
-        // bubbled wrapper click. asChild merges the open handler onto the
-        // child element itself, exactly like PopoverTrigger does.
-        <Dialog open={open} onOpenChange={(o) => { if (!o) void triggerHaptic('tap'); setOpen(o); }}>
-          <DialogTrigger asChild>{trigger}</DialogTrigger>
-          <DialogContent
-            showCloseButton={false}
-            aria-describedby={undefined}
-            className={cn(
-              'w-[min(22rem,calc(100vw-2rem))] max-h-[calc(100dvh-4rem)] overflow-y-auto rounded-3xl border-white/10 bg-background/95 p-0 shadow-2xl backdrop-blur-xl custom-scrollbar',
-              className,
-            )}
-          >
-            <DialogTitle className="sr-only">{uiI18n.t('app.profile_preview_9a067c9b')} {name}</DialogTitle>
-            {cardBody}
-          </DialogContent>
-        </Dialog>
+        <>
+          {trigger}
+          <MobileProfilePeek open={open} onClose={close} label={previewLabel} showCloseButton={false}
+            footer={<div className="peek-actions bg-card px-4 pt-3">
+              <Button variant="ghost" onClick={goToProfile} disabled={!handle}
+                className="h-11 w-full rounded-lg text-sm font-medium">
+                {uiI18n.t('app.view_profile_b98795a2')}
+              </Button>
+            </div>}>
+            <div className={cn('bg-card', className)}>{cardBody}</div>
+          </MobileProfilePeek>
+        </>
       ) : (
         <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger asChild>{trigger}</PopoverTrigger>
@@ -496,7 +476,7 @@ export function ProfileWidgetCard({
             align="center"
             onInteractOutside={keepNestedBadgeWidgetOpen}
             className={cn(
-              'z-[50] w-80 overflow-hidden rounded-3xl border-white/10 bg-background/90 p-0 shadow-2xl backdrop-blur-xl',
+              't-menu-popup z-[50] w-80 overflow-hidden rounded-2xl border-border bg-card p-0 shadow-xl',
               className,
             )}
           >

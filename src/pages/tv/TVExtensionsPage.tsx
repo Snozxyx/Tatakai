@@ -1,3 +1,4 @@
+import { SlidingTabList } from '@/components/ui/sliding-tab-list';
 import { TVLoadMore } from "@/components/tv/TVLoadMore";
 import { CompatibilityExtensionsPanel } from '@/components/extensions/CompatibilityExtensionsPanel';
 import { InstalledCompatibilityExtensions } from '@/components/extensions/InstalledCompatibilityExtensions';
@@ -52,7 +53,7 @@ export default function TVExtensionsPage({
         />
         </div>
       </div>
-      <div className="tv-filter-tabs">
+      <SlidingTabList className="tv-filter-tabs">
         {[
           ["all", "Discover"],
           ["installed", "Installed"],
@@ -72,7 +73,7 @@ export default function TVExtensionsPage({
             {label}
           </button>
         ))}
-      </div>
+      </SlidingTabList>
       {!extensionId && <InstalledCompatibilityExtensions search={query} ecosystem="all" type={tab === 'installed' ? 'all' : tab === 'custom' ? 'manga' : tab} compatibility="all" />}
       <RemoteExtensionsPanel search={query} type={tab === 'installed' ? 'all' : tab} extensionId={extensionId} tv />
       {catalog.isLoading && <p role="status">Loading extensions…</p>}

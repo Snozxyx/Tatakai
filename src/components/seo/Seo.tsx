@@ -17,7 +17,7 @@ import { Helmet } from "react-helmet-async";
 
 const SITE_NAME = "Tatakai";
 const SITE_ORIGIN = "https://tatakai.app";
-const DEFAULT_IMAGE = `${SITE_ORIGIN}/assets/logo/tatakaibanner.png`;
+const DEFAULT_IMAGE = `${SITE_ORIGIN}/assets/logo/crimson-sakura-banner.png`;
 
 export type SeoKind = "website" | "video.other" | "book" | "article" | "profile";
 

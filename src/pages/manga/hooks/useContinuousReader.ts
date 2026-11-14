@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getMangaReadByKey } from "@/core/content/manga-client";
+import { useQueryClient } from '@tanstack/react-query';
+import { mangaReadQuery } from '@/lib/reader/chapterQuery';
+import { fetchReaderChapter } from '@/lib/reader/fetchChapter';
 import type { MangaPage, MappedMangaChapter } from "@/types/manga";
 import {
   pickMangaChapterSource,
@@ -44,6 +46,7 @@ export function useContinuousReader(params: {
   lockedProvider?: string;
 }) {
   const { enabled, mangaId, chapters, entryIndex, preferProvider, lockedProvider } = params;
+  const queryClient = useQueryClient();
 
   const [after, setAfter] = useState<ReaderSegment[]>([]);
   const [before, setBefore] = useState<ReaderSegment[]>([]);
@@ -82,12 +85,11 @@ export function useContinuousReader(params: {
       const source = pickMangaChapterSource(chapter.sources, lockedProvider || preferProvider, Boolean(lockedProvider));
       if (!source) return null;
       const alternatives = sortMangaChapterSources(chapter.sources).filter((s) => !lockedProvider || s.provider === lockedProvider);
-      const resp = await getMangaReadByKey(mangaId, source.chapterKey, {
-        signal: controllerRef.current?.signal,
+      const resp = await fetchReaderChapter(queryClient, mangaReadQuery(mangaId, source.chapterKey, {
         provider: source.provider,
         providerChapterId: source.providerChapterId,
         alternatives,
-      });
+      }), controllerRef.current?.signal || new AbortController().signal);
       const pages = resp?.data?.pages ?? [];
       if (!pages.length) return null;
       const servedProvider = resp?.data?.chapter?.provider || source.provider;
@@ -114,7 +116,7 @@ export function useContinuousReader(params: {
           Boolean(resp?.data?.readMeta?.fallbackUsed) || servedProvider !== source.provider,
       };
     },
-    [chapters, mangaId, preferProvider, lockedProvider],
+    [chapters, mangaId, preferProvider, lockedProvider, queryClient],
   );
 
   const appendNext = useCallback(async () => {

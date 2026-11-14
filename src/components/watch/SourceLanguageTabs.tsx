@@ -7,6 +7,7 @@
  * Validates: Requirements 2.6.1, 2.6.2, 2.6.3
  */
 
+import { SlidingTabList } from '@/components/ui/sliding-tab-list';
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
@@ -51,9 +52,9 @@ export function SourceLanguageTabs({
   if (languageTabs.length < 2) return null;
 
   return (
-    <div className="flex gap-1 flex-wrap mb-2">
+    <SlidingTabList className="flex gap-1 flex-wrap mb-2">
       {/* "All" tab */}
-      <button
+      <button aria-pressed={activeLanguage === "all"}
         onClick={() => onLanguageChange("all")}
         className={cn(
           "px-3 py-1 rounded-full text-xs font-semibold transition-colors",
@@ -67,7 +68,7 @@ export function SourceLanguageTabs({
 
       {/* One tab per distinct language */}
       {languageTabs.map(({ value, label }) => (
-        <button
+        <button aria-pressed={activeLanguage === value}
           key={value}
           onClick={() => onLanguageChange(value)}
           className={cn(
@@ -80,6 +81,6 @@ export function SourceLanguageTabs({
           {label}
         </button>
       ))}
-    </div>
+    </SlidingTabList>
   );
 }

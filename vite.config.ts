@@ -1,14 +1,15 @@
 import { defineConfig, loadEnv } from "vite";
-import react from "@vitejs/plugin-react-swc";
+import react from "@vitejs/plugin-react";
 import { visualizer } from "rollup-plugin-visualizer";
 import path from "path";
 import { createRequire } from 'node:module';
 import { contributorEnvironment } from './scripts/contributor-env.mjs';
-import packageJson from "./package.json";
+import packageJson from "./package.json" with { type: 'json' };
 import { seoPreviewPlugin } from "./scripts/seo/vite-seo-preview.mjs";
 import { packagedAssetsPlugin } from './scripts/packaged-assets.mjs';
+import { assRendererAssetsPlugin } from './scripts/build-ass-renderer.mjs';
 import { mediaCachePlugin } from './scripts/media-cache.mjs';
-import { publicImageUrl } from './src/lib/media/imageUrl';
+import { publicImageUrl } from './src/lib/media/imageUrl.ts';
 
 // Resolve the translation library's own ONNX runtime; KittenTTS uses another version.
 const configRequire = createRequire(import.meta.url);
@@ -38,8 +39,9 @@ export default defineConfig(({ mode }) => {
 
   return {
     envDir,
+    // Contributor builds expose only the checked public allowlist below.
     envPrefix: isContributorMode ? 'TATAKAI_NO_AUTOMATIC_PUBLIC_ENV_' : 'VITE_',
-    plugins: [react({ jsxImportSource: '@/lib/media-jsx' }), mediaCachePlugin(), seoPreviewPlugin(),
+    plugins: [assRendererAssetsPlugin(), react({ jsxImportSource: '@/lib/media-jsx' }), mediaCachePlugin(), seoPreviewPlugin(),
       // CSS backgrounds don't pass through React's JSX factories. Rewrite public
       // raster assets at build time; packaged styles retain their offline URLs.
       ...(!isPackagedBuild ? [{
@@ -59,8 +61,8 @@ export default defineConfig(({ mode }) => {
     // ONNX Runtime model files for the on-device KittenTTS narrator.
     assetsInclude: ['**/*.wasm'],
     worker: { format: 'es' },
-    // Keep console calls for the explicitly enabled production diagnostic viewer.
-    esbuild: mode === 'production' || mode === 'web' ? { drop: ['debugger'] } : {},
+    // The esbuild build minifier uses this to retain diagnostic console calls.
+    ...(mode === 'production' || mode === 'web' ? { esbuild: { drop: ['debugger'] } } : {}),
     base: isElectronBuild ? './' : '/',
     resolve: {
       // Workers explicitly supply the packaged WASM URL; avoid bundling every
@@ -68,10 +70,10 @@ export default defineConfig(({ mode }) => {
       conditions: ['onnxruntime-web-use-extern-wasm', 'module', 'browser', 'development|production'],
       alias: {
         '@translation-ort-assets': translationOrtAssets,
-        "@tatakai/release-parser": path.resolve(__dirname, "./desktop/runtime/torrent/naming/release-parser.cjs"),
-        "@tatakai/candidate-scorer": path.resolve(__dirname, "./src/core/download/candidate-scorer.cjs"),
-        "@tatakai/candidate-evaluator": path.resolve(__dirname, "./src/core/download/candidate-evaluator.cjs"),
-        "@": path.resolve(__dirname, "./src"),
+        "@tatakai/release-parser": path.resolve(import.meta.dirname, "./desktop/runtime/torrent/naming/release-parser.cjs"),
+        "@tatakai/candidate-scorer": path.resolve(import.meta.dirname, "./src/core/download/candidate-scorer.cjs"),
+        "@tatakai/candidate-evaluator": path.resolve(import.meta.dirname, "./src/core/download/candidate-evaluator.cjs"),
+        "@": path.resolve(import.meta.dirname, "./src"),
       },
       // Guarantee a SINGLE physical copy of React and any library that reads
       // React context. Without this, Vite's dep pre-bundler can emit two copies
@@ -91,6 +93,8 @@ export default defineConfig(({ mode }) => {
     // lazily-loaded route (e.g. BecauseYouWatched) can't trigger a mid-session
     // re-optimization that spawns a second React instance under a new `?v=` hash.
     optimizeDeps: {
+      // Scan the app entry, avoiding archived builds and the independent repos.
+      entries: ['index.html'],
       exclude: [
         '@translation-ort-assets/ort-wasm-simd-threaded.mjs?url',
         '@translation-ort-assets/ort-wasm-simd-threaded.wasm?url',
@@ -125,8 +129,8 @@ export default defineConfig(({ mode }) => {
       reportCompressedSize: false,
       // esbuild minify: terser OOM'd its worker on this graph even with a 6GB
       // heap (worker threads don't inherit NODE_OPTIONS), failing every
-      // production build. esbuild is Vite's default minifier, uses a fraction
-      // of the memory, and console/debugger stripping is preserved below.
+      // production build. Keep the tested esbuild minifier; it removes debugger
+      // statements while retaining console calls for the diagnostic viewer.
       minify: 'esbuild',
       // Webapp specific build config
       rollupOptions: {
@@ -169,7 +173,7 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       // Model/browser test caches contain large files and OS-locked journals on Windows.
-      watch: { ignored: ['**/.tmp*/**', '**/.cache/**', '**/android/**/build/**', '**/ios/**/build/**', '**/tatakaiapi/node_modules/**', '**/tatakaiapi/dist/**'] },
+      watch: { ignored: ['**/.tmp*/**', '**/.cache/**', '**/artifacts/**', '**/translate-engine/target/**', '**/resources/bin/**', '**/android/**/build/**', '**/ios/**/build/**', '**/tatakaiapi/node_modules/**', '**/tatakaiapi/dist/**'] },
       host: isContributorMode ? '127.0.0.1' : "::",
       port: isContributorMode ? 8090 : isWebMode ? 8081 : 8090,
       strictPort: isContributorMode,

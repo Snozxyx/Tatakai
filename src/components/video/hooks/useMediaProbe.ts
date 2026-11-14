@@ -144,6 +144,7 @@ export function useMediaProbe({
                 label: formatMediaTrackLabel(t),
                 lang: normalizeTrackLanguage(t.language),
                 default: !!t.default,
+                codec: t.codec,
               }));
 
             const dedupedSubs = dedupeInternalSubtitleTracks(subs);

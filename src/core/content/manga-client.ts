@@ -589,8 +589,8 @@ async function readMangaChapter(
                 pageNumber: p.pageNumber,
                 imageUrl: p.imageUrl,
                 proxiedImageUrl: null,
-                width: null,
-                height: null,
+                width: (p as any).width || null,
+                height: (p as any).height || null,
               })),
               chapter: {
                 chapterKey: matchedKey,
@@ -663,8 +663,8 @@ async function readMangaChapter(
                 pageNumber: Number(p.pageNumber) || 0,
                 imageUrl,
                 proxiedImageUrl: null,
-                width: null,
-                height: null,
+                width: (p as any).width || null,
+                height: (p as any).height || null,
               };
             }),
           );

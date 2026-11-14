@@ -1,4 +1,5 @@
 import { ReaderPresets } from '@/components/settings/ReaderPresets';
+import { ReaderInteractionControls } from '@/components/reader/ReaderInteractionControls';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useEffect, useState } from 'react';
@@ -207,7 +208,8 @@ export function ReaderPanel() {
           <SettingRow title={uiI18n.t('app.continuous_scroll_bf2bf036')} description={uiI18n.t('app.load_the_next_chapter_at_the_end_and_the_previou_1702ff09')} control={<Switch checked={settings.continuousScroll} onCheckedChange={(c) => updateSetting('continuousScroll', c)} />} />
           <SettingRow title={uiI18n.t('app.click_to_turn_pages_73343530')} description={uiI18n.t('app.tap_the_left_right_edge_of_a_page_to_turn_paged__2fa7e749')} control={<Switch checked={settings.clickToTurn} onCheckedChange={(c) => updateSetting('clickToTurn', c)} />} />
           <SettingRow title={uiI18n.t('app.auto_scroll_d4617dac')} description={uiI18n.t('app.automatically_scroll_through_pages_vertical_mode_83e0273f')} control={<Switch checked={settings.autoScroll} onCheckedChange={(c) => updateSetting('autoScroll', c)} />} />
-          {settings.autoScroll && (
+          <ReaderInteractionControls settings={settings} update={updateSetting} />
+          {settings.autoScroll && settings.autoScrollMode === 'creep' && (
             <SettingRow
               title={uiI18n.t('app.auto_scroll_speed_1b63a4e6')}
               control={
@@ -252,21 +254,21 @@ export function ReaderPanel() {
         <div className="flex flex-col">
           <SettingRow
             title={uiI18n.t('app.preloading_f2684504')}
-            description={uiI18n.t('app.how_many_upcoming_pages_to_load_ahead_68fb1ab8')}
+            description={uiI18n.t('readerSmooth.preloadDescription')}
             control={
               <Select value={settings.preloading} onValueChange={(v) => updateSetting('preloading', v as 'none' | 'partial' | 'full')}>
                 <SelectTrigger className="h-9 w-40 rounded-lg text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">{uiI18n.t('app.none_6eef6648')}</SelectItem>
-                  <SelectItem value="partial">{uiI18n.t('app.partial_65de2e2a')}</SelectItem>
-                  <SelectItem value="full">{uiI18n.t('app.full_10b28a8c')}</SelectItem>
+                  <SelectItem value="partial">{uiI18n.t('readerSmooth.partialPreload')}</SelectItem>
+                  <SelectItem value="full">{uiI18n.t('readerSmooth.fullPreload')}</SelectItem>
                 </SelectContent>
               </Select>
             }
           />
           <SettingRow
             title={uiI18n.t('app.loading_method_5a01057f')}
-            description="Native <img> or blob fetch (blob replays image headers)"
+            description={uiI18n.t('readerSmooth.loadingDescription')}
             control={
               <Select value={settings.loadingMethod} onValueChange={(v) => updateSetting('loadingMethod', v as 'native' | 'blob')}>
                 <SelectTrigger className="h-9 w-40 rounded-lg text-sm"><SelectValue /></SelectTrigger>

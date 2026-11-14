@@ -136,6 +136,7 @@ pub fn stroke(session: &mut Session, stroke: Stroke) -> Result<()> {
         }
     } else {
         page.layers.push(Layer {
+            manual: Some(true),
             cleanup: None,
             source_region: None,
             id: id(),

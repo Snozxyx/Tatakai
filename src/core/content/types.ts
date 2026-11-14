@@ -154,6 +154,7 @@ export interface TatakaiMedia {
 export interface MediaTag {
   id: number;
   name: string;
+  description?: string;
   category?: string;
   rank?: number;
   isGeneralSpoiler?: boolean;

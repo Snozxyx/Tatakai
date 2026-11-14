@@ -1,0 +1,377 @@
+/* Refined with unslop by Damir Sokolovsky (@heydamir), CC BY 4.0. */
+.update-bookmark {
+  display: inline-block;
+  flex: none;
+  width: 12px;
+  height: 20px;
+  background: hsl(var(--primary));
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 76%, 0 100%);
+}
+
+.update-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: hsl(var(--muted-foreground));
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+}
+
+/* This surface uses the modal recipe; keep Radix's focus trap and dismissal,
+   while its mounted lifetime is driven by the CSS close duration. */
+html .ui-sheet.release-sheet[data-sheet-side] {
+  gap: 0;
+  overflow: hidden;
+  padding: 0;
+  border-color: hsl(var(--foreground) / 0.1);
+  background: hsl(var(--card));
+  box-shadow: none;
+}
+
+html .ui-sheet.release-sheet[data-state],
+html .ui-backdrop.release-sheet-backdrop[data-state] {
+  animation: none !important;
+}
+
+/* Override the shared Sheet's data-state duration utilities without changing
+   the modal recipe or the motion used by other sheets. */
+html .release-sheet.t-modal[data-state] {
+  transition-duration: var(--modal-open-dur);
+  transition-timing-function: var(--modal-ease);
+}
+
+html .release-sheet.t-modal.is-closing[data-state] {
+  transition-duration: var(--modal-close-dur);
+}
+
+.release-sheet-backdrop.ui-backdrop {
+  opacity: 0;
+  background: rgb(0 0 0 / 0.64);
+  transition: opacity var(--modal-close-dur) var(--modal-ease);
+}
+
+.release-sheet-backdrop.ui-backdrop.is-open {
+  opacity: 1;
+  transition-duration: var(--modal-open-dur);
+}
+
+.release-sheet-handle {
+  display: none;
+}
+
+.release-sheet-header {
+  flex: none;
+  padding: 32px 24px 24px;
+  text-align: left;
+}
+
+.release-sheet-header .update-brand {
+  margin: 0 44px 20px 0;
+}
+
+.release-sheet-title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.release-sheet-header > .release-sheet-description:nth-child(n) {
+  margin-top: 12px;
+  max-width: 32ch;
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.release-sheet-notes {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 24px;
+  border-block: 1px solid hsl(var(--foreground) / 0.08);
+  scrollbar-width: thin;
+}
+
+.release-notes-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.release-notes-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 20px 0;
+  color: hsl(var(--foreground) / 0.88);
+  font-size: 14px;
+  line-height: 24px;
+  overflow-wrap: anywhere;
+}
+
+.release-notes-list li + li {
+  border-top: 1px solid hsl(var(--foreground) / 0.06);
+}
+
+.release-note-number {
+  width: 20px;
+  flex: none;
+  color: hsl(var(--muted-foreground));
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.release-sheet-unavailable {
+  margin: 0;
+  padding: 24px 0;
+  color: hsl(var(--muted-foreground));
+  font-size: 14px;
+  line-height: 24px;
+}
+
+.release-sheet-footer {
+  flex: none;
+  padding: 20px 24px 24px;
+}
+
+.release-sheet .release-continue {
+  width: 100%;
+  height: 48px;
+  justify-content: space-between;
+  padding-inline: 20px;
+  border-radius: 8px;
+  background: hsl(var(--foreground));
+  color: hsl(var(--background));
+}
+
+.release-sheet .release-continue:hover {
+  background: hsl(var(--foreground) / 0.9);
+}
+
+.release-sheet .release-continue svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 1.5;
+}
+
+/* Remain below modal portals so an available download cannot cover a title. */
+.mobile-update-banner {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  justify-content: center;
+  padding: 8px max(16px, var(--sar)) 0 max(16px, var(--sal));
+}
+
+.mobile-update-card {
+  width: 100%;
+  max-width: 672px;
+  padding: 16px;
+  border: 1px solid hsl(var(--foreground) / 0.1);
+  border-radius: 16px;
+  background: hsl(var(--card));
+}
+
+.mobile-update-card:not(.is-open) {
+  pointer-events: none;
+}
+
+.mobile-update-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mobile-update-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.mobile-update-card .update-brand {
+  gap: 8px;
+  font-size: 12px;
+}
+
+.mobile-update-card .update-bookmark {
+  width: 8px;
+  height: 12px;
+}
+
+.mobile-update-version {
+  margin-left: auto;
+  font-family: ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+}
+
+.mobile-update-title {
+  margin: 8px 0 0;
+  color: hsl(var(--foreground));
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 24px;
+  overflow-wrap: anywhere;
+}
+
+.mobile-update-current {
+  margin: 8px 0 0;
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+  line-height: 20px;
+  font-variant-numeric: tabular-nums;
+}
+
+.mobile-update-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.mobile-update-card button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  transition:
+    background-color var(--duration-quick) var(--ease-smooth-out),
+    color var(--duration-quick) var(--ease-smooth-out);
+}
+
+.mobile-update-card button:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+.mobile-update-card button:disabled {
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+.mobile-update-card button svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  stroke-width: 1.5;
+}
+
+.mobile-update-icon-button {
+  width: 44px;
+  flex: none;
+  color: hsl(var(--muted-foreground));
+}
+
+.mobile-update-icon-button:hover {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+}
+
+.mobile-update-action {
+  min-width: 0;
+  flex: 1;
+  padding: 8px 16px;
+  background: hsl(var(--foreground));
+  color: hsl(var(--background));
+}
+
+.mobile-update-action:hover {
+  background: hsl(var(--foreground) / 0.9);
+}
+
+.mobile-update-action-secondary {
+  border: 1px solid hsl(var(--foreground) / 0.1);
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+}
+
+.mobile-update-action-secondary:hover {
+  background: hsl(var(--muted) / 0.8);
+}
+
+.mobile-update-progress {
+  height: 4px;
+  overflow: hidden;
+  margin-top: 16px;
+  border-radius: 4px;
+  background: hsl(var(--foreground) / 0.1);
+}
+
+.mobile-update-progress-fill {
+  width: 100%;
+  height: 100%;
+  background: hsl(var(--primary));
+  transform-origin: left;
+  transition: transform var(--duration-fast) var(--ease-smooth-out);
+}
+
+@media (max-width: 767px) {
+  html .ui-sheet.release-sheet[data-sheet-side="bottom"] {
+    inset: auto calc(16px + var(--sar)) calc(16px + var(--sab)) calc(16px + var(--sal));
+    width: auto;
+    max-width: none;
+    height: auto;
+    max-height: min(720px, calc(100dvh - var(--sat) - var(--sab) - 32px));
+    border: 1px solid hsl(var(--foreground) / 0.1);
+    border-radius: 20px;
+  }
+
+  .release-sheet-handle {
+    display: block;
+    width: 32px;
+    height: 4px;
+    flex: none;
+    margin: 12px auto 0;
+    border-radius: 4px;
+    background: hsl(var(--foreground) / 0.16);
+  }
+
+  .release-sheet-header {
+    padding: 20px 20px 24px;
+  }
+
+  .release-sheet-title {
+    font-size: 24px;
+    line-height: 32px;
+  }
+
+  .release-sheet-notes {
+    padding-inline: 20px;
+  }
+
+  .release-sheet-footer {
+    padding: 16px 20px 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .release-sheet-backdrop.ui-backdrop,
+  .mobile-update-progress-fill { transition: none !important; }
+}
+
+/* Keep the notes readable on short landscape screens. */
+@media (max-height: 500px) {
+  .release-sheet-handle,
+  .release-sheet-header .update-brand { display: none; }
+
+  .release-sheet-header { padding: 16px 20px; }
+  .release-sheet-title { font-size: 20px; line-height: 28px; }
+  .release-sheet-header > .release-sheet-description:nth-child(n) {
+    margin-top: 8px;
+    line-height: 20px;
+  }
+  .release-sheet-footer { padding: 12px 20px; }
+  .release-sheet .release-continue { height: 44px; }
+}
+
+html[data-reduced-motion="true"] :is(.release-sheet-backdrop, .mobile-update-progress-fill),
+.reduce-motion :is(.release-sheet-backdrop, .mobile-update-progress-fill) { transition: none !important; }

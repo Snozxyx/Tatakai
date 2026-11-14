@@ -19,6 +19,8 @@ export interface ReaderKeyboardHandlers {
   zoomOut?: () => void;
   toggleComments?: () => void;
   reload?: () => void;
+  toggleSettings?: () => void;
+  toggleAutoScroll?: () => void;
 }
 
 /**
@@ -60,6 +62,8 @@ export function useReaderKeyboard(
         zoomOut: handlers.zoomOut,
         toggleComments: handlers.toggleComments,
         reload: handlers.reload,
+        toggleSettings: handlers.toggleSettings,
+        toggleAutoScroll: handlers.toggleAutoScroll,
       };
 
       const fn = run[action];

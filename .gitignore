@@ -153,3 +153,6 @@ coverage/
 /agent.md
 /resources/bin/rtx-video/
 **/__pycache__/
+
+# Generated libass workers, WASM and native overlay bundle
+/public/assets/libass/

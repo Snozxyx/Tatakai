@@ -53,6 +53,8 @@ pub struct Page {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Layer {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub manual: Option<bool>,
     pub id: String,
     pub name: String,
     pub visible: bool,

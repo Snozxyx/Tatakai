@@ -157,7 +157,16 @@ fn dispatch(shared: &Shared, cancel: &Arc<AtomicBool>, request: &Request) -> Res
                 .iter()
                 .find(|p| Some(p.id.as_str()) == a["pageId"].as_str())
                 .context("Page not found")?;
-            let image = render::composite(s, page)?;
+            let image = match a["view"].as_str().unwrap_or("translated") {
+                "original" => import::decode(&s.blob(&page.blob)?)?.into_rgba8(),
+                "cleaned" => {
+                    let mut cleaned = page.clone();
+                    cleaned.layers.retain(|l| !matches!(l.content, scene::Content::Text { .. }));
+                    render::composite(s, &cleaned)?
+                }
+                "translated" => render::composite(s, page)?,
+                _ => bail!("Unknown page view"),
+            };
             let image = if let Some(max) = a["maxWidth"].as_u64() {
                 let max = max.clamp(64, 4096) as u32;
                 if image.width() > max {

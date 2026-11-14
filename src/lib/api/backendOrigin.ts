@@ -14,11 +14,11 @@
  * share this resolver.
  */
 
-import { isCapacitor, isElectron } from "@/lib/platform/platform";
+import { isCapacitor } from "@/lib/platform/platform";
 
-/** Vite owns API proxying for browser development, including localhost/tunnels. */
+/** Vite proxies HTTP development renderers, including Electron's localhost window. */
 export function usesDevelopmentApiProxy(): boolean {
-  return import.meta.env.DEV === true && !isCapacitor() && !isElectron()
+  return import.meta.env.DEV === true && !isCapacitor()
     && typeof window !== 'undefined' && /^https?:$/i.test(window.location.protocol);
 }
 

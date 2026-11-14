@@ -1,5 +1,7 @@
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
+import { importAssFonts } from '@/core/player/ass-fonts';
+import { toast } from 'sonner';
 import { useRef } from "react";
 import { Subtitles, Upload, Type } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -60,9 +62,6 @@ export function SubtitleSelector({
   const { settings, updateSetting } = useVideoSettings();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  if (subtitles.length === 0 && customSubtitles.length === 0 && internalSubtitles.length === 0) {
-    return null;
-  }
 
   return (
     <div className="relative">
@@ -188,10 +187,17 @@ export function SubtitleSelector({
             <input
               ref={fileInputRef}
               type="file"
-              accept=".vtt,.srt"
+              accept=".vtt,.srt,.ass,.ssa"
               className="hidden"
               onChange={onCustomUpload}
             />
+          </label>
+          <label className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-1.5 text-xs text-foreground hover:bg-muted md:text-sm">
+            <Type className="size-3" /><span>Add ASS fonts</span>
+            <input type="file" multiple accept=".ttf,.otf,.woff,.woff2" className="hidden" onChange={async event => {
+              const input=event.currentTarget;if(!input.files)return;
+              try { const count=await importAssFonts(input.files);toast.success(count+' subtitle fonts loaded'); } catch(error){toast.error(String(error));}finally{input.value='';}
+            }} />
           </label>
         </div>
       )}

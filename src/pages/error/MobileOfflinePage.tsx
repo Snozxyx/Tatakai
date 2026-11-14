@@ -1,3 +1,4 @@
+import { SlidingTabList } from '@/components/ui/sliding-tab-list';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 /**
@@ -409,7 +410,7 @@ export default function MobileOfflinePage() {
           )}
 
           {(animeGroups.length > 0 || mangaGroups.length > 0) && (
-            <div role="tablist" aria-label={uiI18n.t('app.offline_library_filter_ad5e4a86')} className="mb-5 grid grid-cols-3 rounded-2xl border border-white/10 bg-white/[0.03] p-1">
+            <SlidingTabList role="tablist" aria-label={uiI18n.t('app.offline_library_filter_ad5e4a86')} className="mb-5 grid grid-cols-3 rounded-2xl border border-white/10 bg-white/[0.03] p-1">
               {(['all', 'anime', 'manga'] as const).map((filter) => (
                 <button
                   key={filter}
@@ -422,7 +423,7 @@ export default function MobileOfflinePage() {
                   {uiI18n.t(({"all":"app.all_d87c4480","anime":"app.anime_11a3e059","manga":"app.manga_1c404c69"})[filter])}
                 </button>
               ))}
-            </div>
+            </SlidingTabList>
           )}
 
           {/* Active downloads */}

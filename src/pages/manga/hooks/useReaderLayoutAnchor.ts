@@ -40,12 +40,17 @@ export function useReaderLayoutAnchor(rootRef: RefObject<HTMLDivElement>, identi
     };
     const observer = new ResizeObserver(restore);
     observer.observe(root);
-    root.querySelectorAll<HTMLElement>('[data-reader-entry]').forEach(el => observer.observe(el));
+    const observeChapters = () => {
+      root.querySelectorAll<HTMLElement>('[data-reader-entry], [data-ch]').forEach(el => observer.observe(el));
+    };
+    observeChapters();
+    const mutation = new MutationObserver(observeChapters);
+    mutation.observe(root, { childList: true, subtree: true });
     root.addEventListener('scroll', capture, { passive: true });
     root.addEventListener('load', restore, true);
     const old = root.style.overflowAnchor; root.style.overflowAnchor = 'none';
     return () => {
-      observer.disconnect(); cancelAnimationFrame(frame);
+      observer.disconnect(); mutation.disconnect(); cancelAnimationFrame(frame);
       root.removeEventListener('scroll', capture); root.removeEventListener('load', restore, true);
       root.style.overflowAnchor = old;
     };

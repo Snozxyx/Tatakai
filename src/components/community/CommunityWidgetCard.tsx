@@ -54,7 +54,7 @@ export function CommunityWidgetCard({
         side={side}
         onClick={(e) => e.stopPropagation()}
         className={cn(
-          'w-80 overflow-hidden rounded-xl border border-white/10 bg-[#08090b]/95 p-0 shadow-2xl backdrop-blur-xl',
+          't-menu-popup w-80 overflow-hidden rounded-xl border border-white/10 bg-[#08090b]/95 p-0 shadow-2xl backdrop-blur-xl',
           className
         )}
       >

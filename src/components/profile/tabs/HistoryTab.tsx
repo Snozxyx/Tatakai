@@ -1,3 +1,4 @@
+import { SlidingTabList } from '@/components/ui/sliding-tab-list';
 import { isTV } from "@/core/tv/device";
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
@@ -75,12 +76,12 @@ export function HistoryTab({ history, mangaHistoryEntries, novelHistoryEntries =
 
           {hasAnyHistory && (
             <div className="flex items-center gap-3 flex-wrap w-full sm:w-auto">
-              <div className="flex items-center gap-1 rounded-full bg-white/[0.03] border border-white/[0.08] p-1">
+              <SlidingTabList className="flex items-center gap-1 rounded-full bg-white/[0.03] border border-white/[0.08] p-1">
                 {FILTERS.map((f) => {
                   const Icon = f.icon;
                   const active = filter === f.key;
                   return (
-                    <button
+                    <button aria-pressed={filter === f.key}
                       key={f.key}
                       type="button"
                       onClick={() => setFilter(f.key)}
@@ -96,7 +97,7 @@ export function HistoryTab({ history, mangaHistoryEntries, novelHistoryEntries =
                     </button>
                   );
                 })}
-              </div>
+              </SlidingTabList>
               <div className="relative flex-1 min-w-[8rem] sm:w-56 sm:flex-none">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60" />
                 <Input

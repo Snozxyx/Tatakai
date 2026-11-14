@@ -1,3 +1,4 @@
+import { SlidingTabList } from '@/components/ui/sliding-tab-list';
 import { CosmeticAvatar, CosmeticName } from '@/components/profile/IdentityCosmetics';
 import { supabase } from '@/integrations/supabase/client';
 import uiI18n from '@/lib/uiI18n';
@@ -432,13 +433,13 @@ export function Comments({ entityType, entityId, episodeId, entityName, sourceKi
 
             {/* Filter (anime-info page only — mixes global + per-episode) */}
             {isAnime && !epId && comments.length > 0 && (
-              <div className="mb-4 flex items-center gap-1.5">
+              <SlidingTabList className="mb-4 flex items-center gap-1.5">
                 {([
                   { key: 'new', get label() { return uiI18n.t('app.new_6403f2b7'); }, icon: Sparkles },
                   { key: 'global', get label() { return uiI18n.t('app.global_5f1184f7'); }, icon: Globe2 },
                   { key: 'episodes', get label() { return uiI18n.t('app.episodes_49d641ba'); }, icon: Film },
                 ] as const).map(({ key, label, icon: Icon }) => (
-                  <button
+                  <button aria-pressed={filter === key}
                     key={key}
                     onClick={() => setFilter(key)}
                     className={cn(
@@ -452,7 +453,7 @@ export function Comments({ entityType, entityId, episodeId, entityName, sourceKi
                     {label}
                   </button>
                 ))}
-              </div>
+              </SlidingTabList>
             )}
 
             {/* Comments list */}

@@ -1,3 +1,4 @@
+import { SlidingTabList } from '@/components/ui/sliding-tab-list';
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Copy, Plus, RotateCcw, Save, Trash2, X, LayoutDashboard, Palette, PanelsTopLeft, PanelLeft, ArrowRight, Image as ImageIcon, Sparkles } from 'lucide-react';
@@ -120,9 +121,9 @@ export function CustomizationEditor() {
   const editPage = (path: string) => { const query = new URLSearchParams({ customize: '1', customizationTarget: target, customizationTheme: editTheme }); const route = target === 'tv' && !isTV() ? `/customize-tv/${path === '/' ? 'home' : path.slice(1)}` : path; closeSettings(); navigate(`${route}?${query}`); };
   return <AppearanceDraftProvider resetKey={draftReset}><div className="space-y-8" data-customization-editor>
     <SettingsSection title={t('customization.title')} description={t('customization.simpleDescription')}>
-      <div className="customization-tabs" role="tablist" aria-label={t('customization.title')}>
+      <SlidingTabList className="customization-tabs" role="tablist" aria-label={t('customization.title')}>
         {([['home', LayoutDashboard], ['spotlight', Sparkles], ['theme', Palette], ['background', ImageIcon], ['cards', PanelsTopLeft], ['sidebar', PanelLeft]] as const).map(([value, Icon]) => <button key={value} type="button" role="tab" aria-selected={tab === value} aria-controls={`customization-${value}`} onClick={() => setTab(value)}><Icon className="size-4" />{t(`customization.tabs.${value}`)}</button>)}
-      </div>
+      </SlidingTabList>
       <div className="customization-control-grid">
         {(tab === 'cards' || tab === 'background' || tab === 'spotlight' || tab === 'theme' && selected.mode === 'system') && <label className="customization-field"><span>{t('customization.editTheme')}</span><ThemedSelect value={editTheme} onChange={event => { setEditTheme(event.target.value); setDesignId(''); if (tab === 'theme' && selected.mode === 'manual') changeSelection({ theme: event.target.value }); }}>{availableThemes.map(id => <option key={id} value={id}>{availableInfo[id]?.name || id}</option>)}</ThemedSelect></label>}
         {tab !== 'sidebar' && tab !== 'background' && <label className="customization-field"><span>{t('customization.previewTarget')}</span><ThemedSelect value={target} onChange={event => { setTarget(event.target.value as LayoutTarget); setDesignId(''); }}>{(['desktop', 'mobile', 'tv'] as const).map(value => <option key={value} value={value}>{t(`customization.${value}`)}</option>)}</ThemedSelect></label>}

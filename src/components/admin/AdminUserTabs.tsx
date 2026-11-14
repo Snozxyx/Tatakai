@@ -1,3 +1,4 @@
+import { SlidingTabList } from '@/components/ui/sliding-tab-list';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState } from 'react';
@@ -347,9 +348,9 @@ export function AdminUserTabs({ userId, userName }: { userId: string; userName: 
   const [tab, setTab] = useState<UserTab>('comments');
   return (
     <div>
-      <div className="mb-4 flex flex-wrap gap-1 rounded-xl border border-white/5 bg-white/[0.02] p-1">
+      <SlidingTabList className="mb-4 flex flex-wrap gap-1 rounded-xl border border-white/5 bg-white/[0.02] p-1">
         {TABS.map(({ id, label, icon: Icon }) => (
-          <button
+          <button aria-pressed={tab === id}
             key={id}
             onClick={() => setTab(id)}
             className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${tab === id ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:bg-white/[0.04] hover:text-foreground'}`}
@@ -357,7 +358,7 @@ export function AdminUserTabs({ userId, userName }: { userId: string; userName: 
             <Icon className="h-4 w-4" /> {label}
           </button>
         ))}
-      </div>
+      </SlidingTabList>
       {tab === 'comments' && <CommentsTab userId={userId} userName={userName} />}
       {tab === 'posts' && <PostsTab userId={userId} userName={userName} />}
       {tab === 'tierlists' && <TierlistsTab userId={userId} userName={userName} />}

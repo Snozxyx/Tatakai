@@ -1,3 +1,12 @@
+import { rememberPornhwaEdition } from '@/lib/reader/pornhwaEdition';
+import { ReaderChapterWindow } from '@/components/reader/ReaderChapterWindow';
+import { useReaderVisiblePages } from './hooks/useReaderVisiblePages';
+import { useReaderInteractions } from './hooks/useReaderInteractions';
+import { useReaderAutoScroll } from './hooks/useReaderAutoScroll';
+import { READER_CONTROL_SELECTOR, ReaderTapTracker } from '@/lib/reader/interactions';
+import { mangaReadQuery, mangaResourceScope } from '@/lib/reader/chapterQuery';
+import { fetchReaderChapter } from '@/lib/reader/fetchChapter';
+import { usePrepareReaderChapter } from './hooks/usePrepareReaderChapter';
 import { readerEntryPages, readerEntryReady } from '@/lib/reader/loading';
 import { useReaderLayoutAnchor } from './hooks/useReaderLayoutAnchor';
 import { usePublishSocialActivity } from '@/hooks/community/useSocialActivity';
@@ -5,7 +14,7 @@ import { useReadingViewTracker } from '@/hooks/user/useReadingViews';
 import { ReaderPageRail } from '@/components/reader/ReaderPageRail';
 import { MangaSourceStatus } from '@/components/manga/MangaSourceStatus';
 import { readingViewId } from '@/lib/readingViewId';
-import { readerImageStyles, readerPageIsEager } from "@/components/reader/readerImageStyles";
+import { readerImageStyles, readerPageIsEager, readerPageLoadPriority, effectiveReaderPreloading } from "@/components/reader/readerImageStyles";
 import { useReaderFullscreen } from "@/hooks/media/useReaderFullscreen";
 import { ReaderToolButton as ToolBtn, ReaderTopbar, ReaderToolbar, ReaderSettingsSheet, ReaderNavigationSheet } from "@/components/reader/ReaderChrome";
 import { ThemedSelect } from '@/components/ui/themed-select';
@@ -42,7 +51,7 @@ import {
   Unlock,
 } from "lucide-react";
 import { getMangaReadByKey } from "@/core/content/manga-client";
-import { useIsNativeApp, useIsMobileApp } from "@/hooks/ui/useIsNativeApp";
+import { useIsNativeApp } from "@/hooks/ui/useIsNativeApp";
 import { useReaderSettings, DEFAULT_READER_SETTINGS } from "@/hooks/media/useReaderSettings";
 import { setUpscaleScope, clearUpscaleScope, subscribeUpscaleProgress, subscribeEngineReadiness, type UpscaleProgress } from "@/lib/reader/upscaleProgress";
 import { getProfileKnobs } from "@/lib/memoryProfile";
@@ -64,6 +73,7 @@ import { ReaderPanel } from "@/components/settings/panels/ReaderPanel";
 import { Comments } from "@/components/comments/Comments";
 import type { MangaChapterSource, MangaPage, MappedMangaChapter } from "@/types/manga";
 import { ReaderImage } from "@/components/reader/ReaderImage";
+import { ReaderPagedImages } from "@/components/reader/ReaderPagedImages";
 import { fetchViaMobileProxy, isMobileProxyUrl } from "@/core/extensions/mobile/mobileProxy";
 import { getEffectiveMemoryProfile } from "@/lib/mobile/dataSaver";
 import { KeepAwake } from "@capacitor-community/keep-awake";
@@ -121,7 +131,6 @@ export default function MangaReaderPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const isNative = useIsNativeApp();
-  const isMobileApp = useIsMobileApp();
   const reducedMotion = useMotionPreference();
   const compactReader = useIsMobile();
   const { user } = useAuth();
@@ -200,16 +209,7 @@ export default function MangaReaderPage() {
   const [reloadNonce, setReloadNonce] = useState(0);
 
   const { data, isLoading, error, isFetching } = useQuery({
-    queryKey: [
-      "manga-read", mangaId, chapterKey, provider, providerChapterId, alternativesKey, reloadNonce,
-    ],
-    queryFn: ({ signal }) =>
-      getMangaReadByKey(mangaId || "", chapterKey, {
-        signal,
-        provider: provider || undefined,
-        providerChapterId: providerChapterId || undefined,
-        alternatives: alternatives.length ? alternatives : undefined,
-      }),
+    ...mangaReadQuery(mangaId || '', chapterKey, { provider, providerChapterId, alternatives, reloadNonce }),
     enabled: Boolean(mangaId && chapterKey),
     // Pages are immutable — keep them cached so back/forward is instant and a
     // remount doesn't refetch on mobile radio. One retry for flaky mobile nets.
@@ -255,6 +255,7 @@ export default function MangaReaderPage() {
   const pages = data?.data?.pages ?? [];
   const total = pages.length;
   const resolvedProvider = data?.data?.chapter?.provider || provider;
+  useEffect(() => { if(mangaId && resolvedProvider) rememberPornhwaEdition(mangaId,resolvedProvider); },[mangaId,resolvedProvider]);
 
   const { data: detailResp } = useMangaDetail(mangaId);
   const detail = detailResp?.detail;
@@ -537,7 +538,7 @@ export default function MangaReaderPage() {
   // and lets pages appear as they load — no blocking overlay between chapters.
   const allowLoadScreenRef = useRef(true);
   const handlePageLoaded = useCallback((pageNumber: number) => {
-    if (chapterLoadDoneRef.current || !allowLoadScreenRef.current) return;
+    if (chapterLoadDoneRef.current) return;
     const set = loadedSetRef.current;
     if (set.has(pageNumber)) return;
     set.add(pageNumber);
@@ -593,104 +594,46 @@ export default function MangaReaderPage() {
     return () => { cancelled = true; };
   }, [nativeEngine]);
 
-  // Prefetch the adjacent chapters' page lists as soon as the current chapter
-  // is readable, so Prev/Next navigation hits the cache and advances instantly
-  // (no loading screen). Both directions are fetched — previous and next — and
-  // failures are never cached (throw => prefetch stores nothing), so a dead
-  // source can't poison the navigation. Uses the same query-key shape as the
-  // main read query (including the alternatives fingerprint) so it becomes a
-  // cache hit when navToChapter fires. Toggled by the reader setting
-  // "Prefetch prev/next chapters". Continuous scroll streams its own chapters
-  // so it doesn't need this.
+  const nextPreparationSource = nextChapter
+    ? pickMangaChapterSource(sortMangaChapterSources(nextChapter.sources).filter(source => !lockedProvider || source.provider === lockedProvider), resolvedProvider)
+    : null;
+  const nextPreparationAlternatives = nextChapter
+    ? sortMangaChapterSources(nextChapter.sources).filter(source => !lockedProvider || source.provider === lockedProvider) : [];
+  const nextPreparationQuery = nextPreparationSource
+    ? mangaReadQuery(mangaId || '', nextPreparationSource.chapterKey, {
+        provider: nextPreparationSource.provider, providerChapterId: nextPreparationSource.providerChapterId,
+        alternatives: nextPreparationAlternatives,
+      }) : null;
+  usePrepareReaderChapter({
+    identity: nextPreparationQuery ? JSON.stringify(nextPreparationQuery.queryKey) : '',
+    ready: chapterLoadDoneRef.current && Boolean(total), settings,
+    load: async signal => {
+      if (!nextPreparationQuery) return null;
+      const response = await fetchReaderChapter(queryClient, nextPreparationQuery, signal);
+      return { pages: response.data.pages, scope: mangaResourceScope(mangaId || '', response.data.chapter) };
+    },
+  });
+  // Previous-chapter metadata remains useful for manual backwards navigation.
   useEffect(() => {
-    if (continuous) return;
-    if (!settings.prefetchAdjacentChapters || !chapterLoadDoneRef.current) return;
-    if (!data?.data?.pages?.length) return;
-    const owned: Array<{ key: readonly unknown[]; controller: AbortController }> = [];
-    const prefetchChapter = (chapter: MappedMangaChapter | null) => {
-      if (!chapter) return;
-      const ordered = sortMangaChapterSources(chapter.sources).filter((s) => !lockedProvider || s.provider === lockedProvider);
-      const src = pickMangaChapterSource(ordered, resolvedProvider);
-      if (!src) return;
-      const altKey = ordered
-        .map((s) => `${s.provider}::${s.chapterKey}::${s.providerChapterId || ""}`)
-        .sort()
-        .join('|');
-      void queryClient.prefetchQuery({
-        queryKey: ["manga-read", mangaId, src.chapterKey, src.provider, src.providerChapterId || "", altKey, 0],
-        queryFn: async ({ signal, queryKey }) => {
-          const controller = new AbortController();
-          owned.push({ key: queryKey, controller });
-          const res = await getMangaReadByKey(mangaId || "", src.chapterKey, {
-            signal: AbortSignal.any([signal, controller.signal]),
-            provider: src.provider,
-            providerChapterId: src.providerChapterId || undefined,
-            alternatives: ordered.length ? ordered : undefined,
-          });
-          // Don't poison the cache: empty reads throw so prefetch stores
-          // nothing and the real navigation fetches fresh with its fallbacks.
-          if (!res?.data?.pages?.length) throw new Error(uiI18n.t('app.prefetch_no_pages_yet_e6de1d7b'));
-          return res;
-        },
-        staleTime: 10 * 60 * 1000,
-      }).catch(() => {});
-    };
-    prefetchChapter(prevChapter);
-    prefetchChapter(nextChapter);
-    return () => {
-      for (const task of owned) {
-        const query = queryClient.getQueryCache().find({ queryKey: task.key, exact: true });
-        if (!query || query.getObserversCount() === 0) task.controller.abort();
-      }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [continuous, settings.prefetchAdjacentChapters, data?.data?.pages?.length, chapterKey, mangaId, resolvedProvider, lockedProvider, queryClient, prevChapter, nextChapter, loadedCount]);
+    if (!settings.prefetchAdjacentChapters || !chapterLoadDoneRef.current || !prevChapter) return;
+    const sources = sortMangaChapterSources(prevChapter.sources).filter(source => !lockedProvider || source.provider === lockedProvider);
+    const source = pickMangaChapterSource(sources, resolvedProvider);
+    if (!source) return;
+    const controller = new AbortController();
+    void fetchReaderChapter(queryClient, mangaReadQuery(mangaId || '', source.chapterKey, {
+      provider: source.provider, providerChapterId: source.providerChapterId, alternatives: sources,
+    }), controller.signal).catch(() => undefined);
+    return () => controller.abort();
+  }, [settings.prefetchAdjacentChapters, prevChapter, resolvedProvider, lockedProvider, mangaId, queryClient, loadedCount]);
 
-  // Vertical mode (single chapter): track the top-most visible page for progress.
-  useEffect(() => {
-    if (continuous || settings.readingMode !== "vertical" || total === 0) return;
-    const root = scrollRef.current;
-    if (!root) return;
-    const els = Array.from(root.querySelectorAll<HTMLElement>("[data-page]"));
-    if (!els.length) return;
-    const io = new IntersectionObserver((entries) => {
-      const vis = entries
-        .filter((e) => e.isIntersecting)
-        .map((e) => Number(e.target.getAttribute("data-page")))
-        .filter((n) => Number.isFinite(n))
-        .sort((a, b) => a - b);
-      if (vis.length && !restoringPage.current) setPageIndex(Math.max(0, vis[0] - 1));
-    }, { root, threshold: 0.4 });
-    els.forEach((el) => io.observe(el));
-    return () => io.disconnect();
-  }, [continuous, settings.readingMode, total, chapterKey, restoringPage]);
-
-  // Continuous mode: track the top-most visible page across ALL streamed chapters
-  // (each page's chapter is read from its `[data-ch]` wrapper) to drive the active
-  // chapter (header/nav) and the in-chapter page index (progress).
-  useEffect(() => {
-    if (!continuous || total === 0) return;
-    const root = scrollRef.current;
-    if (!root) return;
-    const els = Array.from(root.querySelectorAll<HTMLElement>("[data-page]"));
-    if (!els.length) return;
-    const io = new IntersectionObserver((entries) => {
-      const vis = entries
-        .filter((e) => e.isIntersecting)
-        .map((e) => ({
-          ch: Number((e.target as HTMLElement).closest("[data-ch]")?.getAttribute("data-ch")),
-          pg: Number(e.target.getAttribute("data-page")),
-          top: e.boundingClientRect.top,
-        }))
-        .filter((v) => Number.isFinite(v.ch) && Number.isFinite(v.pg))
-        .sort((a, b) => a.top - b.top);
-      if (!vis.length || restoringPage.current) return;
-      setActiveIndex(vis[0].ch);
-      setPageIndex(Math.max(0, vis[0].pg - 1));
-    }, { root, threshold: 0.2 });
-    els.forEach((el) => io.observe(el));
-    return () => io.disconnect();
-  }, [continuous, total, chapterKey, before.length, after.length, restoringPage]);
+  useReaderVisiblePages(scrollRef, settings.readingMode === 'vertical' && total > 0,
+    [mangaId, chapterKey, provider, providerChapterId, continuous].join('|'), element => {
+      if (restoringPage.current) return;
+      const chapterIndex = Number(element.closest('[data-ch]')?.getAttribute('data-ch'));
+      const index = Number(element.dataset.page);
+      if (continuous && Number.isFinite(chapterIndex)) setActiveIndex(chapterIndex);
+      if (Number.isFinite(index)) setPageIndex(Math.max(0, index - 1));
+    });
 
   // Bottom sentinel → load the next chapter as it comes into range.
   useEffect(() => {
@@ -700,7 +643,7 @@ export default function MangaReaderPage() {
     if (!root || !el) return;
     const io = new IntersectionObserver((entries) => {
       if (entries.some((e) => e.isIntersecting)) void appendNext();
-    }, { root, rootMargin: "400px 0px" });
+    }, { root, rootMargin: `${root.clientHeight * 2}px 0px` });
     io.observe(el);
     return () => io.disconnect();
   }, [continuous, total, hasNext, appendNext, before.length, after.length]);
@@ -885,6 +828,7 @@ export default function MangaReaderPage() {
   settingsRef.current = settings;
   const updateRef = useRef(updateSetting);
   updateRef.current = updateSetting;
+  const doubleTapTracker = useRef(new ReaderTapTracker());
   const activePointersRef = useRef(new Map<number, { x: number; y: number }>());
   const lastReaderTapRef = useRef<{ at: number; x: number; y: number } | null>(null);
   useReaderLayoutAnchor(scrollRef, [mangaId, chapterKey, provider, providerChapterId].join('|'), [settings.zoom, settings.widthPercent, settings.maxWidthPx, settings.gap, settings.sizing, scrollH].join('|'), settings.readingMode === 'vertical');
@@ -893,6 +837,7 @@ export default function MangaReaderPage() {
   const handleReaderPointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.pointerType !== 'touch') return;
     if (settingsRef.current.autoScroll) updateRef.current('autoScroll', false);
+    doubleTapTracker.current.down(event.pointerId, event.clientX, event.clientY);
     activePointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
     if (activePointersRef.current.size > 1) lastReaderTapRef.current = null;
   }, []);
@@ -902,7 +847,8 @@ export default function MangaReaderPage() {
     const wasPinching = pinchGesture.current;
     activePointersRef.current.delete(event.pointerId);
 
-    if (wasPinching) return;
+    const isTap = doubleTapTracker.current.up(event.pointerId, event.clientX, event.clientY);
+    if (wasPinching || !isTap || (event.target as Element)?.closest(READER_CONTROL_SELECTOR)) { lastReaderTapRef.current = null; return; }
     const previous = lastReaderTapRef.current;
     const current = { at: Date.now(), x: event.clientX, y: event.clientY };
     lastReaderTapRef.current = current;
@@ -921,6 +867,7 @@ export default function MangaReaderPage() {
 
   const handleReaderPointerCancel = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     activePointersRef.current.delete(event.pointerId);
+    doubleTapTracker.current.remove(event.pointerId);
   }, []);
 
   const goNextPage = useCallback(() => {
@@ -968,21 +915,12 @@ export default function MangaReaderPage() {
     scrollRef.current?.scrollBy({ top: direction * 120, behavior: reducedMotion ? 'instant' : 'smooth' });
   };
 
-  // Auto-scroll (vertical mode): advance the scroll position continuously.
-  useEffect(() => {
-    if (!settings.autoScroll || settings.readingMode !== "vertical" || total === 0 || showSettings || showReaderNavigator || showCommentsDrawer || readerToolsOpen) return;
-    const el = scrollRef.current;
-    if (!el) return;
-    let frame = 0;
-    let previous = 0;
-    const advance = (time: number) => {
-      if (previous && !document.hidden) el.scrollBy({ top: settings.autoScrollSpeed * Math.min(32, time - previous) / 16, behavior: 'auto' });
-      previous = time;
-      frame = requestAnimationFrame(advance);
-    };
-    frame = requestAnimationFrame(advance);
-    return () => cancelAnimationFrame(frame);
-  }, [settings.autoScroll, settings.autoScrollSpeed, settings.readingMode, total, showSettings, showReaderNavigator, showCommentsDrawer, readerToolsOpen]);
+  const readerPaused = showSettings || showReaderNavigator || showCommentsDrawer || readerToolsOpen || !total;
+  useReaderAutoScroll(scrollRef, settings, readerPaused);
+  useReaderInteractions({ rootRef: scrollRef, settings, paused: readerPaused, reducedMotion,
+    onSettings: () => setShowSettings(true), onNextPage: goNextPage,
+    onStopAutoScroll: () => updateRef.current('autoScroll', false),
+  });
   const toggleDirection = useCallback(
     () => updateSetting("readingMode", settings.readingMode === "vertical" ? "paged" : "vertical"),
     [settings.readingMode, updateSetting],
@@ -1026,6 +964,7 @@ export default function MangaReaderPage() {
     nextPage: goNextPage, prevPage: goPrevPage,
     scrollDown: () => scrollReader(1), scrollUp: () => scrollReader(-1),
     nextChapter: () => navToChapter(nextChapter), prevChapter: () => navToChapter(prevChapter),
+    toggleSettings: () => setShowSettings(value => !value), toggleAutoScroll: () => updateSetting('autoScroll', !settings.autoScroll),
     toggleFullscreen, toggleDirection, zoomIn, zoomOut, toggleComments: isFs ? undefined : toggleComments, reload,
   }, !showSettings && !showReaderNavigator && !showCommentsDrawer && !readerToolsOpen);
   useTVReader({ next: goNextPage, previous: goPrevPage, controls: () => setShowSettings(true) });
@@ -1040,55 +979,19 @@ export default function MangaReaderPage() {
 
   const { vertical: widthStyle, paged: pagedStyle } = readerImageStyles(settings, isCoarsePointer || isNative);
 
-  const eagerFor = (idx: number) => !chapterLoadDoneRef.current && settings.chapterLoadScreen
-    ? idx === clampReaderPageIndex(pageParam, total)
-    : readerPageIsEager(settings, idx, pageIndex, isCoarsePointer || isNative);
+  // The entry overlay controls when reading begins, not which pages may load.
+  const eagerFor = (idx: number) => readerPageIsEager(settings, idx, pageIndex, isCoarsePointer || isNative);
+  const priorityFor = (idx: number) => readerPageLoadPriority(idx,
+    chapterLoadDoneRef.current ? pageIndex : clampReaderPageIndex(pageParam, total));
 
   // Streamed (non-entry) chapters can't use the entry's page-index window; eager-load
   // their first couple of pages so the boundary is seamless, lazy-load the rest.
   const segEager = (idx: number) => {
-    const effectivePreloading =
-      settings.preloading === "partial"
-        ? getProfileKnobs(getEffectiveMemoryProfile()).readerPreload
-        : settings.preloading;
+    const effectivePreloading = effectiveReaderPreloading(settings);
     // Mobile: eager-load a deeper boundary window for seamless chapter joins.
     const boundary = effectivePreloading === "none" ? 1 : isCoarsePointer || isNative ? 3 : 2;
-    return settings.loadingStrategy === "eager" || effectivePreloading === "full" || idx < boundary;
+    return effectivePreloading === "full" || idx < boundary;
   };
-
-  // Warm the native blob cache for pages just ahead of the viewport so the
-  // image element finds them already resolved (parallel, bounded, best-effort).
-  // This is what makes mobile vertical scroll feel instant after the first pages.
-  useEffect(() => {
-    const effectivePreloading = settings.preloading === 'partial'
-      ? getProfileKnobs(getEffectiveMemoryProfile()).readerPreload : settings.preloading;
-    if (!pages.length || !chapterLoadDoneRef.current || effectivePreloading === 'none') return;
-    const controller = new AbortController();
-    let cancelled = false;
-    const t = window.setTimeout(() => {
-      if (cancelled) return;
-      void import("@/core/extensions/mobile/mobileProxy").then(async (m) => {
-        if (cancelled || typeof m.prefetchMobileReaderImages !== "function") return;
-        const windowSize = effectivePreloading === "full" ? pages.length : isMobileApp ? 6 : 3;
-        let ahead = pages.slice(pageIndex + 1, pageIndex + 1 + windowSize);
-        if (isMobileApp) {
-          const [{ loadMobileConfig }, { buildMobileCloudImageProxyUrl }] = await Promise.all([
-            import('@/hooks/ui/useMobileConfig'), import('@/core/player/mobile-cloud-proxy'),
-          ]);
-          if (cancelled) return;
-          // Cloud pages use the browser image cache; don't also download them
-          // through the local blob bridge while warming upcoming pages.
-          if (loadMobileConfig().cloudProxyByDefault) ahead = ahead.filter(page => !buildMobileCloudImageProxyUrl(page));
-        }
-        m.prefetchMobileReaderImages(ahead, { concurrency: 3, signal: controller.signal });
-      }).catch(() => {});
-    }, 250);
-    return () => {
-      cancelled = true;
-      controller.abort();
-      window.clearTimeout(t);
-    };
-  }, [pages, pageIndex, chapterKey, isMobileApp, settings.preloading, loadedCount]);
 
   // Reveal the requested page/spread as soon as it settles, including a retry state.
   // Distant pages and optional enhancement never block entry.
@@ -1222,7 +1125,7 @@ export default function MangaReaderPage() {
           // At high zoom the narrow sentinel can be outside the horizontal
           // viewport. Vertical proximity must still advance the chapter.
           const root = event.currentTarget;
-          if (continuous && hasNext && root.scrollHeight - root.scrollTop - root.clientHeight < 400) {
+          if (continuous && hasNext && root.scrollHeight - root.scrollTop - root.clientHeight < root.clientHeight * 2) {
             void appendNext();
           }
         }}
@@ -1233,6 +1136,7 @@ export default function MangaReaderPage() {
           else updateRef.current('zoom', settingsRef.current.zoom > 115 ? 100 : 175);
           void triggerHaptic('light');
         }}
+        onPointerMove={event => doubleTapTracker.current.move(event.pointerId, event.clientX, event.clientY)}
         onPointerDown={handleReaderPointerDown}
         onPointerUp={handleReaderPointerUp}
         onPointerCancel={handleReaderPointerCancel}
@@ -1294,9 +1198,11 @@ export default function MangaReaderPage() {
                       />
                     ) : null}
                     <div className="flex flex-col items-center" style={{ gap: `${settings.gap}px` }}>
+                      <ReaderChapterWindow pageStyle={widthStyle} active={Math.abs(seg.index - navIndex) <= 1} geometry={[settings.zoom, settings.widthPercent, settings.gap].join('|')}>
                       {seg.pages.map((page, idx) => (
-                        <ReaderImage key={readerPageRenderKey(seg.key, page)} page={page} mode={settings.loadingMethod} upscaling={settings} style={widthStyle} eager={segEager(idx)} onRetryChapter={() => retryStreamedChapter(seg)} />
+                        <ReaderImage key={readerPageRenderKey(seg.key, page)} page={page} mode={settings.loadingMethod} upscaling={settings} resourceScope={mangaResourceScope(mangaId || '', { chapterKey: seg.key, provider: seg.provider, providerChapterId: seg.providerChapterId || '' })} style={widthStyle} eager={segEager(idx)} priority={readerPageLoadPriority(idx, navIndex === seg.index ? pageIndex : 0)} onRetryChapter={() => retryStreamedChapter(seg)} />
                       ))}
+                      </ReaderChapterWindow>
                     </div>
                   </div>
                 ))
@@ -1317,9 +1223,11 @@ export default function MangaReaderPage() {
                 />
               ) : null}
               <div className="flex flex-col items-center" style={{ gap: `${settings.gap}px` }}>
+                <ReaderChapterWindow pageStyle={widthStyle} active={!continuous || Math.abs(currentIndex - navIndex) <= 1} geometry={[settings.zoom, settings.widthPercent, settings.gap].join('|')}>
                 {pages.map((page, idx) => (
-                  <ReaderImage key={readerPageRenderKey(chapterKey, page)} page={page} mode={settings.loadingMethod} upscaling={settings} upscaleScope={entryChapterScope} style={widthStyle} eager={eagerFor(idx)} onRetryChapter={retryChapterPages} onPageLoaded={handlePageLoaded} />
+                  <ReaderImage key={readerPageRenderKey(chapterKey, page)} page={page} mode={settings.loadingMethod} upscaling={settings} upscaleScope={entryChapterScope} resourceScope={mangaResourceScope(mangaId || '', data.data.chapter)} style={widthStyle} eager={eagerFor(idx)} priority={priorityFor(idx)} onRetryChapter={retryChapterPages} onPageLoaded={handlePageLoaded} />
                 ))}
+                </ReaderChapterWindow>
               </div>
             </div>
             {continuous
@@ -1337,9 +1245,11 @@ export default function MangaReaderPage() {
                       />
                     ) : null}
                     <div className="flex flex-col items-center" style={{ gap: `${settings.gap}px` }}>
+                      <ReaderChapterWindow pageStyle={widthStyle} active={Math.abs(seg.index - navIndex) <= 1} geometry={[settings.zoom, settings.widthPercent, settings.gap].join('|')}>
                       {seg.pages.map((page, idx) => (
-                        <ReaderImage key={readerPageRenderKey(seg.key, page)} page={page} mode={settings.loadingMethod} upscaling={settings} style={widthStyle} eager={segEager(idx)} onRetryChapter={() => retryStreamedChapter(seg)} />
+                        <ReaderImage key={readerPageRenderKey(seg.key, page)} page={page} mode={settings.loadingMethod} upscaling={settings} resourceScope={mangaResourceScope(mangaId || '', { chapterKey: seg.key, provider: seg.provider, providerChapterId: seg.providerChapterId || '' })} style={widthStyle} eager={segEager(idx)} priority={readerPageLoadPriority(idx, navIndex === seg.index ? pageIndex : 0)} onRetryChapter={() => retryStreamedChapter(seg)} />
                       ))}
+                      </ReaderChapterWindow>
                     </div>
                   </div>
                 ))
@@ -1360,17 +1270,14 @@ export default function MangaReaderPage() {
 
         {total > 0 && settings.readingMode === "paged" ? (
           <div className="relative flex min-h-full items-center justify-center">
-            {settings.doublePage && pages[pageIndex + 1] ? (
-              <div
-                className="flex items-center justify-center gap-1"
-                style={{ flexDirection: settings.readingDirection === "rtl" ? "row-reverse" : "row" }}
-              >
-                <ReaderImage key={readerPageRenderKey(chapterKey, pages[pageIndex])} page={pages[pageIndex]} mode={settings.loadingMethod} upscaling={settings} upscaleScope={entryChapterScope} style={pagedStyle} eager onRetryChapter={retryChapterPages} onPageLoaded={handlePageLoaded} />
-                <ReaderImage key={readerPageRenderKey(chapterKey, pages[pageIndex + 1])} page={pages[pageIndex + 1]} mode={settings.loadingMethod} upscaling={settings} upscaleScope={entryChapterScope} style={pagedStyle} eager onRetryChapter={retryChapterPages} onPageLoaded={handlePageLoaded} />
-              </div>
-            ) : pages[pageIndex] ? (
-              <ReaderImage key={readerPageRenderKey(chapterKey, pages[pageIndex])} page={pages[pageIndex]} mode={settings.loadingMethod} upscaling={settings} upscaleScope={entryChapterScope} style={pagedStyle} eager onRetryChapter={retryChapterPages} onPageLoaded={handlePageLoaded} />
-            ) : null}
+            <div className="flex items-center justify-center gap-1" style={{
+              display: settings.doublePage ? 'flex' : 'contents',
+              flexDirection: settings.readingDirection === 'rtl' ? 'row-reverse' : 'row',
+            }}>
+              <ReaderPagedImages pages={pages} resourceScope={mangaResourceScope(mangaId || '', data.data.chapter)} chapterScope={chapterKey} pageIndex={pageIndex} settings={settings}
+                style={pagedStyle} touchOrNative={isCoarsePointer || isNative} upscaleScope={entryChapterScope}
+                onRetryChapter={retryChapterPages} onPageLoaded={handlePageLoaded} />
+            </div>
             {settings.clickToTurn ? (
               <>
                 <button

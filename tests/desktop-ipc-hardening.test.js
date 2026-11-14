@@ -69,6 +69,25 @@ describe('IPC sender guard (DESK-2)', () => {
         expect(isTrustedFrameUrl('https://evil.example/', { ...opts, isDev: true })).toBe(false);
     });
 
+    it('trusts only the selected local dev port after a port conflict', () => {
+        const previous = process.env.ELECTRON_DEV_SERVER_URL;
+        try {
+            process.env.ELECTRON_DEV_SERVER_URL = 'http://127.0.0.1:8091';
+            const dev = { ...opts, isDev: true };
+            expect(isTrustedFrameUrl('http://127.0.0.1:8091/reader', dev)).toBe(true);
+            expect(isTrustedFrameUrl('http://localhost:8091/', dev)).toBe(true);
+            expect(isTrustedFrameUrl('http://localhost:8090/', dev)).toBe(false);
+            expect(isTrustedFrameUrl('http://localhost.evil.example:8091/', dev)).toBe(false);
+            expect(isTrustedFrameUrl('http://user:password@localhost:8091/', dev)).toBe(false);
+            expect(isTrustedFrameUrl('http://127.0.0.1:8091/', opts)).toBe(false);
+            process.env.ELECTRON_DEV_SERVER_URL = 'https://evil.example';
+            expect(isTrustedFrameUrl('https://evil.example/', dev)).toBe(false);
+        } finally {
+            if (previous === undefined) delete process.env.ELECTRON_DEV_SERVER_URL;
+            else process.env.ELECTRON_DEV_SERVER_URL = previous;
+        }
+    });
+
     it('denies non-web schemes and malformed URLs', () => {
         for (const url of ['', 'javascript:alert(1)', 'data:text/html,<h1>x', 'about:blank', 'tatakai-media://c/x']) {
             expect(isTrustedFrameUrl(url, opts)).toBe(false);

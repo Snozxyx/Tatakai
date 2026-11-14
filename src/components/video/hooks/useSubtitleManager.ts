@@ -436,6 +436,7 @@ export function useSubtitleManager({
         lang: prepared.lang,
         url: url,
         label: file.name,
+        assContent: prepared.assContent,
       };
 
       setCustomSubtitles((prev) => {

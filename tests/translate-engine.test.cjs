@@ -16,6 +16,53 @@ const binary =
   process.env.TATAKAI_TRANSLATE_TEST_BINARY ||
   engineOptions({isPackaged:false,getPath:()=>os.tmpdir()}).binary;
 
+test('manual mode: painted cleanup, original preview, protected regions and selected text replacement', {
+  timeout:90000,skip:!fs.existsSync(binary)&&'Build the native engine first',
+},async()=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'tatakai-manual-'));
+  const engine=new TranslationEngine({binary,root:path.join(root,'projects')});
+  const sharp=require('sharp'); let pageId; const requests=[];
+  const server=http.createServer((req,res)=>{let bytes='';req.on('data',c=>bytes+=c);req.on('end',()=>{
+    const body=JSON.parse(bytes);requests.push(body);
+    const system=body.messages[0].content;
+    const reply=system.includes('detect and transcribe') ? {coordinateSpace:'pixels',regions:[{x:8,y:8,width:20,height:20,text:'Detected'}]} : system.includes('transcribe manga') ? ['Re-read source'] : ['New translation'];
+    res.setHeader('Content-Type','application/json');res.end(JSON.stringify({choices:[{message:{content:JSON.stringify(reply)}}]}));
+  });});
+  const process=async args=>{const done=completion(engine);await engine.request('process',args);return await done;};
+  try{
+    await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+    let current=await engine.request('create',{name:'Manual',credit:{name:'Fixture',userId:null}});
+    const raw=Buffer.alloc(64*64*4,255);raw.fill(0,(16*64+16)*4,(16*64+16)*4+3);raw.fill(42,(3*64+3)*4,(3*64+3)*4+3);
+    const source=path.join(root,'page.png');await sharp(raw,{raw:{width:64,height:64,channels:4}}).png().toFile(source);
+    current=await engine.request('import',{paths:[source],revision:current.revision});pageId=current.pages[0].id;
+    const original=await engine.request('render',{pageId,view:'original'});
+    assert.equal((await process({revision:current.revision,pageIds:[pageId],stages:['cleanup'],cleanupMask:[{diameter:8,points:[[16,16]]}]})).event,'complete');
+    current=(await engine.request('status')).project;
+    assert.equal(current.pages[0].layers[0].cleanup.edited,true);
+    const rendered=await engine.request('render',{pageId});const pixels=await sharp(Buffer.from(rendered.png,'base64')).raw().toBuffer();
+    assert.deepEqual([...pixels.subarray((16*64+16)*4,(16*64+16)*4+4)],[255,255,255,255]);
+    assert.deepEqual([...pixels.subarray((3*64+3)*4,(3*64+3)*4+4)],[42,42,42,255]);
+    assert.equal((await engine.request('render',{pageId,view:'original'})).png,original.png);
+    current=await engine.request('undo',{revision:current.revision});assert.equal(current.pages[0].layers.length,0);
+    current=await engine.request('redo',{revision:current.revision});
+    const layer={id:'manual-region',manual:true,name:'Manual region',kind:'text',x:8,y:8,width:20,height:20,sourceRegion:{x:8,y:8,width:20,height:20},rotation:0,opacity:1,visible:true,source:'Authored source',translation:'Authored translation',sourceEdited:true,translationEdited:true,style:{family:'sans-serif',size:8,weight:400,italic:false,fill:[0,0,0,255],stroke:[255,255,255,255],strokeWidth:0,align:'center',direction:'auto',autoFit:true}};
+    current.pages[0].layers.push(layer,{...layer,id:'other-region',x:40,y:40,sourceRegion:{x:40,y:40,width:20,height:20}});
+    current=await engine.request('commit',{project:current,revision:current.revision});
+    await engine.request('saveSettings',{settings:{providers:[{id:'fixture',name:'Fixture',kind:'openai-compatible',endpoint:`http://127.0.0.1:${server.address().port}/v1`,model:'fixture'}],translationProvider:'fixture',visionProvider:'fixture'}});
+    assert.equal((await process({revision:current.revision,pageIds:[pageId],stages:['detect']})).event,'complete');
+    current=(await engine.request('status')).project;
+    assert.equal(current.pages[0].layers.filter(l=>l.kind==='text').length,2,'re-detection must preserve and avoid duplicating manually drawn regions');
+    assert.equal((await process({revision:current.revision,pageIds:[pageId],layerIds:['manual-region'],stages:['ocr','translate'],overwriteSelected:true})).event,'complete');
+    current=(await engine.request('status')).project;const result=current.pages[0].layers.find(l=>l.id==='manual-region');
+    assert.equal(result.source,'Re-read source');assert.equal(result.translation,'New translation');
+    assert.equal(current.pages[0].layers.find(l=>l.id==='other-region').translation,'Authored translation');
+    assert.equal((await engine.request('render',{pageId,view:'cleaned'})).png,rendered.png);
+    const revision=current.revision;
+    assert.equal((await process({revision,pageIds:[pageId],stages:['translate'],overwriteSelected:true})).event,'error');
+    assert.equal((await engine.request('status')).project.revision,revision);
+  }finally{const exited=engine.child?new Promise(resolve=>engine.child.once('exit',resolve)):Promise.resolve();engine.stop();await exited;await new Promise(resolve=>server.close(resolve));fs.rmSync(root,{recursive:true,force:true});}
+});
+
 test("development engine location is independent of Electron entry directory", () => {
   for (const appPath of [path.resolve('.'), path.resolve('desktop')]) {
     const options=engineOptions({isPackaged:false,getAppPath:()=>appPath,getPath:()=>os.tmpdir()});

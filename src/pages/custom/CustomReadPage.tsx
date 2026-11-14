@@ -1,4 +1,9 @@
+import { useReaderVisiblePages } from '@/pages/manga/hooks/useReaderVisiblePages';
 import { useReaderResume } from "@/pages/manga/hooks/useReaderResume";
+import { usePrepareReaderChapter } from '@/pages/manga/hooks/usePrepareReaderChapter';
+import { fetchReaderChapter } from '@/lib/reader/fetchChapter';
+import { useQueryClient } from '@tanstack/react-query';
+import { customReadQuery } from '@/hooks/api/useCustomSource';
 import { useUiTranslation } from "@/hooks/ui/useUiTranslation";
 /**
  * Custom-source read page (`kind: 'read'`).
@@ -53,6 +58,8 @@ export default function CustomReadPage() {
   const { data, isLoading, isError, error, refetch, isFetching } =
     useCustomRead(namespace, sourceId, id, chapterId);
   const { settings } = useReaderSettings();
+  const queryClient = useQueryClient();
+  const [readyChapter, setReadyChapter] = useState('');
 
   const pages = data?.pages ?? [];
   const total = pages.length;
@@ -84,6 +91,15 @@ export default function CustomReadPage() {
       ? entries[currentIdx + 1]
       : null;
   const currentLabel = currentIdx >= 0 ? entries[currentIdx].label : chapterId;
+  usePrepareReaderChapter({
+    identity: next ? JSON.stringify([namespace, sourceId, id, next.id]) : '',
+    ready: readyChapter === chapterIdentity && total > 0, settings,
+    load: async signal => {
+      if (!next) return null;
+      const prepared = await fetchReaderChapter(queryClient, customReadQuery(namespace!, sourceId!, id!, next.id), signal);
+      return { pages: prepared.pages, scope: JSON.stringify([namespace, sourceId, id, next.id]) };
+    },
+  });
   const libraryTitle =
     info && namespace && sourceId && id
       ? {
@@ -172,30 +188,11 @@ export default function CustomReadPage() {
     onPage: restorePage,
     pageSelector: "[data-extension-page]",
   });
-  useEffect(() => {
-    if (settings.readingMode !== "vertical" || !total) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (restoring.current) return;
-        const visible = entries
-          .filter((e) => e.isIntersecting)
-          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
-        const index = Number(
-          (visible[0]?.target as HTMLElement | undefined)?.dataset.extensionPage
-        );
-        if (Number.isFinite(index)) setPageIndex(index);
-      },
-      {
-        root: scrollContainer.current,
-        rootMargin: "-10% 0px -55% 0px",
-        threshold: 0,
-      }
-    );
-    pageContainer.current
-      ?.querySelectorAll("[data-extension-page]")
-      .forEach((node) => observer.observe(node));
-    return () => observer.disconnect();
-  }, [chapterIdentity, total, settings.readingMode, restoring]);
+  useReaderVisiblePages(scrollContainer, settings.readingMode === 'vertical' && total > 0, chapterIdentity, element => {
+    if (restoring.current) return;
+    const index = Number(element.closest('[data-extension-page]')?.getAttribute('data-extension-page'));
+    if (Number.isFinite(index)) setPageIndex(index);
+  });
   useEffect(() => {
     if (restoredPage.current !== null) {
       if (pageIndex !== restoredPage.current) return;
@@ -261,6 +258,8 @@ export default function CustomReadPage() {
       scrollContainer={scrollContainer}
       entries={entries}
       chapterId={chapterId || ""}
+      resourceScope={chapterIdentity}
+      onEntryReady={setReadyChapter}
       onChapter={goEntry}
       prev={prev?.id}
       next={next?.id}

@@ -42,6 +42,10 @@ import { useActiveCues } from "./hooks/useActiveCues";
 import { useSubtitleTranslation } from "./hooks/useSubtitleTranslation";
 import { useSubtitlePretranslation } from "./hooks/useSubtitlePretranslation";
 import { useStableVolume, useSleepTimer, useAmbientMode } from "./hooks/usePlayerEnhancements";
+import type { ExternalSubtitle } from './VideoPlayer.types';
+import { useAssSubtitle } from './hooks/useAssSubtitle';
+import { AssSubtitleOverlay } from './overlays/AssSubtitleOverlay';
+import { prepareSubtitle } from '@/core/player/subtitle-service';
 import { SubtitleOverlay } from "./overlays/SubtitleOverlay";
 import { Anime4KRenderer, type Anime4KMode } from "@/lib/video/anime4k/Anime4KRenderer";
 import { useRtxVideo } from './hooks/useRtxVideo';
@@ -503,6 +507,9 @@ function BuiltinVideoPlayer({
     setSubtitleBlobs,
   });
 
+  const [internalAssSubtitle, setInternalAssSubtitle] = useState<ExternalSubtitle | null>(null);
+  const assSubtitle = useAssSubtitle(currentSubtitle.startsWith('internal:') ? (internalAssSubtitle ? [internalAssSubtitle] : []) : allRenderedSubtitles, currentSubtitle.startsWith('internal:') ? 'auto' : currentSubtitle, headers?.Referer, headers?.['User-Agent']);
+
   // Custom subtitle rendering: tracks run in "hidden" mode, we paint the active
   // cues ourselves so color/opacity/outline/position are styleable and sit above
   // the Anime4K canvas. Re-scan when the source or subtitle selection changes.
@@ -564,7 +571,7 @@ function BuiltinVideoPlayer({
       toast.loading(t('player.internalSubLoading', { label: sub.label || sub.lang }), { id: "internal-sub-load" });
 
       try {
-        const result = await runtime.extractSubtitle(probeUrl, trackId);
+        const result = await runtime.extractSubtitle(probeUrl, trackId, { format: /^(ass|ssa)$/i.test(sub.codec || '') ? 'ass' : 'vtt', fonts: true });
         toast.dismiss("internal-sub-load");
 
         if (!result?.success || !result?.url) {
@@ -594,7 +601,9 @@ function BuiltinVideoPlayer({
           if (!res.ok) throw new Error(uiI18n.t('app.http_i18n_value_0_63a176f2', { value0: res.status }));
           text = await res.text();
         }
-        const blob = new Blob([text], { type: "text/vtt" });
+        const prepared = prepareSubtitle(text);
+        setInternalAssSubtitle(prepared.assContent ? {url: subtitleUrl, lang: sub.lang, assContent: prepared.assContent, fonts: result.fonts || []} : null);
+        const blob = new Blob([prepared.vtt], { type: "text/vtt" });
         const blobUrl = URL.createObjectURL(blob);
 
         // Remove any existing internal subtitle tracks
@@ -1743,8 +1752,9 @@ function BuiltinVideoPlayer({
 
       {/* Custom subtitle overlay — paints active cues above the Anime4K canvas,
           fully styled from user settings (color/opacity/outline/position). */}
+      <AssSubtitleOverlay videoRef={videoRef} subtitle={assSubtitle} offset={settings.subtitleOffset} mediaKey={currentSource?.url} />
       <SubtitleOverlay
-        lines={displayCueLines}
+        lines={assSubtitle ? [] : displayCueLines}
         settings={settings}
         controlsVisible={getShowControls()}
       />

@@ -25,6 +25,12 @@
 }
 
 @media (max-width: 767px) {
+  [data-reader-chrome] {
+    /* Leave a visible gap above gesture navigation, including WebViews that
+       report a zero inset while Android still draws the gesture handle. */
+    --reader-tools-bottom: calc(24px + max(24px, var(--sab)));
+  }
+
   [data-reader-chrome] .reader-topbar {
     gap: 8px;
     padding-left: max(12px, var(--sal));
@@ -34,19 +40,23 @@
   [data-reader-chrome] .reader-tools {
     top: auto;
     right: auto;
-    bottom: calc(12px + var(--sab));
+    bottom: var(--reader-tools-bottom);
     left: calc(50% + (var(--sal) - var(--sar)) / 2);
     transform: translateX(-50%);
     flex-direction: row;
     gap: 8px;
     max-width: calc(100vw - 24px - var(--sal) - var(--sar));
+    max-height: calc(100dvh - var(--sat) - var(--reader-tools-bottom) - 24px);
     padding: 8px;
     border-radius: 16px;
     backdrop-filter: none;
   }
 
   [data-reader-chrome="true"] [data-reader-scroll] {
-    padding-bottom: calc(6rem + var(--sab));
-    scroll-padding-bottom: calc(6rem + var(--sab));
+    padding-bottom: calc(5rem + var(--reader-tools-bottom));
+    scroll-padding-bottom: calc(5rem + var(--reader-tools-bottom));
   }
 }
+[data-reader-cursor-hidden="true"],
+[data-reader-cursor-hidden="true"] [data-image-original] { cursor: none; }
+[data-reader-cursor-hidden="true"] :is(button, a, input, textarea, select, [role="button"], [role="slider"]) { cursor: revert; }

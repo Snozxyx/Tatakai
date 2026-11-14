@@ -645,7 +645,7 @@ function createHomeServer({ store, adapters, logger }) {
       return sendJson(res, upstream.status, { success: false, error: 'subtitle_unavailable' }, extraHeaders);
     }
     const raw = await upstream.text();
-    const vtt = normalizeSubtitleToVtt(raw);
+    const vtt = /\[Script Info\]|\[V4\+? Styles\]/i.test(raw) ? raw : normalizeSubtitleToVtt(raw);
     res.writeHead(200, {
       'Content-Type': 'text/vtt; charset=utf-8',
       'Content-Length': Buffer.byteLength(vtt),
@@ -1015,7 +1015,7 @@ function createHomeServer({ store, adapters, logger }) {
           text = fs.readFileSync(subtitlePath, 'utf8');
         }
 
-        const vtt = normalizeSubtitleToVtt(text);
+        const vtt = /\[Script Info\]|\[V4\+? Styles\]/i.test(text) ? text : normalizeSubtitleToVtt(text);
         res.writeHead(200, {
           'Content-Type': 'text/vtt; charset=utf-8',
           'Content-Length': Buffer.byteLength(vtt),

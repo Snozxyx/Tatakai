@@ -1,3 +1,4 @@
+import { SlidingTabList } from '@/components/ui/sliding-tab-list';
 import { messageNotificationConversation } from '@/lib/messageNotifications';
 import { useChatDock } from '@/contexts/ChatDockContext';
 import { NotificationSoundToggle } from '@/components/community/NotificationSoundToggle';
@@ -109,9 +110,9 @@ export default function NotificationsPage() {
 
           <NotificationSoundToggle />
           <div className="flex items-center gap-2">
-            <div className="flex rounded-lg bg-muted/40 p-1">
+            <SlidingTabList className="flex rounded-lg bg-muted/40 p-1">
               {(['all', 'unread'] as const).map((f) => (
-                <button
+                <button aria-pressed={filter === f}
                   key={f}
                   onClick={() => setFilter(f)}
                   className={cn(
@@ -122,7 +123,7 @@ export default function NotificationsPage() {
                   {uiI18n.t(({"all":"app.all_d87c4480","unread":"app.unread_1b9aebd6"})[f])}
                 </button>
               ))}
-            </div>
+            </SlidingTabList>
             <Button
               variant="ghost"
               size="sm"

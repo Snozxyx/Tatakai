@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { clampFrame } from "@/core/translate/geometry";
 import type {
   TextLayer,
   TranslationLayer,
@@ -101,6 +102,7 @@ export function LayerInspector({
                         });
                     }}
                   />
+                  <label className="flex items-center gap-2 text-xs text-muted-foreground"><ThemedCheckbox type="checkbox" checked={text.sourceEdited} onChange={e=>onChange(text.id,{sourceEdited:e.target.checked})}/>Protect source text from automatic OCR</label>
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <Label htmlFor="translation-text">Translation</Label>
@@ -118,7 +120,22 @@ export function LayerInspector({
                         });
                     }}
                   />
+                  <label className="flex items-center gap-2 text-xs text-muted-foreground"><ThemedCheckbox type="checkbox" checked={text.translationEdited} onChange={e=>onChange(text.id,{translationEdited:e.target.checked})}/>Protect translation from automatic changes</label>
                 </div>
+                <details className="border-t border-border">
+                  <summary>OCR & cleanup region</summary>
+                  <p className="mb-2 text-xs text-muted-foreground">This area on the original page is read by OCR and cleaned. The translated text frame can be positioned separately.</p>
+                  <Button size="sm" variant="outline" className="mb-3" onClick={()=>onChange(text.id,{sourceRegion:clampFrame(text,page.width,page.height)})}>Use current text frame as source region</Button>
+                  <div className="grid grid-cols-2 gap-3 pb-3">
+                    {(["x","y","width","height"] as const).map(key=>{
+                      const region=text.sourceRegion || {x:text.x,y:text.y,width:text.width,height:text.height};
+                      return <div key={key} className="flex flex-col gap-1"><Label htmlFor={`source-${key}`}>{key}</Label><Input id={`source-${key}`} className="editor-input" type="number" min={key==="width" || key==="height" ? 1 : 0} key={`${text.id}-${key}-${region[key]}`} defaultValue={region[key]} onBlur={e=>{
+                        const value=Number(e.target.value), next={...region,[key]:value};
+                        if(Number.isFinite(value) && next.x>=0 && next.y>=0 && next.width>=1 && next.height>=1 && next.x+next.width<=page.width && next.y+next.height<=page.height) onChange(text.id,{sourceRegion:next});
+                      }}/></div>;
+                    })}
+                  </div>
+                </details>
                 <details className="border-t border-border">
                   <summary>Typography</summary>
                   <div className="flex flex-col gap-3 pb-2">

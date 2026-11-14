@@ -1,4 +1,8 @@
-import { readerImageStyles, readerPageIsEager } from "./readerImageStyles";
+import { useReaderInteractions } from '@/pages/manga/hooks/useReaderInteractions';
+import { useReaderAutoScroll } from '@/pages/manga/hooks/useReaderAutoScroll';
+import { useReaderLayoutAnchor } from '@/pages/manga/hooks/useReaderLayoutAnchor';
+import { useReaderPinchZoom } from '@/pages/manga/hooks/useReaderPinchZoom';
+import { readerImageStyles, readerPageIsEager, readerPageLoadPriority } from "./readerImageStyles";
 import { ReaderPageRail } from './ReaderPageRail';
 import { useMotionPreference } from '@/hooks/ui/useMotionPreference';
 import {
@@ -37,6 +41,7 @@ import {
   ReaderNavigationSheet,
 } from "./ReaderChrome";
 import { ReaderImage, type ReaderPageImage } from "./ReaderImage";
+import { ReaderPagedImages } from './ReaderPagedImages';
 import { useReaderSettings } from "@/hooks/media/useReaderSettings";
 import { useReaderFullscreen } from "@/hooks/media/useReaderFullscreen";
 import { useReaderKeyboard } from "@/pages/manga/hooks/useReaderKeyboard";
@@ -75,6 +80,8 @@ interface CustomReaderViewProps {
   scrollContainer: RefObject<HTMLDivElement>;
   entries: { id: string; label: string; number?: number }[];
   chapterId: string;
+  resourceScope?: string;
+  onEntryReady?: (scope: string) => void;
   onChapter(id: string): void;
   prev?: string;
   next?: string;
@@ -126,6 +133,14 @@ export function CustomReaderView(props: CustomReaderViewProps) {
     total
   );
   const chromeVisible = !isFs || !settings.hideChromeInFullscreen;
+  const resourceScope = props.resourceScope || JSON.stringify([namespace, chapterId]);
+  const settledPages = useRef(new Set<number>());
+  useLayoutEffect(() => { settledPages.current.clear(); }, [resourceScope]);
+  const pageLoaded = (number: number) => {
+    settledPages.current.add(number);
+    const entry = pages.slice(pageIndex, pageIndex + (settings.readingMode === 'paged' && settings.doublePage ? 2 : 1));
+    if (entry.length && entry.every(page => settledPages.current.has(page.pageNumber))) props.onEntryReady?.(resourceScope);
+  };
   useEffect(() => {
     setChapterPage(0);
   }, [chapterSearch, chapterId]);
@@ -213,6 +228,8 @@ export function CustomReaderView(props: CustomReaderViewProps) {
         ? () => setShowComments((value) => !value)
         : undefined,
       reload: props.onReload,
+      toggleSettings: () => setShowSettings(value => !value),
+      toggleAutoScroll: () => updateSetting('autoScroll', !settings.autoScroll),
     },
     !showSettings && !showNavigator && !showComments
   );
@@ -233,37 +250,15 @@ export function CustomReaderView(props: CustomReaderViewProps) {
     root.addEventListener("wheel", wheel, { passive: false });
     return () => root.removeEventListener("wheel", wheel);
   }, [settings.zoomWithWheel, settings.zoom, updateSetting, scrollContainer]);
-  useEffect(() => {
-    const element = scrollContainer.current;
-    if (
-      !element ||
-      settings.readingMode !== "vertical" ||
-      !settings.autoScroll ||
-      showSettings ||
-      showNavigator ||
-      showComments
-    )
-      return;
-    let frame = 0,
-      last = 0;
-    const tick = (now: number) => {
-      if (last)
-        element.scrollTop +=
-          Math.min(now - last, 50) * settings.autoScrollSpeed * 0.018;
-      last = now;
-      frame = requestAnimationFrame(tick);
-    };
-    frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
-  }, [
-    settings.readingMode,
-    settings.autoScroll,
-    settings.autoScrollSpeed,
-    showSettings,
-    showNavigator,
-    showComments,
-    scrollContainer,
-  ]);
+  const readerPaused = showSettings || showNavigator || showComments || props.loading || !total;
+  useReaderAutoScroll(scrollContainer, settings, readerPaused);
+  useReaderInteractions({ rootRef: scrollContainer, settings, paused: readerPaused, reducedMotion,
+    onSettings: () => setShowSettings(true), onNextPage: nextPage,
+    onStopAutoScroll: () => updateSetting('autoScroll', false),
+  });
+  useReaderPinchZoom(scrollContainer, settings.zoom, zoom => updateSetting('zoom', zoom), settings.zoomWithWheel);
+  useReaderLayoutAnchor(scrollContainer, resourceScope,
+    [settings.zoom, settings.widthPercent, settings.maxWidthPx, settings.gap, settings.sizing, scrollHeight].join('|'), settings.readingMode === 'vertical');
   useEffect(() => {
     if (!settings.keepScreenAwake) return;
     if (isCapacitor()) {
@@ -597,9 +592,12 @@ export function CustomReaderView(props: CustomReaderViewProps) {
               >
                 <ReaderImage
                   page={page}
+                  resourceScope={resourceScope}
+                  onPageLoaded={pageLoaded}
                   mode={settings.loadingMethod} upscaling={settings}
                   style={imageStyle}
                   eager={eagerFor(index)}
+                  priority={readerPageLoadPriority(index, pageIndex)}
                   onRetryChapter={props.onReload}
                 />
               </div>
@@ -629,18 +627,9 @@ export function CustomReaderView(props: CustomReaderViewProps) {
               settings.readingDirection === "rtl" && "flex-row-reverse"
             )}
           >
-            {pages
-              .slice(pageIndex, pageIndex + (settings.doublePage ? 2 : 1))
-              .map((page) => (
-                <ReaderImage
-                  key={readerPageRenderKey(chapterId, page)}
-                  page={page}
-                  mode={settings.loadingMethod} upscaling={settings}
-                  style={imageStyle}
-                  eager
-                  onRetryChapter={props.onReload}
-                />
-              ))}
+            <ReaderPagedImages pages={pages} resourceScope={resourceScope} onPageLoaded={pageLoaded} chapterScope={chapterId} pageIndex={pageIndex} settings={settings}
+              style={imageStyle} touchOrNative={isNative() || window.matchMedia('(pointer: coarse)').matches}
+              onRetryChapter={props.onReload} />
             {settings.clickToTurn && (
               <>
                 <button

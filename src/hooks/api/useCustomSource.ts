@@ -147,14 +147,24 @@ export function useCustomWatch(namespace?: string, sourceId?: string, id?: strin
   });
 }
 
-export function useCustomRead(namespace?: string, sourceId?: string, id?: string, chapterId?: string) {
-  return useQuery<CustomReadData>({
-    queryKey: ["custom", namespace, sourceId, "read", id, chapterId],
-    queryFn: ({ signal }) => extensionDeadline(() => fetchCustomRead(namespace!, sourceId!, id!, chapterId!), 45000, signal),
-    retry: false,
-    enabled: Boolean(namespace && sourceId && id && chapterId),
+export function customReadQuery(namespace: string, sourceId: string, id: string, chapterId: string) {
+  return {
+    queryKey: ["custom", namespace, sourceId, "read", id, chapterId] as const,
+    queryFn: async ({ signal }: { signal: AbortSignal }) => {
+      const data = await extensionDeadline(() => fetchCustomRead(namespace, sourceId, id, chapterId), 45000, signal);
+      if (!data.pages?.length) throw new Error('This chapter has no readable pages');
+      return data;
+    },
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
+  };
+}
+
+export function useCustomRead(namespace?: string, sourceId?: string, id?: string, chapterId?: string) {
+  return useQuery<CustomReadData>({
+    ...customReadQuery(namespace!, sourceId!, id!, chapterId!),
+    retry: false,
+    enabled: Boolean(namespace && sourceId && id && chapterId),
     refetchOnWindowFocus: false,
   });
 }

@@ -47,19 +47,26 @@ module.exports = function registerMediaHandlers(ipcMain, app, logger) {
         return service.probe(url);
     });
 
-    ipcMain.handle('media:extract-subtitle', async (_event, url, trackIndex) => {
+    ipcMain.handle('media:extract-subtitle', async (_event, url, trackIndex, options = {}) => {
         const check = checkMediaInput(url);
         if (!check.ok) return { success: false, error: check.error };
-        const fileName = `sub-${Date.now()}-${trackIndex}.vtt`;
+        if (!Number.isInteger(trackIndex) || trackIndex < 0) return {success:false,error:'invalid subtitle track'};
+        const format = options.format === 'ass' ? 'ass' : 'vtt';
+        const fileName = `sub-${Date.now()}-${trackIndex}.${format}`;
         const outputPath = path.join(tempDir, fileName);
-        const result = await service.extractSubtitle(url, trackIndex, outputPath);
+        const result = await service.extractSubtitle(url, trackIndex, outputPath, format);
         
         if (result.success) {
             try {
                 const content = await fs.promises.readFile(outputPath, 'utf8');
-                const dataUrl = `data:text/vtt;charset=utf-8,${encodeURIComponent(content)}`;
+                const dataUrl = `data:${format === 'ass' ? 'text/x-ssa' : 'text/vtt'};charset=utf-8,${encodeURIComponent(content)}`;
                 await fs.promises.unlink(outputPath).catch(() => {});
-                return { success: true, url: dataUrl };
+                let fonts=[];
+                if(format === 'ass' && options.fonts) {
+                    const folder=await fs.promises.mkdtemp(path.join(tempDir,'ass-fonts-'));
+                    try { fonts=await service.extractFontAttachments(url,folder); } finally { await fs.promises.rmdir(folder).catch(()=>{}); }
+                }
+                return { success: true, url: dataUrl, fonts };
             } catch {
                 const normalizedPath = outputPath.replace(/\\/g, '/');
                 return { success: true, url: `tatakai-media:///${normalizedPath}` };
@@ -142,7 +149,7 @@ module.exports = function registerMediaHandlers(ipcMain, app, logger) {
     }
 
     // Read local subtitles and return as data URL for browser-safe loading.
-    ipcMain.handle('media:read-local-file', async (_event, filePath) => {
+    ipcMain.handle('media:read-local-file', async (_event, filePath, originalAss = false) => {
         try {
             const normalizedPath = fileUrlToPath(filePath);
 
@@ -163,9 +170,12 @@ module.exports = function registerMediaHandlers(ipcMain, app, logger) {
                 return { success: false, error: 'File not found' };
             }
 
-            const { normalizeSubtitleToVtt } = await import('../../src/core/player/subtitle-core.js');
-            const content = normalizeSubtitleToVtt(await fs.promises.readFile(normalizedPath, 'utf8'));
-            if (!content || !content.includes('-->')) return { success: false, error: 'Subtitle contains no readable cues' };
+            const { normalizeSubtitleToVtt, isAssScript } = await import('../../src/core/player/subtitle-core.js');
+            const raw = await fs.promises.readFile(normalizedPath, 'utf8');
+            // Original reads remain restricted to recognized ASS/SSA subtitle files.
+            const preserveAss = originalAss === true && ['.ass', '.ssa'].includes(path.extname(normalizedPath).toLowerCase()) && isAssScript(raw) && /^\s*Dialogue:/im.test(raw);
+            const content = preserveAss ? raw : normalizeSubtitleToVtt(raw);
+            if (!content || (!preserveAss && !content.includes('-->'))) return { success: false, error: 'Subtitle contains no readable cues' };
             // Return as data URL
             const dataUrl = `data:text/vtt;charset=utf-8,${encodeURIComponent(content)}`;
             return { success: true, url: dataUrl };

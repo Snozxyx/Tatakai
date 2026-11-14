@@ -88,7 +88,7 @@ function cleanAssText(text) {
         .replace(/\\h/gi, ' ')
         .trim();
 }
-function isAssScript(text) {
+export function isAssScript(text) {
     const head = String(text || '').slice(0, 2000);
     return /\[Script Info\]/i.test(head) || /\[V4\+?\s*Styles\]/i.test(head) || /^\s*Dialogue:/im.test(head);
 }

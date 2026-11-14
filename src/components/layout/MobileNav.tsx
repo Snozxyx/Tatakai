@@ -17,6 +17,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useHaptics } from "@/hooks/ui/useHaptics";
 import { useIsMobileApp } from "@/hooks/ui/useIsNativeApp";
 import { cn } from "@/lib/utils";
+import { useSlidingPill } from '@/hooks/ui/useSlidingPill';
 import { useSettingsModal } from "@/contexts/SettingsModalContext";
 import { useMobileDownload } from "@/hooks/media/useMobileDownload";
 import { memo, useState, useCallback, useEffect, type ComponentType } from "react";
@@ -98,16 +99,15 @@ const MobileNavButton = memo(function MobileNavButton({
       title={label}
       aria-current={active ? 'page' : undefined}
       className={cn(
-        'ui-mobile-nav-button group relative flex flex-1 items-center justify-center rounded-xl py-2 outline-none transition-[transform,color] duration-150 motion-safe:active:scale-[.97] focus-visible:ring-2 focus-visible:ring-primary/60',
+        'ui-mobile-nav-button t-tab group relative flex flex-1 items-center justify-center rounded-xl py-2 outline-none transition-[transform,color] duration-150 motion-safe:active:scale-[.97] focus-visible:ring-2 focus-visible:ring-primary/60',
         active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
       )}
     >
       <span
+        data-nav-icon
         className={cn(
           'relative flex h-9 w-full max-w-12 min-w-0 items-center justify-center rounded-xl transition-[background-color,box-shadow] duration-150',
-          active
-            ? 'bg-foreground/10 shadow-[inset_0_0_0_1px_hsl(var(--foreground)/0.1)]'
-            : 'group-hover:bg-foreground/[0.06] group-active:bg-foreground/[0.08]',
+          !active && 'group-hover:bg-foreground/[0.06] group-active:bg-foreground/[0.08]',
         )}
       >
         <Icon className={cn('h-[22px] w-[22px]')} />
@@ -153,6 +153,12 @@ export function MobileNav() {
     );
   });
   const [isPlayerFullscreen, setIsPlayerFullscreen] = useState<boolean>(() => isPlayerFullscreenActive());
+  const navHidden = isAnnouncementPopupActive || open || isPlayerFullscreen || isHiddenRoute(location.pathname);
+  const { group: dockRef, pill: selectionRef } = useSlidingPill(`${location.pathname}:${navHidden}`, {
+    activeSelector: '[aria-current="page"]',
+    targetSelector: '[data-nav-icon]',
+    rememberKey: 'mobile-navigation',
+  });
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof document === 'undefined') return;
@@ -238,7 +244,7 @@ export function MobileNav() {
   // the bottom of the screen and its own nav stays tappable), and while the
   // mobile player holds CSS-fallback fullscreen (the player covers the
   // viewport; the bar must not paint above it on any device).
-  if (isAnnouncementPopupActive || open || isPlayerFullscreen || isHiddenRoute(location.pathname)) {
+  if (navHidden) {
     return null;
   }
 
@@ -253,7 +259,8 @@ export function MobileNav() {
       aria-label={t("nav.mainNavigation")}
     >
       {/* Solid, edge-to-edge chrome with safe-area padding for thumb reach. */}
-      <div className="mobile-nav-dock relative flex items-center">
+      <div ref={dockRef} className="t-tabs mobile-nav-dock relative flex items-center">
+        <span ref={selectionRef} className="t-tabs-pill" aria-hidden="true" />
         <MobileNavButton icon={LayoutGrid} label={t('nav.home')} active={isActive('/')} onClick={goHome} />
         <MobileNavButton icon={Search} label={t('nav.search')} active={isActive('/search')} onClick={goSearch} />
 
@@ -266,13 +273,13 @@ export function MobileNav() {
               title={t('comments.savedTab')}
               aria-current={favActive ? 'page' : undefined}
               className={cn(
-                'ui-mobile-nav-button group relative flex flex-1 items-center justify-center rounded-xl py-2 outline-none transition-[transform,color] duration-150 motion-safe:active:scale-[.97] focus-visible:ring-2 focus-visible:ring-primary/60',
+                'ui-mobile-nav-button t-tab group relative flex flex-1 items-center justify-center rounded-xl py-2 outline-none transition-[transform,color] duration-150 motion-safe:active:scale-[.97] focus-visible:ring-2 focus-visible:ring-primary/60',
                 favActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
               )}
             >
-              <span className={cn(
+              <span data-nav-icon className={cn(
                 'flex h-9 w-full max-w-12 min-w-0 items-center justify-center rounded-xl transition-[background-color,box-shadow] duration-150',
-                favActive ? 'bg-foreground/10 shadow-[inset_0_0_0_1px_hsl(var(--foreground)/0.1)]' : 'group-hover:bg-foreground/[0.06]',
+                !favActive && 'group-hover:bg-foreground/[0.06]',
               )}>
                 <Heart className={cn('h-[22px] w-[22px]', favActive && 'fill-foreground/20')} />
               </span>

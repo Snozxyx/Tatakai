@@ -1,3 +1,4 @@
+import { SlidingTabList } from '@/components/ui/sliding-tab-list';
 import { selectReadingTitle } from '@/lib/titleLanguage';
 import { ThemedSelect } from '@/components/ui/themed-select';
 import uiI18n from '@/lib/uiI18n';
@@ -342,7 +343,7 @@ export const MangaSmartDiscover = memo(function MangaSmartDiscover() {
           <option value="completed">{uiI18n.t('app.completed_1798b3ba')}</option>
         </ThemedSelect>
 
-        <div className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto py-0.5" style={{ scrollbarWidth: "none" }}>
+        <SlidingTabList className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto py-0.5" style={{ scrollbarWidth: "none" }}>
           <button
             aria-pressed={genre === "all"}
             onClick={() => {
@@ -377,7 +378,7 @@ export const MangaSmartDiscover = memo(function MangaSmartDiscover() {
               {g === topTasteGenre && <span className="ml-1 text-primary">★</span>}
             </button>
           ))}
-        </div>
+        </SlidingTabList>
         </div>
       </div>
 
@@ -461,7 +462,7 @@ export const MangaSmartDiscover = memo(function MangaSmartDiscover() {
                     {VARIANTS.find((v) => v.id === variant)?.label}
                   </p>
                   {shortlist.length > 1 && (
-                    <div className="flex items-center gap-1.5" role="tablist" aria-label={uiI18n.t('app.picks_f5f61efb')}>
+                    <SlidingTabList className="flex items-center gap-1.5" role="tablist" aria-label={uiI18n.t('app.picks_f5f61efb')}>
                       {shortlist.map((_, i) => (
                         <button
                           key={i}
@@ -477,7 +478,7 @@ export const MangaSmartDiscover = memo(function MangaSmartDiscover() {
                           )}
                         />
                       ))}
-                    </div>
+                    </SlidingTabList>
                   )}
                 </div>
 

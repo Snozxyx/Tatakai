@@ -488,9 +488,9 @@ contextBridge.exposeInMainWorld('tatakaiRuntime', {
 
     // Media Probe
     probeMedia: (url) => ipcRenderer.invoke('media:probe', url),
-    extractSubtitle: (url, trackIndex) => ipcRenderer.invoke('media:extract-subtitle', url, trackIndex),
+    extractSubtitle: (url, trackIndex, options) => ipcRenderer.invoke('media:extract-subtitle', url, trackIndex, options),
     extractAudioTrack: (url, trackIndex) => ipcRenderer.invoke('media:extract-audio-track', url, trackIndex),
-    readLocalFile: (filePath) => ipcRenderer.invoke('media:read-local-file', filePath),
+    readLocalFile: (filePath, originalAss) => ipcRenderer.invoke('media:read-local-file', filePath, originalAss),
 
     // FlareSolverr — configure and query the external bypass service
     flareSolverrConfig: (config) => ipcRenderer.invoke('runtime:flaresolverr-config', config),

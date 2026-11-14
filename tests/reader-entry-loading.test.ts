@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { abortableReaderTask, readerDelay, readerEntryPages, readerEntryReady, scheduleReaderImage } from '../src/lib/reader/loading';
+import { abortableReaderTask, prioritizeReaderImage, readerDelay, readerEntryPages, readerEntryReady, scheduleReaderImage } from '../src/lib/reader/loading';
 
 describe('manga reader entry', () => {
   const pages = Array.from({ length: 100 }, (_, i) => ({ pageNumber: i + 1 }));
@@ -51,6 +51,7 @@ describe('manga reader entry', () => {
       active.push(name);
       await new Promise<void>(resolve => release.push(resolve));
     }, new AbortController().signal));
+    await Promise.resolve();
     const controller = new AbortController();
     const cancelled = scheduleReaderImage(async () => { active.push('cancelled'); }, controller.signal);
     const starting = scheduleReaderImage(async () => { active.push('starting'); }, new AbortController().signal, 10);
@@ -62,5 +63,33 @@ describe('manga reader entry', () => {
     expect(active).toEqual(['a', 'b', 'c', 'starting']);
     release[1](); release[2]();
     await Promise.all(running);
+  });
+
+  test('a saved starting page wins the first slots even when earlier chapter pages were queued first', async () => {
+    const started: number[] = [];
+    await Promise.all(Array.from({ length: 30 }, (_, index) => scheduleReaderImage(async () => {
+      started.push(index);
+    }, new AbortController().signal, index === 20 ? 20 : index === 21 ? 10 : 0)));
+    expect(started.slice(0, 3)).toEqual([20, 21, 0]);
+    expect(new Set(started).size).toBe(30);
+  });
+
+  test('jumping ahead promotes a queued page without restarting an active download', async () => {
+    const started: string[] = [];
+    const release: Array<() => void> = [];
+    const running = ['a', 'b', 'c'].map(name => scheduleReaderImage(async () => {
+      started.push(name);
+      await new Promise<void>(resolve => release.push(resolve));
+    }, new AbortController().signal));
+    await Promise.resolve();
+    const background = scheduleReaderImage(async () => { started.push('background'); }, new AbortController().signal);
+    const controller = new AbortController();
+    const visible = scheduleReaderImage(async () => { started.push('visible'); }, controller.signal);
+    prioritizeReaderImage(controller.signal, 20);
+    release[0]();
+    await visible;
+    expect(started.slice(0, 4)).toEqual(['a', 'b', 'c', 'visible']);
+    release[1](); release[2]();
+    await Promise.all([...running, background]);
   });
 });

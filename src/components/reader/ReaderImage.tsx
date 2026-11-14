@@ -1,15 +1,15 @@
 import { ReaderImageSlot } from './ReaderImageSlot';
 import { readerImageLayout } from '@/lib/reader/imageLayout';
-import { abortableReaderTask, readerDelay, scheduleReaderImage } from '@/lib/reader/loading';
+import { readerDelay } from '@/lib/reader/loading';
+import { acquireReaderImageResource, readerDimensions, rememberReaderDimensions } from '@/lib/reader/imageResources';
+import { readerResourceKey, resolveReaderImageResource } from '@/lib/reader/imageTransport';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
-import { Loader2, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 import {
-  getMobileHeaderedImageBlobUrl,
-  getMobileProxyImageBlobUrl,
   isMobileProxyUrl,
   isNativeProxyUrl,
   normalizeMobileHeaders,
@@ -50,11 +50,14 @@ export interface ReaderPageImage {
  * Shared by the manga reader (`MangaReaderPage`) and custom-source read pages so
  * the blob/proxy subtlety lives in one place.
  */
-export function ReaderImage({ page, mode, style, eager, onRetryChapter, upscaling, upscaleScope, onPageLoaded }: {
+export function ReaderImage({ page, mode, style, eager, priority = eager ? 10 : 0, onRetryChapter, upscaling, upscaleScope, resourceScope = "", onPageLoaded }: {
   page: ReaderPageImage;
   mode: "native" | "blob";
   style: CSSProperties;
   eager: boolean;
+  /** Visible/starting pages take precedence over full-chapter background work. */
+  priority?: number;
+  resourceScope?: string;
   onRetryChapter?: () => void;
   upscaling?: PageUpscalingSettings;
   /** Chapter identity this page reports its enhancement to, so the reader can
@@ -99,6 +102,10 @@ export function ReaderImage({ page, mode, style, eager, onRetryChapter, upscalin
     headerSignature,
   ].join("\u0000");
 
+  const resourceKey = readerResourceKey(page, mode, src, resourceScope);
+  const [learnedDimensions, setLearnedDimensions] = useState(readerDimensions(resourceKey));
+  const imageRef = useRef<HTMLImageElement>(null);
+  const leaseRef = useRef<ReturnType<typeof acquireReaderImageResource> | null>(null);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const slotRef = useRef<HTMLDivElement>(null);
@@ -106,6 +113,7 @@ export function ReaderImage({ page, mode, style, eager, onRetryChapter, upscalin
   const shouldLoad = eager || nearViewport;
   useEffect(() => {
     if (eager) { setNearViewport(true); return; }
+    if (config.dataSaver) setNearViewport(false);
     const element = slotRef.current;
     if (!element) return;
     if (typeof IntersectionObserver === 'undefined') { setNearViewport(true); return; }
@@ -114,7 +122,7 @@ export function ReaderImage({ page, mode, style, eager, onRetryChapter, upscalin
     }, { rootMargin: '400px 0px' });
     observer.observe(element);
     return () => observer.disconnect();
-  }, [eager, sourceIdentity]);
+  }, [eager, sourceIdentity, config.dataSaver]);
 
   const [failed, setFailed] = useState(false);
   const [nonce, setNonce] = useState(0);
@@ -124,22 +132,10 @@ export function ReaderImage({ page, mode, style, eager, onRetryChapter, upscalin
     if (failed && useCloud) setFailedCloudUrl(cloudUrl);
   }, [failed, useCloud, cloudUrl]);
   const mountedRef = useRef(true);
-  const retryOwnedBlobRef = useRef<string | null>(null);
   useEffect(() => {
     mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
+    return () => { mountedRef.current = false; };
   }, []);
-
-  // A successful plain-URL automatic retry mints its own object URL outside
-  // the primary fetch effect. Keep that URL alive while the image uses it, but
-  // release it when the source changes or this page unmounts.
-  useEffect(() => () => {
-    const owned = retryOwnedBlobRef.current;
-    retryOwnedBlobRef.current = null;
-    if (owned) URL.revokeObjectURL(owned);
-  }, [sourceIdentity]);
 
   // Reader routes do not remount between chapters. Reset every source-bound
   // bit when React reuses this component (paged mode and old page-number keys
@@ -149,136 +145,47 @@ export function ReaderImage({ page, mode, style, eager, onRetryChapter, upscalin
     setBlobUrl(null);
     setLoaded(false);
     setFailed(false);
+    setNonce(0);
     setNearViewport(eager);
-  }, [sourceIdentity]);
+    setLearnedDimensions(readerDimensions(resourceKey));
+  }, [sourceIdentity, resourceKey]);
 
   useEffect(() => {
-    if (!useBlobPath || !shouldLoad) return;
-    setFailed(false);
-    // Don't reset blobUrl to null on nonce retry when we already have one —
-    // keeps the old frame visible behind the spinner.
+    if (!shouldLoad) return;
     const controller = new AbortController();
-    let cancelled = false;
-    let obj: string | null = null;
-    let owned = false;
-    const run = async () => {
-      try {
-        if (isProxy) {
-          const resolved = await abortableReaderTask(getMobileProxyImageBlobUrl(src, {
-            originalUrl: page.originalUrl || page.imageUrl,
-            headers: page.headers || undefined,
-            retries: 1,
-          }), controller.signal);
-          if (cancelled || !mountedRef.current) return;
-          if (resolved) {
-            setBlobUrl(resolved);
-            setFailed(false);
-          } else {
-            setFailed(true);
-          }
-          return;
-        }
-        if (needsHeaderBlob) {
-          const resolved = await abortableReaderTask(getMobileHeaderedImageBlobUrl(src, page.headers, { retries: 1 }), controller.signal);
-          if (cancelled || !mountedRef.current) return;
-          if (resolved) {
-            setBlobUrl(resolved);
-            setFailed(false);
-          } else {
-            setFailed(true);
-          }
-          return;
-        }
-        for (let i = 0; i < 3; i++) {
-          try {
-            const r = await fetch(src, { signal: controller.signal });
-            if (!r.ok) throw new Error(uiI18n.t('app.http_i18n_value_0_63a176f2', { value0: r.status }));
-            const b = await r.blob();
-            if (!b || b.size === 0) throw new Error(uiI18n.t('app.empty_ad87109b'));
-            if (cancelled || !mountedRef.current) return;
-            obj = URL.createObjectURL(b);
-            owned = true;
-            setBlobUrl(obj);
-            setFailed(false);
-            return;
-          } catch {
-            if (controller.signal.aborted) return;
-            if (i + 1 < 3) await readerDelay(500 * (i + 1), controller.signal);
-          }
-        }
-        if (!cancelled && mountedRef.current) setFailed(true);
-      } catch {
-        if (!cancelled && mountedRef.current) setFailed(true);
+    const lease = acquireReaderImageResource(resourceKey + (nonce ? `:retry:${nonce}` : ''),
+      signal => resolveReaderImageResource(page, mode, src, signal, useCloud),
+      controller.signal, priority, useBlobPath, priority < 10);
+    leaseRef.current = lease;
+    void lease.promise.then(value => {
+      if (!controller.signal.aborted) {
+        if (useBlobPath) setBlobUrl(value.src);
+        setLearnedDimensions(readerDimensions(resourceKey));
       }
-    };
-    void scheduleReaderImage(run, controller.signal, eager ? 10 : 0).catch(() => undefined);
+    }).catch(() => { if (!controller.signal.aborted) setFailed(true); });
     return () => {
-      cancelled = true;
       controller.abort();
-      if (owned && obj) URL.revokeObjectURL(obj);
+      lease.release();
+      if (leaseRef.current === lease) leaseRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [src, mode, isProxy, needsHeaderBlob, page.originalUrl, page.imageUrl, headerSignature, nonce, shouldLoad]);
+  }, [resourceKey, nonce, shouldLoad, useBlobPath]);
 
-  // Automatic retry ladder after a failure — Android WebView commonly drops
-  // CapacitorHttp requests mid-flight on suspend/radio-swap, and manual
-  // tap-to-retry was the only escape. Up to 3 auto-attempts with growing
-  // backoff; a single blip no longer leaves a permanent black page.
+  useEffect(() => { leaseRef.current?.promote(priority); }, [priority]);
+
+  // Retry uses the same scheduler and transport as foreground/prepared images.
+  const autoAttempts = useRef(0);
+  useEffect(() => { autoAttempts.current = 0; }, [resourceKey]);
   useEffect(() => {
-    if (!failed || !useBlobPath) return;
+    if (!failed || autoAttempts.current >= 3) return;
     const controller = new AbortController();
-    let cancelled = false;
-    const delays = [750, 2000, 4500];
-    const chain = async () => {
-      for (const delay of delays) {
-        await readerDelay(delay, controller.signal);
-        if (cancelled || !mountedRef.current) return;
-        try {
-          let resolved: string | null = null;
-          // Proxy/header helpers return cache-owned object URLs. Only the
-          // plain-fetch branch creates a URL owned by this retry attempt; an
-          // obsolete chapter must never revoke a shared cached page URL when
-          // its async work finishes after cancellation.
-          let ownsResolved = false;
-          if (isProxy) {
-            resolved = await getMobileProxyImageBlobUrl(src, {
-              originalUrl: page.originalUrl || page.imageUrl,
-              headers: page.headers || undefined,
-              retries: 1,
-            });
-          } else if (needsHeaderBlob) {
-            resolved = await getMobileHeaderedImageBlobUrl(src, page.headers, { retries: 1 });
-          } else {
-            const r = await fetch(src, { signal: controller.signal });
-            if (!r.ok) throw new Error(uiI18n.t('app.http_i18n_value_0_63a176f2', { value0: r.status }));
-            const b = await r.blob();
-            if (!b || b.size === 0) throw new Error(uiI18n.t('app.empty_ad87109b'));
-            resolved = URL.createObjectURL(b);
-            ownsResolved = true;
-          }
-          if (cancelled || !mountedRef.current) {
-            if (resolved && ownsResolved) URL.revokeObjectURL(resolved);
-            return;
-          }
-          if (resolved) {
-            if (ownsResolved) {
-              const previous = retryOwnedBlobRef.current;
-              if (previous && previous !== resolved) URL.revokeObjectURL(previous);
-              retryOwnedBlobRef.current = resolved;
-            }
-            setBlobUrl(resolved);
-            setFailed(false);
-            return;
-          }
-        } catch {
-          /* fall through to the next delay */
-        }
-      }
-    };
-    void chain().catch(() => undefined);
-    return () => { cancelled = true; controller.abort(); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [failed, useBlobPath, isProxy, needsHeaderBlob, src, page.originalUrl, page.imageUrl, headerSignature]);
+    const delay = [750, 2000, 4500][autoAttempts.current++];
+    void readerDelay(delay, controller.signal).then(() => {
+      setFailed(false);
+      setLoaded(false);
+      setNonce(value => value + 1);
+    }).catch(() => undefined);
+    return () => controller.abort();
+  }, [failed, resourceKey]);
 
   useEffect(() => { if (failed) onPageLoaded?.(page.pageNumber); }, [failed, onPageLoaded, page.pageNumber]);
 
@@ -309,7 +216,7 @@ export function ReaderImage({ page, mode, style, eager, onRetryChapter, upscalin
     };
   }, [loaded, failed, useBlobPath, blobUrl]);
 
-  const layout = readerImageLayout(style, page, loaded);
+  const layout = readerImageLayout(style, { width: page.width || learnedDimensions?.width, height: page.height || learnedDimensions?.height }, loaded);
 
   // Proxy/headered payloads render from their resolved blob URL; while it
   // resolves, hold the placeholder (never hand the opaque token URL to `<img>`).
@@ -323,6 +230,7 @@ export function ReaderImage({ page, mode, style, eager, onRetryChapter, upscalin
     setLoaded(false);
     setBlobUrl(null);
     setFailedCloudUrl(null);
+    autoAttempts.current = 0;
     setNonce((n) => n + 1);
     // Signed page URLs can expire. Refresh the chapter response (or fail over
     // its provider) as well as recreating this image.
@@ -334,7 +242,7 @@ export function ReaderImage({ page, mode, style, eager, onRetryChapter, upscalin
       <div
         data-page={page.pageNumber}
         className="mx-auto flex w-full flex-col items-center justify-center gap-2 rounded-none bg-white/[0.04] px-6 py-14 text-center"
-        style={{ ...style, minHeight: "32vh" }}
+        style={layout.slot}
       >
         <p className="text-sm text-muted-foreground">{t('migration.pageFailed', { number: page.pageNumber })}</p>
         <button
@@ -353,21 +261,36 @@ export function ReaderImage({ page, mode, style, eager, onRetryChapter, upscalin
       pageNumber={page.pageNumber} style={layout.slot} pending={!loaded && !failed}>
       {showImg ? (
         <img
+          key={nonce}
+          ref={imageRef}
+          data-reader-image-state={loaded ? "ready" : "loading"}
           data-image-original
           data-original-src={imgSrc}
           src={enhancement.enhanced || imgSrc}
           alt={t('reader.pageNumber', { number: page.pageNumber })}
           className="mx-auto block h-auto rounded-none bg-black/30"
           style={layout.image}
-          width={page.width || undefined}
-          height={page.height || undefined}
+          width={page.width || learnedDimensions?.width || undefined}
+          height={page.height || learnedDimensions?.height || undefined}
           loading={eager ? "eager" : "lazy"}
-          // First pages of the chapter win the bandwidth race; the rest wait.
-          fetchPriority={eager ? "high" : "auto"}
+          {...{ fetchpriority: priority > 0 ? "high" : eager ? "low" : "auto" }}
           decoding="async"
           draggable={false}
           referrerPolicy="no-referrer"
-          onLoad={() => { setLoaded(true); onPageLoaded?.(page.pageNumber); }}
+          onLoad={async (event) => {
+            const image = event.currentTarget;
+            const loadedSrc = image.src;
+            rememberReaderDimensions(resourceKey, image.naturalWidth, image.naturalHeight);
+            setLearnedDimensions(readerDimensions(resourceKey));
+            try {
+              if (priority >= 10 && image.decode) await image.decode();
+              if (imageRef.current !== image || image.src !== loadedSrc || !mountedRef.current) return;
+              setLoaded(true);
+              onPageLoaded?.(page.pageNumber);
+            } catch {
+              if (imageRef.current === image && image.src === loadedSrc) setFailed(true);
+            }
+          }}
           onError={() => {
             // Bare <img> failed (hotlink 403 etc). If headers exist, the blob
             // path will succeed — flip to it by flagging failure so the retry

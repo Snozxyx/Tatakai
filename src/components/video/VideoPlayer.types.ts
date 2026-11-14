@@ -31,6 +31,10 @@ export interface ExternalSubtitle {
   label?: string;
   originalUrl?: string;
   headers?: Record<string, string>;
+  /** Original SSA/ASS script, never a WebVTT conversion. */
+  assContent?: string;
+  /** Font attachments supplied by the source or imported alongside the script. */
+  fonts?: string[];
 }
 
 export interface CustomSubtitle extends ExternalSubtitle {
@@ -42,6 +46,7 @@ export interface InternalSubtitleTrack {
   label: string;
   lang: string;
   default?: boolean;
+  codec?: string;
 }
 
 export interface SubtitleDisplayKey {

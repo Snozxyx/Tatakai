@@ -66,6 +66,7 @@ public class NativePlayerPlugin extends Plugin {
         intent.putExtra(PlayerActivity.EXTRA_PREFERRED_SUBTITLE_LANGUAGE, preferredSubtitleLanguage == null ? "" : preferredSubtitleLanguage);
         intent.putExtra(PlayerActivity.EXTRA_SUBTITLES_ENABLED, call.getBoolean("subtitlesEnabled", true));
 
+        intent.putExtra("assFonts", call.getArray("assFonts", new JSArray()).toString());
         JSArray subtitles = call.getArray("subtitles", new JSArray());
         intent.putExtra(PlayerActivity.EXTRA_SUBTITLES, subtitles == null ? "[]" : subtitles.toString());
         JSObject headers = call.getObject("headers", new JSObject());

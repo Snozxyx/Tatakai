@@ -1,0 +1,31 @@
+services:
+  website-me-seo:
+    image: ${SEO_RUNTIME_IMAGE:?Set a verified Node 22+ image digest}
+    entrypoint: [node]
+    command: [/app/seo/server.mjs]
+    restart: unless-stopped
+    init: true
+    read_only: true
+    user: '1000:1000'
+    mem_limit: 128m
+    cpus: 0.25
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      PORT: '8088'
+      SITE_ORIGIN: https://tatakai.me
+      SHARE_API_ORIGIN: http://api:4001
+      SEO_INDEX_PATH: /releases/website-me-compat-current/website/index.html
+      SEO_APP_INDEX_PATH: /releases/website-app-current/website/index.html
+    volumes:
+      - /srv/tatakai/website-seo/current:/app/seo:ro
+      - /srv/tatakai/releases:/releases:ro
+    networks: [tatakai]
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:8088/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+networks:
+  tatakai:
+    external: true

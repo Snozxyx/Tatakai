@@ -1,3 +1,5 @@
+import { getAssFonts } from '@/core/player/ass-fonts';
+import { getCustomSubtitleFontDataUrl } from '@/lib/video/customSubtitleFont';
 import { randomUUID } from '../../lib/uuid';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
@@ -159,6 +161,7 @@ export function NativeTorrentPlayer({
       settings.subtitleLanguage === 'auto' ? 'english' : settings.subtitleLanguage,
     ),
     subtitlesEnabled: settings.subtitleLanguage !== 'off',
+    assFonts: [...getAssFonts(), getCustomSubtitleFontDataUrl()].filter((font): font is string => !!font),
   }), [preferredAudioLanguage, settings.audioLanguage, settings.subtitleLanguage]);
   // Read via ref in the open effect: subtitle arrays get new identities when
   // upstream metadata re-resolves, and reopening the native Activity for that

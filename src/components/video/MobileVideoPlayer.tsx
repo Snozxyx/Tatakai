@@ -3,6 +3,9 @@ import { OptionalJWPlayer } from './JWPlayer';
 import { PlayerSeekInput } from './controls/PlayerSeekInput';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { ExternalPlayerButton } from './controls/ExternalPlayerButton';
+import { importAssFonts } from '@/core/player/ass-fonts';
+import { useAssSubtitle } from './hooks/useAssSubtitle';
+import { AssSubtitleOverlay } from './overlays/AssSubtitleOverlay';
 import { uploadSubtitle, fetchSubtitle, decodeSubtitle } from '@/core/player/subtitle-service';
 import { usePlaybackCoordinator } from '@/core/player/usePlaybackCoordinator';
 import { OptionalVidstackPlayer } from './OptionalVidstackPlayer';
@@ -199,7 +202,7 @@ function BuiltinMobileVideoPlayer({
   torrentUrl,
 }: MobileVideoPlayerProps) {
   useUiTranslation();
-  const [uploadedSubtitles, setUploadedSubtitles] = useState<Array<{ url: string; lang: string; label?: string }>>([]);
+  const [uploadedSubtitles, setUploadedSubtitles] = useState<Array<{ url: string; lang: string; label?: string; assContent?: string }>>([]);
   const uploadedUrls = useRef<string[]>([]);
   const subtitleUploadInput = useRef<HTMLInputElement>(null);
   const subtitles = useMemo(() => [...providedSubtitles, ...uploadedSubtitles], [providedSubtitles, uploadedSubtitles]);
@@ -512,6 +515,7 @@ function BuiltinMobileVideoPlayer({
 
   // Custom subtitle overlay (desktop parity): tracks run in "hidden" mode and
   // we paint active cues ourselves so size/font/color/BG/position/offset apply.
+  const assSubtitle = useAssSubtitle(subtitles, currentSubtitle, playbackReferer, playbackUserAgent);
   const activeCueLines = useActiveCues(videoRef, `${sourceUrlKey}|${currentSubtitle}`, settings.subtitleOffset);
   useSubtitlePretranslation(videoRef, `${sourceUrlKey}|${currentSubtitle}`);
   const translatedCues = useSubtitleTranslation(activeCueLines);
@@ -1974,8 +1978,9 @@ function BuiltinMobileVideoPlayer({
       </video>
       </div>
 
+      <AssSubtitleOverlay videoRef={videoRef} subtitle={assSubtitle} offset={settings.subtitleOffset} mediaKey={sourceUrlKey} />
       {/* Custom styled subtitles — desktop parity (size/font/color/BG/position). */}
-      {activeCueLines.length > 0 && currentSubtitle !== 'off' && (
+      {!assSubtitle && activeCueLines.length > 0 && currentSubtitle !== 'off' && (
         <div
           className="pointer-events-none absolute inset-x-0 z-20 flex flex-col items-center gap-1 px-4 text-center"
           style={{ bottom: `${12 + Math.min(settings.subtitlePosition * 3, 60) + (showControls ? 48 : 0)}px` }}
@@ -2161,10 +2166,16 @@ function BuiltinMobileVideoPlayer({
                   <input ref={subtitleUploadInput} type="file" accept=".srt,.ass,.ssa,.vtt" className="sr-only" aria-label={t('migration.uploadSubtitle')} onChange={async event => {
                     const file = event.target.files?.[0]; if (!file) return;
                     const input = event.currentTarget;
-                    try { const sub = await uploadSubtitle(file); uploadedUrls.current.push(sub.url); setUploadedSubtitles(previous => [...previous, sub]); }
+                    try { const sub = await uploadSubtitle(file); uploadedUrls.current.push(sub.url); setUploadedSubtitles(previous => [...previous, sub]); setCurrentSubtitle(getSubtitleSelectionKey(sub, subtitles.length)); }
                     catch (error) { toast.error(error instanceof Error ? error.message : t('migration.subtitleFailed')); }
                     input.value = '';
                   }} />
+                  <label className="flex min-h-11 cursor-pointer items-center px-2 text-xs text-white/80" aria-label="Add ASS fonts">Fonts
+                    <input type="file" multiple accept=".ttf,.otf,.woff,.woff2" className="sr-only" onChange={async event=>{
+                      const input=event.currentTarget;if(!input.files)return;
+                      try{await importAssFonts(input.files);toast.success('Subtitle fonts loaded');}catch(error){toast.error(String(error));}finally{input.value='';}
+                    }} />
+                  </label>
                 <button
                   onClick={() => {
                     setSettingsTab('playback');

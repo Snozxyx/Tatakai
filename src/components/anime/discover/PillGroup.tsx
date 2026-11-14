@@ -8,9 +8,9 @@
  * and a wrapped row moves the content below it on every render. When the row
  * overflows, the edges fade to signal there is more to scroll to.
  */
-import { useCallback, useEffect, useLayoutEffect, useRef, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
-import { useMotionPreference } from '@/hooks/ui/useMotionPreference';
+import { useSlidingPill } from '@/hooks/ui/useSlidingPill';
 
 export interface PillOption<T extends string> {
   id: T;
@@ -34,39 +34,7 @@ export function PillGroup<T extends string>({
   label,
   className,
 }: PillGroupProps<T>) {
-  const group = useRef<HTMLDivElement>(null);
-  const pill = useRef<HTMLSpanElement>(null);
-  const positioned = useRef(false);
-  const reducedMotion = useMotionPreference();
-
-  const movePill = useCallback((animate: boolean) => {
-    const tab = group.current?.querySelector<HTMLButtonElement>('[aria-selected="true"]');
-    const indicator = pill.current;
-    if (!tab || !indicator) return;
-    const previousTransition = indicator.style.transition;
-    if (!animate) indicator.style.transition = 'none';
-    indicator.style.transform = `translateX(${tab.offsetLeft}px)`;
-    indicator.style.width = `${tab.offsetWidth}px`;
-    indicator.style.top = `${tab.offsetTop}px`;
-    indicator.style.height = `${tab.offsetHeight}px`;
-    if (!animate) {
-      void indicator.offsetWidth;
-      indicator.style.transition = previousTransition;
-    }
-  }, []);
-
-  useLayoutEffect(() => {
-    movePill(positioned.current && !reducedMotion);
-    positioned.current = true;
-  }, [value, options, reducedMotion, movePill]);
-
-  useEffect(() => {
-    if (!group.current) return;
-    const observer = new ResizeObserver(() => movePill(false));
-    observer.observe(group.current);
-    group.current.querySelectorAll('[role="tab"]').forEach(tab => observer.observe(tab));
-    return () => observer.disconnect();
-  }, [options, movePill]);
+  const { group, pill } = useSlidingPill(value);
   const handleKey = (event: React.KeyboardEvent<HTMLDivElement>) => {
     const keys = ["ArrowLeft", "ArrowRight", "Home", "End"];
     if (!keys.includes(event.key)) return;

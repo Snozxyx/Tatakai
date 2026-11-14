@@ -1,3 +1,4 @@
+import { SlidingTabList } from '@/components/ui/sliding-tab-list';
 import { randomUUID } from '../../../../lib/uuid';
 import { useEffect, useRef, useState } from 'react';
 import { Copy, Plus, Trash2, ArrowUp, ArrowDown, ImagePlus, RotateCcw } from 'lucide-react';
@@ -98,7 +99,7 @@ export default function SekaiEditor({ configuration, onChange, preferences, onPr
   const range = (label: string, value: number, min: number, max: number, change: (v: number) => void, step = 1) => <label className="sp-field">{label}<span>{value}</span><input aria-label={label} type="range" min={min} max={max} step={step} value={value} onChange={e => change(Number(e.target.value))} /></label>;
   return <aside className="sp-editor" aria-label="Edit scrapbook">
     <header className="sp-plate"><h2>Edit profile</h2><span>Make yourself at home.</span></header>
-    <div className="sp-tabs" role="tablist" aria-label="Customization sections">{['Widgets', 'Theme', 'Wallpaper', 'Music', 'Mascots', 'Layout', 'Presets'].map(t => <button type="button" role="tab" aria-selected={tab === t} id={`sp-tab-${t}`} aria-controls="sp-editor-panel" className={tab === t ? 'active' : ''} onClick={() => setTab(t)} key={t}>{t}</button>)}</div>
+    <SlidingTabList className="sp-tabs" role="tablist" aria-label="Customization sections">{['Widgets', 'Theme', 'Wallpaper', 'Music', 'Mascots', 'Layout', 'Presets'].map(t => <button type="button" role="tab" aria-selected={tab === t} id={`sp-tab-${t}`} aria-controls="sp-editor-panel" className={tab === t ? 'active' : ''} onClick={() => setTab(t)} key={t}>{t}</button>)}</SlidingTabList>
     <div key={tab} id="sp-editor-panel" role="tabpanel" aria-labelledby={`sp-tab-${tab}`} className="sp-editor-body">
       {tab === 'Widgets' && <>
         <p className="sp-help">Add a widget, then drag its handle on the canvas. Notes and image cards are public profile content.</p>

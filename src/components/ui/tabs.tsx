@@ -2,22 +2,37 @@ import * as React from "react";
 import * as TabsPrimitive from "@radix-ui/react-tabs";
 
 import { cn } from "@/lib/utils";
+import { useSlidingPill } from "@/hooks/ui/useSlidingPill";
 
 const Tabs = TabsPrimitive.Root;
 
 const TabsList = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.List>,
   React.ComponentPropsWithoutRef<typeof TabsPrimitive.List>
->(({ className, ...props }, ref) => (
-  <TabsPrimitive.List
-    ref={ref}
+>(({ className, children, ...props }, ref) => {
+  const { group, pill } = useSlidingPill(children, {
+    activeSelector: '[role="tab"][data-state="active"]',
+    tabSelector: '[role="tab"]',
+    observeSelection: true,
+    matchTabStyle: true,
+  });
+  const setRef = React.useCallback((node: HTMLDivElement | null) => {
+    group.current = node;
+    if (typeof ref === 'function') ref(node);
+    else if (ref) ref.current = node;
+  }, [group, ref]);
+  return <TabsPrimitive.List
+    ref={setRef}
     className={cn(
-      "inline-flex h-10 items-center justify-center max-w-full rounded-xl bg-muted p-1 text-muted-foreground",
+      "sliding-tab-list inline-flex h-10 items-center justify-center max-w-full rounded-xl bg-muted p-1 text-muted-foreground",
       className,
     )}
     {...props}
-  />
-));
+  >
+    <span ref={pill} className="t-tabs-pill" aria-hidden="true" />
+    {children}
+  </TabsPrimitive.List>;
+});
 TabsList.displayName = TabsPrimitive.List.displayName;
 
 const TabsTrigger = React.forwardRef<

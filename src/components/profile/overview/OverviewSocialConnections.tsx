@@ -1,3 +1,4 @@
+import { SlidingTabList } from '@/components/ui/sliding-tab-list';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState } from 'react';
@@ -77,7 +78,7 @@ export function OverviewSocialConnections({
         </div>
 
         {/* Followers / Following toggle */}
-        <div
+        <SlidingTabList
           role="tablist"
           aria-label={uiI18n.t('app.social_connections_filter_b633421d')}
           className="flex items-center gap-1 bg-black/20 p-1 rounded-xl border border-white/[0.03]"
@@ -117,7 +118,7 @@ export function OverviewSocialConnections({
             </span>
             <span className="text-[10px] font-semibold text-muted-foreground/80">{uiI18n.t('app.following_90eeb100')}</span>
           </button>
-        </div>
+        </SlidingTabList>
 
         {/* User preview — single column, banner-as-card */}
         <div>

@@ -1,4 +1,25 @@
 {
+  "detailUi": {
+    "tagRelevance": "{{rank}}% de relevancia para este título",
+    "browseTag": {
+      "anime": "Explorar anime con esta etiqueta",
+      "manga": "Explorar manga con esta etiqueta",
+      "novel": "Explorar novelas con esta etiqueta"
+    },
+    "browseGenre": "Explorar el género {{genre}}",
+    "browseAuthor": "Buscar títulos de {{author}}",
+    "browseProducer": "Explorar anime de {{producer}}",
+    "rating": "Puntuación media de la comunidad para este título.",
+    "format": "El tipo de lanzamiento o publicación.",
+    "status": "El estado actual de emisión o publicación.",
+    "duration": "Duración habitual de cada episodio.",
+    "subEpisodes": "Episodios disponibles con subtítulos.",
+    "dubEpisodes": "Episodios disponibles con audio doblado.",
+    "chapters": "Capítulos registrados en el catálogo. La disponibilidad varía según la fuente.",
+    "volumes": "Volúmenes publicados registrados en el catálogo.",
+    "searchUnavailable": "La búsqueda de anime no está disponible temporalmente. Inténtalo de nuevo.",
+    "retrySearch": "Reintentar búsqueda de anime"
+  },
   "extensionSetup": {
     "invalidManifestUrl": "El complemento no devolvió una URL de manifiesto.",
     "wrongAddon": "La configuración devolvió un complemento distinto o no válido.",
@@ -7299,6 +7320,13 @@
     "noBadges": "Todavía no has obtenido insignias",
     "loadFailed": "No se pudieron cargar tus insignias. Inténtalo de nuevo.",
     "levels": "Niveles de la insignia",
+    "currentLevel": "Nivel actual",
+    "levelCount": "Nivel {{level}} de {{total}}",
+    "nextLevel": "Siguiente: {{name}}",
+    "maxLevel": "Nivel máximo alcanzado",
+    "current": "Actual",
+    "unlocked": "Desbloqueado",
+    "locked": "Bloqueado",
     "earned": "Obtenida",
     "openDetails": "Haz clic o toca para ver los detalles",
     "viewCollection": "Ver las {{count}} insignias",

@@ -7,6 +7,7 @@ const { attachStreamingCors } = require('./cors-bridge.cjs');
 const { registerShortcuts } = require('./shortcuts.cjs');
 const { adBlocker } = require('../security/ad-blocker.cjs');
 const { APP_SCHEME, APP_HOST, APP_START_URL } = require('./app-scheme.cjs');
+const { getDevServerUrl, isDevServerUrl } = require('./dev-server.cjs');
 
 /**
  * @param {object} deps
@@ -46,10 +47,7 @@ function createMainWindow(deps) {
         if (url.protocol === 'app:') return url.hostname === APP_HOST;
         if (url.protocol === 'https:') return url.origin === 'https://api.tatakai.app';
         if (url.protocol === 'http:') {
-            return (
-                (url.hostname === 'localhost' || url.hostname === '127.0.0.1') &&
-                url.port === '8090'
-            );
+            return isDev && isDevServerUrl(rawUrl);
         }
         if (url.protocol === 'file:') {
             let filePath;
@@ -190,7 +188,7 @@ function createMainWindow(deps) {
             : `file:///${normalizedPath}`;
     })();
 
-    const startUrl = isDev ? 'http://localhost:8090' : APP_START_URL;
+    const startUrl = isDev ? getDevServerUrl() : APP_START_URL;
 
     logger.info(`[Main] Loading: ${startUrl} (dev=${isDev})`);
 
@@ -206,7 +204,7 @@ function createMainWindow(deps) {
             }
         } catch (err) {
             logger.error(`[Loading] Failed to load ${url}:`, err.message);
-            if (isDev && url.includes('localhost:8090')) {
+            if (isDev && isDevServerUrl(url)) {
                 logger.info('[Loading] Dev server not ready, retrying in 2s...');
                 setTimeout(() => loadURL(url), 2000);
             } else if (!isDev && !prodFallbackTried && url === APP_START_URL) {

@@ -1,12 +1,25 @@
 import type { CSSProperties } from 'react';
-import { DEFAULT_READER_SETTINGS, type ReaderSettings } from '@/hooks/media/useReaderSettings';
+import { DEFAULT_SETTINGS as DEFAULT_READER_SETTINGS, type ReaderSettings } from '@/lib/reader/settings';
 import { getProfileKnobs } from '@/lib/memoryProfile';
 import { getEffectiveMemoryProfile } from '@/lib/mobile/dataSaver';
+import { isDataSaverEnabled } from '@/lib/mobile/dataSaver';
+
+export function effectiveReaderPreloading(settings: ReaderSettings) {
+  if (isDataSaverEnabled()) return 'none';
+  return settings.preloading === 'partial' ? getProfileKnobs(getEffectiveMemoryProfile()).readerPreload : settings.preloading;
+}
 
 export function readerPageIsEager(settings: ReaderSettings, index: number, currentPage: number, touchOrNative: boolean) {
-  const preloading = settings.preloading === 'partial' ? getProfileKnobs(getEffectiveMemoryProfile()).readerPreload : settings.preloading;
-  if (settings.loadingStrategy === 'eager' || preloading === 'full') return true;
+  const preloading = effectiveReaderPreloading(settings);
+  if (!isDataSaverEnabled() && (settings.loadingStrategy === 'eager' || preloading === 'full')) return true;
   return Math.abs(index - currentPage) <= (preloading === 'none' ? 1 : touchOrNative ? 6 : 3);
+}
+
+/** Full preloading still gives the page being read the first available slot. */
+export function readerPageLoadPriority(index: number, currentPage: number, spread = false): number {
+  if (index === currentPage || (spread && index === currentPage + 1)) return 20;
+  if (index > currentPage && index <= currentPage + 2) return 10;
+  return 0;
 }
 
 /** Exact sizing shared by the standard and extension readers. */

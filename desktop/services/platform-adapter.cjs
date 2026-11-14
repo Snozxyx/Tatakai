@@ -12,6 +12,7 @@
 const fs = require('fs')
 const path = require('path')
 const os = require('os')
+const { registerProtocolClient } = require('../window/deep-link.cjs')
 
 // ─── Factory ──────────────────────────────────────────────────────────────────
 
@@ -125,7 +126,7 @@ function createPlatformAdapter({ app, BrowserWindow, logger }) {
    */
   function registerProtocol(scheme) {
     try {
-      app.setAsDefaultProtocolClient(scheme)
+      registerProtocolClient(app, path, [scheme])
     } catch (err) {
       _logError(logger, `[PlatformAdapter] Failed to register protocol "${scheme}"`, err)
     }

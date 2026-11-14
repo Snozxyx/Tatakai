@@ -21,6 +21,7 @@ export interface TextStyle {
   autoFit: boolean;
 }
 interface LayerBase {
+  manual?: boolean;
   sourceRegion?: {x:number;y:number;width:number;height:number};
   cleanup?: {mask:string;sourceBlob:string;method:"edge-fill"|"diffusion";runtime:string;edited?:boolean};
   id: string;
@@ -136,7 +137,7 @@ interface Commands {
   undo: { args: { revision: number }; result: TranslationProject };
   redo: { args: { revision: number }; result: TranslationProject };
   render: {
-    args: { pageId: string; maxWidth?: number };
+    args: { pageId: string; maxWidth?: number; view?: "original" | "cleaned" | "translated" };
     result: { png: string; revision: number };
   };
   stroke: {
@@ -166,6 +167,8 @@ interface Commands {
       pageIds: string[];
       layerIds?: string[];
       stages: string[];
+      overwriteSelected?: boolean;
+      cleanupMask?: CleanupStroke[];
     };
     result: { started: boolean };
   };
@@ -181,6 +184,7 @@ interface Commands {
   };
   cancel: { args: Record<string, never>; result: { stopping: boolean } };
 }
+export interface CleanupStroke { diameter: number; points: number[][] }
 export interface OfflineModelStatus {installed:boolean;installing:boolean;message:string;name:string|null;bytes:number;source:string;license:string;running:boolean;loading:boolean;vision?:boolean;}
 export interface TranslationBridge {
   offlineStatus():Promise<OfflineModelStatus>;

@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
+import { ArrowRight } from 'lucide-react';
 import {
   Sheet,
   SheetContent,
@@ -11,15 +12,23 @@ import {
 import { Button } from '@/components/ui/button';
 import { CHANGELOG } from '@/lib/changelog';
 import { useChangelog } from '@/hooks/admin/useAdminFeatures';
+import { useIsMobile } from '@/hooks/ui/use-mobile';
+import { useMotionPreference } from '@/hooks/ui/useMotionPreference';
+import './update-surfaces.css';
 
 const STORAGE_KEY = 'tatakai:last-opened-version';
 export function UpdateChangelogSheet() {
   const { t } = useTranslation();
   const { pathname } = useLocation();
+  const mobile = useIsMobile();
+  const reducedMotion = useMotionPreference();
   const { data: releases, isLoading, isError } = useChangelog();
   const version = __APP_VERSION__;
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
+  const [motionClass, setMotionClass] = useState('');
+  const contentRef = useRef<HTMLDivElement>(null);
+  const closeTimer = useRef<number | null>(null);
   const published = releases?.find(
     (release) => release.version.replace(/^v/, '') === version.replace(/^v/, '')
   );
@@ -44,9 +53,30 @@ export function UpdateChangelogSheet() {
     )
       setOpen(true);
   }, [pending, isLoading, release, isError, pathname]);
+  useEffect(() => {
+    if (!open) return;
+    const frame = requestAnimationFrame(() => {
+      // Establish the recipe's resting scale before entering.
+      void contentRef.current?.offsetWidth;
+      setMotionClass('is-open');
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [open]);
+  useEffect(() => () => {
+    if (closeTimer.current !== null) window.clearTimeout(closeTimer.current);
+  }, []);
   const dismiss = () => {
-    setOpen(false);
+    if (closeTimer.current !== null) return;
+    setMotionClass('is-closing');
     setPending(false);
+    const closeMs = reducedMotion ? 0 : parseFloat(
+      getComputedStyle(document.documentElement).getPropertyValue('--modal-close-dur')
+    ) || 150;
+    closeTimer.current = window.setTimeout(() => {
+      setOpen(false);
+      setMotionClass('');
+      closeTimer.current = null;
+    }, closeMs);
     try {
       localStorage.setItem(STORAGE_KEY, version);
     } catch {
@@ -60,26 +90,40 @@ export function UpdateChangelogSheet() {
         if (!value) dismiss();
       }}
     >
-      <SheetContent side="right" className="flex w-full flex-col overflow-hidden p-0 sm:max-w-lg">
-        <SheetHeader className="shrink-0 px-6 pb-4 pt-6 pr-16">
-          <SheetTitle>{t('releaseSheet.title', { version })}</SheetTitle>
-          <SheetDescription>{t('releaseSheet.description')}</SheetDescription>
+      <SheetContent
+        ref={contentRef}
+        side={mobile ? 'bottom' : 'right'}
+        className={`release-sheet t-modal ${motionClass} flex w-full flex-col sm:max-w-lg`}
+        overlayClassName={`release-sheet-backdrop ${motionClass}`}
+      >
+        <div className="release-sheet-handle" aria-hidden="true" />
+        <SheetHeader className="release-sheet-header space-y-0">
+          <div className="update-brand">
+            <span className="update-bookmark" aria-hidden="true" />
+            <span>Tatakai</span>
+          </div>
+          <SheetTitle className="release-sheet-title">{t('releaseSheet.title', { version })}</SheetTitle>
+          <SheetDescription className="release-sheet-description">{t('releaseSheet.description')}</SheetDescription>
         </SheetHeader>
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6" data-release-notes-scroll>
-          <ul className="my-8 list-disc space-y-4 pl-5 text-sm leading-relaxed">
+        <div className="release-sheet-notes" data-release-notes-scroll>
+          <ul className="release-notes-list">
             {release?.changes.map((change, index) => (
-              <li key={index}>{change}</li>
+              <li key={index}>
+                <span className="release-note-number" aria-hidden="true">{index + 1}</span>
+                <span>{change}</span>
+              </li>
             ))}
           </ul>
           {!release && (
-            <p className="my-8 text-sm text-muted-foreground">
+            <p className="release-sheet-unavailable">
               {t('releaseSheet.unavailable')}
             </p>
           )}
         </div>
-        <div className="shrink-0 border-t p-6">
-          <Button onClick={dismiss} className="w-full">
+        <div className="release-sheet-footer">
+          <Button onClick={dismiss} className="release-continue">
             {t('releaseSheet.continue')}
+            <ArrowRight aria-hidden="true" />
           </Button>
         </div>
       </SheetContent>

@@ -1,3 +1,4 @@
+import { SlidingTabList } from '@/components/ui/sliding-tab-list';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMemo, useState } from 'react';
@@ -127,9 +128,9 @@ export function OverviewActivityHeatmap({
 
         {/* Source filter + Streak & Volume Summary Badges */}
         <div className="flex items-center gap-2 text-xs self-start lg:self-auto flex-wrap">
-          <div className="flex items-center gap-1 bg-black/20 p-1 rounded-xl border border-white/[0.03]">
+          <SlidingTabList className="flex items-center gap-1 bg-black/20 p-1 rounded-xl border border-white/[0.03]">
             {SOURCE_TABS.map((t) => (
-              <button
+              <button aria-pressed={source === t.key}
                 key={t.key}
                 onClick={() => setSource(t.key)}
                 className={cn(
@@ -142,7 +143,7 @@ export function OverviewActivityHeatmap({
                 {t.label}
               </button>
             ))}
-          </div>
+          </SlidingTabList>
 
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-black/20 border border-white/[0.03]">
             <Flame className="w-3.5 h-3.5 text-orange-400" />

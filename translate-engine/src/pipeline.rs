@@ -47,6 +47,15 @@ pub fn process(
         .map(|v| serde_json::from_value(v.clone()))
         .transpose()?
         .unwrap_or_default();
+    let overwrite = args["overwriteSelected"].as_bool().unwrap_or(false);
+    let manual_mask: Option<Vec<crate::cleanup::MaskStroke>> = args.get("cleanupMask")
+        .map(|v| serde_json::from_value(v.clone())).transpose()?;
+    if overwrite && (layer_ids.is_empty() || stages.iter().any(|s| s != "ocr" && s != "translate")) {
+        bail!("Replacing manual text requires selected layers and OCR or translation only");
+    }
+    if manual_mask.is_some() && (ids.len() != 1 || stages != ["cleanup"] || !layer_ids.is_empty()) {
+        bail!("A painted cleanup mask requires one page and cleanup only");
+    }
     if args.get("layerIds").is_some()
         && (layer_ids.is_empty() || stages.iter().any(|s| s == "detect"))
     {
@@ -118,7 +127,7 @@ pub fn process(
                 // Re-detection repairs old automatic boxes rather than silently
                 // skipping the page. Manually authored text remains untouched.
                 page.layers.retain(|layer| {
-                    !matches!(
+                    layer.manual == Some(true) || !matches!(
                         &layer.content,
                         Content::Text {
                             source_edited: false,
@@ -131,6 +140,12 @@ pub fn process(
                     if r.kind == "outside" && !settings.workflow.include_outside_text {
                         continue;
                     }
+                    // Manual regions own their source area during re-detection.
+                    if page.layers.iter().any(|l| l.manual == Some(true) && matches!(l.content, Content::Text { .. }) && {
+                        let b = crate::vision::source_rect(l);
+                        let x = r.x + r.width / 2.; let y = r.y + r.height / 2.;
+                        x >= b.x && x <= b.x + b.width && y >= b.y && y <= b.y + b.height
+                    }) { continue; }
                     if ![r.x, r.y, r.width, r.height].iter().all(|v| v.is_finite())
                         || r.width <= 0.
                         || r.height <= 0.
@@ -143,6 +158,7 @@ pub fn process(
                     }
                     let style = crate::vision::text_style(original, &r);
                     page.layers.push(Layer {
+                        manual: None,
                         cleanup: None,
                         source_region: Some(r.source_bounds.clone().unwrap_or(
                             scene::SourceRegion {
@@ -184,10 +200,10 @@ pub fn process(
                     .filter(|(_, l)| layer_ids.is_empty() || layer_ids.contains(&l.id))
                     .filter_map(|(i, l)| match &l.content {
                         Content::Text {
-                            source_edited: false,
+                            source_edited,
                             source,
                             ..
-                        } if !(stages.iter().any(|s| s == "detect")
+                        } if (!source_edited || overwrite) && !(stages.iter().any(|s| s == "detect")
                             && l.source_region.is_some()
                             && !source.trim().is_empty()) =>
                         {
@@ -223,9 +239,10 @@ pub fn process(
                         &page.layers[index],
                     )?;
                     let text = crate::vision::transcribe(provider, &crop, cancel, &cache)?;
-                    if let Content::Text { source, .. } = &mut page.layers[index].content {
+                    if let Content::Text { source, source_edited, .. } = &mut page.layers[index].content {
                         if !text.trim().is_empty() {
                             *source = text;
+                            if overwrite { *source_edited = false; }
                             changed = true;
                         } else if source.trim().is_empty() {
                             bail!("OCR could not read this text region. Check the vision model or redraw the text box around the lettering.");
@@ -240,7 +257,9 @@ pub fn process(
                     let s = crate::session(&mut state)?;
                     crate::import::decode(&s.blob(&page.blob)?)?.into_rgba8()
                 };
-                let (mask, fill) = crate::cleanup::mask(&original, page, &layer_ids)?;
+                let (mask, fill) = if let Some(strokes) = &manual_mask {
+                    crate::cleanup::painted_mask(&original, strokes)?
+                } else { crate::cleanup::mask(&original, page, &layer_ids)? };
                 let mut hash = blake3::Hasher::new();
                 hash.update(b"yomi-cleanup-v2");
                 hash.update(mask.as_raw());
@@ -274,7 +293,7 @@ pub fn process(
                             &image::DynamicImage::ImageLuma8(mask).into_rgba8(),
                         )?;
                         layer.cleanup = Some(scene::CleanupRecord {
-                            edited: None,
+                            edited: manual_mask.as_ref().map(|_| true),
                             mask: s.put_blob(&mask_png)?,
                             source_blob: page.blob.clone(),
                             method: settings.workflow.cleanup.mode.clone(),
@@ -284,7 +303,7 @@ pub fn process(
                                 "native-cpu".into()
                             },
                         });
-                        if layer_ids.is_empty() {
+                        if layer_ids.is_empty() && manual_mask.is_none() {
                             page.layers.retain(|l| {
                                 l.cleanup.as_ref().is_none_or(|c| {
                                     c.source_blob != page.blob || c.edited == Some(true)
@@ -296,7 +315,7 @@ pub fn process(
                             .iter()
                             .position(|l| {
                                 matches!(l.content, Content::Text { .. })
-                                    || l.cleanup.as_ref().is_some_and(|c| c.edited == Some(true))
+                                    || (manual_mask.is_none() && l.cleanup.as_ref().is_some_and(|c| c.edited == Some(true)))
                             })
                             .unwrap_or(page.layers.len());
                         page.layers.insert(position, layer);
@@ -312,9 +331,9 @@ pub fn process(
                     .filter_map(|(i, l)| match &l.content {
                         Content::Text {
                             source,
-                            translation_edited: false,
+                            translation_edited,
                             ..
-                        } if !source.trim().is_empty() => Some((i, source.clone())),
+                        } if (!translation_edited || overwrite) && !source.trim().is_empty() => Some((i, source.clone())),
                         _ => None,
                     })
                     .collect();
@@ -364,10 +383,11 @@ pub fn process(
                     )?);
                 }
                 for ((index, _), text) in selected.into_iter().zip(results) {
-                    if let Content::Text { translation, .. } =
+                    if let Content::Text { translation, translation_edited, .. } =
                         &mut project.pages[page_index].layers[index].content
                     {
                         *translation = text;
+                        if overwrite { *translation_edited = false; }
                         changed = true;
                     }
                 }
@@ -595,6 +615,7 @@ The user decides the language and writing system. Use their explicit choice, oth
         let width = create.width.unwrap_or((page.width as f32 * 0.5).max(1.));
         let height = create.height.unwrap_or((page.height as f32 * 0.2).max(1.));
         page.layers.push(Layer {
+            manual: Some(true),
             cleanup: None,
             source_region: None,
             id: scene::id(),

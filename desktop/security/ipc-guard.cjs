@@ -28,12 +28,9 @@
 
 const { URL, fileURLToPath } = require('node:url');
 const path = require('node:path');
+const { isDevServerUrl } = require('../window/dev-server.cjs');
 
 const APP_SCHEME_HOST = 'tatakai.me';
-const DEV_ORIGINS = new Set([
-    'http://localhost:8090',
-    'http://127.0.0.1:8090',
-]);
 
 /**
  * @param {string} rawUrl
@@ -69,7 +66,7 @@ function isTrustedFrameUrl(rawUrl, opts = {}) {
     }
 
     if (url.protocol === 'http:' || url.protocol === 'https:') {
-        return Boolean(opts.isDev) && DEV_ORIGINS.has(url.origin);
+        return Boolean(opts.isDev) && isDevServerUrl(rawUrl);
     }
 
     return false;

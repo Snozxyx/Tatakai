@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.vitepress/cache/
+content/public/*.md
+content/public/architecture/
+content/public/extensions/
+content/public/feature-guides/
+content/public/technical-reference/
+content/public/llms*.txt
+content/public/sitemap.xml
+content/public/robots.txt

@@ -57,14 +57,15 @@ public class TatakaiMuxPlugin extends Plugin {
                 input = local.getPath();
             } catch (Exception error) { call.resolve(failure("Media is unavailable.")); return; }
         }
-        File output = new File(getContext().getCacheDir(), "subtitle-" + UUID.randomUUID() + ".vtt");
-        FFmpegKit.executeWithArgumentsAsync(new String[] { "-y", "-i", input, "-map", "0:" + index, "-c:s", "webvtt", output.getPath() }, session -> {
+        boolean ass = "ass".equals(call.getString("format", "vtt"));
+        File output = new File(getContext().getCacheDir(), "subtitle-" + UUID.randomUUID() + (ass ? ".ass" : ".vtt"));
+        FFmpegKit.executeWithArgumentsAsync(new String[] { "-y", "-i", input, "-map", "0:" + index, "-c:s", ass ? "copy" : "webvtt", output.getPath() }, session -> {
             try {
                 if (!ReturnCode.isSuccess(session.getReturnCode())) { call.resolve(failure("This subtitle track cannot be extracted as text. Bitmap subtitles require a compatible native player.")); return; }
                 String text = new String(Files.readAllBytes(output.toPath()), StandardCharsets.UTF_8);
-                if (!text.contains("-->")) { call.resolve(failure("No subtitle cues found.")); return; }
+                if (!ass && !text.contains("-->")) { call.resolve(failure("No subtitle cues found.")); return; }
                 JSObject result = success();
-                result.put("url", "data:text/vtt;base64," + android.util.Base64.encodeToString(text.getBytes(StandardCharsets.UTF_8), android.util.Base64.NO_WRAP));
+                result.put("url", "data:" + (ass ? "text/x-ssa" : "text/vtt") + ";base64," + android.util.Base64.encodeToString(text.getBytes(StandardCharsets.UTF_8), android.util.Base64.NO_WRAP));
                 call.resolve(result);
             } catch (Exception error) { call.resolve(failure("Unable to read extracted subtitles.")); }
             finally { output.delete(); }

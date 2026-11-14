@@ -1,3 +1,4 @@
+import { SlidingTabList } from '@/components/ui/sliding-tab-list';
 import { ProfileBadges } from '@/components/profile/ProfileBadges';
 import ProfileThemeDetails from '../ProfileThemeDetails';
 import { profileThemeAssetUrl } from '@/lib/profileThemeAssets';
@@ -186,7 +187,7 @@ export default function KomorebiProfile({ data, onBack, configuration }: ThemeRe
             </div>
           ))}
         </div>
-        <nav className="km-nav" aria-label="Profile sections">
+        <SlidingTabList as="nav" className="km-nav" aria-label="Profile sections">
           {tabs.map((tab) => (
             <button
               type="button"
@@ -197,7 +198,7 @@ export default function KomorebiProfile({ data, onBack, configuration }: ThemeRe
               {tab.label}
             </button>
           ))}
-        </nav>
+        </SlidingTabList>
         <div className="km-content">
           {data.loading ? (
             <p role="status">Opening the collection…</p>

@@ -1,3 +1,4 @@
+import { SlidingTabList } from '@/components/ui/sliding-tab-list';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState } from 'react';
@@ -115,7 +116,7 @@ export function SavedContentPanel({ section }: { section?: string }) {
       <StorageUsageBar />
 
       {/* Sub-tab bar */}
-      <div className="flex flex-wrap gap-2">
+      <SlidingTabList className="flex flex-wrap gap-2">
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -138,7 +139,7 @@ export function SavedContentPanel({ section }: { section?: string }) {
             )}
           </button>
         ))}
-      </div>
+      </SlidingTabList>
 
       {tab === 'bookmarks' && <BookmarksSection query={bookmarks} />}
       {tab === 'tierlists' && <TierListsSection query={tierLists} onOpen={open} />}

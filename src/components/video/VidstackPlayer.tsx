@@ -13,6 +13,9 @@ import { registerGlobalVideo, updateGlobalVideoTime } from '@/core/player/global
 import { usePlaybackCoordinator } from '@/core/player/usePlaybackCoordinator';
 import type { VideoSettings } from '@/hooks/media/useVideoSettings';
 import type { OptionalVidstackProps } from './OptionalVidstackPlayer';
+import { useAssSubtitle } from './hooks/useAssSubtitle';
+import { AssSubtitleOverlay } from './overlays/AssSubtitleOverlay';
+import { getSubtitleSelectionKey } from '@/core/player/subtitle-utils';
 import { normalizeTrackLanguage } from './hooks/useSubtitleManager';
 import { useSleepTimer } from './hooks/usePlayerEnhancements';
 import { useDesktopPlayerFullscreen } from './hooks/useDesktopPlayerFullscreen';
@@ -27,6 +30,10 @@ export default function VidstackPlayer(props: OptionalVidstackProps & { settings
   const { onEpisodeEnd } = props;
   const player = useRef<MediaPlayerInstance>(null);
   const video = useRef<HTMLVideoElement>(null);
+  const [videoRevision, setVideoRevision] = useState(0);
+  const [subtitleSelection, setSubtitleSelection] = useState(props.settings.subtitleLanguage);
+  useEffect(() => setSubtitleSelection(props.settings.subtitleLanguage), [props.settings.subtitleLanguage]);
+  const assSubtitle = useAssSubtitle(props.subtitles || [], subtitleSelection, props.headers?.Referer, props.headers?.['User-Agent']);
   const container = useRef<HTMLDivElement>(null);
   const fullscreenActive = useRef(false);
   const [isDesktopFullscreen, setIsDesktopFullscreen] = useState(false);
@@ -115,6 +122,7 @@ export default function VidstackPlayer(props: OptionalVidstackProps & { settings
       provider.fullscreen = fullscreenAdapter;
     }
     video.current = isVideoProvider(provider) || isHLSProvider(provider) || isDASHProvider(provider) ? provider.video : null;
+    setVideoRevision(value => value + 1);
     registerGlobalVideo(video.current, window.location.pathname, { animeName: props.animeName, animePoster: props.poster });
   }, [props.isLive, props.animeName, props.poster, desktopFullscreen.isDesktop, fullscreenAdapter]);
 
@@ -180,6 +188,11 @@ export default function VidstackPlayer(props: OptionalVidstackProps & { settings
         event.preventDefault();
         void desktopFullscreen.exit();
       }}
+      data-ass-active={!!assSubtitle}
+      onTextTrackChange={track => {
+        const index = track ? (props.subtitles || []).findIndex(subtitle => (subtitle.label || subtitle.lang) === track.label && normalizeTrackLanguage(subtitle.lang) === track.language) : -1;
+        setSubtitleSelection(index >= 0 ? getSubtitleSelectionKey(props.subtitles![index], index) : 'off');
+      }}
       onProviderChange={onProviderChange} onCanPlay={onCanPlay} onError={onError} onEnded={onEnded}
       onPlaying={() => setError(null)} onPlay={() => props.onPlay?.()}
       onPause={() => { props.onPause?.(); if (!pendingSeek.current) report(resumePosition.current, player.current?.duration, false, true); }}
@@ -199,6 +212,7 @@ export default function VidstackPlayer(props: OptionalVidstackProps & { settings
           type={/\.srt(?:[?#]|$)/i.test(subtitle.originalUrl || subtitle.url) ? 'srt' : /\.(ass|ssa)(?:[?#]|$)/i.test(subtitle.originalUrl || subtitle.url) ? 'ass' : 'vtt'}
           default={index === subtitleIndex} />)}
       </MediaProvider>
+      <AssSubtitleOverlay videoRef={video} subtitle={assSubtitle} offset={props.settings.subtitleOffset} mediaKey={`${url}|${videoRevision}`} />
       <DefaultVideoLayout icons={defaultLayoutIcons} colorScheme="dark" playbackRates={[0.5, 0.75, 1, 1.25, 1.5, 2, 3]}
         menuContainer={isDesktopFullscreen ? container.current : undefined} />
       {activeSkip && !error && <button type="button" onClick={() => { if (player.current) player.current.currentTime = activeSkip.end; }}

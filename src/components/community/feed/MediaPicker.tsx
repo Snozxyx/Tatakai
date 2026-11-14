@@ -1,3 +1,4 @@
+import { SlidingTabList } from '@/components/ui/sliding-tab-list';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useEffect, useState } from 'react';
@@ -132,9 +133,9 @@ export function MediaPicker({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>{trigger}</PopoverTrigger>
       <PopoverContent align="start" className="w-80 p-3">
-        <div className="mb-2 flex gap-1 rounded-lg bg-muted/40 p-1">
+        <SlidingTabList className="mb-2 flex gap-1 rounded-lg bg-muted/40 p-1">
           {(['anime', 'manga', 'novel', 'character'] as Tab[]).map((t) => (
-            <button
+            <button aria-pressed={tab === t}
               key={t}
               type="button"
               onClick={() => setTab(t)}
@@ -143,7 +144,7 @@ export function MediaPicker({
               {t === 'manga' ? uiI18n.t('app.manga_87db0f99') : t === 'novel' ? uiI18n.t('app.novels_4ae488fd') : t === 'character' ? uiI18n.t('app.character_ee9946c8') : uiI18n.t('app.anime_f1b32a19')}
             </button>
           ))}
-        </div>
+        </SlidingTabList>
         <div className="relative mb-2">
           <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input autoFocus value={raw} onChange={(e) => setRaw(e.target.value)} placeholder={uiI18n.t('app.search_i18n_value_0_debbcdc0', { value0: tab })} className="h-9 pl-8 text-sm" />

@@ -214,6 +214,16 @@ export default function SearchPage() {
 
   const [imageConfidenceThreshold, setImageConfidenceThreshold] = useState<number>(0.85);
   const [showAdvancedAssist, setShowAdvancedAssist] = useState(false);
+  const [filtersMounted, setFiltersMounted] = useState(false);
+  const advancedFiltersRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const panel = advancedFiltersRef.current;
+    if (!panel) return;
+    if (!showAdvancedAssist && panel.contains(document.activeElement)) {
+      document.getElementById('search-filters-toggle')?.focus();
+    }
+    panel.inert = !showAdvancedAssist;
+  }, [showAdvancedAssist]);
   const [selectedAnimeTags, setSelectedAnimeTags] = useHistoryPreference<string[]>('selectedAnimeTags', () => {
     const values = searchParams.getAll('animeTag');
     const packed = searchParams.get('animeTags');
@@ -606,6 +616,8 @@ export default function SearchPage() {
     hasNextPage: hasNextSearchPage,
     isFetchingNextPage: isFetchingNextSearchPage,
     isLoading: isLoadingSearch,
+    error: animeSearchError,
+    refetch: retryAnimeSearch,
   } = useInfSearch(query, animeBackendFilters, shouldEnableAnimeSearch, animeFilterActive || selectedAnimeTags.length > 0 || catalogSortActive);
   useScrollRestoration('search', { useWindow: true, ready: !isLoadingSearch });
 
@@ -1453,7 +1465,7 @@ export default function SearchPage() {
           </form>
         </div>
 
-        <div className="mb-8 md:mb-10">
+        <div className="t-acc search-control-section mb-8 md:mb-10" data-open={showAdvancedAssist}>
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5 mb-6">
             <div>
@@ -1494,31 +1506,19 @@ export default function SearchPage() {
               label={uiI18n.t('app.sort_adc4e96a')}
             />
 
-            {/* Type Switcher Pills */}
-            <div className="discover-types flex max-w-full flex-wrap bg-muted/40 p-1 rounded-xl ring-1 ring-inset ring-border">
-              {[
+            <PillGroup<typeof resultType>
+              className="discover-types search-type-tabs w-full md:w-auto"
+              label={uiI18n.t('app.type_3deb7456')}
+              value={resultType}
+              onChange={setResultType}
+              options={[
                 { id: 'all', get label() { return uiI18n.t('app.all_6a720856'); } },
-                { id: 'anime', get label() { return uiI18n.t('app.anime_f1b32a19'); }, icon: <Film className="w-3 h-3" /> },
-                { id: 'manga', get label() { return uiI18n.t('app.manga_87db0f99'); }, icon: <BookOpen className="w-3 h-3" /> },
-                { id: 'novel', get label() { return uiI18n.t('app.novels_4ae488fd'); }, icon: <BookOpen className="w-3 h-3" /> },
+                { id: 'anime', get label() { return uiI18n.t('app.anime_f1b32a19'); }, icon: <Film className="w-4 h-4" /> },
+                { id: 'manga', get label() { return uiI18n.t('app.manga_87db0f99'); }, icon: <BookOpen className="w-4 h-4" /> },
+                { id: 'novel', get label() { return uiI18n.t('app.novels_4ae488fd'); }, icon: <BookOpen className="w-4 h-4" /> },
                 { id: 'character', get label() { return uiI18n.t('app.characters_b6f59f08'); } }
-              ].map(type => (
-                <button
-                  key={type.id}
-                  aria-pressed={resultType === type.id}
-                  onClick={() => setResultType(type.id as any)}
-                  className={cn(
-                    "min-h-10 px-3 py-1 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-[color,background-color,border-color,opacity,transform] whitespace-nowrap md:min-h-8",
-                    resultType === type.id
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  {type.icon}
-                  {type.label}
-                </button>
-              ))}
-            </div>
+              ]}
+            />
 
             {/* Year Dropdown */}
             <DropdownMenu>
@@ -1620,7 +1620,10 @@ export default function SearchPage() {
               id="search-filters-toggle"
               aria-expanded={showAdvancedAssist}
               aria-controls="search-advanced-filters"
-              onClick={() => setShowAdvancedAssist((val) => !val)}
+              onClick={() => {
+                setFiltersMounted(true);
+                setShowAdvancedAssist((val) => !val);
+              }}
               className={cn(
                 "h-8 px-3 rounded-full text-xs font-medium border transition-[color,background-color,border-color,opacity,transform] flex items-center gap-1.5",
                 showAdvancedAssist
@@ -1635,13 +1638,15 @@ export default function SearchPage() {
                   {activeFilterCount}
                 </span>
               )}
+              <span className="t-acc-chevron" aria-hidden="true"><ChevronDown className="h-4 w-4" /></span>
             </button>
           </div>
 
           <AppliedFilters filters={appliedFilters} onClear={resetFilters} />
 
-          {showAdvancedAssist && (
-            <GlassPanel quiet id="search-advanced-filters" className="premium-filter-panel mt-4 p-4 md:p-6 space-y-6 rounded-2xl border border-border overflow-hidden relative ui-state-fade bg-card/60">
+          <div id="search-advanced-filters" className="t-acc-panel" aria-hidden={!showAdvancedAssist}>
+            <div ref={advancedFiltersRef} className="t-acc-panel-inner">
+            {filtersMounted && <GlassPanel quiet className="premium-filter-panel mt-4 p-4 md:p-6 space-y-6 rounded-2xl border border-border overflow-hidden relative bg-card/60">
 
               <div className="flex flex-wrap items-center justify-between gap-4 relative z-10 pb-4 border-b border-white/[0.07]">
                 <div className="flex items-center gap-2.5">
@@ -2141,9 +2146,9 @@ export default function SearchPage() {
 
               </div>
 
-            </GlassPanel>
-
-          )}
+            </GlassPanel>}
+            </div>
+          </div>
 
 
 
@@ -2385,6 +2390,12 @@ export default function SearchPage() {
               </div>
             )}
 
+            {showAnimeResults && animeSearchError && (
+              <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 p-5 text-sm">
+                <p>{uiI18n.t('detailUi.searchUnavailable')}</p>
+                <Button className="mt-3" onClick={() => void retryAnimeSearch()}>{uiI18n.t('detailUi.retrySearch')}</Button>
+              </div>
+            )}
             {showNovelResults && novelSearchError && (
               <div role="alert" className="my-6 rounded-2xl border border-destructive/30 p-5">
                 <p>{novelSearchError.message}</p>
@@ -2431,7 +2442,7 @@ export default function SearchPage() {
               </>
             )}
 
-            {!hasAnyResult && !hasMoreResults && !mangaSearchError && !novelSearchError && (
+            {!hasAnyResult && !hasMoreResults && !(showAnimeResults && animeSearchError) && !mangaSearchError && !novelSearchError && (
               <div className="text-center py-20">
                 <Search className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
                 <h2 className="text-xl font-medium mb-2">{uiI18n.t('app.no_results_found_658e79f9')}</h2>

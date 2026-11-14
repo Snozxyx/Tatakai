@@ -25,3 +25,5 @@
 .vidstack-player-container.is-player-fullscreen [data-vidstack-toolbar] {
   display: none;
 }
+
+[data-ass-active="true"] .vds-captions { display: none; }

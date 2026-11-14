@@ -1,3 +1,4 @@
+import { SlidingTabList } from '@/components/ui/sliding-tab-list';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useState } from 'react';
@@ -400,11 +401,11 @@ export default function RecommendationsPage() {
                 <Slider value={[nicheBoost]} min={0} max={1} step={0.05} onValueChange={(v) => setNicheBoost(v[0])} className="w-32" />
                 <span className="text-xs text-muted-foreground whitespace-nowrap">{uiI18n.t('app.niche_d6aa4102')}</span>
               </div>
-              <div className="flex gap-2">
-                <Button variant={filter === 'all' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('all')}>{uiI18n.t('app.all_6a720856')}</Button>
-                <Button variant={filter === 'high' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('high')}>{uiI18n.t('app.high_b1a5954a')}</Button>
-                <Button variant={filter === 'medium' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('medium')}>{uiI18n.t('app.medium_d404968e')}</Button>
-              </div>
+              <SlidingTabList className="flex gap-2">
+                <Button aria-pressed={filter === 'all'} variant={filter === 'all' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('all')}>{uiI18n.t('app.all_6a720856')}</Button>
+                <Button aria-pressed={filter === 'high'} variant={filter === 'high' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('high')}>{uiI18n.t('app.high_b1a5954a')}</Button>
+                <Button aria-pressed={filter === 'medium'} variant={filter === 'medium' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('medium')}>{uiI18n.t('app.medium_d404968e')}</Button>
+              </SlidingTabList>
             </div>
           </div>
 

@@ -1,10 +1,10 @@
 'use strict';
 
-function registerProtocolClient(app, pathModule) {
+function registerProtocolClient(app, pathModule, schemes = ['tatakai', 'magnet']) {
     // An unpackaged Electron executable needs the app entry before the URL.
     // process.defaultApp is not a reliable packaging check, and argv[1] can
     // itself be a callback URL. Resolve our entry from this module instead.
-    for (const scheme of ['tatakai', 'magnet']) {
+    for (const scheme of schemes) {
         if (app.isPackaged) {
             app.setAsDefaultProtocolClient(scheme);
         } else {
@@ -51,8 +51,8 @@ function handleDeepLink(url, getMainWindow) {
     }
 
     // Security: Sanitize standard routes
-    // Only allow alphanumeric, slashes, dashes, underscores, dots, and question marks (for queries)
-    const sanitizedRoute = '/' + rawRoute.replace(/[^a-zA-Z0-9\/\-_\.\?\=&]/g, '');
+    // Preserve encoded watch IDs and namespaced reading IDs while keeping a local route.
+    const sanitizedRoute = '/' + rawRoute.replace(/^\/+/, '').replace(/[^a-zA-Z0-9\/\-_\.\?\=&%:]/g, '');
 
     mainWindow.webContents.send('navigate', sanitizedRoute);
 }

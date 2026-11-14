@@ -1,3 +1,4 @@
+import { SlidingTabList } from '@/components/ui/sliding-tab-list';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -201,7 +202,7 @@ export function MessagesPanel({ conversationId, onSelect, compact = false, activ
   const requests = conversations.data?.filter(c => c.status === 'pending' && c.requested_by !== user?.id).length ?? 0;
   return <div className="messages-panel" data-compact={compact} data-selected={!!conversationId}>
       <aside className="messages-panel-sidebar" aria-label="Conversations">
-        <div className="flex gap-2 border-b border-border p-3"><Button size="sm" variant={tab === 'chats' ? 'default' : 'ghost'} onClick={() => setTab('chats')}>Chats</Button><Button size="sm" variant={tab === 'requests' ? 'default' : 'ghost'} onClick={() => setTab('requests')}>Requests{requests ? ` (${requests})` : ''}</Button></div>
+        <SlidingTabList className="flex gap-2 border-b border-border p-3"><Button size="sm" aria-pressed={tab === 'chats'} variant={tab === 'chats' ? 'default' : 'ghost'} onClick={() => setTab('chats')}>Chats</Button><Button size="sm" aria-pressed={tab === 'requests'} variant={tab === 'requests' ? 'default' : 'ghost'} onClick={() => setTab('requests')}>Requests{requests ? ` (${requests})` : ''}</Button></SlidingTabList>
         {conversations.isLoading ? <p className="p-4 text-sm text-muted-foreground">Loading conversations…</p> : conversations.isError ? <div className="space-y-3 p-4"><p className="text-sm text-muted-foreground">Messages couldn’t load.</p><Button variant="outline" onClick={() => void conversations.refetch()}>Retry</Button></div> : !rows.length ? <p className="p-4 text-sm text-muted-foreground">{tab === 'requests' ? 'No message requests.' : 'No conversations yet. Open someone’s profile and choose Message.'}</p> : <ul>{rows.map(c => {
           const peerId = c.user_a === user?.id ? c.user_b : c.user_a;
           const peer = profiles.data?.find(p => p.user_id === peerId);

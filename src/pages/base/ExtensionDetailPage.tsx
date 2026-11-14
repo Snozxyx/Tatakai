@@ -1,3 +1,4 @@
+import { SlidingTabList } from '@/components/ui/sliding-tab-list';
 import { registeredExtensionAliases } from '@/hooks/api/useExtensionStore';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
@@ -441,7 +442,7 @@ export default function ExtensionDetailPage() {
 
         <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
           <div>
-            <div className="inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-full border border-white/[0.07] bg-white/[0.03] p-1 scrollbar-none">
+            <SlidingTabList className="inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-full border border-white/[0.07] bg-white/[0.03] p-1 scrollbar-none">
               {TABS.map((entry) => (
                 <button
                   key={entry.id}
@@ -459,7 +460,7 @@ export default function ExtensionDetailPage() {
                   {entry.label}
                 </button>
               ))}
-            </div>
+            </SlidingTabList>
 
             <div className="mt-6">
               {tab === 'overview' ? (

@@ -143,6 +143,49 @@ fn diffusion(
     result
 }
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MaskStroke {
+    pub diameter: f32,
+    pub points: Vec<[f32; 2]>,
+}
+pub fn painted_mask(original: &RgbaImage, strokes: &[MaskStroke]) -> Result<(GrayImage, RgbaImage)> {
+    if original.width() as u64 * original.height() as u64 > 32_000_000
+        || strokes.is_empty() || strokes.len() > 1000
+        || strokes.iter().map(|s| s.points.len()).sum::<usize>() > 100_000 {
+        bail!("Cleanup mask exceeds its size limit");
+    }
+    let mut mask = GrayImage::new(original.width(), original.height());
+    let mut work = 0u64;
+    for stroke in strokes {
+        if !stroke.diameter.is_finite() || !(1. ..=300.).contains(&stroke.diameter)
+            || stroke.points.is_empty() || !stroke.points.iter().flatten().all(|p| p.is_finite() && p.abs() < 100_000.) {
+            bail!("Invalid cleanup mask stroke");
+        }
+        let radius = stroke.diameter / 2.;
+        for (a, b) in stroke.points.windows(2).map(|p| (p[0], p[1]))
+            .chain(std::iter::once((stroke.points[0], stroke.points[0]))) {
+            let x0 = (a[0].min(b[0]) - radius).clamp(0., original.width() as f32) as u32;
+            let x1 = (a[0].max(b[0]) + radius + 1.).clamp(0., original.width() as f32) as u32;
+            let y0 = (a[1].min(b[1]) - radius).clamp(0., original.height() as f32) as u32;
+            let y1 = (a[1].max(b[1]) + radius + 1.).clamp(0., original.height() as f32) as u32;
+            work = work.saturating_add((x1 - x0) as u64 * (y1 - y0) as u64);
+            if work > 100_000_000 { bail!("Cleanup mask is too large; apply shorter strokes"); }
+            let dx = b[0] - a[0]; let dy = b[1] - a[1]; let len = dx * dx + dy * dy;
+            for y in y0..y1 { for x in x0..x1 {
+                let px = x as f32 + 0.5 - a[0]; let py = y as f32 + 0.5 - a[1];
+                let t = if len == 0. { 0. } else { ((px * dx + py * dy) / len).clamp(0., 1.) };
+                if (px - t * dx).powi(2) + (py - t * dy).powi(2) <= radius * radius {
+                    mask[(x, y)] = Luma([255]);
+                }
+            } }
+        }
+    }
+    if !mask.pixels().any(|p| p[0] > 0) { bail!("Paint a cleanup mask inside the page first"); }
+    if mask.pixels().all(|p| p[0] > 0) { bail!("Leave some surrounding artwork outside the cleanup mask"); }
+    Ok((mask, RgbaImage::new(original.width(), original.height())))
+}
+
 pub fn mask(original: &RgbaImage, page: &Page, ids: &[String]) -> Result<(GrayImage, RgbaImage)> {
     if original.width() as u64 * original.height() as u64 > 32_000_000 {
         bail!("Cleanup is limited to 32 megapixels per page; split long pages before cleanup");
@@ -392,6 +435,7 @@ fn interpolate_background(
 
 pub fn layer(page: &Page, blob: String) -> Layer {
     Layer {
+        manual: None,
         id: crate::scene::id(),
         name: "Cleanup".into(),
         visible: true,
@@ -409,6 +453,19 @@ pub fn layer(page: &Page, blob: String) -> Layer {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn painted_masks_clean_only_selected_pixels_without_ocr() {
+        let mut original = image::RgbaImage::from_pixel(32,32,image::Rgba([240,240,240,255]));
+        original[(16,16)] = image::Rgba([0,0,0,255]);
+        original[(2,2)] = image::Rgba([10,20,30,255]);
+        let strokes = [super::MaskStroke {diameter: 6., points:vec![[16.,16.]]}];
+        let (mask,fill)=super::painted_mask(&original,&strokes).unwrap();
+        let (output,mask)=super::clean_prepared(&original,mask,fill,&super::Options::default(),&std::sync::atomic::AtomicBool::new(false)).unwrap();
+        assert_eq!(output[(16,16)],image::Rgba([240,240,240,255]));
+        for (x,y,pixel) in output.enumerate_pixels() { if mask[(x,y)][0] == 0 {assert_eq!(pixel[3],0);} }
+        assert!(super::painted_mask(&original,&[super::MaskStroke {diameter: f32::NAN,points:vec![[0.,0.]]}]).is_err());
+        assert!(super::painted_mask(&original,&[super::MaskStroke {diameter: 300.,points:vec![[16.,16.]]}]).is_err());
+    }
     use super::*;
     #[test]
     fn background_fill_follows_a_gradient() {

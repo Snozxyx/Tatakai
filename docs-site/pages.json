@@ -1,0 +1,154 @@
+[
+  {
+    "title": "Welcome to Tatakai",
+    "path": "welcome-to-tatakai.md"
+  },
+  {
+    "title": "Product overview",
+    "path": "product-overview.md"
+  },
+  {
+    "title": "Development setup",
+    "path": "development-setup.md"
+  },
+  {
+    "title": "Contributing",
+    "path": "contributing.md"
+  },
+  {
+    "title": "Feature guides",
+    "path": "feature-guides.md"
+  },
+  {
+    "title": "Product overview",
+    "path": "feature-guides/product-overview.md"
+  },
+  {
+    "title": "Video player",
+    "path": "feature-guides/video-player.md"
+  },
+  {
+    "title": "Manga reader",
+    "path": "feature-guides/manga-reader.md"
+  },
+  {
+    "title": "Novel reader",
+    "path": "feature-guides/novel-reader.md"
+  },
+  {
+    "title": "Search and discovery",
+    "path": "feature-guides/search-and-discovery.md"
+  },
+  {
+    "title": "Recommendations",
+    "path": "feature-guides/recommendations.md"
+  },
+  {
+    "title": "Community and social",
+    "path": "feature-guides/community-and-social.md"
+  },
+  {
+    "title": "Downloads and offline access",
+    "path": "feature-guides/downloads-and-offline-access.md"
+  },
+  {
+    "title": "Settings and personalization",
+    "path": "feature-guides/settings-and-personalization.md"
+  },
+  {
+    "title": "Architecture",
+    "path": "architecture.md"
+  },
+  {
+    "title": "System architecture",
+    "path": "architecture/system-architecture.md"
+  },
+  {
+    "title": "Backend and data",
+    "path": "architecture/backend-and-data.md"
+  },
+  {
+    "title": "Frontend architecture",
+    "path": "architecture/frontend-architecture.md"
+  },
+  {
+    "title": "Desktop architecture",
+    "path": "architecture/desktop-architecture.md"
+  },
+  {
+    "title": "Extensions",
+    "path": "extensions.md"
+  },
+  {
+    "title": "Extension overview",
+    "path": "extensions/extension-overview.md"
+  },
+  {
+    "title": "Build your first extension",
+    "path": "extensions/build-your-first-extension.md"
+  },
+  {
+    "title": "Extension manifest",
+    "path": "extensions/extension-manifest.md"
+  },
+  {
+    "title": "Extension capabilities",
+    "path": "extensions/extension-capabilities.md"
+  },
+  {
+    "title": "Analytics capability",
+    "path": "extensions/extension-capabilities/analytics-capability.md"
+  },
+  {
+    "title": "Sources",
+    "path": "extensions/extension-capabilities/sources.md"
+  },
+  {
+    "title": "Custom sources",
+    "path": "extensions/extension-capabilities/custom-sources.md"
+  },
+  {
+    "title": "Themes",
+    "path": "extensions/extension-capabilities/themes.md"
+  },
+  {
+    "title": "UI slots",
+    "path": "extensions/extension-capabilities/ui-slots.md"
+  },
+  {
+    "title": "Manga capability",
+    "path": "extensions/extension-capabilities/manga-capability.md"
+  },
+  {
+    "title": "Novel capability",
+    "path": "extensions/extension-capabilities/novel-capability.md"
+  },
+  {
+    "title": "Services and modules",
+    "path": "extensions/extension-capabilities/services-and-modules.md"
+  },
+  {
+    "title": "Renderer loader",
+    "path": "extensions/renderer-loader.md"
+  },
+  {
+    "title": "Security",
+    "path": "extensions/security.md"
+  },
+  {
+    "title": "Migration guide",
+    "path": "extensions/migration-guide.md"
+  },
+  {
+    "title": "Technical reference",
+    "path": "technical-reference.md"
+  },
+  {
+    "title": "Design system",
+    "path": "technical-reference/design-system.md"
+  },
+  {
+    "title": "AI use and project transparency",
+    "path": "technical-reference/ai-use-and-project-transparency.md"
+  }
+]

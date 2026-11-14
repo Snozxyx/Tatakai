@@ -1,3 +1,5 @@
+import { SlidingTabList } from '@/components/ui/sliding-tab-list';
+import { DetailTag, DetailTooltip } from '@/components/media/DetailTooltip';
 import '@/components/anime/detail-polish.css';
 import '@/components/layout/catalog-polish.css';
 import { CharacterQuickFavorite } from '@/components/media/MediaLibraryMenu';
@@ -289,6 +291,7 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
               id
               name
               category
+              description
               rank
               isMediaSpoiler
               isGeneralSpoiler
@@ -309,6 +312,7 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
           id: number;
           name: string;
           category?: string;
+          description?: string;
           rank?: number;
           isMediaSpoiler?: boolean;
           isGeneralSpoiler?: boolean;
@@ -949,41 +953,53 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
                   <div className="flex flex-wrap gap-4 mb-6">
                     <TatakaiAnimeViews animeId={contentAnimeId} variant="detail" />
                     {info.stats.rating && (
-                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber/20 text-amber">
-                        <Star className="w-4 h-4 fill-amber" />
-                        <span className="font-medium">{info.stats.rating}</span>
-                      </div>
+                      <DetailTooltip content={uiI18n.t('detailUi.rating')}>
+                        <div tabIndex={0} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber/20 text-amber">
+                          <Star className="w-4 h-4 fill-amber" />
+                          <span className="font-medium">{info.stats.rating}</span>
+                        </div>
+                      </DetailTooltip>
                     )}
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted">
-                      <Tv className="w-4 h-4" />
-                      <span>{info.stats.type}</span>
-                    </div>
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted">
-                      <Clock className="w-4 h-4" />
-                      <span>{info.stats.duration}</span>
-                    </div>
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary/20 text-primary">
-                      <Film className="w-4 h-4" />
-                      <span>{uiI18n.t('app.sub_7c63b7df')} {info.stats.episodes.sub}</span>
-                    </div>
-                    {info.stats.episodes.dub > 0 && (
-                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-secondary/20 text-secondary">
-                        <Film className="w-4 h-4" />
-                        <span>{uiI18n.t('app.dub_61fd0276')} {info.stats.episodes.dub}</span>
+                    <DetailTooltip content={uiI18n.t('detailUi.format')}>
+                      <div tabIndex={0} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted">
+                        <Tv className="w-4 h-4" />
+                        <span>{info.stats.type}</span>
                       </div>
+                    </DetailTooltip>
+                    <DetailTooltip content={uiI18n.t('detailUi.duration')}>
+                      <div tabIndex={0} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted">
+                        <Clock className="w-4 h-4" />
+                        <span>{info.stats.duration}</span>
+                      </div>
+                    </DetailTooltip>
+                    <DetailTooltip content={uiI18n.t('detailUi.subEpisodes')}>
+                      <div tabIndex={0} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary/20 text-primary">
+                        <Film className="w-4 h-4" />
+                        <span>{uiI18n.t('app.sub_7c63b7df')} {info.stats.episodes.sub}</span>
+                      </div>
+                    </DetailTooltip>
+                    {info.stats.episodes.dub > 0 && (
+                      <DetailTooltip content={uiI18n.t('detailUi.dubEpisodes')}>
+                        <div tabIndex={0} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-secondary/20 text-secondary">
+                          <Film className="w-4 h-4" />
+                          <span>{uiI18n.t('app.dub_61fd0276')} {info.stats.episodes.dub}</span>
+                        </div>
+                      </DetailTooltip>
                     )}
                   </div>
 
                   {/* Genres */}
                   <div className="flex flex-wrap gap-2 mb-4">
                     {moreInfo.genres?.map((genre, index) => (
-                      <span
-                        key={`${genre}-${index}`}
-                        onClick={() => navigate(`/genre/${genre.toLowerCase()}`)}
-                        className="px-3 py-1 rounded-full border border-border text-sm cursor-pointer hover:bg-muted transition-colors"
-                      >
-                        {genre}
-                      </span>
+                      <DetailTooltip key={`${genre}-${index}`} content={uiI18n.t('detailUi.browseGenre', { genre })}>
+                        <button type="button"
+
+                          onClick={() => navigate(`/genre/${genre.toLowerCase()}`)}
+                          className="px-3 py-1 rounded-full border border-border text-sm cursor-pointer hover:bg-muted transition-colors"
+                        >
+                          {genre}
+                        </button>
+                      </DetailTooltip>
                     ))}
                   </div>
 
@@ -995,12 +1011,11 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
                         {uiI18n.t('app.tags_b5ddd4e8')}
                       </span>
                       {animeTags.slice(0, 16).map((tag: any) => (
-                        <button
+                        <DetailTag tag={tag} mediaType="anime"
                           key={tag.id || tag.name}
                           type="button"
                           onClick={() => navigate(`/search?animeTag=${encodeURIComponent(tag.name)}&type=anime`)}
                           className="px-2.5 py-0.5 rounded-full bg-white/5 hover:bg-primary/20 border border-white/10 hover:border-primary/40 text-xs text-muted-foreground hover:text-primary transition-[color,background-color,border-color,opacity] flex items-center gap-1 group"
-                          title={tag.category ? uiI18n.t('app.i18n_value_0_click_to_search_befc3ac0', { value0: tag.category }) : uiI18n.t('app.click_to_search_8e81d4fa')}
                         >
                           <span>{tag.name}</span>
                           {typeof tag.rank === 'number' && (
@@ -1008,7 +1023,7 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
                               {tag.rank}%
                             </span>
                           )}
-                        </button>
+                        </DetailTag>
                       ))}
                     </div>
                   )}
@@ -1122,14 +1137,15 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
                       <span className="text-xs text-muted-foreground normal-case tracking-normal">{uiI18n.t('app.producers_a44fa04f')}</span>
                       <div className="mt-2 flex flex-wrap gap-2">
                         {producerNames.map((producer) => (
-                          <button
-                            key={producer}
-                            type="button"
-                            onClick={() => navigate(`/search/producer/${encodeURIComponent(producer)}`)}
-                            className="px-3 py-1 rounded-full border border-border text-sm hover:bg-muted transition-colors"
-                          >
-                            {producer}
-                          </button>
+                          <DetailTooltip key={producer} content={uiI18n.t('detailUi.browseProducer', { producer })}>
+                            <button
+                              type="button"
+                              onClick={() => navigate(`/search/producer/${encodeURIComponent(producer)}`)}
+                              className="px-3 py-1 rounded-full border border-border text-sm hover:bg-muted transition-colors"
+                            >
+                              {producer}
+                            </button>
+                          </DetailTooltip>
                         ))}
                       </div>
                     </div>
@@ -1188,23 +1204,25 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
                     description={info.description}
                   />
                   <OpenInAppButton size="lg" className="h-12 sm:h-14 rounded-full" label={uiI18n.t('app.open_in_app_07d911ac')} />
-                  <button
-                    onClick={() => navigate(`/isshoni?anime=${encodeURIComponent(contentAnimeId!)}&title=${encodeURIComponent(info.name)}&poster=${encodeURIComponent(info.poster)}`)}
-                    className="group flex h-14 w-14 items-center justify-center rounded-full bg-[hsl(var(--isshoni-accent))] text-black ring-1 ring-inset ring-white/25 shadow-[0_10px_30px_-8px_hsl(var(--isshoni-accent)/0.6)] transition-[color,background-color,border-color,opacity]  hover:bg-[hsl(var(--isshoni-accent)/0.9)] hover:shadow-[0_0_28px_hsl(var(--isshoni-accent)/0.5)] active:scale-95"
-                    title={uiI18n.t('app.watch_together_195732a6')}
-                    aria-label={uiI18n.t('app.start_a_watch_together_party_c96182e8')}
-                  >
-                    <Users className="w-5 h-5 transition-transform " />
-                  </button>
+                  <DetailTooltip content={uiI18n.t('app.watch_together_195732a6')}>
+                    <button
+                      onClick={() => navigate(`/isshoni?anime=${encodeURIComponent(contentAnimeId!)}&title=${encodeURIComponent(info.name)}&poster=${encodeURIComponent(info.poster)}`)}
+                      className="group flex h-14 w-14 items-center justify-center rounded-full bg-[hsl(var(--isshoni-accent))] text-black ring-1 ring-inset ring-white/25 shadow-[0_10px_30px_-8px_hsl(var(--isshoni-accent)/0.6)] transition-[color,background-color,border-color,opacity]  hover:bg-[hsl(var(--isshoni-accent)/0.9)] hover:shadow-[0_0_28px_hsl(var(--isshoni-accent)/0.5)] active:scale-95"
+                      aria-label={uiI18n.t('app.start_a_watch_together_party_c96182e8')}
+                    >
+                      <Users className="w-5 h-5 transition-transform " />
+                    </button>
+                  </DetailTooltip>
 
                   {(isMobileNative || isDesktopApp) && (
-                    <button
-                      onClick={() => setIsDownloadModalOpen(true)}
-                      className="h-14 w-14 rounded-full bg-primary/20 hover:bg-primary/30 text-primary flex items-center justify-center transition-[color,background-color,border-color,opacity] "
-                      title={uiI18n.t('app.download_season_37e47278')}
-                    >
-                      <Download className="w-6 h-6" />
-                    </button>
+                    <DetailTooltip content={uiI18n.t('app.download_season_37e47278')}>
+                      <button aria-label={uiI18n.t('app.download_season_37e47278')}
+                        onClick={() => setIsDownloadModalOpen(true)}
+                        className="h-14 w-14 rounded-full bg-primary/20 hover:bg-primary/30 text-primary flex items-center justify-center transition-[color,background-color,border-color,opacity] "
+                      >
+                        <Download className="w-6 h-6" />
+                      </button>
+                    </DetailTooltip>
                   )}
                 </AnimeDetailActions>
               </AnimeDetailContent>
@@ -1260,7 +1278,7 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
                           className="h-11 md:h-9 w-full min-w-0 md:w-60 pl-8 pr-3 rounded-full bg-muted/50 border border-border text-base md:text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
                         />
                       </div>
-                      <div className="flex items-center rounded-full border border-border overflow-hidden">
+                      <SlidingTabList className="flex items-center rounded-full border border-border overflow-hidden">
                         <button
                           onClick={() => setEpisodeLayout("grid")}
                           aria-label={uiI18n.t('app.thumbnail_view_8ab530e9')}
@@ -1287,7 +1305,7 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
                         >
                           <List className="w-4 h-4" />
                         </button>
-                      </div>
+                      </SlidingTabList>
                     </>
                   )}
                 </div>
@@ -1341,82 +1359,83 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
                 {visibleEpisodes.map((ep, index) => (
                   <ContextMenu key={`${ep.episodeId}-${index}`}>
                     <ContextMenuTrigger>
-                      <button
-                        onClick={() => handleEpisodeClick(ep.episodeId)}
-                        title={ep.hasAired === false ? uiI18n.t('app.i18n_value_0_not_yet_aired_23234e78', { value0: ep.title }) : ep.title}
-                        disabled={ep.hasAired === false}
-                        aria-disabled={ep.hasAired === false}
-                        className={cn(
-                          "group w-full text-left rounded-xl overflow-hidden border bg-muted/30 transition-[color,background-color,border-color,opacity] hover:border-primary/60 hover:bg-muted/60 disabled:cursor-not-allowed disabled:hover:border-white/15 disabled:hover:bg-muted/30",
-                          ep.isFiller
-                            ? "border-orange/40"
-                            : ep.hasAired === false
-                              ? "border-dashed border-white/15 opacity-70"
-                              : "border-border"
-                        )}
-                      >
-                        <div className="relative aspect-video bg-muted/60 overflow-hidden">
-                          {ep.image ? (
-                            <img
-                              src={ep.image}
-                              alt={ep.title}
-                              loading="lazy"
-                              className="w-full h-full object-cover transition-transform duration-300 "
-                              onError={(event) => {
-                                event.currentTarget.style.visibility = "hidden";
-                              }}
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <Tv className="w-7 h-7 text-muted-foreground/40" />
-                            </div>
+                      <DetailTooltip content={ep.hasAired === false ? uiI18n.t('app.i18n_value_0_not_yet_aired_23234e78', { value0: ep.title }) : ep.title}>
+                        <button aria-label={ep.hasAired === false ? uiI18n.t('app.i18n_value_0_not_yet_aired_23234e78', { value0: ep.title }) : ep.title}
+                          onClick={() => handleEpisodeClick(ep.episodeId)}
+                          disabled={ep.hasAired === false}
+                          aria-disabled={ep.hasAired === false}
+                          className={cn(
+                            "group w-full text-left rounded-xl overflow-hidden border bg-muted/30 transition-[color,background-color,border-color,opacity] hover:border-primary/60 hover:bg-muted/60 disabled:cursor-not-allowed disabled:hover:border-white/15 disabled:hover:bg-muted/30",
+                            ep.isFiller
+                              ? "border-orange/40"
+                              : ep.hasAired === false
+                                ? "border-dashed border-white/15 opacity-70"
+                                : "border-border"
                           )}
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-                          <span className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-black/70 text-white text-xs font-medium backdrop-blur-sm">
-                            {uiI18n.t('app.ep_00c1bff9')} {ep.number}
-                          </span>
-                          {ep.isFiller && (
-                            <span className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-orange/90 text-black text-xs font-medium normal-case tracking-normal">
-                              {uiI18n.t('app.filler_e0a62127')}
+                        >
+                          <div className="relative aspect-video bg-muted/60 overflow-hidden">
+                            {ep.image ? (
+                              <img
+                                src={ep.image}
+                                alt={ep.title}
+                                loading="lazy"
+                                className="w-full h-full object-cover transition-transform duration-300 "
+                                onError={(event) => {
+                                  event.currentTarget.style.visibility = "hidden";
+                                }}
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <Tv className="w-7 h-7 text-muted-foreground/40" />
+                              </div>
+                            )}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+                            <span className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-black/70 text-white text-xs font-medium backdrop-blur-sm">
+                              {uiI18n.t('app.ep_00c1bff9')} {ep.number}
                             </span>
-                          )}
-                          {ep.hasAired === false ? (
-                            <span className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-primary/90 text-primary-foreground text-xs font-medium normal-case tracking-normal">
-                              {uiI18n.t('app.upcoming_523baab9')}
-                            </span>
-                          ) : (
-                            <span className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                              <span className="w-11 h-11 rounded-full bg-primary/90 flex items-center justify-center shadow-lg">
-                                <Play className="w-5 h-5 text-primary-foreground ml-0.5" />
-                              </span>
-                            </span>
-                          )}
-                        </div>
-                        <div className="p-3 space-y-1.5">
-                          <p className="text-sm font-medium leading-snug line-clamp-2 group-hover:text-primary transition-colors">
-                            {ep.title}
-                          </p>
-                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                            {ep.airDate && (
-                              <span className="inline-flex items-center gap-1">
-                                <Calendar className="w-3 h-3" />
-                                {ep.airDate}
+                            {ep.isFiller && (
+                              <span className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-orange/90 text-black text-xs font-medium normal-case tracking-normal">
+                                {uiI18n.t('app.filler_e0a62127')}
                               </span>
                             )}
-                            {ep.runtime ? (
-                              <span className="inline-flex items-center gap-1">
-                                <Clock className="w-3 h-3" />
-                                {ep.runtime}m
+                            {ep.hasAired === false ? (
+                              <span className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-primary/90 text-primary-foreground text-xs font-medium normal-case tracking-normal">
+                                {uiI18n.t('app.upcoming_523baab9')}
                               </span>
-                            ) : null}
+                            ) : (
+                              <span className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                <span className="w-11 h-11 rounded-full bg-primary/90 flex items-center justify-center shadow-lg">
+                                  <Play className="w-5 h-5 text-primary-foreground ml-0.5" />
+                                </span>
+                              </span>
+                            )}
                           </div>
-                          {ep.overview && (
-                            <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3">
-                              {ep.overview}
+                          <div className="p-3 space-y-1.5">
+                            <p className="text-sm font-medium leading-snug line-clamp-2 group-hover:text-primary transition-colors">
+                              {ep.title}
                             </p>
-                          )}
-                        </div>
-                      </button>
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                              {ep.airDate && (
+                                <span className="inline-flex items-center gap-1">
+                                  <Calendar className="w-3 h-3" />
+                                  {ep.airDate}
+                                </span>
+                              )}
+                              {ep.runtime ? (
+                                <span className="inline-flex items-center gap-1">
+                                  <Clock className="w-3 h-3" />
+                                  {ep.runtime}m
+                                </span>
+                              ) : null}
+                            </div>
+                            {ep.overview && (
+                              <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3">
+                                {ep.overview}
+                              </p>
+                            )}
+                          </div>
+                        </button>
+                      </DetailTooltip>
                     </ContextMenuTrigger>
                     <ContextMenuContent>
                       <ContextMenuItem
@@ -1438,21 +1457,22 @@ export default function AnimePage({ catalogId, sourceContext }: CatalogDetailPro
                     <ContextMenuTrigger>
                       <HoverCard openDelay={220} closeDelay={80}>
                         <HoverCardTrigger asChild>
-                          <button
-                            onClick={() => handleEpisodeClick(ep.episodeId)}
-                            disabled={ep.hasAired === false}
-                            aria-disabled={ep.hasAired === false}
-                            className={`h-12 w-full rounded-lg font-medium transition-[color,background-color,border-color,opacity]  relative disabled:cursor-not-allowed disabled: ${ep.isFiller
-                              ? "bg-orange/20 text-orange hover:bg-orange/30"
-                              : ep.hasAired === false
-                                // Dated in the future: still listed (ani.zip knows
-                                // about it) but visibly not playable yet.
-                                ? "bg-muted/40 text-muted-foreground border border-dashed border-white/15 hover:bg-muted/60"
-                                : "bg-muted hover:bg-primary hover:text-primary-foreground"}`}
-                            title={ep.hasAired === false ? uiI18n.t('app.i18n_value_0_not_yet_aired_23234e78', { value0: ep.title }) : ep.title}
-                          >
-                            {ep.number}
-                          </button>
+                          <DetailTooltip content={ep.hasAired === false ? uiI18n.t('app.i18n_value_0_not_yet_aired_23234e78', { value0: ep.title }) : ep.title}>
+                            <button aria-label={ep.hasAired === false ? uiI18n.t('app.i18n_value_0_not_yet_aired_23234e78', { value0: ep.title }) : ep.title}
+                              onClick={() => handleEpisodeClick(ep.episodeId)}
+                              disabled={ep.hasAired === false}
+                              aria-disabled={ep.hasAired === false}
+                              className={`h-12 w-full rounded-lg font-medium transition-[color,background-color,border-color,opacity]  relative disabled:cursor-not-allowed disabled: ${ep.isFiller
+                                ? "bg-orange/20 text-orange hover:bg-orange/30"
+                                : ep.hasAired === false
+                                  // Dated in the future: still listed (ani.zip knows
+                                  // about it) but visibly not playable yet.
+                                  ? "bg-muted/40 text-muted-foreground border border-dashed border-white/15 hover:bg-muted/60"
+                                  : "bg-muted hover:bg-primary hover:text-primary-foreground"}`}
+                            >
+                              {ep.number}
+                            </button>
+                          </DetailTooltip>
                         </HoverCardTrigger>
                         <HoverCardContent side="top" className="w-72 p-0 overflow-hidden">
                           {ep.image && (

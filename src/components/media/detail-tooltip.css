@@ -1,0 +1,108 @@
+/* Tooltip recipe from Transitions.dev, copyright 2026 Jakub Antalik. */
+:root {
+  --tt-in-dur: 150ms;
+  --tt-out-dur: 50ms;
+  --tt-scale: 0.98;
+  --tt-delay: 80ms;
+  --tt-in-ease: ease-out;
+  --tt-out-ease: ease-out;
+  --tt-move-dur: 160ms;
+  --tt-move-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --tt-bg: #ffffff;
+  --tt-fg: #2f2f2f;
+}
+.t-tt-group {
+  position: relative;
+  display: inline-flex;
+}
+.t-tt {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 0;                 /* the JS writes the measured width */
+  overflow: hidden;
+  /* Individual transform properties: the travel (translate) and the
+     appear (scale) run on their own clocks. */
+  translate: var(--tt-x, 0px) 0;
+  scale: var(--tt-scale);
+  transform-origin: 50% 100%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--tt-bg);
+  color: var(--tt-fg);
+  white-space: nowrap;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.06),
+    0 2px 6px 0 rgba(0, 0, 0, 0.05),
+    0 4px 42px 0 rgba(0, 0, 0, 0.06);
+  opacity: 0;
+  pointer-events: none;
+  /* Default rule controls the LEAVE state: no delay, so hiding plays
+     immediately. The move lanes are always live. */
+  transition:
+    opacity   var(--tt-out-dur) var(--tt-out-ease),
+    scale     var(--tt-out-dur) var(--tt-out-ease),
+    translate var(--tt-move-dur) var(--tt-move-ease),
+    width     var(--tt-move-dur) var(--tt-move-ease);
+}
+/* The appear delay belongs ONLY to the show rule, so hiding snaps it
+   back to 0. A retarget while showing carries no delay at all. */
+.t-tt[data-show="true"] {
+  opacity: 1;
+  scale: 1;
+  transition:
+    opacity   var(--tt-in-dur) var(--tt-in-ease) var(--tt-delay),
+    scale     var(--tt-in-dur) var(--tt-in-ease) var(--tt-delay),
+    translate var(--tt-move-dur) var(--tt-move-ease),
+    width     var(--tt-move-dur) var(--tt-move-ease);
+}
+.t-tt-text { white-space: nowrap; }
+
+@media (prefers-reduced-motion: reduce) {
+  .t-tt { transition: none !important; }
+}
+
+/* Radix owns portal placement, collisions, focus, and Escape dismissal. */
+html .detail-tooltip.t-tt {
+  --tt-bg: hsl(var(--popover));
+  --tt-fg: hsl(var(--popover-foreground));
+  position: relative;
+  bottom: auto;
+  left: auto;
+  width: auto;
+  max-width: min(320px, calc(100vw - 32px));
+  display: block;
+  white-space: normal;
+  translate: none;
+  transform-origin: var(--radix-tooltip-content-transform-origin);
+  border: 1px solid hsl(var(--border));
+  z-index: 80;
+}
+html .detail-tooltip.t-tt[data-state] {
+  animation: detail-tooltip-in var(--tt-in-dur) var(--tt-in-ease) both !important;
+}
+html .detail-tooltip.t-tt[data-state="closed"] {
+  animation: detail-tooltip-out var(--tt-out-dur) var(--tt-out-ease) both !important;
+}
+@keyframes detail-tooltip-in {
+  from { opacity: 0; scale: var(--tt-scale); }
+  to { opacity: 1; scale: 1; }
+}
+@keyframes detail-tooltip-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+.detail-hint-trigger:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 3px;
+}
+@media (prefers-reduced-motion: reduce) {
+  html .detail-tooltip.t-tt[data-state] { animation: none !important; transition: none !important; }
+}
+html[data-reduced-motion="true"] .detail-tooltip.t-tt[data-state],
+html.reduce-motion .detail-tooltip.t-tt[data-state],
+.reduce-motion .detail-tooltip.t-tt[data-state] { animation: none !important; transition: none !important; }

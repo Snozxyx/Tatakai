@@ -4,10 +4,24 @@ import { createHash } from "node:crypto";
 import { join, dirname, resolve, delimiter } from "node:path";
 import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
+import { buildFingerprint, isBuildCurrent, saveBuildStamp } from './native-build-cache.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const target = process.env.TATAKAI_TRANSLATE_TARGET;
 const development = process.argv.includes("--dev");
+const force = process.argv.includes('--force');
+const stamp = join(root, '.cache', `translate-dev-${target || process.platform + '-' + process.arch}.json`);
+const fingerprint = development ? buildFingerprint([
+  fileURLToPath(import.meta.url), join(root, 'scripts/native-build-cache.mjs'),
+  ...['Cargo.toml', 'Cargo.lock', 'build.rs', 'src', '.cargo'].map(file => join(root, 'translate-engine', file)),
+  join(root, '.cargo'), join(homedir(), '.cargo/config.toml'), join(root, 'rust-toolchain.toml'),
+], { target, platform: process.platform, arch: process.arch,
+  env: Object.fromEntries(Object.entries(process.env).filter(([key]) => /^(RUST|CARGO|CC$|CXX$|CFLAGS$|CXXFLAGS$|AR$|TATAKAI_TRANSLATE)/i.test(key))),
+}) : null;
+if (development && !force && isBuildCurrent(stamp, fingerprint)) {
+  console.log('Translation engine: unchanged; using cached development binary.');
+  process.exit(0);
+}
 if (process.platform === "darwin" && !target && !development) {
   for (const macTarget of ["x86_64-apple-darwin", "aarch64-apple-darwin"]) {
     const result = spawnSync(
@@ -129,6 +143,7 @@ if (development) {
   if(!exe)chmodSync(binary,0o755);
   const pointer=join(directory,'current.json');
   writeFileSync(`${pointer}.tmp`,JSON.stringify({file:filename}));renameSync(`${pointer}.tmp`,pointer);
+  saveBuildStamp(stamp, fingerprint, [pointer, binary]);
 } else {
   copyFileSync(source, join(destination, name));
   if (!exe) chmodSync(join(destination, name), 0o755);

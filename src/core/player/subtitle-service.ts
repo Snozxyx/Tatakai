@@ -1,4 +1,4 @@
-import { normalizeSubtitleToVtt } from './subtitle-utils';
+import { isAssScript, normalizeSubtitleToVtt } from './subtitle-utils';
 
 const LANGUAGE_ALIASES: Record<string, string> = { eng: 'en', english: 'en', jpn: 'ja', jp: 'ja', japanese: 'ja', hin: 'hi', hindi: 'hi', spa: 'es', spanish: 'es', fre: 'fr', fra: 'fr', french: 'fr', ger: 'de', deu: 'de', german: 'de', ara: 'ar', chi: 'zh', zho: 'zh', por: 'pt', rus: 'ru', kor: 'ko' };
 export function detectSubtitleLanguage(metadata?: string, filename = '', text = ''): string {
@@ -28,12 +28,13 @@ export function decodeSubtitle(bytes: ArrayBuffer): string {
 
 export function prepareSubtitle(text: string, filename = '', language?: string) {
   const vtt = normalizeSubtitleToVtt(text);
-  if (!vtt || !vtt.includes('-->')) throw new Error('No readable subtitle cues were found');
-  const originalFormat = /\[Script Info\]|\[Events\]/i.test(text) ? 'ass' : /^WEBVTT/.test(text.trim()) ? 'vtt' : 'srt';
-  return { vtt, original: text, originalFormat, lang: detectSubtitleLanguage(language, filename, text) };
+  const assContent = isAssScript(text) ? text : undefined;
+  if (!assContent && (!vtt || !vtt.includes('-->'))) throw new Error('No readable subtitle cues were found');
+  const originalFormat = assContent ? 'ass' : /^WEBVTT/.test(text.trim()) ? 'vtt' : 'srt';
+  return { vtt, original: text, originalFormat, assContent, lang: detectSubtitleLanguage(language, filename, text) };
 }
 
-export async function fetchSubtitle(url: string, options: { signal?: AbortSignal; headers?: Record<string, string>; read?: () => Promise<string> } = {}): Promise<string> {
+export async function fetchSubtitleDocument(url: string, options: { signal?: AbortSignal; headers?: Record<string, string>; read?: () => Promise<string> } = {}) {
   if (options.signal?.aborted) throw new DOMException('Cancelled', 'AbortError');
   const text = options.read ? await options.read() : await (async () => {
     const response = await fetch(url, { headers: { Accept: 'text/vtt,text/plain,*/*', ...options.headers }, signal: options.signal });
@@ -41,7 +42,11 @@ export async function fetchSubtitle(url: string, options: { signal?: AbortSignal
     return decodeSubtitle(await response.arrayBuffer());
   })();
   if (options.signal?.aborted) throw new DOMException('Cancelled', 'AbortError');
-  return prepareSubtitle(text).vtt;
+  return prepareSubtitle(text);
+}
+
+export async function fetchSubtitle(url: string, options: Parameters<typeof fetchSubtitleDocument>[1] = {}): Promise<string> {
+  return (await fetchSubtitleDocument(url, options)).vtt;
 }
 
 export async function uploadSubtitle(file: File) {

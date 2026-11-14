@@ -12,6 +12,7 @@ import { getAdultMode, getAdultModeRevision } from '@/lib/adultMode';
 import { adultAnimeHomeBundle, readAdultHome } from '@/lib/adultHome';
 import { trackEvent } from '@/core/analytics/AnalyticsService';
 import { isCapacitor } from '@/lib/platform/platform';
+import { searchAnimeTags } from './anime-tag-search';
 import { db, type CachedMedia } from '../db';
 import type {
   TatakaiMedia,
@@ -280,8 +281,9 @@ class ContentGraph {
   // ── Search ────────────────────────────────────────────────────────────────
 
   async search(filters: SearchFilters): Promise<ContentSearchResult> {
-    const cacheKey = `search:v4:${JSON.stringify(filters)}`;
+    const cacheKey = `search:v5:${JSON.stringify(filters)}`;
     return this.cached(cacheKey, TTL.HOT, async () => {
+      if (filters.tags?.some(tag => tag.trim()) && !filters.studio?.length) return searchAnimeTags(filters);
       // Full results need pagination and alias-aware DB/AniList/Jikan matching.
       // The suggestions endpoint deliberately returns only a short, single page.
       const params: Record<string, string | number | boolean | undefined> = {

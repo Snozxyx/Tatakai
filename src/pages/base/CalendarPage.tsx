@@ -1,3 +1,4 @@
+import { SlidingTabList } from '@/components/ui/sliding-tab-list';
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -329,11 +330,11 @@ export default function CalendarPage() {
                 </button>;
               })}
             </nav>
-            <div className="calendar-mobile-types" role="group" aria-label={t("discovery.calendarType")}>
+            <SlidingTabList className="calendar-mobile-types" role="group" aria-label={t("discovery.calendarType")}>
               <button type="button" aria-pressed={mediaTab === "anime"} onClick={() => setMediaTab("anime")}>{t("discovery.anime")}</button>
               <button type="button" aria-pressed={mediaTab === "manga"} onClick={() => setMediaTab("manga")}>{t("discovery.mangaReleases")}</button>
-              {user && mediaTab === "anime" && <button type="button" aria-pressed={mineOnly} onClick={() => setMineOnly(value => !value)}>{t("app.my_shows_739eef73")}</button>}
-            </div>
+              {user && mediaTab === "anime" && <button type="button" data-sliding-tab-static aria-pressed={mineOnly} onClick={() => setMineOnly(value => !value)}>{t("app.my_shows_739eef73")}</button>}
+            </SlidingTabList>
             {mediaTab === "manga" ?
               <MangaReleaseCalendar weekStart={weekStart} selectedDay={view === "day" ? selectedDay : undefined} onSelectDate={selectDate} />
              : <>

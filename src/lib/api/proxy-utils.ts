@@ -146,6 +146,13 @@ export function getProxiedVideoUrl(rawUrl: string, referer?: string, userAgent?:
   return buildProxyUrl(rawUrl, referer, userAgent, 'video');
 }
 
+/** Header-aware passthrough: ASS must never pass through a WebVTT converter. */
+export function getOriginalSubtitleUrl(rawUrl: string, referer?: string, userAgent?: string): string {
+  const url = unwrapProxyUrl(rawUrl);
+  if (!url || isLocalLike(url) || !/^https?:/i.test(url)) return url;
+  return buildProxyUrl(url, referer, userAgent, 'subtitle');
+}
+
 export function getProxiedSubtitleUrl(rawUrl: string, referer?: string, userAgent?: string): string {
   const url = unwrapProxyUrl(rawUrl);
   // In-app proxy tracks resolve natively with header replay (see

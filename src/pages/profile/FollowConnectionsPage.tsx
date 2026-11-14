@@ -1,3 +1,4 @@
+import { SlidingTabList } from '@/components/ui/sliding-tab-list';
 import { readThemePreferences } from '@/lib/profileThemes';
 import { resolveProfileTheme } from '@/components/profile/themes/registry';
 import { useUserBadges } from '@/hooks/community/useUserBadges';
@@ -98,10 +99,11 @@ export default function FollowConnectionsPage() {
           </div>
         </div>
 
-        <div className="mb-4 flex rounded-lg bg-muted/40 p-1">
+        <SlidingTabList className="mb-4 flex rounded-lg bg-muted/40 p-1">
           {(['followers', 'following'] as const).map((t) => (
             <button
               key={t}
+              aria-pressed={tab === t}
               onClick={() => setTab(t)}
               className={cn(
                 'flex flex-1 items-center justify-center gap-1.5 rounded-md py-2 text-sm font-semibold capitalize transition-colors',
@@ -112,7 +114,7 @@ export default function FollowConnectionsPage() {
               {uiI18n.t(({"followers":"app.followers_09322a11","following":"app.following_6cbf68c5"})[t])}
             </button>
           ))}
-        </div>
+        </SlidingTabList>
 
         {loadingProfile || loadingList ? (
           <div className="flex justify-center py-16">

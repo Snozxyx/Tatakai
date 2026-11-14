@@ -72,27 +72,39 @@ type ImageJob = {
   run: () => Promise<void>;
   signal: AbortSignal;
   priority: number;
+  background: boolean;
   resolve: () => void;
   reject: (error: unknown) => void;
   abort: () => void;
 };
 const imageJobs: ImageJob[] = [];
 let activeImages = 0;
+let activeBackgroundImages = 0;
+let drainScheduled = false;
+function requestImageDrain() {
+  if (drainScheduled) return;
+  drainScheduled = true;
+  queueMicrotask(() => { drainScheduled = false; drainImages(); });
+}
 function drainImages() {
   imageJobs.sort((a, b) => b.priority - a.priority);
   while (activeImages < 3 && imageJobs.length) {
-    const job = imageJobs.shift()!;
+    const index = imageJobs.findIndex(job => !job.background || activeBackgroundImages < 2);
+    if (index < 0) break;
+    const job = imageJobs.splice(index, 1)[0];
     job.signal.removeEventListener("abort", job.abort);
     if (job.signal.aborted) {
       job.reject(job.signal.reason);
       continue;
     }
     activeImages++;
+    if (job.background) activeBackgroundImages++;
     job
       .run()
       .then(job.resolve, job.reject)
       .finally(() => {
         activeImages--;
+        if (job.background) activeBackgroundImages--;
         drainImages();
       });
   }
@@ -102,7 +114,8 @@ function drainImages() {
 export function scheduleReaderImage(
   run: () => Promise<void>,
   signal: AbortSignal,
-  priority = 0
+  priority = 0,
+  background = false
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     if (signal.aborted) {
@@ -113,6 +126,7 @@ export function scheduleReaderImage(
       run,
       signal,
       priority,
+      background,
       resolve,
       reject,
       abort: () => {
@@ -123,6 +137,17 @@ export function scheduleReaderImage(
     };
     signal.addEventListener("abort", job.abort, { once: true });
     imageJobs.push(job);
-    drainImages();
+    // Batch a render's jobs before choosing the first three, so a saved page
+    // midway through a full chapter is not queued behind its earlier pages.
+    requestImageDrain();
   });
+}
+
+/** Promote an upcoming page without cancelling an already running download. */
+export function prioritizeReaderImage(signal: AbortSignal, priority: number): void {
+  const job = imageJobs.find(job => job.signal === signal);
+  if (!job) return;
+  job.priority = priority;
+  if (priority >= 10) job.background = false;
+  requestImageDrain();
 }

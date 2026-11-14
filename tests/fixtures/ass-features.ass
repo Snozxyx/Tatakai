@@ -1,0 +1,20 @@
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 640
+PlayResY: 360
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+YCbCr Matrix: TV.709
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Liberation Sans,30,&H00FFFFFF,&H0000FFFF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,1,2,10,10,20,1
+Style: Sign,Liberation Sans,24,&H00FF00FF,&H00FFFFFF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,1,1,7,0,0,0,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:01.00,0:00:06.00,Default,,0,0,0,,{\an7\pos(0,0)\p1\bord0\shad0\1c&H00FF00&\clip(40,40,120,100)}m 40 40 l 200 40 200 100 40 100
+Dialogue: 1,0:00:01.00,0:00:06.00,Default,,0,0,0,,{\an2\pos(320,340)}{\kf100}Ka{\kf100}ra{\kf100}o{\kf100}ke
+Dialogue: 2,0:00:01.00,0:00:06.00,Sign,,0,0,0,,{\move(40,130,450,130)\t(0,4000,\fscx140\fscy140\frz15)\blur1\b1\i1}Motion
+Dialogue: 3,0:00:01.00,0:00:06.00,Default,,0,0,0,,{\an8\pos(320,30)\fad(1000,1000)\u1\s1\fax0.1}Fade, style and outline
+Dialogue: 4,0:00:01.00,0:00:06.00,Default,,0,0,0,,{\an7\pos(400,210)\iclip(420,220,440,240)\frx15\fry10\be1\4c&HFF0000&\alpha&H10&}Clip\Nsecond line

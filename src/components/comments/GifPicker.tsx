@@ -1,3 +1,4 @@
+import { SlidingTabList } from '@/components/ui/sliding-tab-list';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
@@ -111,6 +112,7 @@ export function GifPicker({ onSelect, trigger }: GifPickerProps) {
   const TabButton = ({ value, icon: Icon, label }: { value: Tab; icon: any; label: string }) => (
     <button
       type="button"
+      aria-pressed={tab === value}
       onClick={() => setTab(value)}
       className={cn(
         'flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-colors',
@@ -134,11 +136,11 @@ export function GifPicker({ onSelect, trigger }: GifPickerProps) {
           </div>
         ) : (
           <div className="space-y-3">
-            <div className="flex gap-1 rounded-lg bg-muted/40 p-1">
+            <SlidingTabList className="flex gap-1 rounded-lg bg-muted/40 p-1">
               <TabButton value="trending" icon={TrendingUp} label={t('anime.trending')} />
               <TabButton value="search" icon={Search} label={t('common.search')} />
               <TabButton value="saved" icon={Bookmark} label={t('comments.savedTab')} />
-            </div>
+            </SlidingTabList>
 
             {tab === 'search' && (
               <form

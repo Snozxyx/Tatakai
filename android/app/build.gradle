@@ -8,7 +8,12 @@ def compatibilityRuntimeAssets = tasks.register('prepareCompatibilityRuntime', E
     outputs.dir file('src/main/assets/compatibility/aniyomi')
     outputs.file file('src/main/assets/aniyomi-runtime.json')
 }
-tasks.named('preBuild').configure { dependsOn compatibilityRuntimeAssets }
+def assRendererAssets = tasks.register('prepareAssRenderer', Exec) {
+    workingDir rootProject.projectDir.parentFile
+    commandLine 'node', new File(rootProject.projectDir.parentFile, 'scripts/build-ass-renderer.mjs').absolutePath
+    doLast { copy { from new File(rootProject.projectDir.parentFile, 'public/assets/libass'); into file('src/main/assets/public/assets/libass') } }
+}
+tasks.named('preBuild').configure { dependsOn compatibilityRuntimeAssets, assRendererAssets }
 
 android {
     sourceSets.main.java.srcDir '../../shared/aniyomi/java'

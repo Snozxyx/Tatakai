@@ -1,3 +1,4 @@
+import { SlidingTabList } from '@/components/ui/sliding-tab-list';
 import FavoritesHistory from "./FavoritesHistory";
 import FavoritesWatchControls from "./FavoritesWatchControls";
 import { ThemedCheckbox } from "@/components/ui/themed-checkbox";
@@ -395,7 +396,7 @@ export default function FavoritesPage() {
           </section>
         ) : (
           <>
-            <nav
+            <SlidingTabList as="nav"
               aria-label={t("favoritesHub.title")}
               className="mb-6 flex gap-1 overflow-x-auto border-b border-border"
             >
@@ -424,7 +425,7 @@ export default function FavoritesPage() {
                   {t(`favoritesHub.${value}`)}
                 </Link>
               ))}
-            </nav>
+            </SlidingTabList>
             <section aria-label={t(`favoritesHub.${tab}`)}>
               {tab === "recommendations" ? (
                 <Suspense fallback={<PosterGridSkeleton count={12} />}>

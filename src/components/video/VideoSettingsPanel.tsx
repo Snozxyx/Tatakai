@@ -1,3 +1,4 @@
+import { SlidingTabList } from '@/components/ui/sliding-tab-list';
 import uiI18n from '@/lib/uiI18n';
 import { VideoEnhancementSettings } from '@/components/settings/VideoEnhancementSettings';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
@@ -335,7 +336,7 @@ function SettingsPanelBody({
       )}
 
       {/* Tab Navigation */}
-      <div className="flex min-w-0 gap-1 p-1 bg-muted/30 rounded-xl">
+      <SlidingTabList className="flex min-w-0 gap-1 p-1 bg-muted/30 rounded-xl">
         {TABS.map((tab) => {
           const Icon = tab.icon;
           return (
@@ -352,7 +353,7 @@ function SettingsPanelBody({
             </button>
           );
         })}
-      </div>
+      </SlidingTabList>
 
       {/* Tab Content */}
       <div className="space-y-5">

@@ -45,7 +45,7 @@ export function NovelSearchFilters({ value, onChange, genres }: {
     <div className="space-y-4 rounded-2xl border border-white/[0.06] bg-white/[0.015] p-4 md:p-5">
       <div className="flex items-center gap-2 pb-2 border-b border-white/5">
         <BookOpen className="w-4 h-4 text-primary" />
-        <h3 className="text-xs font-black uppercase tracking-[0.2em] text-foreground">{uiI18n.t('app.novel_filters_44dcf40d')}</h3>
+        <h3 className="text-xs font-medium text-foreground">{uiI18n.t('app.novel_filters_44dcf40d')}</h3>
       </div>
       <div className="space-y-1.5">
         <label htmlFor="filter-novel-origin" className="text-xs text-muted-foreground font-semibold">{uiI18n.t('app.origin_44ab85a2')}</label>

@@ -1,3 +1,4 @@
+import { SlidingTabList } from '@/components/ui/sliding-tab-list';
 import { isMessageNotification, messageNotificationConversation } from '@/lib/messageNotifications';
 import { useChatDock } from '@/contexts/ChatDockContext';
 import { NotificationSoundToggle } from '@/components/community/NotificationSoundToggle';
@@ -454,24 +455,23 @@ export function NotificationSheet({ open, onOpenChange }: NotificationSheetProps
           </div>
         </SheetHeader>
 
-        <div className="flex shrink-0 overflow-x-auto border-b border-border px-2" role="group" aria-label={uiI18n.t('app.notifications_753a22b2')}>
+        <SlidingTabList className="flex shrink-0 overflow-x-auto border-b border-border px-2" role="group" aria-label={uiI18n.t('app.notifications_753a22b2')}>
           {TABS.map(({ value, label }) => (
             <button key={value} type="button" aria-pressed={tab === value} onClick={() => setTab(value)}
-              className={cn('relative min-h-11 shrink-0 flex-1 px-3 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
-                tab === value ? 'font-semibold text-foreground' : 'font-medium text-muted-foreground hover:text-foreground')}>
+              className={cn('relative min-h-11 shrink-0 flex-1 border-b-2 px-3 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
+                tab === value ? 'border-foreground font-semibold text-foreground' : 'border-transparent font-medium text-muted-foreground hover:text-foreground')}>
               <span className="block truncate">{label}</span>
-              {tab === value && <span className="absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-foreground" />}
             </button>
           ))}
-        </div>
+        </SlidingTabList>
 
         <div className="custom-scrollbar min-h-0 flex-1 space-y-5 overflow-y-auto px-3 py-5 sm:px-4">
           {tab === 'mention' ? (
             <div className="space-y-4">
               {/* Received / Sent toggle */}
-              <div className="mx-3 grid grid-cols-2 gap-1 rounded-lg bg-muted/40 p-1">
+              <SlidingTabList className="mx-3 grid grid-cols-2 gap-1 rounded-lg bg-muted/40 p-1">
                 {(['received', 'sent'] as const).map((v) => (
-                  <button
+                  <button aria-pressed={mentionView === v}
                     key={v}
                     type="button"
                     onClick={() => setMentionView(v)}
@@ -485,7 +485,7 @@ export function NotificationSheet({ open, onOpenChange }: NotificationSheetProps
                     {uiI18n.t(({"received":"app.received_38428a69","sent":"app.sent_27e7700f"})[v])}
                   </button>
                 ))}
-              </div>
+              </SlidingTabList>
               {mentionView === 'received' ? (
                 visible.length > 0 ? (
                   groupedList

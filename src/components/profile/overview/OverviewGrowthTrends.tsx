@@ -1,3 +1,4 @@
+import { SlidingTabList } from '@/components/ui/sliding-tab-list';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMemo, useState } from 'react';
@@ -64,8 +65,8 @@ export function OverviewGrowthTrends({ months = 12, ...inputs }: OverviewGrowthT
           <p className="text-xs text-muted-foreground/70">{uiI18n.t('app.real_monthly_activity_over_the_last_dc5132ff')} {months} {uiI18n.t('app.months_f1494311')}</p>
         </div>
 
-        <div className="flex items-center gap-1 bg-black/20 p-1 rounded-xl border border-white/[0.03] self-start sm:self-auto">
-          <button
+        <SlidingTabList className="flex items-center gap-1 bg-black/20 p-1 rounded-xl border border-white/[0.03] self-start sm:self-auto">
+          <button aria-pressed={view === 'growth'}
             onClick={() => setView('growth')}
             className={cn(
               'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200',
@@ -77,7 +78,7 @@ export function OverviewGrowthTrends({ months = 12, ...inputs }: OverviewGrowthT
             <TrendingUp className="w-3.5 h-3.5" />
             {uiI18n.t('app.growth_f3b21e04')}
           </button>
-          <button
+          <button aria-pressed={view === 'completion'}
             onClick={() => setView('completion')}
             className={cn(
               'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200',
@@ -89,7 +90,7 @@ export function OverviewGrowthTrends({ months = 12, ...inputs }: OverviewGrowthT
             <LineIcon className="w-3.5 h-3.5" />
             {uiI18n.t('app.completion_2ff25568')}
           </button>
-        </div>
+        </SlidingTabList>
       </div>
 
       <div className="relative z-10 h-[260px] w-full">

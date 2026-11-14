@@ -1,3 +1,4 @@
+import { SlidingTabList } from '@/components/ui/sliding-tab-list';
 import { ProfileBadges } from '@/components/profile/ProfileBadges';
 import ProfileThemeDetails from '../ProfileThemeDetails';
 import { ProfilePresence } from '@/components/profile/ProfilePresence';
@@ -182,12 +183,12 @@ export default function SekaiProfile({ data, configuration, preferences, onBack 
     <Seo title={`${data.owner.display_name || data.owner.username || 'Player'} · Tatakai`} description={data.owner.bio || 'A little world of stories on Tatakai.'} />
     <Wallpaper url={current.wallpaper.url} x={current.wallpaper.x} y={current.wallpaper.y} blur={current.wallpaper.blur} onError={() => { if (data.isOwner) setError('This wallpaper image could not load. Use a direct public image link or upload another image in Wallpaper.'); }} />
     <div className="sp-dim" aria-hidden="true" style={{ background: `rgba(0,0,0,${current.wallpaper.dim / 100})` }} />
-    <nav className="sp-hover-rail" aria-label="Profile navigation"><div className="sp-rail-items">
+    <nav className="sp-hover-rail" aria-label="Profile navigation"><SlidingTabList className="sp-rail-items">
       <button type="button" onClick={handleBack} aria-label="Back"><ArrowLeft size={20} /><span>Back</span></button>
       <div className="sp-rail-divider" />
       <button type="button" onClick={showScrapbook} aria-label="Scrapbook" aria-current={!activeTab ? 'page' : undefined}><Home size={20} /><span>Scrapbook</span></button>
       {data.tabs?.map(tab => { const Icon = ICONS[tab.id as keyof typeof ICONS] || Library; return <button type="button" key={tab.id} aria-label={tab.label} aria-current={openTab === tab.id ? 'page' : undefined} onClick={() => setOpenTab(tab.id)}><Icon size={20} /><span>{tab.label}</span></button>; })}
-    </div></nav>
+    </SlidingTabList></nav>
     <div className={`sp-workspace ${editing && !preview ? 'sp-editing' : ''}`}>
       <header className="sp-world-header"><div className="sp-header-identity"><span className="sp-header-mark">{data.owner.avatar_url ? <MediaImage src={data.owner.avatar_url} alt="" /> : <Sparkles size={22} />}</span><div><h1 className="sp-brand">{data.owner.display_name || data.owner.username || 'My'}’s Sekai</h1><span className="sp-world-title"><span>Tatakai</span><Diamond size={8} />{activeTab?.label || 'A little world of stories'}</span><ProfilePresence userId={data.owner.user_id} /></div></div>{data.isOwner && <div className="sp-owner-actions"><button type="button" onClick={() => openSettings('profile-store')}><Sparkles size={15} /><span>Collection</span></button>{!editing && <button type="button" className="sp-customize-action" onClick={beginEdit}><Edit3 size={15} /><span>Customize</span></button>}<ProfileSocialActions userId={data.owner.user_id} /></div>}{!data.isOwner && <div className="sp-visitor-actions"><button type="button" disabled={data.followPending} onClick={data.onFollow}><Heart size={15} />{data.following ? 'Following' : 'Follow'}</button><ProfileSocialActions userId={data.owner.user_id} /></div>}</header>
       {activeTab && <section className="sp-full-section" aria-label={activeTab.label} key={activeTab.id}><header className="sp-plate"><h2>{activeTab.label}</h2><button type="button" onClick={showScrapbook}><X size={15} />Scrapbook</button></header><div className="sp-section-scroll"><SekaiProfileTab data={data} tab={activeTab.id} /></div></section>}

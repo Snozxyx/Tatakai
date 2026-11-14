@@ -5,12 +5,12 @@ import { withReadingTitle, projectReadingHomeTitles } from '@/lib/titleLanguage'
 import {
   searchNovels,
   getNovelDetail,
+  novelDetailStaleTime,
   getNovelChapters,
   getNovelHome,
   type NovelSearchOptions,
 } from '@/core/content/novel-client';
 import { useContentSafetySettings } from '@/hooks/user/useContentSafetySettings';
-import { MEDIA_METADATA_STALE_TIME } from '@/lib/cache/mediaMetadataCache';
 
 export function useNovelSearch(
   query: string,
@@ -57,7 +57,7 @@ export function useNovelDetail(novelId: string | undefined) {
     queryFn: () => getNovelDetail(String(novelId)),
     select,
     enabled: Boolean(novelId),
-    staleTime: MEDIA_METADATA_STALE_TIME,
+    staleTime: query => novelDetailStaleTime(query.state.data),
   });
 }
 

@@ -1,3 +1,4 @@
+import { SlidingTabList } from '@/components/ui/sliding-tab-list';
 import { TVPlaybackContext } from "@/components/tv/TVPlaybackContext";
 import { useState } from "react";
 import { Link } from "react-router-dom";
@@ -97,7 +98,7 @@ export function TVWatchView({
           )
         )}
       </div>
-      <div className="tv-filter-tabs">
+      <SlidingTabList className="tv-filter-tabs">
         <button
           data-tv-source-picker
           aria-pressed={tab === "sources"}
@@ -117,7 +118,7 @@ export function TVWatchView({
           Refresh sources
         </button>
         {downloads}
-      </div>
+      </SlidingTabList>
       {tab === "sources" ? (
         <div className="tv-source-grid">
           {sources.map((source, index) => (

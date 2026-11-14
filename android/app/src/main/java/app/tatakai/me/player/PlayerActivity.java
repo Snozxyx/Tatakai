@@ -65,6 +65,7 @@ public class PlayerActivity extends AppCompatActivity {
     private final Handler handler = new Handler(Looper.getMainLooper());
     protected ExoPlayer player;
     protected PlayerView playerView;
+    private AssSubtitleView assSubtitleView;
     protected Button skipButton;
     private long introStartMs = -1L;
     private long introEndMs = -1L;
@@ -123,6 +124,9 @@ public class PlayerActivity extends AppCompatActivity {
             FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT
         ));
 
+        assSubtitleView = new AssSubtitleView(this);
+        if (playerView.getOverlayFrameLayout() != null) playerView.getOverlayFrameLayout().addView(assSubtitleView, new FrameLayout.LayoutParams(-1,-1));
+
         skipButton = new Button(this);
         skipButton.setVisibility(View.GONE);
         skipButton.setOnClickListener(view -> {
@@ -144,6 +148,7 @@ public class PlayerActivity extends AppCompatActivity {
             if (!requestHeaders.isEmpty()) httpFactory.setDefaultRequestProperties(requestHeaders);
             DefaultDataSource.Factory dataSourceFactory = new DefaultDataSource.Factory(this, httpFactory);
             DefaultMediaSourceFactory mediaSourceFactory = new DefaultMediaSourceFactory(dataSourceFactory);
+            mediaSourceFactory.experimentalParseSubtitlesDuringExtraction(false);
             // Torrent streams start with almost no buffered data on slow swarms.
             // The default 50s min-buffer keeps the spinner up for a long time, so
             // the minimum stays lean for a fast first frame. The rebuffer targets
@@ -158,7 +163,7 @@ public class PlayerActivity extends AppCompatActivity {
                 .setTargetBufferBytes(-1)
                 .setPrioritizeTimeOverSizeThresholds(true)
                 .build();
-            player = new ExoPlayer.Builder(this)
+            player = new ExoPlayer.Builder(this, new AssRenderersFactory(this,assSubtitleView))
                 .setMediaSourceFactory(mediaSourceFactory)
                 .setLoadControl(fastStartLoadControl)
                 .build();
@@ -230,6 +235,10 @@ public class PlayerActivity extends AppCompatActivity {
                 NativePlayerPlugin.emit("playerError", event);
             }
         });
+        assSubtitleView.attach(player,playerView);
+        final AssSubtitleView fontTarget = assSubtitleView;
+        fontTarget.configureFontSource(url,readRequestHeaders());
+        try { org.json.JSONArray supplied = new org.json.JSONArray(getIntent().getStringExtra("assFonts")); java.util.List<String> fonts = new java.util.ArrayList<>(); for(int i=0;i<supplied.length();i++) if(supplied.optString(i).startsWith("data:font/")) fonts.add(supplied.optString(i)); fontTarget.addFonts(fonts); } catch(Exception ignored) { }
         playerView.setPlayer(player);
         configurePlayer();
 
@@ -385,6 +394,7 @@ public class PlayerActivity extends AppCompatActivity {
             closingEventSent = true;
             NativePlayerPlugin.emit("playerClosed", payload());
         }
+        if (assSubtitleView != null) { assSubtitleView.destroy(); assSubtitleView = null; }
         if (player != null) {
             player.release();
             player = null;

@@ -289,6 +289,8 @@ export interface CustomReadPage {
   proxiedImageUrl?: string | null;
   /** Upstream headers for the mobile in-app proxy's dead-token re-registration. */
   headers?: Record<string, string> | null;
+  width?: number | null;
+  height?: number | null;
 }
 export interface CustomReadData {
   pages: CustomReadPage[];
@@ -438,7 +440,7 @@ export async function fetchCustomRead(
   const remote = await remoteCustomRow(namespace); if (remote) return remoteCustomRead(remote, chapterId);
   const env = await resolveCustomHttpEnv();
   if (isMobileEnv(env)) {
-    const r = await mobileCustom<{ pages?: Array<{ pageNumber?: number; imageUrl?: string; proxiedImageUrl?: string | null; headers?: unknown }> }>(
+    const r = await mobileCustom<{ pages?: Array<{ pageNumber?: number; imageUrl?: string; proxiedImageUrl?: string | null; headers?: unknown; width?: number; height?: number }> }>(
       namespace, 'Read', [sourceId, id, chapterId],
     );
     if (r && Array.isArray(r.pages)) return { pages: normalizeReadPages(r.pages) };
@@ -450,7 +452,7 @@ export async function fetchCustomRead(
     const extId = await resolveExtensionId(namespace);
     if (extId) {
       const r = (await invokeExt(extId, "customRead", [sourceId, id, chapterId])) as
-        | { pages?: Array<{ pageNumber?: number; imageUrl?: string; proxiedImageUrl?: string | null; headers?: unknown }> }
+        | { pages?: Array<{ pageNumber?: number; imageUrl?: string; proxiedImageUrl?: string | null; headers?: unknown; width?: number; height?: number }> }
         | null;
       if (r && Array.isArray(r.pages)) return { pages: normalizeReadPages(r.pages) };
     }
@@ -459,7 +461,7 @@ export async function fetchCustomRead(
 }
 
 function normalizeReadPages(
-  raw: Array<{ pageNumber?: number; imageUrl?: string; proxiedImageUrl?: string | null; headers?: unknown }>,
+  raw: Array<{ pageNumber?: number; imageUrl?: string; proxiedImageUrl?: string | null; headers?: unknown; width?: number; height?: number }>,
 ): CustomReadPage[] {
   return raw
     .map((p, idx) => {
@@ -472,6 +474,8 @@ function normalizeReadPages(
         pageNumber: Number.isFinite(p.pageNumber) ? (p.pageNumber as number) : idx + 1,
         imageUrl: String(p.imageUrl || ""),
         proxiedImageUrl: p.proxiedImageUrl ?? null,
+        width: p.width > 0 ? p.width : null,
+        height: p.height > 0 ? p.height : null,
         ...(headerEntries.length ? { headers: Object.fromEntries(headerEntries) } : {}),
       };
     })

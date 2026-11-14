@@ -1,3 +1,4 @@
+import { SlidingTabList } from '@/components/ui/sliding-tab-list';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useMemo, useState } from 'react';
@@ -62,9 +63,9 @@ export function OverviewLibraryDistribution({
           <p className="text-xs text-muted-foreground/70">{uiI18n.t('app.how_your_titles_break_down_by_status_b983f600')}</p>
         </div>
 
-        <div className="flex items-center gap-1 bg-black/20 p-1 rounded-xl border border-white/[0.03] self-start sm:self-auto">
+        <SlidingTabList className="flex items-center gap-1 bg-black/20 p-1 rounded-xl border border-white/[0.03] self-start sm:self-auto">
           {(['anime', 'manga'] as const).map((key) => (
-            <button
+            <button aria-pressed={tab === key}
               key={key}
               onClick={() => setTab(key)}
               className={cn(
@@ -77,7 +78,7 @@ export function OverviewLibraryDistribution({
               {uiI18n.t(({"anime":"app.anime_11a3e059","manga":"app.manga_1c404c69"})[key])}
             </button>
           ))}
-        </div>
+        </SlidingTabList>
       </div>
 
       <div className="relative z-10">
