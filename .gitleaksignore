@@ -1,0 +1,4 @@
+# This exact finding is the intentionally public development Supabase anon JWT.
+# Contributor configuration tests enforce its anon role and development project.
+# No file, rule, path, service-role key or future JWT finding is broadly ignored.
+0e0ec70f79e647926526279c237027a28432dfc8:config/contributor/.env.example:jwt:3

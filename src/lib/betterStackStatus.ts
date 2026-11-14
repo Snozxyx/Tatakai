@@ -70,6 +70,9 @@ export function parseBetterStackStatus(
     : "unknown";
 }
 async function fetchReportJson(signal?: AbortSignal): Promise<unknown> {
+  if (import.meta.env.MODE === 'contributor') {
+    throw new Error('Production monitoring is not configured in contributor mode.');
+  }
   for (const endpoint of [
     "https://api.tatakai.app/service-status.json",
     "https://tatakai.app/service-status.json",

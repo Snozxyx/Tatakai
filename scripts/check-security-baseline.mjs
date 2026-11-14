@@ -457,6 +457,23 @@ function walk(dir, out = []) {
   }
 }
 
+// The contributor token is public, but its role must never become privileged.
+{
+  try {
+    const match = read('config/contributor/.env.example').match(/^VITE_SUPABASE_ANON_KEY=(.+)$/m);
+    const token = match?.[1]?.trim();
+    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString());
+    if (payload.role !== 'anon' || payload.ref !== 'tatakai-development' || payload.environment !== 'development'
+        || payload.iss !== 'supabase' || !Number.isFinite(Number(payload.exp)) || Number(payload.exp) <= Date.now() / 1000) {
+      throw new Error('Unexpected contributor key claims');
+    }
+    ok('DEV-1 contributor browser key is the public development anon token');
+  } catch {
+    fail('DEV-1', 'contributor browser configuration must contain only a valid development anon key',
+      'Never publish a service-role or production key in the contributor template.');
+  }
+}
+
 // ── Report ────────────────────────────────────────────────────────────────────
 if (failures.length === 0) {
   console.log(`✅ security baseline: ${checked.length} invariants hold`);
