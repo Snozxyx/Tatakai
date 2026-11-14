@@ -1,7 +1,8 @@
-<div align="center">
+ <div align="center">
   <img src="public/assets/logo/readme-banner.webp" alt="Crimson sun over a misty sakura valley" width="100%" />
   <h1>Tatakai</h1>
-  <p><strong>Anime, manga, and novels. Your sources, your way.</strong></p>
+  <p><strong>Anime, manga, and novels. Your sources, your way.</strong></p> 
+   <p>Tatakai (戦い — "battle" in Japanese) is an all-in-one platform for anime, manga, and novel enthusiasts. We believe fans shouldn't need five different apps to track, watch, read, discover, and discuss their favorite stories</p>
   <p>
     <a href="https://tatakai.app">Open Tatakai</a> ·
     <a href="https://github.com/Snozxyx/Tatakai/releases/latest">Download</a> ·
@@ -10,7 +11,6 @@
   </p>
 </div>
 
-Tatakai brings discovery, watching, reading, and community into one customizable app. Install extensions to choose your sources and build a library that follows you across devices.
 
 ## Features
 
@@ -61,3 +61,12 @@ git submodule update --init --recursive
 ## License
 
 [Mozilla Public License 2.0](LICENSE).
+
+## AI disclosure
+
+This project uses AI. Read the [AI disclaimer](docs/reference/ai-disclaimer.md).
+
+## Star history
+
+[![Star History Chart](https://api.star-history.com/chart?repos=snozxyx/tatakai&type=date&legend=top-right)](https://www.star-history.com/?repos=snozxyx%2Ftatakai&type=date&legend=top-right)
+
