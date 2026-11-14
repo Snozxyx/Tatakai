@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react-swc";
 import { visualizer } from "rollup-plugin-visualizer";
 import path from "path";
 import { createRequire } from 'node:module';
+import { contributorEnvironment } from './scripts/contributor-env.mjs';
 import packageJson from "./package.json";
 import { seoPreviewPlugin } from "./scripts/seo/vite-seo-preview.mjs";
 import { packagedAssetsPlugin } from './scripts/packaged-assets.mjs';
@@ -16,15 +17,19 @@ const translationOrtAssets = path.dirname(translationRequire.resolve('onnxruntim
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), '');
+  const isContributorMode = mode === 'contributor';
+  const envDir = isContributorMode ? path.resolve(process.cwd(), 'config/contributor') : process.cwd();
+  const env = isContributorMode
+    ? contributorEnvironment(process.cwd(), loadEnv(mode, envDir, 'VITE_'))
+    : loadEnv(mode, envDir, '');
 
   // Keep React dev JSX runtime consistent; production env strips jsxDEV.
   if (mode !== "production" && mode !== "web" && mode !== 'native') {
     process.env.NODE_ENV = "development";
   }
 
-  const isWebMode = mode === 'web';
-  const isElectronBuild = (process.env.ELECTRON_BUILD || env.ELECTRON_BUILD) === 'true';
+  const isWebMode = mode === 'web' || isContributorMode;
+  const isElectronBuild = !isContributorMode && (process.env.ELECTRON_BUILD || env.ELECTRON_BUILD) === 'true';
   const isPackagedBuild = isElectronBuild || mode === 'native';
   const hmrClientPort = env.VITE_HMR_CLIENT_PORT
     ? Number(env.VITE_HMR_CLIENT_PORT)
@@ -32,6 +37,8 @@ export default defineConfig(({ mode }) => {
   const apiV3Origin = env.VITE_API_V3_ORIGIN || "https://api.tatakai.app";
 
   return {
+    envDir,
+    envPrefix: isContributorMode ? 'TATAKAI_NO_AUTOMATIC_PUBLIC_ENV_' : 'VITE_',
     plugins: [react({ jsxImportSource: '@/lib/media-jsx' }), mediaCachePlugin(), seoPreviewPlugin(),
       // CSS backgrounds don't pass through React's JSX factories. Rewrite public
       // raster assets at build time; packaged styles retain their offline URLs.
@@ -163,8 +170,9 @@ export default defineConfig(({ mode }) => {
     server: {
       // Model/browser test caches contain large files and OS-locked journals on Windows.
       watch: { ignored: ['**/.tmp*/**', '**/.cache/**', '**/android/**/build/**', '**/ios/**/build/**', '**/tatakaiapi/node_modules/**', '**/tatakaiapi/dist/**'] },
-      host: "::",
-      port: isWebMode ? 8081 : 8090, // Standard port for Electron dev
+      host: isContributorMode ? '127.0.0.1' : "::",
+      port: isContributorMode ? 8090 : isWebMode ? 8081 : 8090,
+      strictPort: isContributorMode,
       // Allow Discord Activity iframe to embed the app
       allowedHosts: [
         "tatakai.me",
@@ -210,6 +218,8 @@ export default defineConfig(({ mode }) => {
 
     },
     define: {
+      ...(isContributorMode ? Object.fromEntries(Object.entries(env).map(([key, value]) =>
+        [`import.meta.env.${key}`, JSON.stringify(value)])) : {}),
       'import.meta.env.VITE_PACKAGED_BUILD': JSON.stringify(String(isPackagedBuild)),
       __APP_VERSION__: JSON.stringify(packageJson.version),
       __WEBAPP_MODE__: isWebMode,

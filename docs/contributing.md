@@ -7,21 +7,32 @@ Thank you for contributing! This guide covers code standards, PR process, and ho
 ## Quick Start
 
 ```bash
-# 1. Fork & clone
+# 1. Fork & clone the app
 git clone https://github.com/snozxyx/Tatakai.git
 cd Tatakai
 
-# 2. Install deps
-pnpm install
+# 2. Clone the private API after the maintainer grants access
+git clone https://github.com/Snozxyx/TatakaiAPI.git tatakaiapi
 
-# 3. Set up environment
-cp .env.example .env
-# Edit .env with your Supabase credentials (or use local)
+# 3. Install both repositories
+npm ci
+npm --prefix tatakaiapi ci
 
-# 4. Start dev
-pnpm dev          # Web only
-pnpm dev:desktop  # Electron
+# 4. Create the private API's contributor file once and fill in the dev keys
+cp tatakaiapi/config/contributor/.env.example tatakaiapi/config/contributor/.env.local
+
+# 5. Start the local frontend and local API
+npm run dev
 ```
+
+Use Node.js 22 or later. Supabase is hosted at `https://dev.tatakai.app`;
+the API runs on your computer. The database starts with public catalog metadata
+and no production user records. You need separate invitations to the private
+API repository and `https://dev-studio.tatakai.app`. Maintainers create confirmed
+development accounts; public signup is disabled.
+
+See [Development Setup](development.md) for Windows commands, private
+configuration, port conflicts and running the frontend/API separately.
 
 ---
 
