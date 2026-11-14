@@ -14,20 +14,21 @@ interface TopAnimeSectionProps {
   today: TopAnime[];
   week: TopAnime[];
   month: TopAnime[];
+  labels?: { today: string; week: string; month: string };
 }
 
 type Period = "today" | "week" | "month";
 
-export const TopAnimeSection = memo(function TopAnimeSection({ today, week, month }: TopAnimeSectionProps) {
+export const TopAnimeSection = memo(function TopAnimeSection({ today, week, month, labels }: TopAnimeSectionProps) {
   useUiTranslation();
   const { design } = useCardDesign();
   const navigate = useNavigate();
   const [activePeriod, setActivePeriod] = useState<Period>("today");
 
   const periods: { key: Period; label: string }[] = [
-    { key: "today", get label() { return uiI18n.t('app.today_24345a14'); } },
-    { key: "week", get label() { return uiI18n.t('app.this_week_4e68dca8'); } },
-    { key: "month", get label() { return uiI18n.t('app.this_month_0f6cc3a8'); } },
+    { key: "today", get label() { return labels?.today || uiI18n.t('app.today_24345a14'); } },
+    { key: "week", get label() { return labels?.week || uiI18n.t('app.this_week_4e68dca8'); } },
+    { key: "month", get label() { return labels?.month || uiI18n.t('app.this_month_0f6cc3a8'); } },
   ];
 
   const getAnimes = () => {

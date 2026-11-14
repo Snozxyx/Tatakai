@@ -4,6 +4,17 @@ All notable changes to Tatakai are documented here.
 
 ---
 
+## [6.4.6] - 2026-11-14
+
+- Add session-only Adult Mode with mandatory 18+ confirmation and separate anime, manga, novel, search and trending catalogs.
+- Reuse standard catalog layouts and transitions, with theme-aware NSFW logos and a lime header marker.
+- Connect PornhwaDB series, characters and chapter appearances to verified AniList and canonical catalog identities, including source-only titles.
+- Show character portraits in chapter rows, hide scene tags behind spoiler controls, and save the optional chapter spoiler warning preference.
+- Redesign Gallery with searchable filters, grid and masonry views, automatic pagination and decoded next/previous image preloading.
+- Keep home previews visible in Adult Mode, recover broken cover URLs, and isolate cached content by mode and enabled categories.
+- Compact desktop navigation, align content with one sidebar gutter, remove duplicated Trending navigation, and hide the app sidebar in readers.
+- Limit the home genre cloud, provide 18+ search tags and replace ordinary infinite home feeds with adult-only catalog feeds.
+
 ## [6.4.5] - 2026-11-10
 
 - Restore extension catalogue and stack loading after server container changes.

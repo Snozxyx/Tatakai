@@ -1,3 +1,5 @@
+import { disableAdultMode, getAdultMode, invalidateContentRequests, requestAdultMode, subscribeAdultMode } from '@/lib/adultMode';
+import { normalizeAdultCategories, type AdultCategoryPreferences } from '@/lib/adultContentPolicy';
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { AccountContentSafetyState } from '@/lib/contentSafetyAccount';
@@ -12,6 +14,8 @@ export interface ContentSafetySettings {
   showAdultEverywhere: boolean;
   warnBeforeAdultOpen: boolean;
   blurAdultInSearch: boolean;
+  adultCategories?: AdultCategoryPreferences;
+  hideAdultChapterSpoilers?: boolean;
 }
 
 const STORAGE_KEY = "tatakai_content_safety";
@@ -22,6 +26,8 @@ const DEFAULT_SETTINGS: ContentSafetySettings = {
   showAdultEverywhere: false,
   warnBeforeAdultOpen: true,
   blurAdultInSearch: true,
+  adultCategories: normalizeAdultCategories(null),
+  hideAdultChapterSpoilers: true,
 };
 
 const areSettingsEqual = (
@@ -30,7 +36,9 @@ const areSettingsEqual = (
 ) =>
   left.showAdultEverywhere === right.showAdultEverywhere &&
   left.warnBeforeAdultOpen === right.warnBeforeAdultOpen &&
-  left.blurAdultInSearch === right.blurAdultInSearch;
+  left.blurAdultInSearch === right.blurAdultInSearch &&
+  left.hideAdultChapterSpoilers === right.hideAdultChapterSpoilers &&
+  JSON.stringify(left.adultCategories) === JSON.stringify(right.adultCategories);
 
 const hasContentSafetyPayload = (value: unknown) => {
   if (typeof value !== "object" || value === null) return false;
@@ -38,12 +46,16 @@ const hasContentSafetyPayload = (value: unknown) => {
   return (
     "showAdultEverywhere" in raw ||
     "warnBeforeAdultOpen" in raw ||
-    "blurAdultInSearch" in raw
+    "blurAdultInSearch" in raw ||
+    "adultCategories" in raw ||
+    "hideAdultChapterSpoilers" in raw
   );
 };
 
 const sanitizeSettings = (raw: Partial<ContentSafetySettings> | null | undefined): ContentSafetySettings => ({
-  showAdultEverywhere: Boolean(raw?.showAdultEverywhere),
+  showAdultEverywhere: getAdultMode() === 'adult',
+  adultCategories: normalizeAdultCategories(raw?.adultCategories),
+  hideAdultChapterSpoilers: typeof raw?.hideAdultChapterSpoilers === 'boolean' ? raw.hideAdultChapterSpoilers : true,
   warnBeforeAdultOpen:
     typeof raw?.warnBeforeAdultOpen === "boolean"
       ? raw.warnBeforeAdultOpen
@@ -56,7 +68,7 @@ const sanitizeSettings = (raw: Partial<ContentSafetySettings> | null | undefined
 
 export function getContentSafetySettings(): ContentSafetySettings {
   if (typeof window === "undefined") {
-    return DEFAULT_SETTINGS;
+    return sanitizeSettings(DEFAULT_SETTINGS);
   }
 
   try {
@@ -66,7 +78,7 @@ export function getContentSafetySettings(): ContentSafetySettings {
       if (cookieSettings) {
         return sanitizeSettings(cookieSettings as Partial<ContentSafetySettings>);
       }
-      return DEFAULT_SETTINGS;
+      return sanitizeSettings(DEFAULT_SETTINGS);
     }
     const parsed = JSON.parse(raw) as Partial<ContentSafetySettings>;
     return sanitizeSettings(parsed);
@@ -75,14 +87,15 @@ export function getContentSafetySettings(): ContentSafetySettings {
     if (cookieSettings) {
       return sanitizeSettings(cookieSettings as Partial<ContentSafetySettings>);
     }
-    return DEFAULT_SETTINGS;
+    return sanitizeSettings(DEFAULT_SETTINGS);
   }
 }
 
 const persistSettings = (settings: ContentSafetySettings): ContentSafetySettings => {
   if (typeof window !== "undefined") {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-    writeGuestSettingsCookie({ contentSafety: settings });
+    const preferences = { ...settings, showAdultEverywhere: false };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(preferences));
+    writeGuestSettingsCookie({ contentSafety: preferences });
     window.dispatchEvent(new CustomEvent(UPDATE_EVENT));
   }
   return settings;
@@ -92,11 +105,18 @@ export function patchContentSafetySettings(
   patch: Partial<ContentSafetySettings>
 ): ContentSafetySettings {
   const current = getContentSafetySettings();
+  if (patch.showAdultEverywhere === true) requestAdultMode();
+  else if (patch.showAdultEverywhere === false) disableAdultMode();
   const next = sanitizeSettings({ ...current, ...patch });
-  return persistSettings(next);
+  persistSettings(next);
+  if (JSON.stringify(current.adultCategories) !== JSON.stringify(next.adultCategories)) {
+    invalidateContentRequests();
+  }
+  return next;
 }
 
 export function resetContentSafetySettings(): ContentSafetySettings {
+  disableAdultMode();
   return persistSettings(DEFAULT_SETTINGS);
 }
 
@@ -122,9 +142,11 @@ export function useContentSafetySettings() {
       setSettings(getContentSafetySettings());
     };
 
+    const unsubscribe = subscribeAdultMode(handleInternalUpdate);
     window.addEventListener("storage", handleStorage);
     window.addEventListener(UPDATE_EVENT, handleInternalUpdate);
     return () => {
+      unsubscribe();
       window.removeEventListener("storage", handleStorage);
       window.removeEventListener(UPDATE_EVENT, handleInternalUpdate);
     };
@@ -134,7 +156,9 @@ export function useContentSafetySettings() {
     if (!user?.id) return;
     if (!hasContentSafetyPayload(accountContentSafety)) return;
 
-    const normalized = accountState.read(user.id, sanitizeSettings(accountContentSafety as Partial<ContentSafetySettings>));
+    const normalized = sanitizeSettings(
+      accountState.read(user.id, sanitizeSettings(accountContentSafety as Partial<ContentSafetySettings>)),
+    );
 
     setSettings((current) => {
       if (areSettingsEqual(current, normalized)) return current;
@@ -157,7 +181,7 @@ export function useContentSafetySettings() {
     if (seededAccountRef.current === user.id) return;
     seededAccountRef.current = user.id;
 
-    void saveAccountSettingsPatch(user.id, { contentSafety: settings }).catch(() => {
+    void saveAccountSettingsPatch(user.id, { contentSafety: { ...settings, showAdultEverywhere: false } }).catch(() => {
       seededAccountRef.current = null;
     });
   }, [user?.id, accountContentSafety, settings]);
@@ -166,9 +190,14 @@ export function useContentSafetySettings() {
     const next = patchContentSafetySettings(patch);
     setSettings(next);
 
-    if (user?.id) {
+    if (user?.id && (
+      patch.warnBeforeAdultOpen !== undefined ||
+      patch.blurAdultInSearch !== undefined ||
+      patch.hideAdultChapterSpoilers !== undefined ||
+      patch.adultCategories !== undefined
+    )) {
       const revision = accountState.choose(user.id, sanitizeSettings(accountContentSafety), next);
-      void saveAccountSettingsPatch(user.id, { contentSafety: next }).then(() => {
+      void saveAccountSettingsPatch(user.id, { contentSafety: { ...next, showAdultEverywhere: false } }).then(() => {
         accountState.settled(user.id, revision);
         return refreshProfile();
       }).catch(() => accountState.settled(user.id, revision));
@@ -183,7 +212,7 @@ export function useContentSafetySettings() {
 
     if (user?.id) {
       const revision = accountState.choose(user.id, sanitizeSettings(accountContentSafety), next);
-      void saveAccountSettingsPatch(user.id, { contentSafety: next }).then(() => {
+      void saveAccountSettingsPatch(user.id, { contentSafety: { ...next, showAdultEverywhere: false } }).then(() => {
         accountState.settled(user.id, revision);
         return refreshProfile();
       }).catch(() => accountState.settled(user.id, revision));

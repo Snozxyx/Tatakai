@@ -1,3 +1,4 @@
+import { AdultInfiniteHome } from '@/components/content/AdultInfiniteHome';
 import { selectReadingTitle } from '@/lib/titleLanguage';
 import { HomeCustomization } from '@/components/customization/HomeCustomization';
 import { WebNovelDiscovery } from '@/components/novel/WebNovelDiscovery';
@@ -275,9 +276,9 @@ export default function NovelHomePage() {
                 </div>
               )}
             </section> : null },
-          { id: 'trending', layoutLocked: 'original', preservePresentation: true, label: 'Trending', collection: true, available: !isInitialLoading, node: !isInitialLoading && trendingCards.length > 0 ? <NovelTrendingGrid items={trendingCards} /> : null },
+          { id: 'trending', layoutLocked: 'original', preservePresentation: true, label: 'Trending', collection: true, available: !isInitialLoading, node: !isInitialLoading && trendingCards.length > 0 ? <NovelTrendingGrid rankingSource={home?.trendingSource} items={trendingCards} /> : null },
           { id: 'extra-lanes', label: 'More discovery', collection: true, group: true, available: !isInitialLoading, node: !isInitialLoading ? <NovelExtraLanes /> : null },
-          { id: 'genre-feed', label: 'Genre feed', feed: true, node: <InfiniteNovelSections /> },
+          { id: 'genre-feed', label: 'Genre feed', feed: true, node: canShowAdultEverywhere ? <AdultInfiniteHome kind="novel" /> : <InfiniteNovelSections /> },
         ]} />
       </main>
 

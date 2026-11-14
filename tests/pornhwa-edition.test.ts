@@ -1,0 +1,3 @@
+import {test,expect} from 'bun:test';
+import {getPornhwaEdition,rememberPornhwaEdition} from '../src/lib/reader/pornhwaEdition';
+test('reader edition changes follow the canonical series across its route aliases',()=>{const storage=globalThis.localStorage;let data='{}';globalThis.localStorage={getItem:()=>data,setItem:(_key:string,value:string)=>{data=value}} as any;try{expect(getPornhwaEdition('series')).toBe('standard');rememberPornhwaEdition('series','pornhwareader@standard','42');rememberPornhwaEdition('42','server|toko|pornhwareader@uncensored');expect(getPornhwaEdition('series')).toBe('uncensored');expect(getPornhwaEdition('42')).toBe('uncensored');}finally{globalThis.localStorage=storage;}});

@@ -8,6 +8,8 @@
  */
 
 import { queryCache, TTL } from '../cache/query-cache';
+import { getAdultMode, getAdultModeRevision } from '@/lib/adultMode';
+import { adultAnimeHomeBundle, readAdultHome } from '@/lib/adultHome';
 import { trackEvent } from '@/core/analytics/AnalyticsService';
 import { isCapacitor } from '@/lib/platform/platform';
 import { db, type CachedMedia } from '../db';
@@ -145,7 +147,9 @@ class ContentGraph {
     const hit = queryCache.get<T>(key);
     if (hit !== null) return hit;
 
+    const revision = getAdultModeRevision();
     const result = await fetcher();
+    if (revision !== getAdultModeRevision()) throw new DOMException('Content mode changed', 'AbortError');
     queryCache.set(key, result, ttlMs);
     
     // Background task: If the result contains media, save to local DB
@@ -211,6 +215,7 @@ class ContentGraph {
   // ── Home page (single bundled call) ──────────────────────────────────────
 
   async getHomePage(): Promise<HomePageBundle> {
+    if (getAdultMode() === 'adult') return this.cached('home:bundle', TTL.HOT, async () => adultAnimeHomeBundle(await readAdultHome('anime')) as unknown as HomePageBundle);
     return this.cached('home:bundle', TTL.HOT, () =>
       apiGet<HomePageBundle>('/home'),
     );

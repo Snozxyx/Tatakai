@@ -6,6 +6,8 @@
  * For heavier persistent caching (IndexedDB) this will be extended in Phase 1b.
  */
 
+import { getContentModeCacheKey } from '@/lib/adultMode';
+
 interface CacheEntry<T> {
   value: T;
   expiresAt: number;
@@ -18,6 +20,7 @@ class QueryCache {
   // ── Write ────────────────────────────────────────────────────────────────
 
   set<T>(key: string, value: T, ttlMs: number): void {
+    key = getContentModeCacheKey() + ':' + key;
     const entry: CacheEntry<T> = { value, expiresAt: Date.now() + ttlMs };
 
     // Memory (always)
@@ -37,6 +40,7 @@ class QueryCache {
   // ── Read ─────────────────────────────────────────────────────────────────
 
   get<T>(key: string): T | null {
+    key = getContentModeCacheKey() + ':' + key;
     // Memory first
     const memEntry = this.mem.get(key) as CacheEntry<T> | undefined;
     if (memEntry) {
@@ -66,11 +70,13 @@ class QueryCache {
   // ── Invalidate ────────────────────────────────────────────────────────────
 
   delete(key: string): void {
+    key = getContentModeCacheKey() + ':' + key;
     this.mem.delete(key);
     try { localStorage.removeItem(this.prefix + key); } catch { /* noop */ }
   }
 
   invalidatePrefix(prefix: string): void {
+    prefix = getContentModeCacheKey() + ':' + prefix;
     for (const key of [...this.mem.keys()]) {
       if (key.startsWith(prefix)) this.mem.delete(key);
     }

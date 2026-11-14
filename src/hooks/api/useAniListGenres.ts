@@ -9,6 +9,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useContentSafetySettings } from '@/hooks/user/useContentSafetySettings';
 import { fetchAniListGenres } from '@/lib/anilist';
 import { ALL_GENRES } from '@/lib/externalIntegrations';
+import { classifyAdultContent } from '@/lib/adultContentPolicy';
 
 /** Fallback while the first fetch is in flight and on failure. */
 export const FALLBACK_GENRES = ALL_GENRES;
@@ -26,7 +27,7 @@ export function useAniListGenres() {
 
   return {
     /** AniList genres, or the fallback list when the query has no data yet. */
-    genres: query.data?.length ? query.data : FALLBACK_GENRES,
+    genres: (query.data?.length ? query.data : FALLBACK_GENRES).filter(genre => !settings.showAdultEverywhere || classifyAdultContent({ genres: [genre] }) !== null),
     isLoading: query.isLoading,
     isError: query.isError,
     refetch: query.refetch,

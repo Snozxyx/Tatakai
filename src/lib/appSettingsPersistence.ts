@@ -15,6 +15,8 @@ export interface PersistedAppSettings {
     showAdultEverywhere?: boolean;
     warnBeforeAdultOpen?: boolean;
     blurAdultInSearch?: boolean;
+    hideAdultChapterSpoilers?: boolean;
+    adultCategories?: import('./adultContentPolicy').AdultCategoryPreferences;
   };
   video?: Record<string, unknown>;
   reader?: Record<string, unknown>;

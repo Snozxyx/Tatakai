@@ -8,18 +8,19 @@ import { HomeSectionHeading } from '@/components/home/HomeSectionHeading';
 
 interface MangaTrendingGridProps {
   items: UnifiedMediaCardProps['item'][];
+  rankingSource?: string;
 }
 
 const TRENDING_EXPLORE_TO = '/manga/discover?sort=trending';
 
-export const MangaTrendingGrid = memo(function MangaTrendingGrid({ items }: MangaTrendingGridProps) {
+export const MangaTrendingGrid = memo(function MangaTrendingGrid({ items, rankingSource }: MangaTrendingGridProps) {
   useUiTranslation();
   if (!items?.length) return null;
   const display = items.slice(0, 10);
   return <section className="mb-12 md:mb-24" aria-label={uiI18n.t('app.hype_and_trending_4e452d26')}>
     <HomeSectionHeading
       icon={<Flame className="h-5 w-5 text-primary" />}
-      title={uiI18n.t('app.hype_trending_dc37c734')}
+      title={rankingSource === 'db' ? 'Popular manga' : uiI18n.t('app.hype_trending_dc37c734')}
       subtitle={uiI18n.t('app.the_ten_hottest_titles_right_now_48f9c255')}
       viewAllTo={TRENDING_EXPLORE_TO}
     />

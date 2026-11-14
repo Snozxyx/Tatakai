@@ -46,7 +46,7 @@ function buildPublicImageUrl(value: string, width: number | null, base?: string)
     if (/\.(svg|ico|mp4|webm|m3u8|mpd|mov|mkv|mp3|ogg|wav|m4a)$/i.test(url.pathname)) return value;
     const params = new URLSearchParams({
       url: url.href, output: 'webp', q: '80',
-      fit: 'inside', we: '', n: '-1', maxage: '7d', default: '1',
+      fit: 'inside', we: '', n: '-1', maxage: '7d',
     });
     if (width !== null) params.set('w', String(Math.max(1, Math.min(2560, Math.round(width) || 1920))));
     return `https://wsrv.nl/?${params}`;

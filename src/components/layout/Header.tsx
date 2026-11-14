@@ -1,3 +1,4 @@
+import { contentModePath, getAdultMode } from '@/lib/adultMode';
 import { BrandLogo } from '@/components/branding/BrandLogo';
 import { HeaderSocialActions } from '@/components/layout/HeaderSocialActions';
 import { CosmeticAvatar } from '@/components/profile/IdentityCosmetics';
@@ -109,6 +110,8 @@ export function Header({ providerSearch, providerControls, alignWithPage = false
   const searchWrapperRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const location = useLocation();
+  const adultNavigation = getAdultMode() === 'adult' && location.pathname.startsWith('/adult/');
+  const catalogPath = contentModePath(location.pathname, 'sfw');
   const { user, profile, isAdmin, isModerator, isBanned, signOut, isLoading } = useAuth();
   const isNative = useIsNativeApp();
   const isDesktopApp = useIsDesktopApp();
@@ -160,8 +163,9 @@ export function Header({ providerSearch, providerControls, alignWithPage = false
       localStorage.setItem("tatakai_search_history", JSON.stringify(searches));
     } catch {}
     setShowSuggestions(false);
-    navigate(`/search?q=${encodeURIComponent(trimmed)}`);
-  }, [navigate, providerSearch]);
+    const kind = catalogPath.startsWith('/manga') ? 'manga' : catalogPath.startsWith('/novel') ? 'novel' : new URLSearchParams(location.search).get('kind') || 'anime';
+    navigate(contentModePath(`/search?q=${encodeURIComponent(trimmed)}${adultNavigation ? '&type=' + kind : ''}`));
+  }, [navigate, providerSearch, adultNavigation, catalogPath, location.search]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -173,16 +177,16 @@ export function Header({ providerSearch, providerControls, alignWithPage = false
   // behind `motion-safe` so reduced-motion users just get the instant swap) +
   // reset scroll so the new catalog starts at the top. `triggerHaptic` already
   // honors the user's haptic toggle, reduced-motion and tap throttle.
-  const catalog: 'anime' | 'manga' | 'novel' = location.pathname.startsWith('/manga')
+  const catalog: 'anime' | 'manga' | 'novel' = catalogPath.startsWith('/manga')
     ? 'manga'
-    : location.pathname.startsWith('/novel')
+    : catalogPath.startsWith('/novel')
       ? 'novel'
       : 'anime';
   const handleCatalogSwitch = useCallback(() => {
     void triggerHaptic('toggle');
-    navigate(catalog === 'anime' ? '/manga' : catalog === 'manga' ? '/novel' : '/browse');
+    navigate(contentModePath(catalog === 'anime' ? '/manga' : catalog === 'manga' ? '/novel' : adultNavigation ? '/anime' : '/browse'));
     requestAnimationFrame(() => window.scrollTo({ top: 0 }));
-  }, [navigate, catalog]);
+  }, [navigate, catalog, adultNavigation]);
 
   // Long-press ("hard press") on the catalog pill opens a jump menu with the
   // other two catalogs; a normal tap keeps cycling anime → manga → novel.
@@ -207,9 +211,9 @@ export function Header({ providerSearch, providerControls, alignWithPage = false
     setCatalogMenuOpen(false);
     if (location.pathname === path) return;
     void triggerHaptic('toggle');
-    navigate(path);
+    navigate(contentModePath(path === '/browse' && adultNavigation ? '/anime' : path));
     requestAnimationFrame(() => window.scrollTo({ top: 0 }));
-  }, [navigate, location.pathname]);
+  }, [navigate, location.pathname, adultNavigation]);
 
   const startCatalogLongPress = useCallback((e: React.PointerEvent) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
@@ -298,7 +302,7 @@ export function Header({ providerSearch, providerControls, alignWithPage = false
 
   return (
     <>
-      <header data-mobile-header className={cn(refreshed ? 'block' : 'md:hidden', "sticky z-50 border-b border-white/[0.06] bg-background/85 backdrop-blur-xl", hasSolidTitlebar ? "top-8" : "top-0")}>
+      <header data-mobile-header data-content-mode={getAdultMode()} className={cn(refreshed ? 'block' : 'md:hidden', "sticky z-50 border-b border-white/[0.06] bg-background/85 backdrop-blur-xl", hasSolidTitlebar ? "top-8" : "top-0")}>
         <div className="pt-[env(safe-area-inset-top)]">
         <div className="relative flex h-14 items-center justify-between px-3">
           {/* Left slot: notifications when signed in, otherwise a home shortcut.
@@ -408,7 +412,7 @@ export function Header({ providerSearch, providerControls, alignWithPage = false
           <button type="submit" aria-label="Submit provider search" className="rounded-full px-2 py-1 text-sm font-medium text-primary">Search</button>
         </form>}
       </div>}
-      <header data-desktop-header data-page-aligned={alignWithPage} className={cn(refreshed ? 'hidden' : 'hidden md:flex', 'relative items-center z-50 backdrop-blur-md py-2', alignWithPage ? 'mb-8' : 'mb-4', providerSearch || alignWithPage ? 'px-0' : 'px-6')}>
+      <header data-desktop-header data-content-mode={getAdultMode()} data-page-aligned={alignWithPage} className={cn(refreshed ? 'hidden' : 'hidden md:flex', 'relative items-center z-50 backdrop-blur-md py-2', alignWithPage ? 'mb-8' : 'mb-4', providerSearch || alignWithPage ? 'px-0' : 'px-6')}>
         <div className="flex items-center justify-between w-full gap-8">
         {/* Current catalog and service status */}
         {providerControls ? <div className="min-w-0 flex-1">{providerControls}</div> : <div className="flex items-center gap-3">
@@ -450,7 +454,7 @@ export function Header({ providerSearch, providerControls, alignWithPage = false
                 onKeyDown={(e) => {
                   if (e.key === "Escape") setShowSuggestions(false);
                 }}
-                placeholder={providerSearch ? `Search ${providerSearch.name}…` : t("header.searchPlaceholder")}
+                placeholder={providerSearch ? `Search ${providerSearch.name}` : adultNavigation ? 'Search ' + (catalog === 'novel' ? 'novels' : catalog) : t("header.searchPlaceholder")}
                 className="bg-transparent text-sm text-muted-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus:text-foreground w-24 sm:w-32 lg:w-48"
                 aria-label={providerSearch ? "Search provider" : t("header.searchAria")}
                 autoComplete="off"
@@ -693,7 +697,7 @@ export function Header({ providerSearch, providerControls, alignWithPage = false
                             <button
                               onClick={() => {
                                 setShowImageSearch(false);
-                                navigate(`/search?q=${encodeURIComponent(title)}`);
+                                navigate(contentModePath(`/search?q=${encodeURIComponent(title)}`));
                               }}
                               className="flex-1 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-medium text-muted-foreground hover:text-foreground transition-[transform,background-color,border-color,color,box-shadow,filter] duration-150 border border-white/5"
                             >

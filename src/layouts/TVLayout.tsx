@@ -1,3 +1,5 @@
+import { contentModePath } from '@/lib/adultMode';
+import AdultCatalogPage from '@/pages/adult/AdultCatalogPage';
 import { BrandLogo } from '@/components/branding/BrandLogo';
 import { useCustomization } from '@/hooks/ui/useCustomization';
 import { getThemeCustomization } from '@/lib/customization';
@@ -56,7 +58,7 @@ export default function TVLayout({ children }: { children: React.ReactNode }) {
   const settingsModal = useSettingsModal();
   useEffect(() => {
     if (!settingsModal.open) return;
-    const panel = ({ player: 'playback', mobile: 'playback', debrid: 'accounts', account: 'accounts', extensions: 'library', about: 'about' } as Record<string, string>)[settingsModal.category] || 'appearance';
+    const panel = ({ nsfw: 'nsfw', player: 'playback', mobile: 'playback', debrid: 'accounts', account: 'accounts', extensions: 'library', about: 'about' } as Record<string, string>)[settingsModal.category] || 'appearance';
     settingsModal.closeSettings();
     navigate(`/settings?panel=${panel}`);
   }, [settingsModal.open, settingsModal.category, settingsModal.closeSettings, navigate]);
@@ -167,7 +169,9 @@ export default function TVLayout({ children }: { children: React.ReactNode }) {
   let specialized: React.ReactNode = (
     <div className="tv-adapted-surface">{children}</div>
   );
-  if (path === "/") specialized = <Home />;
+  if (path === '/adult/anime') specialized = <AdultCatalogPage kind="anime" />;
+  else if (path === '/adult/search' || path === '/adult/trending') specialized = <AdultCatalogPage />;
+  else if (path === "/") specialized = <Home />;
   else if (
     path === "/search" ||
     path === "/browse" ||
@@ -257,7 +261,7 @@ export default function TVLayout({ children }: { children: React.ReactNode }) {
                 ["/tv/iptv", "Live TV", Tv],
                 ["/extensions", "Extensions", Zap],
               ] as Array<[string, string, typeof HomeIcon]>).map(([to, label, Icon]) => (
-                <NavLink key={to} to={to} end aria-label={label} data-tv-key={`nav-${label}`}>
+                <NavLink key={to} to={contentModePath(to)} end aria-label={label} data-tv-key={`nav-${label}`}>
                   <Icon /><span className="tv-rail-label">{label}</span>
                 </NavLink>
               ))}

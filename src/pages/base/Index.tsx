@@ -1,3 +1,5 @@
+import { AdultInfiniteHome } from '@/components/content/AdultInfiniteHome';
+import { getAdultMode } from '@/lib/adultMode';
 import { FriendsActivity } from '@/components/home/FriendsActivity';
 import '@/components/layout/catalog-polish.css';
 import { HomeCustomization } from '@/components/customization/HomeCustomization';
@@ -154,18 +156,18 @@ const Index = () => {
               { id: 'followed-manga', label: 'Followed manga updates', collection: true, node: <RevealSection><FollowedMangaUpdates /></RevealSection> },
               { id: 'followed-novel', label: 'Followed novel updates', collection: true, node: <RevealSection><FollowedNovelUpdates /></RevealSection> },
               { id: 'latest-episodes', label: 'Latest episodes', collection: true, node: <RevealSection><LatestEpisodes animes={data.latestEpisodeAnimes} /></RevealSection> },
-              { id: 'trending', layoutLocked: 'original', preservePresentation: true, label: 'Trending anime', collection: true, node: <RevealSection><TrendingGrid animes={data.trendingAnimes} /></RevealSection> },
+              { id: 'trending', layoutLocked: 'original', preservePresentation: true, label: 'Trending anime', collection: true, node: <RevealSection><TrendingGrid title={data.trendingSource === 'db' ? 'Popular titles' : undefined} animes={data.trendingAnimes} /></RevealSection> },
               { id: 'because-you-watched', label: 'Because you watched', collection: true, available: deferredCount >= 1, node: deferredCount >= 1 ? <RevealSection><BecauseYouWatched /></RevealSection> : null },
               { id: 'ai-recommendations', label: 'Recommendations', available: deferredCount >= 2, node: deferredCount >= 2 ? <RevealSection><AIRecommendationBanner /></RevealSection> : null },
-              { id: 'top10', label: 'Top anime', collection: true, available: deferredCount >= 3, node: deferredCount >= 3 ? <RevealSection><TopAnimeSection today={data.top10Animes.today} week={data.top10Animes.week} month={data.top10Animes.month} /></RevealSection> : null },
+              { id: 'top10', label: 'Top anime', collection: true, available: deferredCount >= 3, node: deferredCount >= 3 ? <RevealSection><TopAnimeSection labels={data.rankingLabels} today={data.top10Animes.today} week={data.top10Animes.week} month={data.top10Animes.month} /></RevealSection> : null },
               { id: 'upcoming', label: 'Upcoming anime', collection: true, available: deferredCount >= 4, node: deferredCount >= 4 ? <RevealSection><UpcomingAnimeSection /></RevealSection> : null },
               { id: 'most-popular', label: 'Most popular', collection: true, available: deferredCount >= 5, node: deferredCount >= 5 ? <RevealSection><AnimeGrid animes={data.mostPopularAnimes.slice(0, 6)} title={uiI18n.t('app.most_popular_385b4b23')} icon={<Heart className="w-[18px] h-[18px] text-muted-foreground" strokeWidth={1.5} />} /></RevealSection> : null },
-              { id: 'most-favorite', label: 'Most favorite', collection: true, available: deferredCount >= 6, node: deferredCount >= 6 ? <RevealSection><AnimeGrid animes={data.mostFavoriteAnimes.slice(0, 6)} title={uiI18n.t('app.most_favorite_cbe5ea81')} /></RevealSection> : null },
+              { id: 'most-favorite', label: 'Most favorite', collection: true, available: deferredCount >= 6, node: deferredCount >= 6 ? <RevealSection><AnimeGrid animes={data.mostFavoriteAnimes.slice(0, 6)} title={data.rankingLabels ? 'Highest rated' : uiI18n.t('app.most_favorite_cbe5ea81')} /></RevealSection> : null },
               { id: 'manga-showcase', label: 'Manga showcase', collection: true, available: deferredCount >= 7, node: deferredCount >= 7 ? <RevealSection><IndexMangaShowcase /></RevealSection> : null },
               { id: 'genres', label: 'Genres', available: deferredCount >= 8, node: deferredCount >= 8 ? <RevealSection><GenreCloud genres={data.genres} /></RevealSection> : null },
               { id: 'community', label: 'Community', available: deferredCount >= 9, node: deferredCount >= 9 ? <RevealSection><CommunitySection /></RevealSection> : null },
               { id: 'discord', label: 'Discord', available: deferredCount >= 10, node: deferredCount >= 10 ? <RevealSection><DiscordSection /></RevealSection> : null },
-              { id: 'genre-feed', label: 'Genre feed', feed: true, available: deferredCount >= 11, node: deferredCount >= 11 ? showInfiniteEarly ? <MobileInfiniteHomeSections /> : <InfiniteHomeSections /> : null },
+              { id: 'genre-feed', label: 'Genre feed', feed: true, available: deferredCount >= 11, node: deferredCount >= 11 ? getAdultMode() === 'adult' ? <AdultInfiniteHome kind="anime" /> : showInfiniteEarly ? <MobileInfiniteHomeSections /> : <InfiniteHomeSections /> : null },
             ]} />
             {!showDeferredSections && <div className="min-h-[60vh]" aria-hidden />}
           </div>

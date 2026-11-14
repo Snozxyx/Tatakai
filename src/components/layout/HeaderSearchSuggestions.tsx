@@ -1,3 +1,4 @@
+import { contentModePath, getAdultMode } from '@/lib/adultMode';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useEffect, useRef, useState } from "react";
@@ -36,7 +37,8 @@ async function fetchSuggestions(q: string, showAdult: boolean): Promise<Suggesti
   // The compact suggestions endpoint always excludes mature titles. The full
   // catalogue honours the user's choice and also resolves English aliases.
   const endpoint = showAdult ? 'search' : 'search/suggestions';
-  const raw = await fetch(`${resolveApiV3Base()}/content/${endpoint}?${params}`, {
+  if(showAdult) { params.set('kind','all'); params.set('limit','14'); }
+  const raw = await fetch(`${resolveApiV3Base()}/${showAdult ? 'adult' : 'content'}/${endpoint}?${params}`, {
     signal: AbortSignal.timeout(8000),
   }).then((response) => { if (!response.ok) throw new Error('Search unavailable'); return response.json(); });
 
@@ -102,6 +104,7 @@ export function HeaderSearchSuggestions({ query, visible, onSelect, onClose, inl
 
   const [history, setHistory] = useState<string[]>(() => {
     try {
+      if(getAdultMode() === 'adult') return [];
       const raw = localStorage.getItem("tatakai_search_history");
       const parsed = raw ? JSON.parse(raw) : [];
       return Array.isArray(parsed) ? parsed.filter(item => typeof item === 'string') : [];
@@ -121,6 +124,7 @@ export function HeaderSearchSuggestions({ query, visible, onSelect, onClose, inl
   const { data: extra = [], isFetching: catalogFetching } = useQuery({
     queryKey: ['header-mangabaka', debouncedQuery.trim(), getPreferredReadingTitleLanguage(), showAdult],
     queryFn: async (): Promise<Suggestion[]> => {
+      if(showAdult) return [];
       const catalog = await searchMangaTags(debouncedQuery.trim(), 1, 12, { tagSource: 'mangabaka', adult: showAdult });
       return catalog.results.filter(item => showAdult || !inferMangaAdultFlag(item)).map(item => ({
         id: item.id!, anilistId: item.anilistId, malId: item.malId,
@@ -173,7 +177,7 @@ export function HeaderSearchSuggestions({ query, visible, onSelect, onClose, inl
 
   const handleHistorySelect = (term: string) => {
     onSelect(term);
-    navigate(`/search?q=${encodeURIComponent(term)}`);
+    navigate(contentModePath(`/search?q=${encodeURIComponent(term)}`));
   };
 
   const removeHistory = (term: string, e: React.MouseEvent) => {
@@ -238,7 +242,7 @@ export function HeaderSearchSuggestions({ query, visible, onSelect, onClose, inl
                           <img
                             src={item.poster}
                             alt=""
-                            className="w-full h-full object-cover"
+                            className={cn("w-full h-full object-cover",showAdult && settings.blurAdultInSearch && "blur-lg")}
                             loading="lazy"
                           />
                         ) : (
@@ -289,7 +293,7 @@ export function HeaderSearchSuggestions({ query, visible, onSelect, onClose, inl
             type="button"
             onClick={() => {
               onSelect(query);
-              navigate(`/search?q=${encodeURIComponent(query.trim())}`);
+              navigate(contentModePath(`/search?q=${encodeURIComponent(query.trim())}`));
             }}
             className="w-full flex items-center gap-2 px-3 py-2.5 mt-1 rounded-xl bg-primary/10 hover:bg-primary/20 transition-colors text-sm font-semibold text-primary border border-primary/20 hover:border-primary/40"
           >

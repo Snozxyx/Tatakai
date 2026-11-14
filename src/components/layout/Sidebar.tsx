@@ -1,4 +1,5 @@
 import { BrandLogo } from '@/components/branding/BrandLogo';
+import { contentModePath, disableAdultMode, getAdultMode } from '@/lib/adultMode';
 import { useSidebarPreferences, sidebarRailItems, sidebarOverflowItems, sidebarItemActive, sidebarItemLabel } from '@/lib/sidebarCustomization';
 import { sidebarIcon } from '@/components/layout/sidebarIcons';
 import { openSidebarLink } from '@/lib/sidebarLinks';
@@ -16,6 +17,8 @@ import {
   MoreHorizontal,
   Plus,
   Languages,
+  Images,
+  LogOut,
 } from "lucide-react";
 import { NavIcon } from "@/components/ui/NavIcon";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -40,7 +43,10 @@ import { cn } from "@/lib/utils";
 export function Sidebar() {
   const { t } = useTranslation();
   const location = useLocation();
-  const navigate = useNavigate();
+  const navigateTo = useNavigate();
+  const navigate = (path: string) => navigateTo(contentModePath(path));
+  const contentPath = location.pathname.replace(/^\/adult(?=\/)/, '').replace(/^\/(anime|browse)$/, '/');
+  const adultMode = getAdultMode() === 'adult';
   const { user, profile, isBanned } = useAuth();
   const { openSettings } = useSettingsModal();
   const isNative = useIsNativeApp();
@@ -90,24 +96,22 @@ export function Sidebar() {
   // at all (no Home/Search/Settings/Community access).
   if (isMobileApp && isPhoneWidth) return null;
 
-  const isActive = (path: string) => location.pathname === path;
-  const isMangaActive = location.pathname === "/manga" || location.pathname.startsWith("/manga/");
-  const isNovelActive = location.pathname === "/novel" || location.pathname.startsWith("/novel/");
+  const isActive = (path: string) => contentPath === path;
+  const isMangaActive = contentPath === "/manga" || contentPath.startsWith("/manga/");
+  const isNovelActive = contentPath === "/novel" || contentPath.startsWith("/novel/");
   const overflowItems = sidebarOverflowItems(preferences, isDesktopApp);
   const overflowActive = overflowItems.some(item => sidebarItemActive(item.id, location.pathname, preferences)) || (isDesktopApp && isActive('/translate'));
 
   return (
     <nav
       data-sidebar
-      data-sidebar-rail={isDesktopApp ? "desktop" : "floating"}
-      style={isDesktopApp ? { bottom: 0, height: 'auto', maxHeight: 'none' } : undefined}
+      data-sidebar-rail="desktop"
+      style={{ bottom: 0, height: 'auto', maxHeight: 'none' }}
       className={cn(
         "fixed z-40 flex flex-col min-w-0 overflow-x-hidden transition-[color,background-color,opacity,transform] duration-500 ease-out",
         preferences && !isDesktopApp && "max-h-[calc(100dvh-3rem)] h-[calc(100dvh-3rem)]",
-        isDesktopApp
-          ? "left-0 top-8 bottom-0 w-20 bg-background/80 backdrop-blur-xl border-r border-border/40 pt-6 pb-6 items-center shadow-2xl"
-          // Floating pill design for web
-          : "left-6 top-1/2 -translate-y-1/2 w-[72px] rounded-[2rem] border border-border/40 bg-background/60 py-5 hidden md:flex items-center"
+        "hidden md:flex left-0 bottom-0 w-20 bg-background/80 border-r border-border/40 pt-6 pb-6 items-center",
+        isDesktopApp ? "top-8" : "top-0"
       )}
     >
       {/* 1. Logo Section with Hover Glow — pinned to the top on desktop */}
@@ -138,6 +142,9 @@ export function Sidebar() {
         <NavIcon nativeTooltip icon={Search} active={isActive("/search")} onClick={() => navigate("/search")} label={t("nav.search")} />
         <NavIcon nativeTooltip icon={BookOpen} active={isMangaActive} onClick={() => navigate("/manga")} label={t("nav.manga")} />
         <NavIcon nativeTooltip icon={ScrollText} active={isNovelActive} onClick={() => navigate("/novel")} label={t('nav.novels')} />
+        {adultMode && <>
+          <NavIcon nativeTooltip icon={Images} active={isActive('/gallery')} onClick={() => navigateTo('/adult/gallery')} label="Gallery" />
+        </>}
 
         {/* Separator Line */}
         <div className="w-8 h-[1px] bg-border/50 my-1 rounded-full" />
@@ -148,7 +155,7 @@ export function Sidebar() {
         <button type="button" aria-label={t("nav.customSources")} title={t("nav.customSources")} onClick={() => navigate('/custom-providers')} className={cn("flex h-10 w-10 items-center justify-center rounded-xl transition-colors hover:bg-accent", location.pathname.startsWith('/x/') || location.pathname === '/custom-providers' ? 'bg-primary/10 text-primary' : 'text-muted-foreground')}><Plus className="size-5" /></button>
         </>}
 
-        {/* Overflow Menu */}
+      {/* Overflow Menu */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
@@ -191,6 +198,10 @@ export function Sidebar() {
                 </DropdownMenuItem>
               );
             })}
+            {adultMode && <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={disableAdultMode} className="gap-3 rounded-lg px-3 py-2.5"><LogOut className="h-4 w-4" />Turn off Adult Mode</DropdownMenuItem>
+            </>}
             {isDesktopApp && <>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => navigate('/translate')} className={cn('gap-3 rounded-lg px-3 py-2.5 font-medium cursor-pointer', isActive('/translate') && 'bg-primary/10 text-primary')}>

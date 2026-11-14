@@ -157,7 +157,7 @@ export default function SearchPage() {
   }, [searchInput]);
   const [page, setPage] = useState(1);
   const [resultType, setResultType] = useHistoryPreference<'all' | 'anime' | 'manga' | 'novel' | 'character'>('resultType', () => {
-    const t = searchParams.get("type");
+    const t = searchParams.get("type") || searchParams.get('kind');
     if (t === 'manga') return 'manga';
     if (t === 'novel') return 'novel';
     if (t === 'anime') return 'anime';

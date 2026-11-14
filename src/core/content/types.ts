@@ -128,6 +128,7 @@ export interface TatakaiMedia {
   tags: MediaTag[];
   source?: MediaSource;
   isAdult: boolean;
+  adultCategory?: 'explicit' | 'ecchi' | 'mature' | null;
   countryOfOrigin?: string;
 
   // Relations & people
@@ -354,7 +355,7 @@ export function toAnimeCard(m: TatakaiMedia): AnimeCard {
     id: primaryId,
     name: selectMediaTitle(m),
     jname: m.titleNative ?? m.titleRomaji,
-    poster: m.coverImageLarge ?? m.coverImageMedium ?? '',
+    poster: m.coverImageLarge || m.coverImageMedium || '',
     tvMetadata: cardMetadataSnapshot(m),
     type: formatToDisplayType(m.format),
     duration: m.duration ? `${m.duration}m` : undefined,
@@ -392,7 +393,7 @@ export function toSpotlightAnime(m: TatakaiMedia, rank: number): SpotlightAnime 
     id: primaryId,
     name: selectMediaTitle(m),
     jname: m.titleNative ?? m.titleRomaji,
-    poster: m.coverImageLarge ?? m.coverImageMedium ?? m.bannerImage ?? '',
+    poster: m.coverImageLarge || m.coverImageMedium || m.bannerImage || '',
     banner: m.bannerImage,
     logo: (m as TatakaiMedia & { logo?: string }).logo,
     titleLogo: (m as TatakaiMedia & { titleLogo?: string }).titleLogo,
@@ -417,7 +418,7 @@ export function toTopAnime(m: TatakaiMedia, rank: number): TopAnime {
   return {
     id: primaryId,
     name: selectMediaTitle(m),
-    poster: m.coverImageLarge ?? m.coverImageMedium ?? '',
+    poster: m.coverImageLarge || m.coverImageMedium || '',
     rank,
     episodes: {
       sub: m.episodeSubCount ?? m.episodes ?? 0,
@@ -440,7 +441,7 @@ export function toTrendingAnime(m: TatakaiMedia, rank: number): TrendingAnime {
   return {
     id: primaryId,
     name: selectMediaTitle(m),
-    poster: m.coverImageLarge ?? m.coverImageMedium ?? '',
+    poster: m.coverImageLarge || m.coverImageMedium || '',
     rank,
     isAdult: m.isAdult,
     tvMetadata: cardMetadataSnapshot(m),
@@ -449,14 +450,18 @@ export function toTrendingAnime(m: TatakaiMedia, rank: number): TrendingAnime {
 
 /** Convert a HomePageBundle into the legacy HomeData shape used by existing components */
 export function toHomeData(bundle: HomePageBundle): HomeData {
+  const catalog = bundle as HomePageBundle & { catalogRankings?: boolean; trendingSource?: string; trendingNote?: string };
   return {
+    rankingLabels: catalog.catalogRankings ? { today: 'Trending', week: 'Popular', month: 'Highest rated' } : undefined,
+    trendingSource: catalog.trendingSource,
+    trendingNote: catalog.trendingNote,
     genres: bundle.genres,
     spotlightAnimes: bundle.spotlight.map((m, i) => toSpotlightAnime(m, i + 1)),
     trendingAnimes: bundle.trending.map((m, i) => toTrendingAnime(m, i + 1)),
     topAiringAnimes: bundle.topAiring.map(toAnimeCard),
     topUpcomingAnimes: bundle.topUpcoming.map(toAnimeCard),
     mostPopularAnimes: bundle.popular.map(toAnimeCard),
-    mostFavoriteAnimes: bundle.popular.map(toAnimeCard), // fallback: same as popular
+    mostFavoriteAnimes: (catalog.catalogRankings ? bundle.top10.month : bundle.popular).map(toAnimeCard),
     latestCompletedAnimes: bundle.latestCompleted.map(toAnimeCard),
     latestEpisodeAnimes: bundle.topAiring.slice(0, 15).map(toAnimeCard),
     top10Animes: {

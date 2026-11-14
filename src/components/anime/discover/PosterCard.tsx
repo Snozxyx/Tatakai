@@ -67,7 +67,7 @@ export function PosterCard({ item, rank, eager, footer, preview, className }: Po
       poster={<>
         <img src={getHighQualityPoster(item.poster, item.anilistId)} alt="" aria-hidden loading={eager ? 'eager' : 'lazy'} decoding="async"
           className={cn('media-card-image h-full w-full object-cover', hover.isActive ? 'opacity-0' : 'opacity-100')}
-          onError={event => handlePosterFallback(event, item.poster)} />
+          onError={event => handlePosterFallback(event, item.poster, item.fallbackPoster)} />
         {previewEnabled && <video ref={hover.videoRef} className={cn('absolute inset-0 h-full w-full object-cover transition-opacity duration-150', hover.isActive ? 'opacity-100' : 'opacity-0')}
           muted loop playsInline crossOrigin="anonymous" onError={hover.onError} />}
         {hover.unavailable && <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center"><span className="rounded-lg bg-black/75 px-3 py-2 text-xs text-white">{uiI18n.t('app.preview_unavailable_36d31d45')}</span></div>}
@@ -103,7 +103,7 @@ export function PosterCard({ item, rank, eager, footer, preview, className }: Po
               'h-full w-full object-cover transition-[opacity,transform] duration-200',
               hover.isActive ? 'opacity-0' : 'opacity-100 ',
             )}
-            onError={(event) => handlePosterFallback(event, item.poster)}
+            onError={(event) => handlePosterFallback(event, item.poster, item.fallbackPoster)}
           />
 
           {previewEnabled && (

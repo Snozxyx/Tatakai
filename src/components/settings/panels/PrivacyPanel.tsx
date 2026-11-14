@@ -65,76 +65,9 @@ export function PrivacyPanel({ section }: { section?: string }) {
     }
   };
 
-  const matureControls = (signedIn: boolean) => (
-    <SettingsSection
-      id="mature-content-controls"
-      icon={AlertTriangle}
-      eyebrow={t('privacy.matureEyebrow')}
-      title={t('privacy.matureTitle')}
-      description={
-        signedIn
-          ? t('privacy.matureDescriptionSignedIn')
-          : t('privacy.matureDescriptionGuest')
-      }
-    >
-      <div>
-        <SettingRow
-          title={t('privacy.showEverywhere')}
-          description={t('privacy.showEverywhereDescription')}
-          control={
-            <Switch
-              checked={contentSafetySettings.showAdultEverywhere}
-              onCheckedChange={(checked) => {
-                updateContentSafetySettings({ showAdultEverywhere: checked });
-                if (signedIn) {
-                  toast.success(
-                    checked
-                      ? t('privacy.showEverywhereOn')
-                      : t('privacy.showEverywhereOff'),
-                  );
-                }
-              }}
-            />
-          }
-        />
-        <SettingRow
-          title={t('privacy.blurSearch')}
-          description={t('privacy.blurSearchDescription')}
-          control={
-            <Switch
-              checked={contentSafetySettings.blurAdultInSearch}
-              onCheckedChange={(checked) => {
-                updateContentSafetySettings({ blurAdultInSearch: checked });
-                if (signedIn) {
-                  toast.success(checked ? t('privacy.blurSearchOn') : t('privacy.blurSearchOff'));
-                }
-              }}
-            />
-          }
-        />
-        <SettingRow
-          title={t('privacy.warnBefore')}
-          description={t('privacy.warnBeforeDescription')}
-          control={
-            <Switch
-              checked={contentSafetySettings.warnBeforeAdultOpen}
-              onCheckedChange={(checked) => {
-                updateContentSafetySettings({ warnBeforeAdultOpen: checked });
-                if (signedIn) {
-                  toast.success(checked ? t('privacy.warnOn') : t('privacy.warnOff'));
-                }
-              }}
-            />
-          }
-        />
-      </div>
-    </SettingsSection>
-  );
-
   if (!user) {
     return (
       <div className="space-y-6">
-        {matureControls(false)}
         <SettingsSection icon={Shield} eyebrow={t('privacy.accountEyebrow')} title={t('privacy.profilePrivacyTitle')}>
           <div className="flex flex-col items-center gap-4 py-4 text-center">
             <p className="text-sm text-muted-foreground">{t('privacy.signInPrompt')}</p>
@@ -147,7 +80,6 @@ export function PrivacyPanel({ section }: { section?: string }) {
 
   return (
     <div className="space-y-6">
-      {matureControls(true)}
       <SocialPrivacyControls />
 
       <SettingsSection

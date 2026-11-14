@@ -539,7 +539,7 @@ export function useHomeData() {
   const { settings } = useContentSafetySettings();
   const showAdult = settings.showAdultEverywhere;
   return useQuery({
-    queryKey: ["home", getPreferredTitleLanguage()],
+    queryKey: ["home", showAdult, settings.adultCategories, getPreferredTitleLanguage()],
     placeholderData: previous => previous,
     queryFn: async () => {
       const bundle = await contentGraph.getHomePage();

@@ -1,5 +1,7 @@
 import { ANILIST_GRAPHQL_ENDPOINT, resolveApiV3Base } from '@/lib/api/backendOrigin';
 import { isCapacitor } from '@/lib/platform/platform';
+import { getAdultMode, getContentModeCacheKey } from '@/lib/adultMode';
+import { classifyAdultContent, matchesContentMode, normalizeAdultCategories, selectedAdultCategories } from '@/lib/adultContentPolicy';
 import type { MangaSearchItem, MangaSearchResult } from '@/types/manga';
 import type { MangaSearchOptions } from './manga-client';
 
@@ -36,8 +38,11 @@ async function aniList<T>(query: string, variables: Record<string, unknown> = {}
 }
 
 export function getMangaTagOptions(source: 'anilist' | 'mangabaka'): Promise<MangaTagOption[]> {
-  const cached = tagCache.get(source);
-  if (cached) return cached;
+  const key = source + ':' + getContentModeCacheKey();
+  const adult = getAdultMode() === 'adult';
+  const restrict = (tags: MangaTagOption[]) => adult ? tags.filter(tag => tag.isAdult === true) : tags;
+  const cached = tagCache.get(key);
+  if (cached) return cached.then(restrict);
   const request = source === 'anilist'
     ? aniList<{ MediaTagCollection: MangaTagOption[] }>('query { MediaTagCollection { id name description category isAdult isGeneralSpoiler } }')
       .then(data => data.MediaTagCollection)
@@ -47,9 +52,9 @@ export function getMangaTagOptions(source: 'anilist' | 'mangabaka'): Promise<Man
         category: tag.name_path.split(' > ').slice(0, -1).join(' / '),
         isGeneralSpoiler: tag.is_spoiler, isAdult: ['erotica', 'pornographic'].includes(tag.content_rating),
       })));
-  tagCache.set(source, request);
-  void request.catch(() => tagCache.delete(source));
-  return request;
+  tagCache.set(key, request);
+  void request.catch(() => tagCache.delete(key));
+  return request.then(restrict);
 }
 
 interface AniListMedia {
@@ -68,6 +73,10 @@ interface MangaBakaSeries {
 }
 
 export async function searchMangaTags(query: string, page: number, limit: number, options: MangaSearchOptions & { adultOnly?: boolean }): Promise<MangaSearchResult> {
+  const adultMode = getAdultMode() === 'adult';
+  let preferences = normalizeAdultCategories(null);
+  try { preferences = normalizeAdultCategories(JSON.parse(localStorage.getItem('tatakai_content_safety') || '{}').adultCategories); } catch { /* defaults */ }
+  const allowedCategories = selectedAdultCategories(preferences);
   const names = [...new Set(options.tags || [])];
   const normalize = (name: string) => name.trim().toLocaleLowerCase();
   let source = options.tagSource;
@@ -89,7 +98,7 @@ export async function searchMangaTags(query: string, page: number, limit: number
         Page(page: $page, perPage: $perPage) {
           pageInfo { total hasNextPage }
           media(type: MANGA, search: $search, tag_in: $tags, isAdult: $adult, genre: $genre, countryOfOrigin: $country, format: $format, sort: [POPULARITY_DESC, ID_DESC]) {
-            id idMal title { romaji english native } coverImage { large } format countryOfOrigin status startDate { year } averageScore popularity isAdult chapters volumes
+            id idMal title { romaji english native } coverImage { large } format countryOfOrigin status startDate { year } averageScore popularity isAdult chapters volumes genres
           }
         }
       }`, {
@@ -97,12 +106,12 @@ export async function searchMangaTags(query: string, page: number, limit: number
       adult: options.adultOnly ? true : options.adult ? undefined : false, genre: options.genre, country,
       format: options.mangaType === 'novel' ? 'NOVEL' : undefined,
     });
-    const results: MangaSearchItem[] = data.Page.media.map(media => ({
+    const results: MangaSearchItem[] = data.Page.media.filter(media => !adultMode || matchesContentMode(media, 'adult', allowedCategories)).map(media => ({
       id: String(media.id), mediaType: media.countryOfOrigin === 'KR' ? 'manhwa' : media.countryOfOrigin === 'CN' ? 'manhua' : 'manga',
       anilistId: media.id, malId: media.idMal, canonicalTitle: media.title.english || media.title.romaji || media.title.native || 'Untitled',
       title: media.title, poster: media.coverImage?.large || null, status: media.status || 'unknown',
       year: media.startDate?.year ?? null, score: media.averageScore ?? null, popularity: media.popularity ?? null,
-      providersAvailable: [], matchConfidence: 1, adult: Boolean(media.isAdult), chapters: media.chapters ?? null,
+      providersAvailable: [], matchConfidence: 1, adult: classifyAdultContent(media) !== null, chapters: media.chapters ?? null,
       volumes: media.volumes ?? null, originLanguage: media.countryOfOrigin ?? null, readingDirection: 'unknown', providerSource: 'AniList',
     }));
     // AniList documents total as an estimate; hasNextPage is authoritative.
@@ -116,10 +125,10 @@ export async function searchMangaTags(query: string, page: number, limit: number
   const mangaType = options.mangaType || ({ KR: 'manhwa', CN: 'manhua', JP: 'manga' }[options.origin || '']);
   if (mangaType) params.append('type', mangaType === 'comics' ? 'oel' : mangaType);
   // Explicitly request allowed ratings; MangaBaka otherwise defaults to safe only.
-  (options.adultOnly ? ['erotica', 'pornographic'] : options.adult ? ['safe', 'suggestive', 'erotica', 'pornographic'] : ['safe', 'suggestive'])
+  (adultMode ? [...(preferences.ecchi ? ['suggestive'] : []), ...(preferences.explicit ? ['erotica', 'pornographic'] : [])] : options.adultOnly ? ['erotica', 'pornographic'] : options.adult ? ['safe', 'suggestive', 'erotica', 'pornographic'] : ['safe', 'suggestive'])
     .forEach(rating => params.append('content_rating', rating));
   const data = await readJson<{ pagination: { count: number; next: string | null }; data: MangaBakaSeries[] }>(`${MANGABAKA_API}/search?${params}`);
-  const results: MangaSearchItem[] = data.data.map(media => {
+  const results: MangaSearchItem[] = data.data.filter(media => !adultMode || matchesContentMode(media, 'adult', allowedCategories)).map(media => {
     const anilistId = Number(media.source?.anilist?.id) || undefined;
     const malId = Number(media.source?.my_anime_list?.id) || undefined;
     return {

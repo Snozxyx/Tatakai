@@ -1,3 +1,6 @@
+import { getPornhwaEdition, providerPornhwaEdition, rememberPornhwaEdition } from '@/lib/reader/pornhwaEdition';
+import { PornhwaChapterDetails } from '@/components/manga/PornhwaChapterDetails';
+import { usePornhwaSeries } from '@/hooks/api/usePornhwaSeries';
 import { selectReadingTitle } from '@/lib/titleLanguage';
 import '@/components/anime/detail-polish.css';
 import '@/components/layout/catalog-polish.css';
@@ -430,6 +433,7 @@ export default function MangaPage({ catalogId, sourceContext }: CatalogDetailPro
   }, [chapterData, kitsuHierarchy]);
   const isChapterListLoading = loadingChapters && !chapterData;
   const [preferredProvider, setPreferredProvider] = useState<string>("auto");
+  const editionSeeded = useRef<string | null>(null);
   const [preferredLanguage, setPreferredLanguage] = useState<string>("auto");
   const [chapterSortMode, setChapterSortMode] = useState<ChapterSortMode>("newest");
   const [chapterSearchTerm, setChapterSearchTerm] = useState("");
@@ -676,6 +680,7 @@ export default function MangaPage({ catalogId, sourceContext }: CatalogDetailPro
     page = 0,
   ) => {
     if (!mangaId || !source?.chapterKey) return;
+    rememberPornhwaEdition(info?.tatakaiId || mangaId, source.provider,mangaId);
     const query = buildReaderQuery({
       chapterKey: source.chapterKey,
       provider: source.provider,
@@ -820,6 +825,16 @@ export default function MangaPage({ catalogId, sourceContext }: CatalogDetailPro
       setPreferredProvider("auto");
     }
   }, [preferredProvider, providerOptions]);
+  useEffect(() => {
+    const series = mangaData?.detail?.tatakaiId || mangaId;
+    if(!series || editionSeeded.current === series) return;
+    const edition=getPornhwaEdition(series,mangaId);
+    const provider=providerOptions.find(value=>providerPornhwaEdition(value)===edition);
+    if(!provider) return;
+    editionSeeded.current=series;
+    setPreferredProvider(provider);
+  },[mangaData?.detail?.tatakaiId,mangaId,providerOptions]);
+
 
   useEffect(() => {
     if (preferredLanguage === "auto") return;
@@ -855,6 +870,7 @@ export default function MangaPage({ catalogId, sourceContext }: CatalogDetailPro
 
   const knownChapterCount = chapterData?.mangaUpdates?.latestChapter ?? chapterData?.mappedChapters.length;
   const info = mangaData?.detail ? { ...mangaData.detail, totalChapters: knownChapterCount || mangaData.detail.totalChapters } : undefined;
+  const pornhwa = usePornhwaSeries(mangaId, info ? { tatakaiId: info.tatakaiId || undefined, anilistId: info.anilistId, sourceIds: info.sourceIds } : undefined);
   useReadingViewTracker('manga',readingViewId(mangaId,(info as any)?.anilistId),!!info&&!loadingInfo);
 
   const displayTitle =
@@ -1854,6 +1870,7 @@ export default function MangaPage({ catalogId, sourceContext }: CatalogDetailPro
                           </div>
                         )}
                         <MangaChapterProviderRows
+                          details={<PornhwaChapterDetails series={pornhwa.data} chapterNumber={chapter.chapterNumber ?? null} hideSpoilers={pornhwa.hideSpoilers} />}
                           key={`${chapter.canonicalOrder}-${chapter.chapterNumber ?? "?"}`}
                           chapter={{
                           metadataSource: chapter.metadataSource,

@@ -1,3 +1,7 @@
+import { getAdultMode } from '@/lib/adultMode';
+import { adultReadingHomeBundle, readAdultHome } from '@/lib/adultHome';
+import { adultApi } from '@/lib/adultApi';
+import { classifyAdultContent } from '@/lib/adultContentPolicy';
 /**
  * Novel client — text-chapter twin of `manga-client.ts`.
  *
@@ -98,6 +102,8 @@ function rowToNovelItem(media: any): NovelSearchItem | null {
 }
 
 export interface NovelHomeData {
+  trendingSource?: string;
+  trendingNote?: string;
   spotlight: NovelSearchItem[]; trending: NovelSearchItem[]; popular: NovelSearchItem[]; topRated: NovelSearchItem[];
   newChapters: NovelSearchItem[]; adultLatest: NovelSearchItem[]; adultPopular: NovelSearchItem[];
   genres: string[]; fetchedAt: number; trendingPending: boolean;
@@ -105,12 +111,13 @@ export interface NovelHomeData {
 
 /** One above-the-fold request, with the same public bundle contract as manga/home. */
 export async function getNovelHome(adult = false): Promise<NovelHomeData> {
-  const data = await apiGet<Record<string, any>>('/api/v3/novel/home', { adult: adult ? 1 : 0 });
+  const data = getAdultMode() === 'adult' ? adultReadingHomeBundle(await readAdultHome('novel')) : await apiGet<Record<string, any>>('/api/v3/novel/home', { adult: adult ? 1 : 0 });
   const lane = (name: string) => (Array.isArray(data[name]) ? data[name] : []).map(rowToNovelItem)
     .filter((item: NovelSearchItem | null): item is NovelSearchItem => Boolean(item));
   return { spotlight: lane('spotlight'), trending: lane('trending'), popular: lane('popular'), topRated: lane('topRated'),
     newChapters: lane('newChapters'), adultLatest: lane('adultLatest'), adultPopular: lane('adultPopular'),
-    genres: data.genres || [], fetchedAt: data.fetchedAt, trendingPending: data.trendingPending === true };
+    genres: data.genres || [], fetchedAt: data.fetchedAt, trendingPending: data.trendingPending === true,
+    trendingSource: (data as any).trendingSource, trendingNote: (data as any).trendingNote };
 }
 
 export async function searchWebNovels(query = '', page = 1, limit = 20, options: NovelSearchOptions = {}): Promise<NovelSearchResult> {
@@ -228,7 +235,12 @@ async function searchAniListNovels(
 export async function getNovelDetail(id: string) {
   const normalizedId = String(id || '');
   let row: any;
-  if (/^mangabaka:\d+$/i.test(normalizedId)) {
+  if (getAdultMode() === 'adult' && !/^mangabaka:/i.test(normalizedId)) {
+    const canonical: any = await adultApi('media/' + encodeURIComponent(normalizedId.replace(/^anilist:/, '')));
+    const full = canonical.anilistId ? await apiGet<any>('/api/v3/manga/by-anilist/' + canonical.anilistId).catch(() => null) : null;
+    row = { ...canonical, ...(full?.media ?? full), tatakaiId: canonical.tatakaiId, sourceIds: canonical.sourceIds,
+      isAdult: canonical.isAdult, adultCategory: canonical.adultCategory };
+  } else if (/^mangabaka:\d+$/i.test(normalizedId)) {
     const series = await fetchMangaBakaSeries(normalizedId.split(':')[1], { source: 'mangabaka' });
     if (!series || series.type !== 'novel') throw new Error('Novel metadata could not be loaded. Please retry.');
     row = { anilistId: series.anilistId, malId: series.malId,
@@ -265,7 +277,7 @@ export async function getNovelDetail(id: string) {
       format: media?.format || 'NOVEL',
       origin: media?.countryOfOrigin || null,
       originLanguage: media?.countryOfOrigin || null,
-      adult: Boolean(media?.isAdult),
+      adult: classifyAdultContent(media) !== null,
       yearStart: media?.startDate?.year ?? null,
       yearEnd: media?.endDate?.year ?? null,
       score: media?.averageScore ?? null,

@@ -1,4 +1,5 @@
 import { flushReadingProgress } from '@/lib/reader/progressOutbox';
+import { contentModePath } from '@/lib/adultMode';
 import { ChatDockProvider } from '@/contexts/ChatDockContext';
 import { ChatDock } from '@/components/community/messages/ChatDock';
 import { useSocialPresencePublisher } from '@/hooks/community/useSocialActivity';
@@ -167,7 +168,8 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
 
   const online = useOnline();
   const hideSidebarPages = ['/', '/welcome', '/download', '/downloads', '/auth', '/onboarding', '/setup', '/maintenance', '/banned', '/error', '/smarttv', '/manga/read', '/novel/read', '/translate'];
-  const isHiddenPage = hideSidebarPages.some(page => page === '/' ? location.pathname === '/' : location.pathname.startsWith(page));
+  const layoutPath = contentModePath(location.pathname, 'sfw');
+  const isHiddenPage = hideSidebarPages.some(page => page === '/' ? layoutPath === '/' : layoutPath.startsWith(page));
   // The community feed ships its own X-style CommunitySidebar, so suppress the
   // global Sidebar there. The single-post /community/forum/:id view and the
   // space page /community/c/:slug now share that layout too, so they render
@@ -255,11 +257,12 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
     <IdleReclaimProvider />
     <div
       data-main-layout
+      data-has-sidebar={showSidebar}
       style={{ '--desktop-content-height': isDesktopApp && !titlebarHidden && !isMac ? 'calc(100dvh - 2rem)' : '100dvh' } as React.CSSProperties}
       className={cn(
         "min-h-screen relative flex flex-col",
         !fullPageProfile && "transition-[padding] duration-300",
-        isDesktopApp && showSidebar && online && "lg:pl-[var(--sidebar-width)]",
+        showSidebar && online && "md:pl-[var(--sidebar-width)]",
         // macOS keeps only a transparent drag overlay (native traffic lights),
         // so it needs no 32px layout clearance — Windows/Linux keep the solid bar.
         isDesktopApp && !titlebarHidden && !isMac && "pt-8"
@@ -272,7 +275,7 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
       <OfflineBanner />
       <MobileBackHandler />
       <MobilePullToRefresh />
-      {!/^\/(watch|manga\/read|novel\/read|auth|welcome|setup|onboarding|integration)(\/|$)/.test(location.pathname) && <ReviewPopup />}
+      {!/^\/(watch|manga\/read|novel\/read|auth|welcome|setup|onboarding|integration)(\/|$)/.test(layoutPath) && <ReviewPopup />}
       {/* Rendered OUTSIDE OfflineGate: the titlebar (drag region + window
           controls) must stay visible even when NoInternetPage takes over the
           viewport, otherwise the desktop window can't be moved or closed. */}
@@ -330,7 +333,7 @@ function ConditionalFooter() {
   const isNative = useIsNativeApp();
   if (isNative) return null;
   const hideFooter = ['/welcome', '/download', '/watch/', '/novel/comingsoon', '/dmca', '/suggestions','/privacy', '/terms', '/community-guidelines', '/community-rules', '/char/', '/genre/', '/manga/', '/manga', '/isshoni/', '/search', '/image-search', '/status', '/banned', '/maintenance', '/service-unavailable', '/503', '/error', '/auth', '/reset-password', '/update-password', '/onboarding', '/setup', '/mal-redirect', '/anilist-redirect', '/favorites', '/', '/trending', '/settings' , '/recommendations' , '/admin', '/mobile-app'].some(path => location.pathname === '/' ? path === '/' : location.pathname.startsWith(path));
-  if (hideFooter || location.pathname.startsWith('/novel/read') || location.pathname.startsWith('/translate')) return null;
+  if (hideFooter || contentModePath(location.pathname, 'sfw').startsWith('/novel/read') || contentModePath(location.pathname, 'sfw').startsWith('/manga/read') || location.pathname.startsWith('/translate')) return null;
   return <Footer />;
 }
 

@@ -7,6 +7,7 @@ export function mangaExtensionContext(id: string, metadata?: MangaDetailResponse
   const titles = [...new Set([detail?.canonicalTitle, detail?.title?.english, detail?.title?.romaji, detail?.title?.native, ...(detail?.title?.synonyms || [])]
     .filter((title): title is string => typeof title === 'string' && !!title.trim() && title.trim() !== 'Untitled').map(title => title.trim()))];
   return {
+    tatakaiId: detail?.tatakaiId || undefined, sourceIds: detail?.sourceIds,
     anilistId: detail?.anilistId || (Number.isSafeInteger(parsedId) && parsedId > 0 ? parsedId : undefined),
     malId: detail?.malId || undefined, title: titles[0], titles,
   };

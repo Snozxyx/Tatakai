@@ -90,7 +90,7 @@ export function useNovelHome() {
   const select = useCallback((feed: Awaited<ReturnType<typeof getNovelHome>>) => projectReadingHomeTitles(feed, titleLanguage), [titleLanguage]);
 
   const query = useQuery({
-    queryKey: ['novel-home', adult],
+    queryKey: ['novel-home', adult, settings.adultCategories],
     queryFn: () => getNovelHome(adult),
     select,
     refetchInterval: query => query.state.data?.trendingPending ? 5000 : false,

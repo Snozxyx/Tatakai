@@ -107,6 +107,7 @@ export interface MangaDetail {
   externalLinks?: ExternalLink[];
   /** Provenance + raw catalog columns (admin content editor / "in DB" badge). */
   tatakaiId?: string | null;
+  sourceIds?: Record<string,string>;
   sourceApi?: string | null;
   inDb?: boolean;
   bannerImage?: string | null;

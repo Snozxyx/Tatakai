@@ -1,4 +1,5 @@
 import uiI18n from '@/lib/uiI18n';
+import { contentModePath } from '@/lib/adultMode';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useLocation } from 'react-router-dom';
@@ -22,7 +23,7 @@ export function MobilePullToRefresh() {
   const busy = useRef(false);
   const refreshEpoch = useRef(0);
   const enabled = !desktop && (nativeMobile || phone) &&
-    !/^\/(watch|manga\/read|novel\/read|integration|api\/mal\/redirect|auth|setup|onboarding)(\/|$)/.test(location.pathname);
+    !/^\/(watch|manga\/read|novel\/read|integration|api\/mal\/redirect|auth|setup|onboarding)(\/|$)/.test(contentModePath(location.pathname, 'sfw'));
 
   const refresh = useCallback(async () => {
     if (busy.current) return;

@@ -5,6 +5,8 @@ import { useTranslation } from "react-i18next";
 import { Hash, ArrowUpRight } from "lucide-react";
 import { useAniListGenres } from "@/hooks/api/useAniListGenres";
 import { translateGenre } from "@/lib/smartDiscoverI18n";
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
 
 interface GenreCloudProps {
   genres: string[];
@@ -39,6 +41,8 @@ export function GenreCloud({ genres }: GenreCloudProps) {
   // genre AniList has retired before the API cache expires still renders.
   const { genres: allGenres } = useAniListGenres();
   const mergedGenres = Array.from(new Set([...(genres || []), ...allGenres]));
+  const [expanded, setExpanded] = useState(false);
+  const visibleGenres = expanded ? mergedGenres : mergedGenres.slice(0, 12);
 
   const handleGenreClick = (genre: string) => {
     navigate(`/genre/${genre.toLowerCase().replace(/\s+/g, "-")}`);
@@ -56,7 +60,7 @@ export function GenreCloud({ genres }: GenreCloudProps) {
       </div>
 
       <div data-mobile-home-rail="genres" className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-        {mergedGenres.map((genre) => {
+        {visibleGenres.map((genre) => {
           const accent = getAccent(genre);
           return (
             <button
@@ -84,6 +88,7 @@ export function GenreCloud({ genres }: GenreCloudProps) {
           );
         })}
       </div>
+      {mergedGenres.length > 12 && <Button variant="ghost" className="mt-4" aria-expanded={expanded} onClick={() => setExpanded(value => !value)}>{expanded ? 'Show fewer genres' : 'Show all genres (' + mergedGenres.length + ')'}</Button>}
     </section>
   );
 }

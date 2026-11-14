@@ -1,3 +1,4 @@
+import { AdultInfiniteHome } from '@/components/content/AdultInfiniteHome';
 import { selectReadingTitle } from '@/lib/titleLanguage';
 import { HomeCustomization } from '@/components/customization/HomeCustomization';
 import { useScrollRestoration } from '@/hooks/ui/useScrollRestoration';
@@ -290,9 +291,9 @@ export default function MangaHomePage() {
                 </div>
               )}
             </section> : null },
-          { id: 'trending', layoutLocked: 'original', preservePresentation: true, label: 'Trending', collection: true, available: !isInitialLoading, node: !isInitialLoading && trendingCards.length > 0 ? <MangaTrendingGrid items={trendingCards} /> : null },
+          { id: 'trending', layoutLocked: 'original', preservePresentation: true, label: 'Trending', collection: true, available: !isInitialLoading, node: !isInitialLoading && trendingCards.length > 0 ? <MangaTrendingGrid rankingSource={home?.trendingSource} items={trendingCards} /> : null },
           { id: 'extra-lanes', label: 'More discovery', collection: true, group: true, available: !isInitialLoading, node: !isInitialLoading ? <MangaExtraLanes /> : null },
-          { id: 'genre-feed', label: 'Genre feed', feed: true, node: <InfiniteMangaSections /> },
+          { id: 'genre-feed', label: 'Genre feed', feed: true, node: canShowAdultEverywhere ? <AdultInfiniteHome kind="manga" /> : <InfiniteMangaSections /> },
         ]} />
       </main>
 

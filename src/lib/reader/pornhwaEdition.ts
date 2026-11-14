@@ -1,0 +1,5 @@
+export type PornhwaEdition = 'standard' | 'uncensored';
+const KEY='tatakai_pornhwa_editions_v1';
+export function providerPornhwaEdition(provider:string|undefined):PornhwaEdition|null {const match=/pornhwareader@(standard|uncensored)/.exec(provider||'');return match?match[1] as PornhwaEdition:null;}
+export function getPornhwaEdition(seriesId:string,aliasId?:string):PornhwaEdition {try{const saved=JSON.parse(localStorage.getItem(KEY)||'{}');const id=saved._aliases?.[seriesId]||seriesId;return (saved[id]??(aliasId?saved[aliasId]:undefined))==='uncensored'?'uncensored':'standard';}catch{return 'standard';}}
+export function rememberPornhwaEdition(seriesId:string,provider:string,aliasId?:string){const edition=providerPornhwaEdition(provider);if(!edition)return;try{const saved=JSON.parse(localStorage.getItem(KEY)||'{}');const id=saved._aliases?.[seriesId]||seriesId;localStorage.setItem(KEY,JSON.stringify({...saved,[id]:edition,...(aliasId?{_aliases:{...saved._aliases,[aliasId]:id}}:{})}));}catch{/* Reading remains available without storage. */}}

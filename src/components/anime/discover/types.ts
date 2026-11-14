@@ -16,6 +16,7 @@ export interface PosterItem {
   href: string;
   title: string;
   poster: string;
+  fallbackPoster?: string;
   /**
    * What the hover preview resolves against — it is the only id the preview API
    * accepts. Manga rows leave it unset: their AniList ids live in a different
@@ -41,6 +42,7 @@ export interface PosterItem {
 export function handlePosterFallback(
   event: React.SyntheticEvent<HTMLImageElement>,
   poster: string,
+  fallbackPoster?: string,
 ) {
   const image = event.currentTarget;
   const stage = image.dataset.fallbackStage || 'upgraded';
@@ -51,6 +53,11 @@ export function handlePosterFallback(
     return;
   }
 
+  if (fallbackPoster && stage !== 'medium' && stage !== 'placeholder' && image.currentSrc !== fallbackPoster) {
+    image.dataset.fallbackStage = 'medium';
+    image.src = fallbackPoster;
+    return;
+  }
   if (stage !== 'placeholder') {
     image.dataset.fallbackStage = 'placeholder';
     image.src = '/placeholder.svg';

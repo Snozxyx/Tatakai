@@ -301,6 +301,7 @@ const resultCache = new Map(); // key → { entries, providerStatus, expiresAt }
 function cacheKey(mode, opts) {
     return [
         mode,
+        opts.contentMode, opts.tatakaiId, JSON.stringify(opts.sourceIds || {}),
         opts.anilistId,
         opts.episode,
         opts.resolution,
@@ -363,7 +364,10 @@ async function optionsFromQuery(searchParams, logger) {
 
     const preferredLanguages = searchParams.get('preferredLanguages');
     return {
-        anilistId: safeAnilistId,
+        ...(safeAnilistId ? { anilistId: safeAnilistId } : {}),
+        contentMode: searchParams.get('contentMode') === 'adult' ? 'adult' : 'sfw',
+        tatakaiId: searchParams.get('tatakaiId') || undefined,
+        sourceIds: parseSourceIds(searchParams.get('sourceIds')),
         titles,
         episode: searchParams.get('episode') ? Number(searchParams.get('episode')) : 1,
         resolution: String(searchParams.get('resolution') || '1080p'),
@@ -381,12 +385,13 @@ async function optionsFromQuery(searchParams, logger) {
  * mapping ignores them; fuzzy providers like AllManga rely on them). No AniList
  * pre-fetch here — the bundle's `enrichMangaParams` does that once internally.
  */
+function parseSourceIds(raw) { try { const value=JSON.parse(raw||'null'); return value && typeof value==='object' && !Array.isArray(value) ? value : undefined; } catch { return undefined; } }
 function mangaParamsFromQuery(searchParams) {
     const anilistId = Number(searchParams.get('anilistId'));
     const malId = Number(searchParams.get('malId'));
     const titles = parseTitles(searchParams);
     const title = searchParams.get('title') || undefined;
-    return {
+    return { contentMode: searchParams.get('contentMode') === 'adult' ? 'adult' : 'sfw', tatakaiId:searchParams.get('tatakaiId')||undefined,sourceIds:parseSourceIds(searchParams.get('sourceIds')),
         ...(Number.isFinite(anilistId) && anilistId > 0 ? { anilistId } : {}),
         ...(Number.isFinite(malId) && malId > 0 ? { malId } : {}),
         ...(title ? { title } : {}),
@@ -1067,7 +1072,7 @@ function createHostApp({ registry, localProxy, logger }) {
         const bypassCache = searchParams.get('refresh') === '1' || searchParams.get('nocache') === '1';
         const key = [
             'manga-chapters', namespace,
-            params.anilistId || 0, params.malId || 0,
+            params.contentMode,params.tatakaiId,JSON.stringify(params.sourceIds||{}),params.anilistId || 0, params.malId || 0,
             params.title || '', (params.titles || []).join('|'),
         ].join(':');
 
@@ -1154,6 +1159,7 @@ function createHostApp({ registry, localProxy, logger }) {
         const anilistId = Number(searchParams.get('anilistId'));
         const pageParams = {
             chapterKey,
+            contentMode: searchParams.get('contentMode') === 'adult' ? 'adult' : 'sfw',
             provider: searchParams.get('provider') || undefined,
             providerChapterId: searchParams.get('providerChapterId') || undefined,
             ...(Number.isFinite(anilistId) && anilistId > 0 ? { anilistId } : {}),

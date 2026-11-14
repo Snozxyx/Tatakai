@@ -1,3 +1,4 @@
+import { getAdultMode } from '@/lib/adultMode';
 import uiI18n from '@/lib/uiI18n';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -80,7 +81,7 @@ export interface ExtensionSourceStreamParams {
 
 export function extensionStreamCacheKey(namespace: string, params: ExtensionSourceStreamParams): string {
   return JSON.stringify({
-    scope: 'ext-stream', namespace, anilistId: params.anilistId ?? null,
+    scope: 'ext-stream', namespace, contentMode: getAdultMode(), anilistId: params.anilistId ?? null,
     titlesKey: (params.titles || []).join('|'), episode: params.episode ?? null,
     resolution: params.resolution ?? '1080p', preferredLanguage: params.preferredLanguage ?? null,
     route: params.route || 'sources',
@@ -273,6 +274,7 @@ function buildStreamUrl(
   forceRefresh = false
 ): string {
   const u = new URL(`${baseUrl}/api/v3/${namespace}/${route}`);
+  u.searchParams.set('contentMode',getAdultMode());
   const anilistId = Number(p.anilistId);
   if (Number.isFinite(anilistId) && anilistId > 0) u.searchParams.set("anilistId", String(anilistId));
   if (p.episode != null && Number.isFinite(Number(p.episode))) u.searchParams.set("episode", String(p.episode));
@@ -598,7 +600,7 @@ export function useExtensionSourceStream<T = any>(
           await host.resolveSources(
             namespace,
             route,
-            { anilistId, titles, episode, resolution, preferredLanguage, refresh: reloadKey > 0 },
+            { anilistId, titles, episode, resolution, preferredLanguage, contentMode: getAdultMode(), refresh: reloadKey > 0 },
             onChunk,
           );
           if (cancelled) return;

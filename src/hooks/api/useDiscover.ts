@@ -16,6 +16,8 @@ import { ALL_GENRES } from '@/lib/externalIntegrations';
 import { buildPreferredAnimeRouteId } from '@/lib/animeIdMapping';
 import { useContentSafetySettings } from '@/hooks/user/useContentSafetySettings';
 import { filterAdultAnime } from '@/lib/contentSafety';
+import { adultApi, type AdultPage } from '@/lib/adultApi';
+import { getAdultMode, getContentModeCacheKey } from '@/lib/adultMode';
 import type { PosterItem } from '@/components/anime/discover/types';
 import { RAIL_LENGTH } from '@/components/anime/discover/types';
 import type {
@@ -103,7 +105,7 @@ export function useDiscoverMedia({ genre, sort = 'for-you', year = null, page = 
   const showAdult = settings.showAdultEverywhere;
 
   return useQuery<ContentSearchResult>({
-    queryKey: ['discover', 'grid', resolvedGenre ?? null, sort, year, page, showAdult],
+    queryKey: ['discover', 'grid', resolvedGenre ?? null, sort, year, page, showAdult, getContentModeCacheKey()],
     queryFn: () =>
       contentGraph.search({
         genres: resolvedGenre ? [resolvedGenre] : undefined,
@@ -175,7 +177,8 @@ export function mediaToPosterItem(media: TatakaiMedia, index = 0): PosterItem {
     key: `${media.anilistId || media.malId || media.tatakaiId || title}-${index}`,
     href: mediaHref(media),
     title,
-    poster: media.coverImageLarge ?? media.coverImageMedium ?? '',
+    poster: media.coverImageLarge || media.coverImageMedium || '',
+    fallbackPoster: media.coverImageMedium || undefined,
     anilistId: media.anilistId,
     meta: label,
     score,
@@ -237,8 +240,8 @@ export function useRankedBoard(board: FeedType) {
   const { settings } = useContentSafetySettings();
   const showAdult = settings.showAdultEverywhere;
   return useQuery<ContentFeed>({
-    queryKey: ['discover', 'board', board],
-    queryFn: () => contentGraph.getFeed(board, 1, POSTERS_PER_BOARD),
+    queryKey: ['discover', 'board', board, getContentModeCacheKey()],
+    queryFn: () => readRankedBoard(board),
     staleTime: 10 * 60 * 1000,
     // The rail is the tallest thing on the page; swapping boards should not
     // make the hero jump to a skeleton and back.
@@ -260,11 +263,22 @@ export function usePrefetchRankedBoard() {
   return useCallback(
     (board: FeedType) => {
       void queryClient.prefetchQuery({
-        queryKey: ['discover', 'board', board],
-        queryFn: () => contentGraph.getFeed(board, 1, POSTERS_PER_BOARD),
+        queryKey: ['discover', 'board', board, getContentModeCacheKey()],
+        queryFn: () => readRankedBoard(board),
         staleTime: 10 * 60 * 1000,
       });
     },
     [queryClient],
   );
+}
+
+async function readRankedBoard(board: FeedType): Promise<ContentFeed> {
+  if (getAdultMode() !== 'adult') return contentGraph.getFeed(board, 1, POSTERS_PER_BOARD);
+  let explicit = true;
+  try { explicit = JSON.parse(localStorage.getItem('tatakai_content_safety') || '{}').adultCategories?.explicit !== false; } catch { /* defaults */ }
+  const result = await adultApi<AdultPage>(board === 'trending' ? 'trending' : 'search', {
+    kind: 'anime', limit: String(POSTERS_PER_BOARD), adultCategories: explicit ? 'explicit' : undefined,
+    sort: board === 'trending' ? undefined : board === 'top_rated' ? 'score' : board === 'seasonal' ? 'latest' : 'popular',
+  });
+  return { type: board, media: result.media as unknown as TatakaiMedia[], fetchedAt: Date.now() };
 }

@@ -1,3 +1,5 @@
+import { classifyAdultContent, matchesContentMode, normalizeAdultCategories, selectedAdultCategories } from './adultContentPolicy';
+import { getAdultMode } from './adultMode';
 import type { MangaSearchItem } from "@/types/manga";
 
 const EXPLICIT_PATTERNS: RegExp[] = [
@@ -29,24 +31,12 @@ const normalize = (value: string) =>
 
 /** Shared policy for extension descriptors and catalogue cards. */
 export function isExplicitExtensionContent(value: unknown): boolean {
-  if (!value || typeof value !== 'object') return false;
-  const row = value as Record<string, unknown>;
-  if (['nsfw', 'isNsfw', 'is_nsfw', 'isAdult', 'adult', 'is18Plus'].some(key => row[key] === true)) return true;
-  const labels = [row.name, row.title, row.rating, row.ageRating, row.contentRating,
-    ...(Array.isArray(row.genres) ? row.genres : []), ...(Array.isArray(row.tags) ? row.tags : []),
-    ...(Array.isArray(row.categories) ? row.categories : [])];
-  return labels.some(label => typeof label === 'string' && EXPLICIT_PATTERNS.some(pattern => pattern.test(normalize(label))));
+  if(!value || typeof value !== 'object') return false;
+  return (value as Record<string,unknown>).adultOnly === true || classifyAdultContent(value) !== null;
 }
 
 /** Non-React consumers use the same persisted preference as the global toggle. */
-export function showAdultExtensionContent(): boolean {
-  try {
-    const saved = localStorage.getItem('tatakai_content_safety');
-    if (saved) return JSON.parse(saved)?.showAdultEverywhere === true;
-    const cookie = document.cookie.split(';').map(value => value.trim()).find(value => value.startsWith('tatakai_guest_settings_v1='));
-    return cookie ? JSON.parse(decodeURIComponent(cookie.slice(cookie.indexOf('=') + 1)))?.contentSafety?.showAdultEverywhere === true : false;
-  } catch { return false; }
-}
+export function showAdultExtensionContent(): boolean { return getAdultMode() === 'adult'; }
 
 export function isExplicitMangaSearchQuery(query: string): boolean {
   const normalized = normalize(query || "");
@@ -54,54 +44,8 @@ export function isExplicitMangaSearchQuery(query: string): boolean {
   return EXPLICIT_PATTERNS.some((pattern) => pattern.test(normalized));
 }
 
-export function inferMangaAdultFlag(
-  manga: Partial<MangaSearchItem> | null | undefined
-): boolean {
-  if (!manga) return false;
-  if (typeof manga.adult === "boolean") {
-    return manga.adult;
-  }
-
-  const candidates = [
-    manga.canonicalTitle,
-    manga.title?.english,
-    manga.title?.romaji,
-    manga.title?.native,
-  ].filter((value): value is string => typeof value === "string" && value.trim().length > 0);
-
-  if (candidates.length === 0) return false;
-
-  return candidates.some((title) => {
-    const normalized = normalize(title);
-    return EXPLICIT_PATTERNS.some((pattern) => pattern.test(normalized));
-  });
-}
-
-export function inferAnimeAdultFlag(anime: any): boolean {
-  if (!anime) return false;
-  if (typeof anime.isAdult === "boolean") return anime.isAdult;
-  if (typeof anime.adult === "boolean") return anime.adult;
-  if (typeof anime.is18Plus === "boolean") return anime.is18Plus;
-  if (typeof anime.isNsfw === "boolean") return anime.isNsfw;
-
-  const ratingStr = String(anime.rating || anime.ageRating || "").toLowerCase();
-  if (ratingStr.includes("rx") || ratingStr.includes("r18") || ratingStr.includes("18+") || ratingStr.includes("hentai")) {
-    return true;
-  }
-
-  const genres: string[] = Array.isArray(anime.genres) ? anime.genres : [];
-  if (genres.some((g) => typeof g === "string" && EXPLICIT_PATTERNS.some((p) => p.test(g.toLowerCase())))) {
-    return true;
-  }
-
-  const candidates = [anime.name, anime.title, anime.englishTitle, anime.japaneseTitle]
-    .filter((v): v is string => typeof v === "string" && v.trim().length > 0);
-
-  return candidates.some((title) => {
-    const normalized = normalize(title);
-    return EXPLICIT_PATTERNS.some((pattern) => pattern.test(normalized));
-  });
-}
+export function inferMangaAdultFlag(manga: unknown): boolean { return classifyAdultContent(manga) !== null; }
+export function inferAnimeAdultFlag(anime: unknown): boolean { return classifyAdultContent(anime) !== null; }
 
 /**
  * Drop mature anime from a discovery/home/feed list unless the user has opted to

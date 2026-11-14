@@ -1,4 +1,6 @@
-import { useEffect, useLayoutEffect, useMemo, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useSyncExternalStore, type ReactNode } from 'react';
+import { getAdultMode, subscribeAdultMode } from '@/lib/adultMode';
+import { adultBrandLogo } from '@/lib/adultBranding';
 import { applyThemePalette, resolveThemePalette, useTheme } from '@/hooks/ui/useTheme';
 import { useIsMobile } from '@/hooks/ui/use-mobile';
 import { CustomizationScopeProvider, useCustomization } from '@/hooks/ui/useCustomization';
@@ -33,6 +35,7 @@ export function BrandRuntimeProvider({ children }: { children: ReactNode }) {
   const customization = getThemeCustomization(settings, theme);
   const palette = useMemo(() => resolveThemePalette(theme, customization.palette), [theme, customization.palette, main.themeInfo]);
   const variant = resolveLogoVariant(customization.logo, theme);
+  const mode = useSyncExternalStore(subscribeAdultMode, getAdultMode, () => 'sfw' as const);
   const background = appThemeBackground(customization, palette.background);
   useEffect(() => {
     applyThemePalette(theme, palette, television ? tv.reduced : main.reduceMotion, main.highContrast);
@@ -45,7 +48,9 @@ export function BrandRuntimeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let icon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
     if (!icon) { icon = document.createElement('link'); icon.rel = 'icon'; document.head.appendChild(icon); }
-    icon.type = 'image/png'; icon.href = brandLogoSource(variant);
+    icon.type = 'image/png'; icon.href = mode === 'adult' ? adultBrandLogo(resolveLogoVariant('auto', theme) === 'light') : brandLogoSource(variant);
+  }, [variant, mode, theme]);
+  useEffect(() => {
     void syncCommittedLauncher(variant).catch(() => undefined);
   }, [variant]);
   return <CustomizationScopeProvider themeId={theme} target={television ? 'tv' : mobile ? 'mobile' : 'desktop'}><AppThemeBackgroundProvider background={background} systemBlur={systemBlur}><CanvasReadability palette={palette} background={background} systemBlur={systemBlur} opacity={canvasOpacity} />{children}</AppThemeBackgroundProvider></CustomizationScopeProvider>;

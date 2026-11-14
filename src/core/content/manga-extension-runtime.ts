@@ -1,3 +1,4 @@
+import { getAdultMode } from '@/lib/adultMode';
 import { abortableReaderTask } from '@/lib/reader/loading';
 import { discoverReadingBatches } from './reading-discovery';
 import { replaceSourceReports, type ExtensionSourceReport } from '@/core/extensions/remote/diagnostics';
@@ -165,7 +166,8 @@ async function resolveMangaHttpEnv(): Promise<HttpMangaEnv | null> {
 
 async function httpGetJson(url: string, timeoutMs = 20_000, signal?: AbortSignal): Promise<{ status: number; body: any | null }> {
   try {
-    const res = await fetch(url, {
+    const scoped = new URL(url); scoped.searchParams.set('contentMode',getAdultMode());
+    const res = await fetch(scoped, {
       signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs),
       headers: { Accept: "application/json" },
     });
@@ -353,7 +355,8 @@ function mergeFlatRows(
   }
 }
 
-export async function fetchExtensionMangaChapters(params: { anilistId?: number; malId?: number; title?: string; titles?: string[] }): Promise<MangaChaptersPayload> {
+export async function fetchExtensionMangaChapters(params: { anilistId?: number; malId?: number; title?: string; titles?: string[]; contentMode?: 'sfw'|'adult'; sourceIds?: Record<string,string>; tatakaiId?: string }): Promise<MangaChaptersPayload> {
+  params = { ...params, contentMode: getAdultMode() };
   const [native, remote, compatibility, servers] = await discoverReadingBatches('manga:'+JSON.stringify(params), {
     native: () => fetchNativeMangaChapters(params),
     remote: () => remoteMangaChapters(params),
@@ -422,6 +425,7 @@ async function fetchChaptersViaHttp(
         // In-WebView runtime: call the dispatch directly instead of HTTP.
         try {
           body = await mobileHost.mangaChapters(ns.namespace, {
+            ...params, contentMode: getAdultMode(),
             anilistId: params.anilistId,
             malId: params.malId,
             title: params.title,
@@ -432,6 +436,10 @@ async function fetchChaptersViaHttp(
         }
       } else {
         const u = new URL(`${env.baseUrl}/api/v3/${ns.namespace}/manga/chapters`);
+        u.searchParams.set('contentMode',getAdultMode());
+        const sourceContext=params as {sourceIds?:Record<string,string>;tatakaiId?:string};
+        if(sourceContext.sourceIds)u.searchParams.set('sourceIds',JSON.stringify(sourceContext.sourceIds));
+        if(sourceContext.tatakaiId)u.searchParams.set('tatakaiId',sourceContext.tatakaiId);
         if (params.anilistId) u.searchParams.set("anilistId", String(params.anilistId));
         if (params.malId) u.searchParams.set("malId", String(params.malId));
         if (params.title) u.searchParams.set("title", params.title);
@@ -727,6 +735,7 @@ async function fetchPagesViaHttp(
     if (isMobile && mobileHost) {
       try {
         body = await mobileHost.mangaPages(ns.namespace, {
+          contentMode: getAdultMode(),
           chapterKey: params.chapterKey,
           provider: params.extensionId,
           providerChapterId: params.providerChapterId,

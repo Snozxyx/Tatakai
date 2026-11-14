@@ -1,3 +1,4 @@
+import { contentModePath } from './adultMode';
 import { useSyncExternalStore } from 'react';
 import { normalizeSidebarRoute, sidebarQuickPeek, type SidebarOpenMode } from './sidebarLinks';
 
@@ -19,7 +20,7 @@ export interface SidebarShortcut { id: `link:${string}`; name: string; path: str
 export interface SidebarPreferences { version: 1; order: SidebarItemId[]; hidden: SidebarItemId[]; links?: Record<string, SidebarShortcut | null> }
 export interface SidebarRouteItem { id: SidebarItemId; path: string; labelKey?: string; name?: string; mode?: SidebarOpenMode; desktopOnly?: boolean; defaultRail?: boolean }
 export function sidebarItemLabel(item: SidebarRouteItem, translate: (key: string) => string): string { return item.name || translate(item.labelKey || ''); }
-export function getSidebarItem(id: SidebarItemId, preferences: SidebarPreferences | null): SidebarRouteItem | undefined { return SIDEBAR_ITEMS.find(item => item.id === id) || preferences?.links?.[id] || undefined; }
+export function getSidebarItem(id: SidebarItemId, preferences: SidebarPreferences | null): SidebarRouteItem | undefined { const item = SIDEBAR_ITEMS.find(item => item.id === id) || preferences?.links?.[id]; return item ? { ...item, path: contentModePath(item.path) } : undefined; }
 export const DEFAULT_SIDEBAR: SidebarPreferences = {
   version: 1, order: SIDEBAR_ITEMS.map(item => item.id), hidden: SIDEBAR_ITEMS.filter(item => !item.defaultRail).map(item => item.id),
 };
@@ -46,10 +47,11 @@ export function sidebarRailItems(preferences: SidebarPreferences | null, desktop
   return config.order.map(id => getSidebarItem(id, config)).filter((item): item is SidebarRouteItem => !!item && !config.hidden.includes(item.id) && (!item.desktopOnly || desktop));
 }
 export function sidebarOverflowItems(preferences: SidebarPreferences | null, desktop: boolean): SidebarRouteItem[] {
-  if (!preferences) return SIDEBAR_ITEMS.filter(item => !item.defaultRail);
+  if (!preferences) return SIDEBAR_ITEMS.filter(item => !item.defaultRail).map(item=>({...item,path:contentModePath(item.path)}));
   return preferences.order.map(id => getSidebarItem(id, preferences)).filter((item): item is SidebarRouteItem => !!item && preferences.hidden.includes(item.id) && (!item.desktopOnly || desktop));
 }
 export function sidebarItemActive(id: SidebarItemId, pathname: string, preferences: SidebarPreferences | null = null): boolean {
+  pathname = contentModePath(pathname,'sfw');
   if (id === 'manga') return pathname === '/manga' || pathname.startsWith('/manga/');
   if (id === 'novels') return pathname === '/novel' || pathname.startsWith('/novel/');
   if (id === 'sources') return pathname === '/custom-providers' || pathname.startsWith('/x/');

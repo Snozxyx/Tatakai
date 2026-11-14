@@ -11,6 +11,7 @@ import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
  * fetched — the neighbours are warmed on hover.
  */
 import { useState } from 'react';
+import { getAdultMode } from '@/lib/adultMode';
 import { Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
@@ -27,7 +28,11 @@ import { RankedPosterRail } from './RankedPosterRail';
 export function DiscoverHero({ className }: { className?: string }) {
   useUiTranslation();
   const [index, setIndex] = useState(0);
-  const board = RANKED_BOARDS[index];
+  const selectedBoard = RANKED_BOARDS[index];
+  const board = getAdultMode() === 'adult' ? { ...selectedBoard,
+    heading: selectedBoard.id === 'popular' ? 'Popular 18+ titles' : selectedBoard.id === 'seasonal' ? 'Recently updated' : selectedBoard.heading,
+    description: selectedBoard.id === 'popular' ? 'Popular adult anime from the catalog' : selectedBoard.id === 'seasonal' ? 'Adult titles recently updated in the catalog' : selectedBoard.description,
+  } : selectedBoard;
   const { data, isLoading } = useRankedBoard(board.id);
   const prefetch = usePrefetchRankedBoard();
 

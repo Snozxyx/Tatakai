@@ -1,3 +1,4 @@
+import { contentModePath, getAdultMode } from '@/lib/adultMode';
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Search } from 'lucide-react';
@@ -54,7 +55,7 @@ export function GlobalSearch() {
         const term = query.trim();
         if (!term) return;
         remember(term);
-        navigate(`/search?q=${encodeURIComponent(term)}`);
+        navigate(contentModePath(`/search?q=${encodeURIComponent(term)}`));
       }} className="flex items-center gap-3 rounded-lg border border-border px-3 focus-within:ring-2 focus-within:ring-ring">
         <Search className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
         <input ref={input} aria-label="Search anime, manga, and novels" placeholder="Search titles…" value={query}

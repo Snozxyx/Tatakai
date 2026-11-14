@@ -72,6 +72,9 @@ export interface AnimeCard extends MediaCardMetadata {
 }
 
 export interface HomeData {
+  rankingLabels?: { today: string; week: string; month: string };
+  trendingSource?: string;
+  trendingNote?: string;
   genres: string[];
   latestEpisodeAnimes: AnimeCard[];
   spotlightAnimes: SpotlightAnime[];

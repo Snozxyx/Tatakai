@@ -115,6 +115,9 @@ const NoInternetPage = lazy(() => import("../pages/error/NoInternetPage"));
 const StatusPage = lazy(() => import("../pages/error/StatusPage"));
 const MobileOfflinePage = lazy(() => import("../pages/error/MobileOfflinePage"));
 
+const AdultCatalogPage = lazy(() => import('@/pages/adult/AdultCatalogPage'));
+const AdultGalleryPage = lazy(() => import('@/pages/adult/AdultGalleryPage'));
+const AdultTrendingPage = lazy(() => import('@/pages/adult/AdultTrendingPage'));
 const PageLoader = () => (
   <div role="status" aria-label="Loading page" className="min-h-screen bg-background flex items-center justify-center">
     <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
@@ -479,6 +482,24 @@ const AppRoutes = () => {
         <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
         <Route path="/setup" element={<SetupPage />} />
         <Route path="/discord" element={<DiscordPage />} />
+        <Route path="/adult/anime" element={<Index />} />
+        <Route path="/adult/manga" element={<MangaHomePage />} />
+        <Route path="/adult/novel" element={<NovelHomePage />} />
+        <Route path="/adult/search" element={<SearchPage />} />
+        <Route path="/adult/trending" element={<AdultTrendingPage />} />
+        <Route path="/adult/gallery" element={<AdultGalleryPage />} />
+        <Route path="/adult/manga/discover" element={<MangaGenreBrowsePage />} />
+        <Route path="/adult/novel/discover" element={<NovelGenreBrowsePage />} />
+        <Route path="/adult/genre" element={<GenrePage />} />
+        <Route path="/adult/genre/:genre" element={<GenrePage />} />
+        <Route path="/adult/manga/genre/:genre" element={<MangaGenreBrowsePage />} />
+        <Route path="/adult/novel/genre/:genre" element={<NovelGenreBrowsePage />} />
+        <Route path="/adult/watch/:episodeId" element={<WebWatchGate><WatchPage /></WebWatchGate>} />
+        <Route path="/adult/anime/:animeId" element={<AnimePage />} />
+        <Route path="/adult/manga/read/:mangaId" element={<WebWatchGate mode="read"><MangaReaderPage /></WebWatchGate>} />
+        <Route path="/adult/novel/read/:novelId" element={<WebWatchGate mode="read"><NovelReaderPage /></WebWatchGate>} />
+        <Route path="/adult/manga/:mangaId" element={<MangaPage />} />
+        <Route path="/adult/novel/:novelId" element={<NovelPage />} />
         <Route path="/" element={<HomeGate />} />
         <Route path="/welcome" element={<LandingPage />} />
         <Route path="/download" element={<DownloadPage />} />

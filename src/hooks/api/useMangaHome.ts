@@ -24,7 +24,7 @@ export function useMangaHome() {
   const select = useCallback((feed: MangaHomeFeed) => projectReadingHomeTitles(feed, titleLanguage), [titleLanguage]);
 
   const query = useQuery<MangaHomeFeed>({
-    queryKey: ["manga-home", adult],
+    queryKey: ["manga-home", adult, settings.adultCategories],
     queryFn: () => getMangaHome(adult),
     select,
     staleTime: 10 * 60 * 1000,

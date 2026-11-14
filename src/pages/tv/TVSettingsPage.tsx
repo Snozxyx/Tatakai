@@ -1,3 +1,4 @@
+import { NsfwPanel } from '@/components/settings/panels/NsfwPanel';
 import { ThemedCheckbox } from '@/components/ui/themed-checkbox';
 import { ThemedSelect } from '@/components/ui/themed-select';
 import { useState } from "react";
@@ -9,7 +10,7 @@ import { useVideoSettings } from "@/hooks/media/useVideoSettings";
 import { useAuth } from "@/contexts/AuthContext";
 import { getTVDeviceInfo } from "@/core/tv/device";
 import { TVPairingModal } from "./TVPairingModal";
-const PANELS = [['appearance', 'Themes & appearance'], ['playback', 'TV playback'], ['accessibility', 'Remote & accessibility'], ['accounts', 'Accounts & debrid'], ['library', 'Downloads & sources'], ['about', 'About this TV']] as const;
+const PANELS = [['nsfw', 'NSFW Mode'], ['appearance', 'Themes & appearance'], ['playback', 'TV playback'], ['accessibility', 'Remote & accessibility'], ['accounts', 'Accounts & debrid'], ['library', 'Downloads & sources'], ['about', 'About this TV']] as const;
 export default function TVSettingsPage() {
   const [params, setParams] = useSearchParams();
   const selected = PANELS.some(([id]) => id === params.get('panel')) ? params.get('panel') : 'appearance';
@@ -24,6 +25,7 @@ export default function TVSettingsPage() {
     <div className="tv-two-column">
       <nav className="tv-side-menu" aria-label="TV settings categories">{PANELS.map(([id, label]) => <button key={id} data-tv-key={`tv-settings-${id}`} aria-pressed={selected === id} onClick={() => setParams({ panel: id }, { replace: true })}>{label}</button>)}</nav>
       <section className="tv-settings-content" aria-label={PANELS.find(([id]) => id === selected)?.[1]}>
+        {selected === 'nsfw' && <NsfwPanel />}
         {selected === 'appearance' && <TVAppearanceSettings />}
         {selected === 'playback' && <>
           <h2>TV playback</h2><p>Native decoding, remote controls, and settings built for the living room.</p>

@@ -15,6 +15,7 @@ import { peekFromAnime } from "@/components/media/quickPeekStore";
 
 interface TrendingGridProps {
   animes: TrendingAnime[];
+  title?: string;
 }
 
 const SPAN_CLASSES = [
@@ -276,7 +277,7 @@ const TrendingCard = memo(function TrendingCard({ anime, spanClass }: { anime: T
   );
 })
 
-export const TrendingGrid = memo(function TrendingGrid({ animes }: TrendingGridProps) {
+export const TrendingGrid = memo(function TrendingGrid({ animes, title }: TrendingGridProps) {
   useUiTranslation();
   const { t } = useTranslation();
   const displayAnimes = animes.slice(0, 4);
@@ -286,7 +287,7 @@ export const TrendingGrid = memo(function TrendingGrid({ animes }: TrendingGridP
       <div className="flex items-center justify-between mb-5 md:mb-8 px-1 md:px-2">
         <h3 className="font-display text-xl md:text-2xl font-medium tracking-tight flex items-center gap-2">
           <Flame className="w-5 h-5 text-orange" />
-          {t('discover.trendingNow')}
+          {title || t('discover.trendingNow')}
         </h3>
         <Link to="/trending" className="text-sm text-muted-foreground hover:text-foreground transition-colors border-b border-transparent hover:border-foreground pb-0.5">
           {t('discover.viewAll')}

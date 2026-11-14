@@ -1,3 +1,4 @@
+import { getAdultMode } from '@/lib/adultMode';
 import { randomUUID } from '../../../lib/uuid';
 import { EXTENSION_INSTALLED_EVENT } from '../ecosystems';
 import type { WatchExtensionBatch } from '../compatibility/watch-batches';
@@ -51,14 +52,14 @@ export function connectionFor(namespace: string) {
   if (!server) throw Error('This server is disabled or disconnected'); return server;
 }
 export function serverInvoke(namespace: string, sourceId: string, op: string, args: Record<string, unknown>, signal?: AbortSignal) {
-  return serverRequest(connectionFor(namespace), '/invoke', { sourceId, op, args, progressive: ['chapters','novelChapters'].includes(op) }, signal);
+  return serverRequest(connectionFor(namespace), '/invoke', { sourceId, op, args: { ...args, contentMode: getAdultMode() }, progressive: ['chapters','novelChapters'].includes(op) }, signal);
 }
 export async function resolveServerSources(options: Record<string, unknown>, signal?: AbortSignal, progress?: (batch: WatchExtensionBatch) => void): Promise<WatchExtensionBatch> {
   const batches = new Map<string, WatchExtensionBatch>();
   const merged = (): WatchExtensionBatch => ({ sources: [...batches.values()].flatMap(row => row.sources), subtitles: [...batches.values()].flatMap(row => row.subtitles), statuses: [...batches.values()].flatMap(row => row.statuses) });
   await Promise.all(listServers().filter(row => row.enabled).map(async server => {
     try {
-      const response = await fetch(server.url + '/api/server/v1/resolve', { method: 'POST', headers: { authorization: `Bearer ${server.token}`, 'content-type': 'application/json', accept: 'application/x-ndjson' }, body: JSON.stringify(options), signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(30000)]) : AbortSignal.timeout(30000), referrerPolicy: 'no-referrer' });
+      const response = await fetch(server.url + '/api/server/v1/resolve', { method: 'POST', headers: { authorization: `Bearer ${server.token}`, 'content-type': 'application/json', accept: 'application/x-ndjson' }, body: JSON.stringify({ ...options, contentMode: getAdultMode() }), signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(30000)]) : AbortSignal.timeout(30000), referrerPolicy: 'no-referrer' });
       if (!response.ok) throw Error(response.status === 401 ? 'Reconnect this server: access expired or revoked' : `Server unavailable (${response.status})`);
       const reader = response.body!.getReader(), decoder = new TextDecoder(); let pending = '';
       try { while (true) { const { value, done } = await reader.read(); pending += decoder.decode(value, { stream: !done }); if (pending.length > 8 * 1024 * 1024) throw Error('Server response exceeded limit'); const lines = pending.split('\n'); pending = lines.pop()!; for (const line of lines) if (line) {

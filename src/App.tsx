@@ -1,3 +1,4 @@
+import { AdultModeBoundary } from '@/components/content/AdultModeBoundary';
 import { BetaSubscriptionSync } from '@/components/settings/BetaChannelSettings';
 import { AutomationScheduler } from '@/core/download/AutomationScheduler';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -128,12 +129,15 @@ const App = () => {
                 <MobileDeepLinkBridge />
                 <ExtensionConfigurationBridge />
                 <SettingsModalProvider>
+                  <AdultModeBoundary>
+                  <GlobalSearch />
                   <LightboxProvider>
                     <ProfilePresentationProvider><Suspense fallback={<div role="status">Loading Tatakai…</div>}><Layout>
                       <AppRoutes />
                     </Layout></Suspense></ProfilePresentationProvider>
             <ExtensionUpdateSheet />
                   </LightboxProvider>
+                  </AdultModeBoundary>
                 </SettingsModalProvider>
                 </BrandRuntimeProvider>
               </Router>

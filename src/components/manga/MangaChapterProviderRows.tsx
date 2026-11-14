@@ -12,6 +12,8 @@ import { languageLabel } from '@/core/extensions/remote/metadata';
  */
 
 import { cn } from "@/lib/utils";
+import { chapterTitleText } from '@/lib/chapterTitle';
+import type { ReactNode } from 'react';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -56,6 +58,7 @@ export interface MangaChapterProviderRowsProps {
   /** Called when the user clicks a readable sub-row */
   onNavigate: (provider: string, chapterKey: string) => void;
   className?: string;
+  details?: ReactNode;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -71,6 +74,7 @@ export function MangaChapterProviderRows({
   effectivePreferredLanguage,
   onNavigate,
   className,
+  details,
 }: MangaChapterProviderRowsProps) {
   useUiTranslation();
   // Build the chapter header label
@@ -80,9 +84,10 @@ export function MangaChapterProviderRows({
       : chapter.chapterTitle || uiI18n.t('app.chapter_46b00590');
 
   // Show title after the label only when it differs (Req 2.7.1 — header shows number + title)
+  const displayTitle = chapterTitleText(chapter.chapterNumber, chapter.chapterTitle);
   const titleSuffix =
-    chapter.chapterTitle && chapter.chapterTitle !== chapterLabel
-      ? ` — ${chapter.chapterTitle}`
+    displayTitle && displayTitle !== chapterLabel
+      ? ` — ${displayTitle}`
       : "";
 
   // Req 2.7.9 — filter sources by active provider/language preferences
@@ -107,6 +112,7 @@ export function MangaChapterProviderRows({
       </div>
       {chapter.sources.length === 0 && <p className="px-4 py-3 text-sm text-muted-foreground">{uiI18n.t('app.release_listed_on_mangaupdates_no_reading_source_a041b816')}</p>}
 
+      {details}
       {/* Sub-rows — one per filtered source (Req 2.7.1, 2.7.2) */}
       {filteredSources.map((src, idx) => {
         const isReadable = Boolean(src.chapterKey); // Req 2.7.6

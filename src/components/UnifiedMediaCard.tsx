@@ -13,6 +13,8 @@ import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
  */
 import { Star, BookOpen, Film, Play } from "lucide-react";
 import { memo } from "react";
+import { useLocation } from 'react-router-dom';
+import { getAdultMode } from '@/lib/adultMode';
 
 import { MediaCardFrame } from "@/components/MediaCardFrame";
 import { getProxiedImageUrl } from "@/lib/api";
@@ -78,12 +80,13 @@ function mangaFormatLabel(type?: string | null, mediaType = 'manga'): string {
 
 export const UnifiedMediaCard = memo(function UnifiedMediaCard({ item, variant, rank, resumed = false, className = "", topBadges = 'auto', libraryActions = true }: UnifiedMediaCardProps) {
   useUiTranslation();
+  const location = useLocation();
   const isAnime = item.mediaType === 'anime';
   const isManga = item.mediaType === 'manga';
   const isNovel = (item.mediaType as string) === 'novel';
   const isCharacter = item.mediaType === 'character';
   const isAdultItem = Boolean(item.isAdult);
-  const shouldBlurAdult = Boolean(isAdultItem && item.blurAdult);
+  const shouldBlurAdult = Boolean(isAdultItem && item.blurAdult && (getAdultMode() !== 'adult' || /\/(search|discover|genre)(\/|$)/.test(location.pathname)));
   const { score, label } = splitRating(item.rating);
   const { style } = useMediaCardStyle();
   const { design, readOnly } = useCardDesign();

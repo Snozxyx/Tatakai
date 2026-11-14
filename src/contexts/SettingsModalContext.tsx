@@ -15,6 +15,7 @@ export type SettingsCategoryId =
   | 'account'
   | 'saved'
   | 'privacy'
+  | 'nsfw'
   | 'integrations'
   | 'appearance'
   | 'profile-store'
@@ -34,6 +35,8 @@ const DEFAULT_CATEGORY: SettingsCategoryId = 'account';
 /** Legacy `?tab=` values that don't match a category id 1:1. */
 const TAB_ALIASES: Record<string, SettingsCategoryId> = {
   'profile-code': 'profile-store',
+  adult: 'nsfw',
+  'mature-content': 'nsfw',
   desktop: 'app',
   appsettings: 'app',
   mobileapp: 'mobile',
@@ -57,7 +60,7 @@ export function normalizeSettingsCategory(value?: string | null): SettingsCatego
   const key = value.trim().toLowerCase();
   if (key in TAB_ALIASES) return TAB_ALIASES[key];
   const known: SettingsCategoryId[] = [
-    'account', 'saved', 'privacy', 'integrations', 'appearance', 'profile-store',
+    'account', 'saved', 'privacy', 'nsfw', 'integrations', 'appearance', 'profile-store',
     'display', 'translation', 'player', 'reader', 'novel-reader', 'app', 'mobile', 'extensions', 'about', 'changelog',
   ];
   return (known as string[]).includes(key) ? (key as SettingsCategoryId) : DEFAULT_CATEGORY;
@@ -82,7 +85,7 @@ export function SettingsModalProvider({ children }: { children: ReactNode }) {
   const [section, setSection] = useState<string | undefined>(undefined);
 
   const openSettings = useCallback((next?: string, nextSection?: string) => {
-    setCategoryState(normalizeSettingsCategory(next));
+    setCategoryState(next === 'privacy' && nextSection === 'mature-content-controls' ? 'nsfw' : normalizeSettingsCategory(next));
     setSection(next === 'profile-code' ? 'html-css' : nextSection);
     setOpen(true);
   }, []);

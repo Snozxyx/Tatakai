@@ -1,4 +1,5 @@
 import uiI18n from '@/lib/uiI18n';
+import { contentModePath, getAdultMode } from '@/lib/adultMode';
 import { useUiTranslation } from '@/hooks/ui/useUiTranslation';
 import {
   Download,
@@ -10,6 +11,7 @@ import {
   TrendingUp,
   Users,
   BookOpen,
+  Images,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useHaptics } from "@/hooks/ui/useHaptics";
@@ -63,6 +65,7 @@ const HIDDEN_PREFIXES = [
 ];
 
 function isHiddenRoute(pathname: string) {
+  pathname = contentModePath(pathname, 'sfw');
   if (pathname === '/') return false;
   return HIDDEN_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`) || pathname.startsWith(p));
 }
@@ -208,13 +211,15 @@ export function MobileNav() {
     };
   }, []);
 
-  const isActive = (path: string) => location.pathname === path;
+  const navigationPath = location.pathname.replace(/^\/adult(?=\/)/, '').replace(/^\/(anime|browse)$/, '/');
+  const adultMode = getAdultMode() === 'adult';
+  const isActive = (path: string) => navigationPath === path;
 
   // `impact()` already respects the `hapticFeedback` toggle, reduced-motion
   // and the rapid-tap throttle in `@/lib/haptics` — no local config parsing.
   const hapticNavigate = useCallback((path: string) => {
     void impact('light');
-    navigate(path);
+    navigate(contentModePath(path));
   }, [navigate, impact]);
 
   const hapticOpenSettings = useCallback(() => {
@@ -285,7 +290,9 @@ export function MobileNav() {
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <MobileNavButton icon={Plus} label={t('nav.customSources')} active={customActive} onClick={goCustom} />
+        {adultMode
+          ? <MobileNavButton icon={Images} label="Gallery" active={navigationPath === '/gallery'} onClick={() => hapticNavigate('/adult/gallery')} />
+          : <MobileNavButton icon={Plus} label={t('nav.customSources')} active={customActive} onClick={goCustom} />}
 
         <MobileNavButton icon={Users} label={t('migration.social')} active={isActive('/community')} onClick={goSocial} />
 

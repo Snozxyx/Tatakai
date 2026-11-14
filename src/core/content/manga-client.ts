@@ -1,3 +1,7 @@
+import { getAdultMode } from '@/lib/adultMode';
+import { adultApi, type AdultMedia } from '@/lib/adultApi';
+import { adultReadingHomeBundle, readAdultHome } from '@/lib/adultHome';
+import { classifyAdultContent } from '@/lib/adultContentPolicy';
 import { abortableReaderTask } from '@/lib/reader/loading';
 import type {
   MangaChapterResponse,
@@ -354,7 +358,7 @@ export async function searchManga(
       popularity: media?.popularity ?? null,
       providersAvailable: [],
       matchConfidence: 1,
-      adult: Boolean(media?.isAdult),
+      adult: classifyAdultContent(media) !== null,
       chapters: media?.chapters ?? null,
       volumes: media?.volumes ?? null,
       originLanguage: media?.countryOfOrigin ?? null,
@@ -391,6 +395,16 @@ export async function getMangaDetail(id: string): Promise<MangaDetailResponse> {
       status: series.status || 'unknown', format: String(series.type || 'manga').toLowerCase(), genres,
       isAdult: genres.some((value: string) => /^(adult|hentai|smut)$/i.test(value)),
       authors: (series.authors || []).map((value: any) => value.name).filter(Boolean), source_api: 'mangaupdates' };
+  } else if (/^pornhwadb:\d+$/.test(normalizedId) || (getAdultMode() === 'adult' && /^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i.test(normalizedId))) {
+    const canonical = await adultApi<AdultMedia>('media/' + encodeURIComponent(normalizedId));
+    if (canonical.mediaType !== 'manga') throw new Error('This catalog title is not manga');
+    const rich = canonical.anilistId
+      ? await apiGet<any>('/api/v3/manga/by-anilist/' + canonical.anilistId, undefined, undefined, 10000).catch(() => null)
+      : null;
+    const metadata = rich?.media ?? rich;
+    row = { ...canonical, ...metadata, tatakaiId: canonical.tatakaiId,
+      sourceIds: { ...metadata?.sourceIds, ...canonical.sourceIds, ...(/^pornhwadb:\d+$/.test(normalizedId) ? { pornhwadb: normalizedId.slice(10) } : {}) },
+      isAdult: canonical.isAdult ?? canonical.adultCategory === 'explicit', adultCategory: canonical.adultCategory };
   } else if (normalizedId.startsWith("anilist:")) {
     const aniId = normalizedId.replace("anilist:", "");
     row = await apiGet<any>(`/api/v3/manga/by-anilist/${aniId}`);
@@ -430,7 +444,7 @@ export async function getMangaDetail(id: string): Promise<MangaDetailResponse> {
       format: media?.format || media?.type || null,
       origin: media?.countryOfOrigin || null,
       originLanguage: media?.countryOfOrigin || null,
-      adult: Boolean(media?.isAdult),
+      adult: classifyAdultContent(media) !== null,
       yearStart: media?.startDate?.year ?? null,
       yearEnd: media?.endDate?.year ?? null,
       score: media?.averageScore ?? null,
@@ -449,12 +463,13 @@ export async function getMangaDetail(id: string): Promise<MangaDetailResponse> {
       languagesAvailable: [],
       providerCoverage: { available: [], failed: [] },
       matchConfidence: 1,
-      matchedBy: normalizedId.startsWith("mangaupdates:") ? "mangaupdates" : "anilist",
+      matchedBy: normalizedId.startsWith("mangaupdates:") ? "mangaupdates" : media?.anilistId ? "anilist" : "provider",
       characters: media?.characters || [],
       staff: media?.staff || [],
       relations: media?.relations || [],
       externalLinks: media?.externalLinks || [],
       // Provenance + raw columns for the admin editor and "in DB" badge.
+      sourceIds: media?.sourceIds,
       tatakaiId: media?.tatakaiId ?? null,
       sourceApi: media?.source_api ?? null,
       inDb: media?.source_api === "tatakai" || Boolean(media?.tatakaiId),
@@ -927,6 +942,8 @@ export type MangaHomeFeed = {
 } & {
   genres: string[];
   fetchedAt: number;
+  trendingSource?: string;
+  trendingNote?: string;
 };
 
 /** One shelf of the endless feed, with the icon still a lucide *name*. */
@@ -952,7 +969,7 @@ const EMPTY_HOME_FEED: MangaHomeFeed = {
  * rather than a flag on the shared one.
  */
 export async function getMangaHome(adult = false): Promise<MangaHomeFeed> {
-  const bundle = await apiGet<MangaHomeBundle>("/api/v3/manga/home", {
+  const bundle = getAdultMode() === 'adult' ? adultReadingHomeBundle(await readAdultHome('manga')) as unknown as MangaHomeBundle : await apiGet<MangaHomeBundle>("/api/v3/manga/home", {
     adult: adult ? 1 : undefined,
   });
   if (!bundle || typeof bundle !== "object") return EMPTY_HOME_FEED;
@@ -969,6 +986,8 @@ export async function getMangaHome(adult = false): Promise<MangaHomeFeed> {
     adultPopular: mapLane(bundle.adultPopular),
     genres: Array.isArray(bundle.genres) ? bundle.genres : [],
     fetchedAt: bundle.fetchedAt ?? Date.now(),
+    trendingSource: (bundle as any).trendingSource,
+    trendingNote: (bundle as any).trendingNote,
   };
 }
 
