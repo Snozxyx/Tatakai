@@ -7,6 +7,11 @@ const jwt = role => 'eyJhbGciOiJIUzI1NiJ9.' + Buffer.from(JSON.stringify({ role,
 const root = new URL('../', import.meta.url).pathname.replace(/^\/([A-Z]:)/, '$1');
 const good = () => contributorEnvironment(root, { VITE_SUPABASE_ANON_KEY: jwt('anon') });
 
+test('the committed public template contains a valid development anon key', () => {
+  const env = contributorEnvironment(root);
+  assert.equal(env.VITE_SUPABASE_URL, 'https://dev.tatakai.app');
+});
+
 test('contributor environment resolves only development DB and local API', () => {
   const env = good();
   assert.equal(env.VITE_SUPABASE_URL, 'https://dev.tatakai.app');
